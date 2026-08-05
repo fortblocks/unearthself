@@ -1,0 +1,15 @@
+{
+  "name": "unearthself",
+  "version": "1.0.0",
+  "description": "Unearthself - A modality for becoming more fully yourself in the world",
+  "scripts": {
+    "build": "echo 'Static site - no build required'",
+    "dev": "echo 'Use a local server to develop'"
+  },
+  "keywords": ["unearthself", "wellness", "retreats"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1"
+  }
+}
