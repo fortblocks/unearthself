@@ -47,12 +47,13 @@ p { max-width: 65ch; }
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
   padding: 1.1rem var(--space-md);
-  background: rgba(248, 240, 237, 0.88);
-  backdrop-filter: blur(12px);
+  background: rgba(248, 240, 237, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   transition: background var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 .nav.scrolled {
-  background: rgba(248, 240, 237, 0.96);
+  background: rgba(248, 240, 237, 0.72);
   box-shadow: 0 1px 0 rgba(22,23,24,0.06);
 }
 .nav__logo {
