@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Badlands Bootcamp — Unearthself</title>
+  <meta name="description" content="Corporate and group experiential programmes in the Canadian Badlands. Getaway days, trail quests, mountain biking, and modality-aligned programmes for teams." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .page-hero { min-height: 70vh; display:flex; align-items:flex-end; position:relative; color:#fff; padding: 0 0 4rem; background: #423530; }
+    .page-hero__bg { position:absolute; inset:0; background: linear-gradient(to top, rgba(22,23,24,.75), rgba(40,18,6,.35)), url('https://raw.githubusercontent.com/fortblocks/unearthself/main/assets:images:exp-hoodoos.jpg') center/cover no-repeat; }
+    .page-hero .container { position:relative; z-index:1; }
+    .page-hero h1 { font-size: clamp(2.5rem, 6.5vw, 4.5rem); letter-spacing: .05em; text-transform: uppercase; margin-bottom: .75rem; }
+    .page-hero .lead { color: rgba(248,240,237,.9); max-width: 38ch; margin-bottom: 1.5rem; }
+    .eyebrow { font-size: .8rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--sandstone); margin-bottom: .75rem; }
+    .content-section { padding: 5rem 0; }
+    .content-section.alt { background: var(--coal); color: var(--fossil); }
+    .content-section.alt .lead { color: rgba(248,240,237,.75); }
+    .package-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 2.5rem; }
+    .package { background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 20px rgba(22,23,24,.06); display: flex; flex-direction: column; }
+    .package__body { padding: 1.75rem 1.5rem; flex: 1; display: flex; flex-direction: column; }
+    .package h3 { font-size: 1.4rem; margin-bottom: .4rem; color: var(--coal); }
+    .package p { font-size: .95rem; color: var(--shale); margin-bottom: 1rem; flex: 1; }
+    .package .meta { font-size: .8rem; font-weight: 600; color: var(--ember); letter-spacing: .04em; margin-bottom: .5rem; }
+    .package ul { margin: 0 0 1.25rem; padding-left: 1.1rem; font-size: .9rem; color: var(--shale); }
+    .package ul li { margin-bottom: .3rem; }
+    .activity-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-top: 2rem; }
+    .activity { border: 1px solid rgba(66,53,48,.12); border-radius: 4px; padding: 1.25rem; }
+    .activity h4 { font-size: 1.05rem; margin-bottom: .35rem; }
+    .activity p { font-size: .9rem; color: var(--shale); margin: 0; }
+    .builder-cta { background: rgba(248,240,237,.04); border: 1px solid rgba(248,240,237,.12); border-radius: 4px; padding: 2.5rem 2rem; text-align: center; margin-top: 3rem; }
+    .builder-cta h3 { color: var(--fossil); margin-bottom: .75rem; }
+    .builder-cta p { color: rgba(248,240,237,.75); max-width: 42ch; margin: 0 auto 1.5rem; }
+    @media (max-width: 900px) { .package-grid, .activity-list { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="nav" id="nav">
+    <a href="/" class="nav__logo">
+      <img src="/assets/logo.svg" alt="" width="28" height="28" class="nav__mark" />
+      Unearthself
+    </a>
+    <nav class="nav__links">
+      <a href="/the-work">The Work</a>
+      <a href="/#experiences">Experiences</a>
+      <a href="/community">Community</a>
+      <a href="/shop">Shop</a>
+      <a href="/journal">Journal</a>
+      <a href="/about">About</a>
+      <a href="/bootcamp#packages" class="nav__cta">Book</a>
+    </nav>
+  </header>
+
+  <section class="page-hero">
+    <div class="page-hero__bg" aria-hidden="true"></div>
+    <div class="container">
+      <p class="eyebrow">Experiences · Corporate & Groups</p>
+      <h1>Badlands Bootcamp</h1>
+      <p class="lead">Experiential programmes for teams and organisations in the Canadian Badlands. From high-energy getaway days to deeper, modality-aligned work that stays with people long after they leave.</p>
+      <a href="#packages" class="hero__cta">View packages</a>
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="container">
+      <div style="max-width: 48ch;">
+        <p class="eyebrow">Why here</p>
+        <h2>The land does half the work</h2>
+        <p class="lead" style="margin:1rem 0 1.25rem;">Drumheller’s hoodoos, coulees and open sky create a natural container. People arrive differently when the landscape is this honest. We use that — for challenge, for reflection, and for shared experience that builds real trust.</p>
+        <p>Badlands Bootcamp sits inside the wider Unearthself ecosystem. Some programmes stay light and energetic. Others draw directly on the Echo System and Human Adaptation Model so the insights become usable back at work.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section alt" id="packages">
+    <div class="container">
+      <div style="text-align:center; max-width:42ch; margin:0 auto;">
+        <p class="eyebrow" style="color:var(--sandstone);">Packages</p>
+        <h2>Choose your intensity</h2>
+        <p class="lead">Four starting points. Every programme can be tailored for size, duration and the outcomes that matter to you.</p>
+      </div>
+      <div class="package-grid">
+        <article class="package">
+          <div class="package__body">
+            <p class="meta">Half-day or full-day · 8–40 people</p>
+            <h3>Getaway Day</h3>
+            <p>A sharp, well-designed day out of the office. Movement, shared challenge, and a clean close so people leave energised rather than drained.</p>
+            <ul><li>Guided Badlands orientation</li><li>Team challenge or trail segment</li><li>Facilitated debrief</li><li>Optional lunch or evening meal</li></ul>
+            <a href="#enquire" class="btn btn--primary" style="background:var(--ember);color:#fff; align-self:flex-start;">Request dates</a>
+          </div>
+        </article>
+        <article class="package">
+          <div class="package__body">
+            <p class="meta">Full day · 8–30 people</p>
+            <h3>Trail Quest</h3>
+            <p>A land-based game and enquiry that weaves physical movement with the language of the Echo System. Teams navigate, decide, and reflect in real time.</p>
+            <ul><li>Multi-stage quest across the landscape</li><li>Adaptive decision points</li><li>Echo-informed debrief</li><li>Clear takeaways for the workplace</li></ul>
+            <a href="#enquire" class="btn btn--primary" style="background:var(--ember);color:#fff; align-self:flex-start;">Request dates</a>
+          </div>
+        </article>
+        <article class="package">
+          <div class="package__body">
+            <p class="meta">Full day or 2 days · 6–24 people</p>
+            <h3>Badlands Ride & Reflect</h3>
+            <p>Mountain biking or e-bike routes through the Drumheller valley paired with structured reflection. For teams that want movement and meaning in the same day.</p>
+            <ul><li>Guided ride options (ability-matched)</li><li>Scenic stops at key formations</li><li>Short practice sessions on the land</li><li>Closing circle and integration</li></ul>
+            <a href="#enquire" class="btn btn--primary" style="background:var(--ember);color:#fff; align-self:flex-start;">Request dates</a>
+          </div>
+        </article>
+        <article class="package">
+          <div class="package__body">
+            <p class="meta">2–3 days · 8–20 people</p>
+            <h3>Adaptation Lab</h3>
+            <p>The deeper programme. Direct work with the Human Adaptation Model and Echo System, held in the Badlands so the insights land in the body as well as the mind.</p>
+            <ul><li>Modality facilitation by trained practitioners</li><li>Land-based practices and challenges</li><li>Individual and group mapping</li><li>Integration plan for return to work</li></ul>
+            <a href="#enquire" class="btn btn--primary" style="background:var(--ember);color:#fff; align-self:flex-start;">Request dates</a>
+          </div>
+        </article>
+      </div>
+      <div class="builder-cta">
+        <h3>Need something more specific?</h3>
+        <p>We can shape a custom programme — mixing activities, facilitation depth, and duration. The retreat builder approach lets us design around your team’s actual needs rather than forcing a fixed template.</p>
+        <a href="#enquire" class="btn btn--ghost" style="border-color:rgba(248,240,237,.45);">Talk about a custom build</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="container">
+      <p class="eyebrow">On the ground</p>
+      <h2>Activities rooted in Drumheller</h2>
+      <p class="lead" style="margin:1rem 0 0; max-width:48ch;">We work with the real landscape and the real town — not a generic team-building backdrop.</p>
+      <div class="activity-list">
+        <div class="activity"><h4>Hoodoos & coulees</h4><p>Short hikes and orientation walks among the signature formations. Perfect for opening a day or creating shared reference points.</p></div>
+        <div class="activity"><h4>Valley cycling</h4><p>Road and trail options through the Badlands and along the Red Deer River. E-bikes available so mixed-ability groups can ride together.</p></div>
+        <div class="activity"><h4>Trail Quest games</h4><p>Designed challenges that require navigation, collaboration and real-time decision-making — then a structured look at the patterns that showed up.</p></div>
+        <div class="activity"><h4>Venue & retail hub</h4><p>Our Drumheller base includes gathering space, a small retail area with Badlands Bootcamp kit, and room for briefings and debriefs.</p></div>
+        <div class="activity"><h4>Local partnerships</h4><p>We can layer in Royal Tyrrell Museum visits, Atlas Coal Mine, or other regional experiences when they serve the programme.</p></div>
+        <div class="activity"><h4>Evening containers</h4><p>Simple, well-held evenings — food, conversation, optional light practice — so the day has a clear arc.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section alt" id="enquire">
+    <div class="container" style="text-align:center; max-width:520px; margin:0 auto;">
+      <p class="eyebrow" style="color:var(--sandstone);">Next step</p>
+      <h2>Enquire about a programme</h2>
+      <p class="lead" style="margin:1rem auto 2rem;">Share your team size, preferred dates and what you’re hoping the day or multi-day will achieve. We’ll come back with options and a clear proposal.</p>
+      <form style="text-align:left; display:grid; gap:1rem;" onsubmit="event.preventDefault(); alert('Enquiry received — we will respond by email.');">
+        <div>
+          <label style="display:block; font-size:.85rem; font-weight:600; margin-bottom:.35rem; color:rgba(248,240,237,.85);">Name & organisation</label>
+          <input type="text" required style="width:100%; padding:.75rem 1rem; border:1px solid rgba(248,240,237,.2); border-radius:2px; background:rgba(0,0,0,.25); color:#fff;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:.85rem; font-weight:600; margin-bottom:.35rem; color:rgba(248,240,237,.85);">Email</label>
+          <input type="email" required style="width:100%; padding:.75rem 1rem; border:1px solid rgba(248,240,237,.2); border-radius:2px; background:rgba(0,0,0,.25); color:#fff;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:.85rem; font-weight:600; margin-bottom:.35rem; color:rgba(248,240,237,.85);">Package interest</label>
+          <select style="width:100%; padding:.75rem 1rem; border:1px solid rgba(248,240,237,.2); border-radius:2px; background:rgba(0,0,0,.25); color:#fff;">
+            <option>Getaway Day</option>
+            <option>Trail Quest</option>
+            <option>Badlands Ride & Reflect</option>
+            <option>Adaptation Lab</option>
+            <option>Custom / not sure yet</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:.85rem; font-weight:600; margin-bottom:.35rem; color:rgba(248,240,237,.85);">Team size, dates & notes</label>
+          <textarea rows="4" style="width:100%; padding:.75rem 1rem; border:1px solid rgba(248,240,237,.2); border-radius:2px; background:rgba(0,0,0,.25); color:#fff; resize:vertical;"></textarea>
+        </div>
+        <button type="submit" class="btn btn--primary" style="justify-content:center; margin-top:.5rem;">Send enquiry</button>
+      </form>
+      <p style="font-size:.85rem; color:rgba(248,240,237,.65); margin-top:1rem;">Or email: <a href="mailto:hello@unearthself.xyz" style="color:var(--sandstone);">hello@unearthself.xyz</a></p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__grid">
+        <div>
+          <div class="footer__brand">
+            <img src="/assets/logo.svg" alt="" width="22" height="22" style="display:inline-block;vertical-align:middle;margin-right:0.5rem;filter:brightness(0) invert(1);opacity:0.9" />
+            Unearthself
+          </div>
+          <p>The holding philosophy, modality and ecosystem for deeper adaptation and presence.</p>
+        </div>
+        <div><h4>Explore</h4><ul><li><a href="/the-work">The Work</a></li><li><a href="/basecamp">Basecamp</a></li><li><a href="/bootcamp">Badlands Bootcamp</a></li><li><a href="/haven">Haven</a></li></ul></div>
+        <div><h4>Experiences</h4><ul><li><a href="/basecamp">Basecamp</a></li><li><a href="/bootcamp">Badlands Bootcamp</a></li><li><a href="/haven">Haven</a></li></ul></div>
+        <div><h4>Connect</h4><ul><li><a href="/about">About</a></li><li><a href="/shop">Shop</a></li><li><a href="mailto:hello@unearthself.xyz">hello@unearthself.xyz</a></li></ul></div>
+      </div>
+      <div class="footer__bottom"><span>© 2026 Unearthself</span><span>Built with presence</span></div>
+    </div>
+  </footer>
+  <script src="/js/main.js"></script>
+</body>
+</html>
