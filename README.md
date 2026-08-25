@@ -1,29 +1,26 @@
 # Unearthself
 
-Primary digital home for **Unearthself** — the holding philosophy, modality and ecosystem that contains:
-
-- The Echo System + Human Adaptation Model (HAM)
-- Basecamp (wellness retreat centre)
-- Badlands Bootcamp (corporate & group experiential programmes)
-- Haven (small hotel / hospitality layer)
+Primary digital home for **Unearthself** — the holding philosophy, modality and ecosystem for the Echo System, Human Adaptation Model, Basecamp, Badlands Bootcamp and Haven.
 
 ## Live site
 
-Domain: [unearthself.xyz](https://unearthself.xyz)
+[unearthself.xyz](https://unearthself.xyz)
 
 ## Stack
 
-- Static HTML / CSS / JS (clean, fast, accessible)
-- Brand system from Badlands Bootcamp (palette, Morganite/Aktiv direction, geometric runes)
-- Hosted on Vercel
+- TanStack Start + React 19 + Tailwind v4
+- Retreat Builder (drag-and-drop 2–5 day planner, samples, PDF, share URL, quote enquiry)
+- Brand system from Badlands Bootcamp (Coal / Shale / Sandstone / Ember / Fossil, Oswald)
 
 ## Local development
 
 ```bash
-cd unearthself
-python3 -m http.server 8080
+npm install
+npm run dev
 ```
 
-## Roadmap
+## Production
 
-See the project brief and ongoing conversation for Content / Commerce / Community pillars and booking integration.
+Vercel Git deploy from `main`. Build: `npm run build` (Nitro `vercel` preset).
+
+The previous static HTML site is archived on branch `archive/static-html-2026-08`.
