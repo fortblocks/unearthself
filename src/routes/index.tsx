@@ -113,7 +113,7 @@ function Home() {
               href="/haven"
               img="/images/exp-rolling.jpg"
               title="Haven"
-              body="Short stays & hospitality. A softer layer of the same philosophy and place."
+              body="Four rooms in downtown Drumheller. Short stays, kitchens, fireplaces — a quieter doorway into the land."
               cta="Explore Haven →"
             />
           </div>

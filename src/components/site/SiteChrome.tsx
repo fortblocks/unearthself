@@ -12,6 +12,7 @@ const links = [
 
 export function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const onHaven = pathname.startsWith("/haven");
 
   return (
     <div className="min-h-screen bg-fossil text-coal">
@@ -25,26 +26,44 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <Link
               key={l.to}
               to={l.to}
-              className={`text-[0.9rem] font-medium transition-colors ${
-                pathname === l.to ? "text-coal" : "text-shale hover:text-coal"
+              className={`text-[0.9rem] font-semibold transition-colors ${
+                pathname === l.to || (l.to === "/bootcamp" && onHaven) ? "text-coal" : "text-shale hover:text-coal"
               }`}
             >
               {l.label}
             </Link>
           ))}
+          {onHaven ? (
+            <a
+              href="#stay"
+              className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft"
+            >
+              Book
+            </a>
+          ) : (
+            <Link
+              to="/builder"
+              className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft"
+            >
+              Book
+            </Link>
+          )}
+        </nav>
+        {onHaven ? (
+          <a
+            href="#stay"
+            className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft md:hidden"
+          >
+            Book
+          </a>
+        ) : (
           <Link
             to="/builder"
-            className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft"
+            className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft md:hidden"
           >
             Book
           </Link>
-        </nav>
-        <Link
-          to="/builder"
-          className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft md:hidden"
-        >
-          Book
-        </Link>
+        )}
       </header>
 
       <main className="pt-0">{children}</main>
