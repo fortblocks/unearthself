@@ -13,6 +13,11 @@ const links = [
 export function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onHaven = pathname.startsWith("/haven");
+  const onD14 = pathname.startsWith("/d14");
+
+  if (onD14) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-fossil text-coal">
