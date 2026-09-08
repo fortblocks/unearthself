@@ -3,7 +3,7 @@
 **Repo:** [fortblocks/unearthself](https://github.com/fortblocks/unearthself)  
 **Path in repo:** `docs/operating-system/`  
 **Status:** Canonical operating library as of 8 September 2026  
-**Steward:** Christopher Mair (CEO thread)
+**Steward:** four partners. This thread is Christopher’s systems chat, not a title.
 
 This folder is the company operating system. Conversation history is not a source of truth. The 1,248-page Master Index is an archive.
 
@@ -21,24 +21,19 @@ The website in this repository (`src/`) is the public test site. These files do 
 ## Pull locally
 
 ```bash
-git clone git@github.com:fortblocks/unearthself.git
-cd unearthself
+cd ~/unearthself
 git pull origin main
 open docs/operating-system/00_README.md
 ```
 
-If you already have the repo:
-
-```bash
-git pull origin main
-```
-
 ## Team pack (Word + Excel)
 
-Shareable review files (Word + Excel) sit in the Grok project artifacts. Markdown here is the canonical text.
+Shareable review files live in the project artifacts folder, not in git:
 
-- `18_MASTER_ROADMAP.md`
-- `16_CHAT_SPAWN_PROMPTS.md`
+- `Unearth_Self_Partner_Operating_System_Sep2026.docx`
+- `Unearth_Self_Master_Roadmap_Sep2026.xlsx`
+
+The roadmap and spawn prompts also exist here as markdown (`18_MASTER_ROADMAP.md`, `16_CHAT_SPAWN_PROMPTS.md`).
 
 ## Rule
 
