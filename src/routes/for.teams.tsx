@@ -17,28 +17,33 @@ export const Route = createFileRoute("/for/teams")({
 function TeamsLander() {
   return (
     <main className="bg-coal text-fossil">
-      <section className="relative flex min-h-[88vh] items-end overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,0.94) 0%, rgba(22,23,24,0.35) 48%), url('/images/exp-hoodoos.jpg')",
-          }}
+      <section className="relative h-[100dvh] overflow-hidden">
+        <img
+          src="/images/exp-hoodoos.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
+        <a
+          href="#why"
+          aria-label="Continue"
+          className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center text-fossil/90"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <path d="M6 8l6 6 6-6" />
+            <path d="M6 13l6 6 6-6" />
+          </svg>
+        </a>
+      </section>
+
+      <section id="why" className="px-6 py-24">
+        <div className="mx-auto max-w-3xl">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
             Drumheller, Alberta - ninety minutes from Calgary
           </p>
-          <h1 className="font-display mb-6 text-[clamp(2.6rem,7.5vw,5.6rem)] leading-[0.9] uppercase">
-            Take the team
-            <br />
-            somewhere the
-            <br />
-            job title won't
-            <br />
-            follow.
+          <h1 className="font-display mb-6 text-[clamp(2.6rem,7vw,5rem)] leading-[0.9] uppercase">
+            Take the team somewhere the job title won't follow.
           </h1>
-          <p className="mb-8 max-w-[42ch] text-lg text-fossil/88">
+          <p className="mb-8 max-w-[46ch] text-lg text-fossil/85">
             Badlands Bootcamp is three days in the Canadian Badlands: hard ground, shared work, and the
             kind of conversation that does not survive a hotel ballroom.
           </p>
@@ -51,7 +56,7 @@ function TeamsLander() {
         </div>
       </section>
 
-      <section className="px-6 py-20">
+      <section className="border-t border-fossil/10 px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Why go</p>
           <h2 className="font-display mb-6 text-[clamp(2rem,4vw,3.2rem)] uppercase">
