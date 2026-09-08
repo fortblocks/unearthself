@@ -22,11 +22,14 @@ export const Route = createRootRoute({
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://use.typekit.net" },
+      { rel: "preconnect", href: "https://p.typekit.net" },
+      { rel: "stylesheet", href: "https://use.typekit.net/xhi4bsq.css" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&display=swap",
       },
     ],
   }),
