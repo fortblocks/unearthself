@@ -46,14 +46,14 @@ function TeamsLander() {
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Drumheller \u00b7 Canadian Badlands \u00b7 Teams from Calgary & Edmonton
+            Drumheller \u00b7 Canadian Badlands \u00b7 Teams from Calgary and Edmonton
           </p>
           <h1 className="font-display mb-6 text-[clamp(2.8rem,8vw,6rem)] leading-[0.9] uppercase">
             The land
             <br />
             does the work
             <br />
-            a ballroom can\u2019t.
+            a ballroom can't.
           </h1>
           <p className="mb-8 max-w-[40ch] text-lg text-fossil/88">
             Badlands Bootcamp is a three-day PACE expedition. Hoodoos, wind, silence, and a method that
@@ -88,7 +88,7 @@ function TeamsLander() {
             <h2 className="font-display mb-4 text-4xl uppercase">Not a ropes course with a slide deck.</h2>
             <p className="mb-4 text-fossil/75">
               PACE is the path: Play, Adaptability, Connection, Experience. Each day has a Rune, a
-              challenge, and an Echo Mirror \u2014 a short, structured noticing of what just happened. It is
+              challenge, and an Echo Mirror. A short, structured noticing of what just happened. It is
               not therapy. We notice. We do not excavate.
             </p>
             <p className="text-fossil/75">
@@ -119,7 +119,7 @@ function TeamsLander() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Who this is for</p>
           <h2 className="font-display mb-6 text-4xl uppercase">HR and ops leads who are tired of the offsite that changes nothing.</h2>
           <ul className="grid max-w-3xl gap-3 text-fossil/75">
-            <li>Leadership groups of 8\u201316 who need friction, not a tasting menu.</li>
+            <li>Leadership groups of 8 to 16 who need friction, not a tasting menu.</li>
             <li>Teams that collaborate on paper and stall in the room.</li>
             <li>People who can travel from Calgary or Edmonton on a Thursday and be on the land by lunch.</li>
           </ul>
@@ -134,7 +134,7 @@ function TeamsLander() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">Working offer</p>
-            <h2 className="font-display text-4xl uppercase">8\u201316 people \u00b7 3 days</h2>
+            <h2 className="font-display text-4xl uppercase">8 to 16 people. 3 days.</h2>
             <p className="mt-3 max-w-[46ch] text-coal/70">
               Price sits with the partners until it is signed. Hold the date. Tess and Christopher read
               every request.
