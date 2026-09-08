@@ -1,10 +1,10 @@
 # Chat Spawn Prompts
 
 **Code:** CHATS  
-**Steward:** CEO thread  
+**Steward:** Chief of Staff thread  
 **Rule:** Copy the block that matches the job. Do not invent a new workstream in a specialist chat.
 
-Paste the prompt into a **new Grok conversation**. Point the chat at `docs/operating-system/`. Conversation history is not canon.
+Paste the prompt into a **new Grok conversation**. Point the chat at `docs/operating-system/`. Conversation history is not canon. Connect Google Drive in that thread to read the working model.
 
 ---
 
@@ -23,6 +23,7 @@ Read first, in this order:
 
 Rules:
 - UK English. Confident, precise, slightly dry. No guru copy.
+- Four partners, no CEO. CoS keeps files current. Do not invent titles.
 - Colour lock: Coal #161718, Fossil #F8F0ED, Ember #F2684C, Shale #423530, Sandstone #C99A4A.
 - PACE = Play, Adaptability, Connection, Existence. Fourth Rune is Existence unless D02 is formally closed otherwise.
 - Self-awareness is an Echo capacity, not a Rune.
@@ -35,50 +36,48 @@ Rules:
 
 ---
 
-## WEB-01 — Website design routes and v1 frames
+## FIN-01 — Working model steward
 
-**Assign:** `08_WS_WEBSITE.md`  
-**Output:** three design routes + low-fi frames, not a rebuild.
+**Assign:** `23_FINANCIAL_MODEL.md` + `14_WS_COMMERCIAL.md` + `20_CATALOGUE_PLACE.md` + `21_CATALOGUE_SPA.md`  
+**Sheet:** https://docs.google.com/spreadsheets/d/1ZHaqjGSggm-9Z4jY2SwWlW2K86f69gQW-vhQitLF0rI/edit  
+**Owner of numbers:** Norah. You may not publish a price or close D01.
 
 ```
 [PASTE UNIVERSAL PREAMBLE]
 
-Workstream: WEB. File: 08_WS_WEBSITE.md.
+Workstream: FIN. Files: 23_FINANCIAL_MODEL.md, 14_WS_COMMERCIAL.md.
+Live calculator: Google Sheet “Unearth Self — Working Model (filled)”
+ID 1ZHaqjGSggm-9Z4jY2SwWlW2K86f69gQW-vhQitLF0rI
 
-Job: Produce three design routes (Seam / Specimen / Basecamp) using the locked tokens, then recommend a hybrid as already sketched in the workstream file. Deliver low-fidelity frames for:
-- Home
-- Bootcamp package
-- Haven suite
-- Spa menu
-- Retreat builder / enquiry
-- Checkout / request confirmation
+Job:
+1. Read the four tabs (Assumptions, Haven BAR, Spa menu, Monthly P&L).
+2. Flag conflicts with 20 / 21 / the November open date.
+3. When Norah changes a yellow cell, re-read and write a dated line in 23.
+4. Propose cell changes in chat first. Do not invent a second model.
+5. v.2 forecast is archive. Do not edit it.
 
-Constraints:
-- Booking is a first-class object.
-- Philosophy does not sit in front of commerce.
-- Runes are orientation devices, not wallpaper.
-- Propose component inventory (buttons, cards, rune chip, suite card, treatment row).
-- Do not choose a new typeface. Morganite + Aktiv Grotesk.
-- Do not invent prices (D01 open).
-- Live site unearthself.xyz is a test. Treat it as content inventory, not visual direction.
-
-Return a written spec a designer or a subsequent build chat can execute.
+Hard limits: no guest-facing copy, no public prices, no closing D01, no 8k BD seat unless a partner hires it.
+Connect Google Drive in this thread to read the sheet.
 ```
+
+---
+
+## WEB-01 — Website design routes and v1 frames
+
+**Assign:** `08_WS_WEBSITE.md`  
+Already merged. Do not respawn.
 
 ---
 
 ## WEB-02 — Website information architecture and build brief
 
-**Assign:** `08_WS_WEBSITE.md` + `10_WS_TECH_ARCHITECTURE.md`
+**Assign:** `08_WS_WEBSITE.md` + `10_WS_TECH_ARCHITECTURE.md` + `24_SITEMAP.md`
 
 ```
 [PASTE UNIVERSAL PREAMBLE]
 
 Workstream: WEB + TECH.
-
-Job: Turn the v1 IA into a build brief: page list, CMS fields, booking embeds, form to CRM events, legal pages, analytics, redirects from the test site, and a 3-week build sequence.
-
-Stack preference is in 10. Do not invent a monolith PMS. Recommend vendors against D03 without closing it.
+Job: Turn 24_SITEMAP.md into a 3-week build sequence. Booking embeds after D03. No monolith PMS.
 ```
 
 ---
@@ -91,170 +90,35 @@ Stack preference is in 10. Do not invent a monolith PMS. Recommend vendors again
 [PASTE UNIVERSAL PREAMBLE]
 
 Workstream: SALES.
-
 Job:
 1. Write a one-page corporate brief a Calgary HR lead can forward internally.
-2. Draft the enquiry form fields.
-3. Draft Concierge bot FAQ (20 questions).
-4. Propose an 80-account Calgary / Edmonton target list structure (industries, titles, why they fit). Do not fabricate specific company contacts as if they are confirmed.
-
-Outcomes we sell: self-awareness under pressure; connection beyond workplace roles; adaptive collaboration and grounded decision-making.
-Do not promise HAM as a finished methodology. Do not invent prices.
-```
-
----
-
-## SALES-02 — Grok Bot playbooks
-
-**Assign:** `12_WS_AUTOMATION.md` + `07_WS_SALES_MARKETING.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: AUTO + SALES.
-
-Job: Write operating playbooks for Concierge, Corporate AE, Stay & Spa, Follow-up, Morning Brief, Friday Digest, Scribe.
-
-For each bot: trigger, allowed tools, tone card, hard limits, escalation path, sample replies (enquiry / objection / no-budget / accessibility / press / crisis).
-
-Hard limits from canon: never invent prices or availability; never diagnose an Echo; stop after three unanswered nudges; escalate injury, mental-health crisis, under-18, legal, press, or bookings above the D15 threshold.
-```
-
----
-
-## RETREAT-01 — Run-of-show for first PACE Expedition
-
-**Assign:** `04_WS_PRODUCT_RETREAT.md` + `13_WS_OPERATIONS_SAFETY.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: RETREAT.
-
-Job: Write a weather-aware run-of-show for a 2.5–3 day PACE Expedition for 12–16 corporate guests. Include hour-by-hour, Rune reveal + challenge + Echo Mirror + carry, indoor / foul-weather variants, staffing, meals as placeholders, and what is still unverified (D06 Dunning, D07 final-day route).
-
-Do not present unverified routes as booked. Flag permits and insurance as gates.
-```
-
----
-
-## ECHO-01 — Facilitator Mirror card
-
-**Assign:** `05_WS_ECHO_HAM.md` + `04_WS_PRODUCT_RETREAT.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: ECHO.
-
-Job: Produce a two-page facilitator card: Mirror sequence, plain-language response options, forbidden language, when to stop and hand the person back to the land, what never goes in the team debrief.
-
-Do not complete the full Echo taxonomy. Do not name Echoes as identities.
-```
-
----
-
-## PLACE-01 — Spa menu and Haven booking rules
-
-**Assign:** `06_WS_SPA_HAVEN.md` + `14_WS_COMMERCIAL.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: PLACE.
-
-Job: Structure the spa menu (name, duration, who it is for, contraindications, whether it can run during a private Bootcamp) and Haven house rules / turnover logic.
-
-Do not invent CAD prices. Leave yellow placeholders for D01.
-Define day-guest hours versus in-house Bootcamp hours.
-```
-
----
-
-## TECH-01 — Vendor shortlist and data map
-
-**Assign:** `10_WS_TECH_ARCHITECTURE.md` + `11_WS_BACK_OFFICE.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: TECH.
-
-Job: Shortlist vendors for PMS, spa booking, CRM, payments, email. Score against: Alberta-friendly, embed quality, Stripe, calendar sync, cost at our volume, time-to-live before November.
-
-Deliver a data-object map (Person, Organisation, Stay, Treatment, Retreat instance, Hold, Invoice) and the events that must hit the CRM.
-
-Recommend, do not close D03 / D04.
-```
-
----
-
-## APP-01 — Trail Quest PWA spec
-
-**Assign:** `09_WS_TRAIL_QUEST.md` + `03_BRAND_SYSTEM.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: APP.
-
-Job: Specify the November PWA: screens, offline pack JSON schema, facilitator controls, privacy sheet, paper fallback.
-
-Tessellate is not a guest-facing character unless D18 is closed that way.
-```
-
----
-
-## OPS-01 — Safety pack
-
-**Assign:** `13_WS_OPERATIONS_SAFETY.md` + `15_WS_PARTNERSHIPS.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: OPS.
-
-Job: Draft the safety pack templates (risk assessment per site, screening form, abort criteria, incident log, ratios, child policy default adult). Mark every item that requires a licensed operator or insurance confirmation (D13).
+2. Align form fields with /book/retreat (name, role, org, email, headcount, dates, notes).
+3. Propose an 80-account Calgary / Edmonton list structure. Do not fabricate confirmed contacts.
+4. Do not invent prices. Point to hold-a-date.
+Outcomes: self-awareness under pressure; connection beyond workplace roles; adaptive collaboration; grounded decisions.
+Do not promise HAM as finished.
 ```
 
 ---
 
 ## COM-01 — Rate card model
 
-**Assign:** `14_WS_COMMERCIAL.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: COM.
-
-Job: Build a rate-card structure (not invented final prices) for Haven BAR, spa, Getaway Day, Adaptation Lab, PACE Expedition. Show the input cells a partner must fill: facilitator day rate, meal cost, Canalta pass-through, margin target.
-
-Blue cells = inputs. Do not publish as the live offer.
-```
+Held. Catalogues already exist in 20 / 21 / the working sheet.
 
 ---
 
-## PART-01 — Partner one-pagers
+## PLACE-01 — Spa menu and Haven booking rules
 
-**Assign:** `15_WS_PARTNERSHIPS.md`
-
-```
-[PASTE UNIVERSAL PREAMBLE]
-
-Workstream: PART.
-
-Job: Draft a one-page ask for Canalta, a town Connection-quest partner, and a licensed canyon operator. No Tyrrell announcement. No invented signed deals.
-```
+Held. See 20 and 21.
 
 ---
 
 ## After the spawn returns
 
-CEO thread job:
+CoS job:
 
 1. Read the deliverable.
-2. Close or refuse each recommendation in `17_OPEN_DECISIONS.md`.
+2. Do not close D01 / D03 / D04 / D13.
 3. Merge accepted text into the relevant workstream file.
 4. Log a dated changelog line.
 
@@ -262,4 +126,5 @@ CEO thread job:
 
 ## Changelog
 
-- 2026-09-08 — Spawn library created. Twelve starter briefs.
+- 2026-09-08 — Spawn library created.
+- 2026-09-08 — FIN-01 added. Steward is CoS, not CEO. WEB-01 marked merged.
