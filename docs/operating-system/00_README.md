@@ -33,22 +33,22 @@ This folder is the single source of truth for every Grok chat, Grok Bot and huma
 | Code | File | Owner (working) | Priority to Nov 2026 |
 |---|---|---|---|
 | GOV | `02_GOVERNANCE_AND_DOC_RULES.md` | Christopher | P0 |
-| BRAND | `03_BRAND_SYSTEM.md` | Christopher + brand | P0 |
-| RETREAT | `04_WS_PRODUCT_RETREAT.md` | Product / facilitators | P0 |
-| ECHO | `05_WS_ECHO_HAM.md` | Christopher / Tess | P1 (forge in parallel, do not block sales) |
-| PLACE | `06_WS_SPA_HAVEN.md` | Norah / Lisa / ops | P0 |
-| SALES | `07_WS_SALES_MARKETING.md` | Christopher + Grok Bots | P0 |
-| WEB | `08_WS_WEBSITE.md` | Product / design | P0 |
-| APP | `09_WS_TRAIL_QUEST.md` | Product / eng | P1 (paper + offline first if needed) |
-| TECH | `10_WS_TECH_ARCHITECTURE.md` | Christopher / CEO chat | P0 |
-| OPSYS | `11_WS_BACK_OFFICE.md` | Ops | P0 |
-| AUTO | `12_WS_AUTOMATION.md` | Christopher / CEO chat | P0 |
-| OPS | `13_WS_OPERATIONS_SAFETY.md` | Facilitators / FOH | P0 |
-| COM | `14_WS_COMMERCIAL.md` | Partners | P0 |
-| PART | `15_WS_PARTNERSHIPS.md` | Christopher / Lisa | P0 |
-| CHATS | `16_CHAT_SPAWN_PROMPTS.md` | CEO chat | P0 |
-| OPEN | `17_OPEN_DECISIONS.md` | CEO chat | P0 |
-| ROAD | `18_MASTER_ROADMAP.md` | CEO chat | P0 |
+| BRAND | `03_BRAND_SYSTEM.md` | Christopher (Tess on rune meaning) | P0 |
+| RETREAT | `04_WS_PRODUCT_RETREAT.md` | Tess (Lisa on the day) | P0 |
+| ECHO | `05_WS_ECHO_HAM.md` | Tess (Lisa contributing) | P1 (forge in parallel, do not block sales) |
+| PLACE | `06_WS_SPA_HAVEN.md` | Norah treatments / Lisa house | P0 |
+| SALES | `07_WS_SALES_MARKETING.md` | Christopher + Tess | P0 |
+| WEB | `08_WS_WEBSITE.md` | Christopher | P0 |
+| APP | `09_WS_TRAIL_QUEST.md` | Christopher (Tess on quest content) | P1 (paper + offline first if needed) |
+| TECH | `10_WS_TECH_ARCHITECTURE.md` | Christopher | P0 |
+| OPSYS | `11_WS_BACK_OFFICE.md` | Christopher builds; Norah + Lisa use | P0 |
+| AUTO | `12_WS_AUTOMATION.md` | Christopher | P0 |
+| OPS | `13_WS_OPERATIONS_SAFETY.md` | Lisa (Tess on psychological safety) | P0 |
+| COM | `14_WS_COMMERCIAL.md` | Norah | P0 |
+| PART | `15_WS_PARTNERSHIPS.md` | Lisa (Christopher on terms) | P0 |
+| CHATS | `16_CHAT_SPAWN_PROMPTS.md` | Christopher | P0 |
+| OPEN | `17_OPEN_DECISIONS.md` | Named owner per row | P0 |
+| ROAD | `18_MASTER_ROADMAP.md` | Christopher | P0 |
 
 ## Human-facing pack
 
