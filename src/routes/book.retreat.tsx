@@ -4,7 +4,7 @@ import { FormEvent } from "react";
 export const Route = createFileRoute("/book/retreat")({
   component: RetreatHold,
   head: () => ({
-    meta: [{ title: "Hold a retreat date — Unearth Self" }],
+    meta: [{ title: "Hold a date - Unearth Self" }],
   }),
 });
 
@@ -22,20 +22,20 @@ function RetreatHold() {
       `Notes: ${data.get("notes")}`,
     ].join("\n");
     window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent(
-      "Retreat hold — " + String(data.get("org") || "new"),
+      "Retreat hold - " + String(data.get("org") || "new"),
     )}&body=${encodeURIComponent(body)}`;
   }
 
   return (
     <main className="bg-fossil text-coal">
       <section className="mx-auto max-w-xl px-6 py-24">
-        <p className="mb-3 text-[0.72rem] tracking-[0.28em] text-shale uppercase">Book · Retreat</p>
+        <p className="mb-3 text-[0.72rem] tracking-[0.28em] text-shale uppercase">Badlands Bootcamp</p>
         <h1 className="font-display mb-4 text-[clamp(2.4rem,6vw,4rem)] uppercase leading-[0.95]">
           Hold a date
         </h1>
         <p className="mb-10 text-coal/70">
-          Not a checkout. Tess and Christopher read this. We reply within one working day. No deposit
-          until prices are signed.
+          Tell us who is coming and when you can travel. We reply within one working day with
+          availability.
         </p>
         <form onSubmit={onSubmit} className="grid gap-4">
           {[
@@ -61,15 +61,15 @@ function RetreatHold() {
             <textarea name="notes" rows={4} className="border border-coal/15 bg-white px-3 py-2.5 outline-none focus:border-ember" />
           </label>
           <button type="submit" className="mt-2 rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white">
-            Send hold request
+            Send request
           </button>
         </form>
         <p className="mt-8 text-sm text-coal/50">
-          Looking for a room or a treatment instead?{" "}
+          Looking for a room or a treatment?{" "}
           <Link to="/haven" className="underline">
             Haven
-          </Link>{" "}
-          ·{" "}
+          </Link>
+          {" / "}
           <Link to="/basecamp" className="underline">
             Basecamp
           </Link>
