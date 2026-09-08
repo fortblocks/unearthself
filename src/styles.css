@@ -17,22 +17,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Aktiv Grotesk";
-  src: url("/fonts/AktivGrotesk-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Aktiv Grotesk";
-  src: url("/fonts/AktivGrotesk-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
   --color-coal: #161718;
   --color-shale: #423530;
@@ -41,7 +25,7 @@
   --color-ember-soft: #f47d66;
   --color-fossil: #f8f0ed;
   --font-display: "Morganite", "Oswald", system-ui, sans-serif;
-  --font-sans: "Aktiv Grotesk", "Inter", system-ui, sans-serif;
+  --font-sans: "aktiv-grotesk", "Aktiv Grotesk", system-ui, sans-serif;
   --ease-brand: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
