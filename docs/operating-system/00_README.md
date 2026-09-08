@@ -2,7 +2,7 @@
 
 **Status:** Canonical operating library  
 **Established:** 8 September 2026  
-**Steward:** Christopher Mair (CEO), via the CEO Grok thread  
+**Steward:** four partners. This thread is Christopher’s systems chat, not a title.  
 **Rule:** Specialist chats READ from this folder. They UPDATE only the file that belongs to their workstream. They do not invent parallel truths.
 
 ## How this library works
@@ -52,9 +52,9 @@ This folder is the single source of truth for every Grok chat, Grok Bot and huma
 
 ## Human-facing pack
 
-Team-shareable files live in the project team pack:
+Team-shareable files:
 
-- `Unearth_Self_CEO_Operating_System_Sep2026.docx`
+- `Unearth_Self_Partner_Operating_System_Sep2026.docx`
 - `Unearth_Self_Master_Roadmap_Sep2026.xlsx`
 
 ## Canonical language (do not drift)
