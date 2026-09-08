@@ -1,0 +1,37 @@
+# Open Decisions
+
+Anything listed here is **not settled**. Specialist chats may recommend. Only a partner may close, and the close must be written back into the relevant workstream file.
+
+| ID | Decision | Options / notes | Blocks | Owner |
+|---|---|---|---|---|
+| D01 | Public prices for Haven, spa, Bootcamp | Need owner actuals | Website, bots, one-pager | Partners |
+| D02 | Fourth Rune public name | Existence is current canon; “Experience” appeared in one brief | Copy, glyphs, app | Christopher / Tess |
+| D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
+| D04 | CRM choice | HubSpot speed vs Attio taste | Bots, pipeline | Christopher |
+| D05 | Domain strategy | xyz only vs add .com/.ca | Print, ads | Christopher |
+| D06 | Dunning format and name | Field-test required | Adaptability morning | Facilitators |
+| D07 | Final-day route | Rosedale → fossil shop → Eleven Bridges → Last Chance | Existence day | Ops |
+| D08 | Alcohol policy | Default non-alcoholic before thermal | Connection quest | Partners |
+| D09 | Local 12-week programme timing | After first corporate season | Sales focus | Partners |
+| D10 | Echo note storage | On-device only vs encrypted sync | App privacy | Product |
+| D11 | Primary corporate price metric | Per person vs team package | Proposals | Sales |
+| D12 | Canalta commercial terms | File the signed version | Large groups | Lisa |
+| D13 | Insurance product | Confirm adventure cover | First paid outdoor day | Lisa |
+| D14 | Website design route mix | A/B/C recommendation in WEB file | Visual build | Christopher |
+| D15 | Escalation money threshold for bots | Proposed CAD 5,000 | Automation | Christopher |
+| D16 | Who owns Friday numbers | Named partner | Reporting | Partners |
+| D17 | Brand PDF update | Ember swatch still shows old hex | External designers | Christopher |
+| D18 | Tessellate persona | Keep as internal metaphor vs guest-facing | App copy | Tess |
+| D19 | Under-18 policy | Adult default | Legal, web | Partners |
+| D20 | Second language / US spelling on site | UK English in this OS; Canadian public site may prefer Canadian spelling | Copy | Christopher |
+
+## Recently closed
+
+| ID | Close | Date |
+|---|---|---|
+| C01 | PACE = Play, Adaptability, Connection, Existence | 2026-09-08 |
+| C02 | Ember = `#F2684C` | 2026-09-08 |
+| C03 | Self-awareness is Echo capacity, not a Rune | 2026-09-08 |
+| C04 | Guest-facing AI coach during quests is out | 2026-09-08 |
+| C05 | Trail Quest v1 = PWA + paper fallback | 2026-09-08 |
+| C06 | Source of Truth is this folder, not the 1,248-page index | 2026-09-08 |
