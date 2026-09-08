@@ -1,8 +1,8 @@
 # Governance and Documentation Rules
 
-**Version:** 1.1 — 8 September 2026
+**Version:** 1.2 — 8 September 2026
 
-The partnership is flat. The remits below are how work is divided, not a hierarchy. Anyone can challenge a decision. Only the named owner may close the file that sits in their remit.
+The partnership is flat. There is no CEO. The remits below are how work is divided, not a hierarchy and not titles for the outside world. Anyone can challenge a decision. Only the named owner may close the file that sits in their remit.
 
 ## Partners
 
@@ -86,3 +86,4 @@ Use the prompt in `16_CHAT_SPAWN_PROMPTS.md`. Every spawned chat must:
 - 2026-09-08 — Library created. PACE + Existence locked as working MVP. Ember hex updated to #F2684C.
 - 2026-09-08 — Spawn prompt library (`16`) and master roadmap (`18`) added. Team pack published.
 - 2026-09-08 — Partner remits restated: Tess product/modality; Lisa site ops and guest relations; Norah finance and treatments; Christopher systems, brand, marketing and sales (with Tess).
+- 2026-09-08 — “CEO” removed from the operating system. Flat partnership. No public title.
