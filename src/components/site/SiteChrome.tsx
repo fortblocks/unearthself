@@ -10,18 +10,18 @@ const links = [
   { to: "/about", label: "About" },
 ];
 
-function Mark({ invert = false }: { invert?: boolean }) {
+function Mark() {
   return (
-    <Link to="/" className={`flex items-center gap-2.5 ${invert ? "text-fossil" : "text-coal"}`}>
+    <Link to="/" className="flex items-center gap-2.5 text-fossil">
       <img
         src="/logo.svg"
         alt=""
         width={22}
         height={22}
-        className={`size-6 shrink-0 ${invert ? "brightness-0 invert opacity-90" : ""}`}
+        className="size-6 shrink-0 brightness-0 invert opacity-90"
       />
-      <span className="font-display text-[1.05rem] font-black uppercase leading-none tracking-[0.14em]">
-        Unearth Self
+      <span className="font-display text-[1.05rem] font-black uppercase leading-none tracking-[0.16em]">
+        Unearth<span className="text-ember">self</span>
       </span>
     </Link>
   );
@@ -39,7 +39,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-fossil text-coal">
-      <header className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between px-4 py-[1.1rem] bg-fossil/55 backdrop-blur-[14px]">
+      <header className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between bg-coal px-4 py-[1.1rem]">
         <Mark />
         <nav className="hidden items-center gap-7 md:flex">
           {links.map((l) => (
@@ -47,7 +47,9 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               key={l.to}
               to={l.to}
               className={`text-[0.8rem] font-semibold tracking-wide transition-colors ${
-                pathname === l.to || (l.to === "/haven" && onHaven) ? "text-coal" : "text-shale hover:text-coal"
+                pathname === l.to || (l.to === "/haven" && onHaven)
+                  ? "text-fossil"
+                  : "text-fossil/55 hover:text-fossil"
               }`}
             >
               {l.label}
@@ -74,7 +76,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
         <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
             <div className="mb-3">
-              <Mark invert />
+              <Mark />
             </div>
             <p className="max-w-sm">
               PACE is the path. Unearth Self is the purpose. Drumheller, Alberta.
