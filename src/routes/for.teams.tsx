@@ -4,34 +4,15 @@ export const Route = createFileRoute("/for/teams")({
   component: TeamsLander,
   head: () => ({
     meta: [
-      { title: "PACE for teams \u2014 Unearth Self" },
+      { title: "Badlands Bootcamp for teams - Unearth Self" },
       {
         name: "description",
         content:
-          "A three-day PACE expedition in the Canadian Badlands for teams who are done with hotel ballrooms.",
+          "A three-day expedition in the Canadian Badlands. Outdoor challenge, honest conversation, and real recovery - ninety minutes from Calgary.",
       },
     ],
   }),
 });
-
-const runes = [
-  {
-    name: "Play",
-    line: "The body goes first. Shared work against the land, not a trust fall on carpet.",
-  },
-  {
-    name: "Adaptability",
-    line: "The plan will break. You watch how the team handles that, in weather that does not care about the agenda.",
-  },
-  {
-    name: "Connection",
-    line: "Not icebreakers. People who have carried something together and still have to look each other in the eye.",
-  },
-  {
-    name: "Experience",
-    line: "A last day that is quiet on purpose. What remains when the role falls away.",
-  },
-];
 
 function TeamsLander() {
   return (
@@ -46,18 +27,20 @@ function TeamsLander() {
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Drumheller \u00b7 Canadian Badlands \u00b7 Teams from Calgary and Edmonton
+            Drumheller, Alberta - ninety minutes from Calgary
           </p>
-          <h1 className="font-display mb-6 text-[clamp(2.8rem,8vw,6rem)] leading-[0.9] uppercase">
-            The land
+          <h1 className="font-display mb-6 text-[clamp(2.6rem,7.5vw,5.6rem)] leading-[0.9] uppercase">
+            Take the team
             <br />
-            does the work
+            somewhere the
             <br />
-            a ballroom can't.
+            job title won't
+            <br />
+            follow.
           </h1>
-          <p className="mb-8 max-w-[40ch] text-lg text-fossil/88">
-            Badlands Bootcamp is a three-day PACE expedition. Hoodoos, wind, silence, and a method that
-            notices how your people actually behave when the script ends.
+          <p className="mb-8 max-w-[42ch] text-lg text-fossil/88">
+            Badlands Bootcamp is three days in the Canadian Badlands: hard ground, shared work, and the
+            kind of conversation that does not survive a hotel ballroom.
           </p>
           <Link
             to="/book/retreat"
@@ -68,64 +51,107 @@ function TeamsLander() {
         </div>
       </section>
 
-      <section className="border-b border-fossil/10 px-6 py-20">
-        <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2">
-          <div>
-            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">The place</p>
-            <h2 className="font-display mb-4 text-4xl uppercase">Ninety minutes from Calgary. A different planet.</h2>
-            <p className="mb-4 text-fossil/75">
-              The Alberta Badlands are not a backdrop. Layered rock, river valley, sky that does not
-              flatter you. Teams arrive as job titles. They spend three days in a landscape that is older
-              than the company.
-            </p>
-            <p className="text-fossil/75">
-              Basecamp and four Haven suites sit in Drumheller. When you outgrow four keys, Canalta takes
-              the overflow. The work still happens on the land.
-            </p>
-          </div>
-          <div>
-            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">The proposition</p>
-            <h2 className="font-display mb-4 text-4xl uppercase">Not a ropes course with a slide deck.</h2>
-            <p className="mb-4 text-fossil/75">
-              PACE is the path: Play, Adaptability, Connection, Experience. Each day has a Rune, a
-              challenge, and an Echo Mirror. A short, structured noticing of what just happened. It is
-              not therapy. We notice. We do not excavate.
-            </p>
-            <p className="text-fossil/75">
-              You leave with a team that has a shared vocabulary for pressure, and a few people who
-              finally said the true thing.
-            </p>
-          </div>
+      <section className="px-6 py-20">
+        <div className="mx-auto max-w-3xl">
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Why go</p>
+          <h2 className="font-display mb-6 text-[clamp(2rem,4vw,3.2rem)] uppercase">
+            Most offsites change the scenery. Almost none change the team.
+          </h2>
+          <p className="mb-4 text-lg text-fossil/80">
+            You already know the pattern. A rented room. A facilitator with a deck. A dinner that is
+            pleasant and forgettable. People fly home as the same group that arrived, with better
+            photographs.
+          </p>
+          <p className="text-lg text-fossil/80">
+            Bring them here instead. The Badlands are older than the company and indifferent to the
+            org chart. That is the point. Pressure with a horizon. Recovery that is actually quiet.
+            A group that has had to rely on each other when the weather, the map, or the plan did not
+            cooperate.
+          </p>
         </div>
       </section>
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Four Runes</p>
-          <h2 className="font-display mb-10 text-4xl uppercase">What the three days are for</h2>
-          <div className="grid gap-8 sm:grid-cols-2">
-            {runes.map((r) => (
-              <article key={r.name} className="border-t border-fossil/15 pt-5">
-                <h3 className="font-display text-2xl uppercase">{r.name}</h3>
-                <p className="mt-2 text-fossil/70">{r.line}</p>
-              </article>
-            ))}
+      <section className="border-t border-fossil/10 px-6 py-20">
+        <div className="mx-auto grid max-w-6xl gap-14 md:grid-cols-2">
+          <div>
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What you are buying</p>
+            <h2 className="font-display mb-4 text-4xl uppercase">Land, challenge, and a proper close.</h2>
+            <p className="mb-4 text-fossil/75">
+              Days outside on hoodoo country and the Red Deer valley. Short, structured time after each
+              piece of work so the group can say what actually happened - not a therapy session, not a
+              circle that never ends.
+            </p>
+            <p className="text-fossil/75">
+              Nights at Haven, our four-suite house on site, or at Canalta when the group is larger.
+              Meals. The spa for heat, cold and hands when the day is done. You leave with a team that
+              has a shared story, not a tote bag.
+            </p>
+          </div>
+          <div>
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What they take home</p>
+            <ul className="space-y-5 text-fossil/80">
+              <li>
+                <strong className="block font-display text-xl uppercase text-fossil">Honesty under pressure.</strong>
+                You see how people decide when the script runs out.
+              </li>
+              <li>
+                <strong className="block font-display text-xl uppercase text-fossil">A bond that is not performed.</strong>
+                Shared work on real ground beats a trust exercise on carpet.
+              </li>
+              <li>
+                <strong className="block font-display text-xl uppercase text-fossil">A way to keep talking.</strong>
+                A simple language for what showed up - so Monday is not a reset to silence.
+              </li>
+            </ul>
           </div>
         </div>
       </section>
 
       <section className="border-t border-fossil/10 px-6 py-20">
         <div className="mx-auto max-w-6xl">
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">The three days</p>
+          <h2 className="font-display mb-10 text-4xl uppercase">Arrive as a roster. Leave as a crew.</h2>
+          <div className="grid gap-8 md:grid-cols-3">
+            <article className="border-t border-fossil/15 pt-5">
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day one</p>
+              <h3 className="font-display mb-2 text-2xl uppercase">Out of the car, onto the land</h3>
+              <p className="text-fossil/70">
+                Arrive, drop the devices that can be dropped, and start with the body. The first hours
+                are about getting out of the meeting and into the place.
+              </p>
+            </article>
+            <article className="border-t border-fossil/15 pt-5">
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day two</p>
+              <h3 className="font-display mb-2 text-2xl uppercase">The plan will not survive</h3>
+              <p className="text-fossil/70">
+                A longer day on the ground. Weather, route, and each other. This is where the useful
+                friction lives - and where the group finds out how it actually works.
+              </p>
+            </article>
+            <article className="border-t border-fossil/15 pt-5">
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day three</p>
+              <h3 className="font-display mb-2 text-2xl uppercase">A close that is quiet on purpose</h3>
+              <p className="text-fossil/70">
+                No forced crescendo. Time to name what matters, eat, and drive home before the spell
+                is talked to death.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-fossil/10 px-6 py-20">
+        <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Who this is for</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">HR and ops leads who are tired of the offsite that changes nothing.</h2>
-          <ul className="grid max-w-3xl gap-3 text-fossil/75">
-            <li>Leadership groups of 8 to 16 who need friction, not a tasting menu.</li>
-            <li>Teams that collaborate on paper and stall in the room.</li>
-            <li>People who can travel from Calgary or Edmonton on a Thursday and be on the land by lunch.</li>
-          </ul>
-          <p className="mt-6 max-w-3xl text-sm text-fossil/55">
-            We are not a clinic. We do not sell a finished methodology called HAM on this page. The live
-            product is the expedition.
+          <h2 className="font-display mb-6 text-4xl uppercase">Leadership groups who need more than a change of hotel.</h2>
+          <p className="mb-4 text-fossil/75">
+            Eight to sixteen people. Founders, senior teams, crews that collaborate on paper and stall
+            in the room. Close enough that Calgary and Edmonton can leave on a Thursday and be on the
+            land by lunch.
+          </p>
+          <p className="text-fossil/75">
+            If you want a tasting menu, a speaker and a branded notebook, this is the wrong page. If
+            you want your people in a landscape that will not flatter them, hold a date.
           </p>
         </div>
       </section>
@@ -133,11 +159,11 @@ function TeamsLander() {
       <section className="bg-fossil px-6 py-16 text-coal">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">Working offer</p>
-            <h2 className="font-display text-4xl uppercase">8 to 16 people. 3 days.</h2>
+            <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">The offer</p>
+            <h2 className="font-display text-4xl uppercase">8 to 16 people. Three days. Drumheller.</h2>
             <p className="mt-3 max-w-[46ch] text-coal/70">
-              Price sits with the partners until it is signed. Hold the date. Tess and Christopher read
-              every request.
+              Tell us who is coming and when you can travel. We will come back with availability and a
+              figure.
             </p>
           </div>
           <Link
