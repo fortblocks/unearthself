@@ -73,7 +73,7 @@ function TheWorkPage() {
                   <img
                     src={`/runes/${r.slug}.svg`}
                     alt=""
-                    className="size-12 shrink-0"
+                    className="size-12 shrink-0 brightness-0 invert"
                   />
                   <h3 className="font-display text-3xl uppercase">{r.name}</h3>
                 </div>
