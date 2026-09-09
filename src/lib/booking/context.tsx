@@ -14,10 +14,14 @@ export type BookLine = {
 };
 
 export type CheckoutMode = "guest" | "member";
+export type BookFace = "bootcamp" | "basecamp" | "haven";
 
 type BookingState = {
   open: boolean;
   setOpen: (v: boolean) => void;
+  face: BookFace | null;
+  setFace: (f: BookFace | null) => void;
+  openFace: (f: BookFace | null) => void;
   lines: BookLine[];
   addTreatment: (t: Treatment) => void;
   removeLine: (key: string) => void;
@@ -31,8 +35,14 @@ const BookingContext = createContext<BookingState | null>(null);
 
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [face, setFace] = useState<BookFace | null>(null);
   const [lines, setLines] = useState<BookLine[]>([]);
   const [mode, setMode] = useState<CheckoutMode>("guest");
+
+  const openFace = useCallback((f: BookFace | null) => {
+    setFace(f);
+    setOpen(true);
+  }, []);
 
   const addTreatment = useCallback((t: Treatment) => {
     setLines((prev) => [
@@ -47,6 +57,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         time: "",
       },
     ]);
+    setFace("basecamp");
     setOpen(true);
   }, []);
 
@@ -61,8 +72,21 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => setLines([]), []);
 
   const value = useMemo(
-    () => ({ open, setOpen, lines, addTreatment, removeLine, updateLine, clear, mode, setMode }),
-    [open, lines, addTreatment, removeLine, updateLine, clear, mode],
+    () => ({
+      open,
+      setOpen,
+      face,
+      setFace,
+      openFace,
+      lines,
+      addTreatment,
+      removeLine,
+      updateLine,
+      clear,
+      mode,
+      setMode,
+    }),
+    [open, face, openFace, lines, addTreatment, removeLine, updateLine, clear, mode],
   );
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
