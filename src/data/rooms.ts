@@ -4,6 +4,7 @@ export type Room = {
   slug: RoomSlug;
   name: string;
   tagline: string;
+  story: string;
   sleeps: number;
   bedrooms: string;
   size?: string;
@@ -15,15 +16,19 @@ export const ROOMS: Room[] = [
   {
     slug: "elowen",
     name: "Elowen",
-    tagline: "The larger suite — space for a small family or a close group.",
+    tagline: "The largest key. Room for a small family or a tight crew.",
+    story:
+      "Elowen is the suite you take when the group will not fit anywhere else in the house. One generous room to gather, cook and sleep five. Fireplace, kitchen, the same quiet downtown street as the rest of Haven.",
     sleeps: 5,
-    bedrooms: "Flexible suite",
+    bedrooms: "1 bedroom",
     images: ["/images/haven/elowen-1.jpg", "/images/haven/elowen-2.jpg"],
   },
   {
     slug: "hidden-hollow",
     name: "Hidden Hollow",
-    tagline: "A one-bedroom on the main floor. Queen bed, sofa bed, 538 square feet.",
+    tagline: "Main floor. Queen, sofa bed, 538 square feet.",
+    story:
+      "Hidden Hollow sits on the main floor of the heritage building. A one-bedroom with a sofa bed for two more. Best when you want the least stairs and a compact, self-contained stay.",
     sleeps: 4,
     bedrooms: "1 bedroom",
     size: "538 sq ft",
@@ -33,15 +38,20 @@ export const ROOMS: Room[] = [
   {
     slug: "river-blossom",
     name: "River Blossom",
-    tagline: "Two bedrooms and a terrace — for longer rest, or travelling together.",
+    tagline: "Two bedrooms and a terrace. The family key.",
+    story:
+      "River Blossom is the two-bedroom suite, about 1,100 square feet, with a terrace. Take it when two rooms matter more than a view of each other. Cooking, fireplace, space to close a door.",
     sleeps: 4,
     bedrooms: "2 bedrooms",
+    size: "About 1,100 sq ft",
     images: ["/images/haven/river-blossom-1.jpg", "/images/haven/river-blossom-2.jpg"],
   },
   {
     slug: "water-mark",
     name: "Water Mark",
-    tagline: "A spacious one-bedroom. Quiet, self-contained, close to the river valley.",
+    tagline: "One bedroom, two baths, closest to the river valley.",
+    story:
+      "Water Mark is a spacious one-bedroom with a Murphy option and two bathrooms. The quietest walk toward the valley. Self-contained, good for two who want room, or four who travel light.",
     sleeps: 4,
     bedrooms: "1 bedroom",
     images: ["/images/haven/water-mark-1.jpg", "/images/haven/water-mark-2.jpg"],
@@ -54,7 +64,7 @@ export const HAVEN_SHARED = [
   "Air conditioning",
   "Wi-Fi",
   "On-site parking",
-  "Washer & dryer",
+  "Washer and dryer",
 ] as const;
 
 export const HAVEN_ADDRESS = "360 4 Street West, Drumheller, Alberta";
