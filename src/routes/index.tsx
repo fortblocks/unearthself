@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { RuneTape } from "@/components/site/RuneTape";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -62,8 +61,6 @@ function Home() {
           </p>
         </div>
       </section>
-
-      <RuneTape />
 
       <section className="px-6 py-20">
         <div className="mx-auto max-w-6xl">

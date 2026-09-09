@@ -23,6 +23,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TheWorkRouteImport } from './routes/the-work'
 import { Route as VisitRouteImport } from './routes/visit'
+import { Route as FoundRouteImport } from './routes/found'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminFridayRouteImport } from './routes/admin.friday'
 import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
@@ -109,6 +110,11 @@ const TheWorkRoute = TheWorkRouteImport.update({
 const VisitRoute = VisitRouteImport.update({
   id: '/visit',
   path: '/visit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FoundRoute = FoundRouteImport.update({
+  id: '/found',
+  path: '/found',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/shop': typeof ShopRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/found': typeof FoundRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -241,6 +248,7 @@ export interface FileRoutesByTo {
   '/shop': typeof ShopRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/found': typeof FoundRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/shop': typeof ShopRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/found': typeof FoundRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/the-work'
     | '/visit'
+    | '/found'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/the-work'
     | '/visit'
+    | '/found'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/the-work'
     | '/visit'
+    | '/found'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -406,6 +418,7 @@ export interface RootRouteChildren {
   ShopRoute: typeof ShopRoute
   TheWorkRoute: typeof TheWorkRoute
   VisitRoute: typeof VisitRoute
+  FoundRoute: typeof FoundRoute
   BookRetreatRoute: typeof BookRetreatRoute
   BookTreatmentRoute: typeof BookTreatmentRoute
   ForTeamsRoute: typeof ForTeamsRoute
@@ -509,6 +522,13 @@ declare module '@tanstack/react-router' {
       path: '/visit'
       fullPath: '/visit'
       preLoaderRoute: typeof VisitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/found': {
+      id: '/found'
+      path: '/found'
+      fullPath: '/found'
+      preLoaderRoute: typeof FoundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -709,6 +729,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopRoute: ShopRoute,
   TheWorkRoute: TheWorkRoute,
   VisitRoute: VisitRoute,
+  FoundRoute: FoundRoute,
   BookRetreatRoute: BookRetreatRoute,
   BookTreatmentRoute: BookTreatmentRoute,
   ForTeamsRoute: ForTeamsRoute,

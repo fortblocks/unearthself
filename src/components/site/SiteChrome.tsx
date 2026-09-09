@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { BookPanel } from "@/components/booking/BookPanel";
 import { BookButton } from "@/components/site/BookButton";
+import { RuneTape } from "@/components/site/RuneTape";
 
 const links = [
   { to: "/the-work", label: "The Work" },
@@ -34,8 +35,9 @@ export function SiteChrome({ children }: { children: ReactNode }) {
   const onJournal = pathname.startsWith("/journal");
   const onD14 = pathname.startsWith("/d14");
   const onDesk = pathname.startsWith("/admin") || pathname.startsWith("/login");
+  const onFound = pathname === "/found";
 
-  if (onD14 || onDesk) {
+  if (onD14 || onDesk || onFound) {
     return <>{children}</>;
   }
 
@@ -69,8 +71,8 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       <main className="pt-0">{children}</main>
       <BookPanel />
 
-      <footer className="bg-coal px-4 pt-16 pb-10 text-[0.9rem] text-fossil/70">
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
+      <footer className="bg-coal pt-16 text-[0.9rem] text-fossil/70">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
             <div className="mb-3">
               <Mark />
@@ -109,10 +111,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             </ul>
           </div>
         </div>
-        <div className="mx-auto mt-10 flex max-w-7xl justify-between border-t border-fossil/10 pt-6 text-[0.8rem] text-fossil/45">
-          <span>2026 Unearth Self</span>
-          <span>Drumheller</span>
-        </div>
+        <RuneTape />
       </footer>
     </div>
   );
