@@ -4,7 +4,7 @@ import { cad, TREATMENT_GROUPS, TREATMENTS } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
 export function TreatmentBook() {
-  const { addTreatment, setOpen } = useBooking();
+  const { addTreatment, setOpen, lines } = useBooking();
 
   return (
     <>
@@ -67,29 +67,38 @@ export function TreatmentBook() {
                 <h3 className="font-display mb-2 text-2xl uppercase">{g.title}</h3>
                 <p className="mb-8 max-w-[46ch] text-fossil/55">{g.line}</p>
                 <ul className="grid gap-x-16 gap-y-1 md:grid-cols-2">
-                  {TREATMENTS.filter((t) => t.group === g.id).map((t) => (
-                    <li key={t.id} className="border-b border-fossil/10">
-                      <div className="flex items-center gap-3 py-4">
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-fossil">{t.name}</span>
-                          <span className="mt-1 block text-sm text-fossil/45">
-                            {t.mins} · {t.line}
+                  {TREATMENTS.filter((t) => t.group === g.id).map((t) => {
+                    const added = lines.some((l) => l.treatmentId === t.id);
+                    return (
+                      <li key={t.id} className="border-b border-fossil/10">
+                        <div className="flex items-center gap-3 py-4">
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-fossil">{t.name}</span>
+                            <span className="mt-1 block text-sm text-fossil/45">
+                              {t.mins} · {t.line}
+                            </span>
                           </span>
-                        </span>
-                        <span className="w-14 shrink-0 text-right text-sm tabular-nums text-sandstone">
-                          {cad(t.price)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => addTreatment(t)}
-                          aria-label={`Add ${t.name}`}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center border border-fossil/20 text-lg leading-none text-fossil/80 hover:border-ember hover:text-ember"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                          <span className="w-14 shrink-0 text-right text-sm tabular-nums text-sandstone">
+                            {cad(t.price)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => addTreatment(t)}
+                            aria-label={added ? `${t.name} is in the booking` : `Add ${t.name}`}
+                            aria-pressed={added}
+                            className={
+                              "flex h-8 w-8 shrink-0 items-center justify-center text-lg leading-none " +
+                              (added
+                                ? "bg-ember text-white"
+                                : "border border-fossil/20 text-fossil/80 hover:border-ember hover:text-ember")
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))}
