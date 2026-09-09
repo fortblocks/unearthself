@@ -1,6 +1,6 @@
 "use client";
 
-import { TREATMENT_GROUPS, TREATMENTS } from "@/data/treatments";
+import { cad, TREATMENT_GROUPS, TREATMENTS } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
 export function TreatmentBook() {
@@ -59,7 +59,7 @@ export function TreatmentBook() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">The menu</p>
           <h2 className="font-display mb-4 text-4xl uppercase">What we do here.</h2>
           <p className="mb-14 max-w-[46ch] text-fossil/70">
-            Add what you want. Book in the bar opens the same panel — date and time per treatment.
+            Prices in CAD. Add what you want. Book opens the same panel.
           </p>
           <div className="grid gap-16">
             {TREATMENT_GROUPS.map((g) => (
@@ -69,13 +69,15 @@ export function TreatmentBook() {
                 <ul className="grid gap-x-16 gap-y-1 md:grid-cols-2">
                   {TREATMENTS.filter((t) => t.group === g.id).map((t) => (
                     <li key={t.id} className="border-b border-fossil/10">
-                      <div className="flex items-baseline gap-3 py-4">
+                      <div className="flex items-center gap-3 py-4">
                         <span className="min-w-0 flex-1">
                           <span className="block text-fossil">{t.name}</span>
-                          <span className="mt-1 block text-sm text-fossil/45">{t.line}</span>
+                          <span className="mt-1 block text-sm text-fossil/45">
+                            {t.mins} · {t.line}
+                          </span>
                         </span>
-                        <span className="w-12 shrink-0 text-right text-sm tabular-nums text-sandstone">
-                          {t.mins.replace(" min", "m")}
+                        <span className="w-14 shrink-0 text-right text-sm tabular-nums text-sandstone">
+                          {cad(t.price)}
                         </span>
                         <button
                           type="button"
