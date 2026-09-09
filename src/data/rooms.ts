@@ -1,3 +1,5 @@
+import { HAVEN_PHOTOS } from "./havenPhotos";
+
 export type RoomSlug = "elowen" | "hidden-hollow" | "river-blossom" | "water-mark";
 
 export type Room = {
@@ -21,7 +23,7 @@ export const ROOMS: Room[] = [
       "Elowen is the suite you take when the group will not fit anywhere else in the house. One generous room to gather, cook and sleep five. Fireplace, kitchen, the same quiet downtown street as the rest of Haven.",
     sleeps: 5,
     bedrooms: "1 bedroom",
-    images: ["/images/haven/elowen-1.jpg", "/images/haven/elowen-2.jpg"],
+    images: [...HAVEN_PHOTOS.elowen],
   },
   {
     slug: "hidden-hollow",
@@ -33,7 +35,7 @@ export const ROOMS: Room[] = [
     bedrooms: "1 bedroom",
     size: "538 sq ft",
     floor: "Main floor",
-    images: ["/images/haven/hidden-hollow-1.jpg", "/images/haven/hidden-hollow-2.jpg"],
+    images: [...HAVEN_PHOTOS["hidden-hollow"]],
   },
   {
     slug: "river-blossom",
@@ -44,7 +46,7 @@ export const ROOMS: Room[] = [
     sleeps: 4,
     bedrooms: "2 bedrooms",
     size: "About 1,100 sq ft",
-    images: ["/images/haven/river-blossom-1.jpg", "/images/haven/river-blossom-2.jpg"],
+    images: [...HAVEN_PHOTOS["river-blossom"]],
   },
   {
     slug: "water-mark",
@@ -54,7 +56,7 @@ export const ROOMS: Room[] = [
       "Water Mark is a spacious one-bedroom with a Murphy option and two bathrooms. The quietest walk toward the valley. Self-contained, good for two who want room, or four who travel light.",
     sleeps: 4,
     bedrooms: "1 bedroom",
-    images: ["/images/haven/water-mark-1.jpg", "/images/haven/water-mark-2.jpg"],
+    images: [...HAVEN_PHOTOS["water-mark"]],
   },
 ];
 
