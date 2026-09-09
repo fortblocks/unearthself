@@ -41,13 +41,12 @@ function Home() {
   return (
     <main className="bg-coal text-fossil">
       <section className="relative flex min-h-[100dvh] items-end overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,0.88) 0%, rgba(22,23,24,0.18) 50%), url('/images/hero-badlands-dusk.jpg')",
-          }}
+        <img
+          src="/images/exp-hoodoos.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
             Canadian Badlands · Drumheller
