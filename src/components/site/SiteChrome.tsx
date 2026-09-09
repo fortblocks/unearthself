@@ -33,8 +33,9 @@ export function SiteChrome({ children }: { children: ReactNode }) {
   const onHaven = pathname.startsWith("/haven");
   const onJournal = pathname.startsWith("/journal");
   const onD14 = pathname.startsWith("/d14");
+  const onDesk = pathname.startsWith("/admin") || pathname.startsWith("/login");
 
-  if (onD14) {
+  if (onD14 || onDesk) {
     return <>{children}</>;
   }
 

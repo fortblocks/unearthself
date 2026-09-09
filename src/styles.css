@@ -24,9 +24,18 @@
   --color-ember: #f2684c;
   --color-ember-soft: #f47d66;
   --color-fossil: #f8f0ed;
+  --color-paper: #fffdfa;
+  --color-muted: #6b5d57;
+  --color-line: color-mix(in oklab, var(--color-coal) 12%, transparent);
+  --color-line-strong: color-mix(in oklab, var(--color-coal) 22%, transparent);
+  --color-ok: #3d6b4f;
+  --color-warn: #9a6b2f;
+  --color-bad: #a33b2c;
   --font-display: "Morganite", "Oswald", system-ui, sans-serif;
   --font-sans: "aktiv-grotesk", "Aktiv Grotesk", system-ui, sans-serif;
   --ease-brand: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --radius-xs: 2px;
+  --radius-sm: 4px;
 }
 
 @layer base {
