@@ -1,5 +1,3 @@
-"use client";
-
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { StayRequest } from "@/components/haven/StayRequest";
@@ -16,7 +14,7 @@ export const Route = createFileRoute("/haven/$slug")({
     const room = getRoom(params.slug);
     return {
       meta: [
-        { title: room ? `${room.name} — Haven` : "Haven" },
+        { title: room ? `${room.name} - Haven` : "Haven" },
         {
           name: "description",
           content: room?.tagline ?? "A room at Haven, Drumheller.",
@@ -33,42 +31,35 @@ function RoomPage() {
 
   return (
     <>
-      <section className="bg-coal px-4 pt-28 pb-6 text-fossil">
-        <div className="mx-auto max-w-7xl">
+      <section className="relative min-h-[62vh] overflow-hidden bg-coal text-fossil">
+        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/40 to-coal/20" />
+        <div className="relative z-10 mx-auto flex min-h-[62vh] max-w-7xl flex-col justify-end px-4 pb-10 pt-28">
           <Link to="/haven" className="text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
-            ← Haven
+            Haven
           </Link>
           <h1 className="font-display mt-4 text-[clamp(2.5rem,6vw,4.5rem)] tracking-wide uppercase">{room.name}</h1>
-          <p className="mt-2 max-w-[48ch] text-lg text-fossil/75">{room.tagline}</p>
+          <p className="mt-2 max-w-[48ch] text-lg text-fossil/80">{room.tagline}</p>
         </div>
       </section>
 
       <section className="bg-coal px-4 pb-16">
-        <div className="mx-auto grid max-w-7xl gap-4 md:grid-cols-[1.6fr_0.8fr]">
-          <div className="overflow-hidden bg-shale">
-            <img
-              src={image}
-              alt=""
-              className="aspect-[3/2] h-full w-full object-cover saturate-[0.78] contrast-[1.05] brightness-[0.93]"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-1">
-            {room.images.map((src, i) => (
-              <button
-                key={src}
-                type="button"
-                onClick={() => setActive(i)}
-                className={
-                  "overflow-hidden border " +
-                  (i === active ? "border-sandstone" : "border-transparent opacity-80 hover:opacity-100")
-                }
-                aria-label={`Photo ${i + 1}`}
-                aria-pressed={i === active}
-              >
-                <img src={src} alt="" className="aspect-[3/2] h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 md:grid-cols-4">
+          {room.images.map((src, i) => (
+            <button
+              key={src}
+              type="button"
+              onClick={() => setActive(i)}
+              className={
+                "overflow-hidden border " +
+                (i === active ? "border-sandstone" : "border-transparent opacity-70 hover:opacity-100")
+              }
+              aria-label={`Photo ${i + 1}`}
+              aria-pressed={i === active}
+            >
+              <img src={src} alt="" className="aspect-[3/2] h-full w-full object-cover" />
+            </button>
+          ))}
         </div>
       </section>
 
@@ -76,6 +67,7 @@ function RoomPage() {
         <div className="mx-auto grid max-w-7xl gap-14 md:grid-cols-[1fr_1fr]">
           <div>
             <p className="mb-3 text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">The room</p>
+            <p className="mb-8 max-w-[46ch] text-lg text-shale">{room.story}</p>
             <dl className="mb-8 grid grid-cols-2 gap-4 text-sm">
               <div className="border border-coal/10 px-4 py-3">
                 <dt className="text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">Sleeps</dt>
@@ -98,10 +90,6 @@ function RoomPage() {
                 </div>
               )}
             </dl>
-            <p className="mb-4 max-w-[46ch] text-shale">
-              Full-service apartment in the heritage building. Kitchen, fireplace, air conditioning. Rates and a
-              longer description will follow — this is the booking frame.
-            </p>
             <p className="text-sm text-shale/80">{HAVEN_ADDRESS}</p>
             <ul className="mt-8 flex flex-wrap gap-2">
               {HAVEN_SHARED.map((item) => (
@@ -112,7 +100,10 @@ function RoomPage() {
             </ul>
           </div>
           <div id="stay" className="border border-coal/10 bg-white p-6 md:p-8">
-            <h2 className="font-display mb-6 text-2xl">Request {room.name}</h2>
+            <h2 className="font-display mb-2 text-2xl uppercase">Request {room.name}</h2>
+            <p className="mb-6 text-sm text-shale">
+              Tell us the dates. We confirm what is free and send the rate before anything is charged.
+            </p>
             <StayRequest presetSlug={room.slug as RoomSlug} />
           </div>
         </div>
