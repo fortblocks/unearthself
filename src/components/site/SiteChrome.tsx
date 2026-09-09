@@ -8,7 +8,7 @@ const links = [
   { to: "/bootcamp", label: "Experiences" },
   { to: "/haven", label: "Haven" },
   { to: "/basecamp", label: "Basecamp" },
-  { to: "/journal", label: "Journal" },
+  { to: "/visit", label: "Visit" },
   { to: "/about", label: "About" },
 ];
 
@@ -81,7 +81,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <ul className="space-y-2">
               <li><Link to="/the-work" className="hover:text-fossil">The Work</Link></li>
               <li><Link to="/for/teams" className="hover:text-fossil">For teams</Link></li>
-              <li><Link to="/journal" className="hover:text-fossil">Journal</Link></li>
+              <li><Link to="/visit" className="hover:text-fossil">Visit</Link></li>
             </ul>
           </div>
           <div>
