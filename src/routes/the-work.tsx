@@ -65,7 +65,16 @@ function TheWorkPage() {
       <section className="border-t border-fossil/10 px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
-          <h2 className="font-display mb-12 text-4xl uppercase">Four Runes. One expedition.</h2>
+          <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
+          <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
+            A Rune is not a personality type and it is not decoration. It is a mark for a way of moving
+            through the Badlands — a capacity you practise on the land, then carry when you leave.
+          </p>
+          <p className="mb-12 max-w-[58ch] text-fossil/65">
+            PACE is the sequence: Play, Adaptability, Connection, Experience. Each day of Bootcamp
+            reveals one, puts you inside it, and asks you to choose again. The four marks below are how
+            that sequence is held — on the wall at Basecamp, in Trail Quest, on the thing you take home.
+          </p>
           <div className="grid gap-10 md:grid-cols-2">
             {runes.map((r) => (
               <article key={r.name} className="border-t border-fossil/15 pt-5">
