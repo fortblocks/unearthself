@@ -23,7 +23,7 @@ function BasecampPage() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,0.88) 0%, rgba(22,23,24,0.3) 50%), url('/images/haven/exterior/exterior-01.jpg')",
+              "linear-gradient(to top, rgba(22,23,24,0.82) 0%, rgba(22,23,24,0.28) 55%), url('/images/basecamp/lounge.jpg')",
           }}
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
