@@ -35,7 +35,15 @@ const runes = [
 function TheWorkPage() {
   return (
     <main className="bg-coal text-fossil">
-      <section className="px-6 pt-32 pb-16">
+      <section className="relative h-[70vh] min-h-[28rem] overflow-hidden">
+        <img
+          src="/images/work/horseshoe.jpg"
+          alt="A small group walking the floor of Horseshoe Canyon"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </section>
+
+      <section className="px-6 pt-16 pb-16">
         <div className="mx-auto max-w-3xl">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">The Work</p>
           <h1 className="font-display mb-6 text-[clamp(2.6rem,7vw,5rem)] leading-[0.9] uppercase">
