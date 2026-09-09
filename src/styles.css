@@ -99,3 +99,40 @@
   box-shadow: 0 0 0 1000px #ffffff inset;
   transition: background-color 9999s ease-out;
 }
+
+.rune-tape {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: rune-tape 56s linear infinite;
+}
+
+.rune-tape-mask {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 5%,
+    #000 95%,
+    transparent
+  );
+  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+}
+
+.rune-tape-mask:hover .rune-tape {
+  animation-play-state: paused;
+}
+
+@keyframes rune-tape {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rune-tape {
+    animation: none;
+  }
+}
