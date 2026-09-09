@@ -7,7 +7,7 @@ export const Route = createFileRoute("/the-work")({
       { title: "The Work - Unearth Self" },
       {
         name: "description",
-        content: "PACE is the path. Unearth Self is the purpose. Echo and HAM are living work, not a finished course.",
+        content: "PACE is the path. Unearth Self is the purpose. An expedition in the Canadian Badlands.",
       },
     ],
   }),
@@ -56,8 +56,8 @@ function TheWorkPage() {
             Unearth Self is the purpose.
           </h1>
           <p className="max-w-[46ch] text-lg text-fossil/80">
-            The live product is the expedition. What follows is the language underneath it — still being
-            forged. We do not sell a finished methodology on this page.
+            A group goes onto the land. They work a sequence. They come back in with a language they
+            can keep using.
           </p>
         </div>
       </section>
@@ -67,8 +67,8 @@ function TheWorkPage() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
           <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
           <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
-            A Rune is not a personality type and it is not decoration. It is a mark for a way of moving
-            through the Badlands — a capacity you practise on the land, then carry when you leave.
+            A Rune is a mark for a way of moving through the Badlands — a capacity you practise on the
+            land, then carry when you leave.
           </p>
           <p className="mb-12 max-w-[58ch] text-fossil/65">
             PACE is the sequence: Play, Adaptability, Connection, Experience. Each day of Bootcamp
@@ -97,23 +97,21 @@ function TheWorkPage() {
         <div className="mx-auto grid max-w-6xl gap-14 md:grid-cols-2">
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Echo</p>
-            <h2 className="font-display mb-4 text-3xl uppercase">A mirror. Not a clinic.</h2>
+            <h2 className="font-display mb-4 text-3xl uppercase">What the day sends back.</h2>
             <p className="mb-4 text-fossil/75">
               Echo is how the work looks back at you. Short prompts after time on the land. Pattern,
-              not diagnosis. Self-awareness lives here — it is not a fifth Rune.
+              not diagnosis. Self-awareness lives here.
             </p>
-            <p className="text-fossil/75">
-              There is no guest-facing coach in your pocket while you walk. The canyon does that job.
-            </p>
+            <p className="text-fossil/75">The canyon does the coaching. The notes are yours.</p>
           </div>
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">HAM</p>
             <h2 className="font-display mb-4 text-3xl uppercase">Human Adaptation Model</h2>
             <p className="mb-4 text-fossil/75">
-              How we protect, adapt, and choose again. Tess leads it. It is not a course you can buy
-              this month. When it is ready it will travel as language people keep after they leave.
+              How we protect, adapt, and choose again. The language a group keeps after they drive
+              home — and the body of work that will travel further when it is ready.
             </p>
-            <p className="text-fossil/75">Trail Quest will carry some of this in the field from mid-October. Paper first if the phone dies.</p>
+            <p className="text-fossil/75">Trail Quest carries some of this in the field. Paper if the phone dies.</p>
           </div>
         </div>
       </section>
