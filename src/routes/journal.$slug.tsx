@@ -47,9 +47,14 @@ function JournalArticle() {
       </article>
 
       <section className="border-t border-fossil/10 px-6 py-16">
-        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2">
-          {others.map((p) => (
-            <Link key={p.slug} to="/journal/$slug" params={{ slug: p.slug }} className="block hover:text-sandstone">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
+          {others.map((p, i) => (
+            <Link
+              key={p.slug}
+              to="/journal/$slug"
+              params={{ slug: p.slug }}
+              className={`block max-w-[20rem] hover:text-sandstone ${i === 1 ? "sm:text-right sm:ml-auto" : ""}`}
+            >
               <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">{p.kicker}</p>
               <h2 className="font-display text-3xl uppercase">{p.title}</h2>
             </Link>
