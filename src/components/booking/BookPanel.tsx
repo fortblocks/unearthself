@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { cad } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
@@ -16,6 +17,8 @@ const label = "mb-1.5 block text-[0.68rem] font-semibold tracking-[0.14em] text-
 
 export function BookPanel() {
   const { open, setOpen, lines, removeLine, updateLine, clear, mode, setMode } = useBooking();
+  const [mounted, setMounted] = useState(false);
+  const [inPos, setInPos] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,6 +26,20 @@ export function BookPanel() {
   const [password, setPassword] = useState("");
   const [saveCard, setSaveCard] = useState(true);
   const [status, setStatus] = useState<"idle" | "done">("idle");
+  const total = lines.reduce((sum, l) => sum + l.price, 0);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setInPos(true));
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    setInPos(false);
+    const t = window.setTimeout(() => setMounted(false), 320);
+    return () => window.clearTimeout(t);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -39,17 +56,8 @@ export function BookPanel() {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const list = lines.map((l) => `${l.name} — ${l.date || "date TBC"} ${l.time}`).join("\n");
-    const body = [
-      `Mode: ${mode}`,
-      `Name: ${name}`,
-      `Email: ${email}`,
-      `Phone: ${phone}`,
-      "",
-      list,
-      "",
-      notes,
-    ].join("\n");
+    const list = lines.map((l) => `${l.name} ${cad(l.price)} — ${l.date || "date TBC"} ${l.time}`).join("\n");
+    const body = [`Mode: ${mode}`, `Name: ${name}`, `Email: ${email}`, `Phone: ${phone}`, "", list, `Total: ${cad(total)}`, "", notes].join("\n");
     try {
       const existing = JSON.parse(localStorage.getItem("unearthself-treatment-requests") || "[]") as unknown[];
       localStorage.setItem(
@@ -59,22 +67,32 @@ export function BookPanel() {
     } catch {
       /* ignore */
     }
-    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent(
-      "Basecamp request",
-    )}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent("Basecamp request")}&body=${encodeURIComponent(body)}`;
     setStatus("done");
   }
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-end">
-      <button type="button" aria-label="Close booking" className="absolute inset-0 bg-coal/40" onClick={() => setOpen(false)} />
-      <aside className="relative flex h-full w-full max-w-[28rem] flex-col bg-white text-coal shadow-2xl">
+      <button
+        type="button"
+        aria-label="Close booking"
+        className={"absolute inset-0 bg-coal/40 transition-opacity duration-300 " + (inPos ? "opacity-100" : "opacity-0")}
+        onClick={() => setOpen(false)}
+      />
+      <aside
+        className={
+          "relative flex h-full w-full max-w-[28rem] flex-col bg-white text-coal shadow-2xl transition-transform duration-300 ease-out " +
+          (inPos ? "translate-x-0" : "translate-x-full")
+        }
+      >
         <header className="flex items-center justify-between px-7 pt-7 pb-5">
           <div>
             <p className="text-[0.68rem] tracking-[0.2em] text-shale uppercase">Your booking</p>
-            <p className="mt-1 text-sm text-coal/50">{lines.length === 0 ? "Nothing added yet" : `${lines.length} treatment${lines.length === 1 ? "" : "s"}`}</p>
+            <p className="mt-1 text-sm text-coal/50">
+              {lines.length === 0 ? "Nothing added yet" : `${lines.length} treatment${lines.length === 1 ? "" : "s"}`}
+            </p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="text-sm text-coal/45 hover:text-coal">
             Close
@@ -130,7 +148,9 @@ export function BookPanel() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium">{line.name}</p>
-                          <p className="text-sm text-coal/45">{line.mins}</p>
+                          <p className="text-sm text-coal/45">
+                            {line.mins} · {cad(line.price)}
+                          </p>
                         </div>
                         <button type="button" onClick={() => removeLine(line.key)} className="text-xs tracking-wide text-coal/35 uppercase hover:text-coal">
                           Remove
@@ -183,9 +203,7 @@ export function BookPanel() {
                     <span className={label}>Notes</span>
                     <textarea rows={3} className={field} value={notes} onChange={(e) => setNotes(e.target.value)} />
                   </label>
-                  <p className="text-sm text-coal/45">
-                    Card is taken when the slot is confirmed. Guests pay per visit.
-                  </p>
+                  <p className="text-sm text-coal/45">Card is taken when the slot is confirmed. Guests pay per visit.</p>
                 </div>
               ) : (
                 <div className="grid gap-4">
@@ -214,6 +232,12 @@ export function BookPanel() {
             </div>
 
             <div className="border-t border-coal/10 px-7 py-5">
+              {lines.length > 0 && (
+                <p className="mb-3 flex justify-between text-sm">
+                  <span className="text-coal/50">Working total</span>
+                  <span className="tabular-nums">{cad(total)}</span>
+                </p>
+              )}
               <button
                 type="submit"
                 disabled={lines.length === 0}
