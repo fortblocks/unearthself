@@ -18,7 +18,7 @@ const doors = [
     to: "/bootcamp" as const,
     kicker: "The expedition",
     title: "Bootcamp",
-    line: "Three days on the land. Teams who need more than a change of hotel.",
+    line: "Two to five days on the land. Groups of six to thirty.",
     img: "/images/exp-hoodoos.jpg",
   },
   {
@@ -45,18 +45,20 @@ function Home() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,0.9) 0%, rgba(22,23,24,0.2) 45%), url('/images/hero-badlands-dusk.jpg')",
+              "linear-gradient(to top, rgba(22,23,24,0.88) 0%, rgba(22,23,24,0.18) 50%), url('/images/hero-badlands-dusk.jpg')",
           }}
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
-          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">Drumheller, Alberta</p>
+          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
+            Canadian Badlands · Drumheller
+          </p>
           <h1 className="font-display mb-5 text-[clamp(2.8rem,8vw,5.6rem)] leading-[0.9] uppercase">
-            Come for the land.
+            Come for
             <br />
-            Leave differently.
+            the land.
           </h1>
-          <p className="max-w-[36ch] text-lg text-fossil/85">
-            PACE is the path. Unearth Self is the purpose.
+          <p className="max-w-[38ch] text-lg text-fossil/85">
+            An expedition, four suites, and a house for heat and cold. Ninety minutes from Calgary.
           </p>
         </div>
       </section>
