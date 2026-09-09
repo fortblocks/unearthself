@@ -1,40 +1,42 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { StayRequest } from "@/components/haven/StayRequest";
+import { HAVEN_PHOTOS } from "@/data/havenPhotos";
 import { HAVEN_ADDRESS, HAVEN_SHARED, ROOMS } from "@/data/rooms";
 
 export const Route = createFileRoute("/haven/")({
   component: HavenPage,
   head: () => ({
     meta: [
-      { title: "Haven — Unearthself" },
+      { title: "Haven - Unearth Self" },
       {
         name: "description",
         content:
-          "Haven is four rooms in a redeveloped heritage building in downtown Drumheller. Short stays, kitchens, fireplaces, and a quieter doorway into Unearthself.",
+          "Four suites in a heritage building in downtown Drumheller. Kitchens, fireplaces, and a quiet stay next to the Badlands.",
       },
     ],
   }),
 });
 
 function HavenPage() {
+  const hero = HAVEN_PHOTOS.exterior[0] ?? ROOMS[0].images[0];
+
   return (
     <>
       <section className="relative flex min-h-[70vh] items-end overflow-hidden px-4 pb-16 text-white">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,.78), rgba(40,18,6,.32)), url('/images/haven/hero.jpg')",
+            backgroundImage: `linear-gradient(to top, rgba(22,23,24,.78), rgba(22,23,24,.25)), url('${hero}')`,
           }}
         />
         <div className="relative z-10 mx-auto w-full max-w-7xl">
           <p className="mb-3 text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
-            Experiences · Hospitality
+            Drumheller - four suites
           </p>
           <h1 className="font-display mb-3 text-[clamp(2.5rem,6.5vw,4.5rem)] tracking-wide uppercase">Haven</h1>
           <p className="mb-8 max-w-[40ch] text-lg text-fossil/90">
-            Four rooms in a redeveloped heritage building in downtown Drumheller. A softer layer of the
-            same philosophy and place.
+            A heritage house in downtown Drumheller. Four apartments with kitchens and fireplaces.
+            Walk to the valley. Sleep here whether or not you are on a Bootcamp.
           </p>
           <a
             href="#stay"
@@ -49,13 +51,12 @@ function HavenPage() {
         <div className="mx-auto grid max-w-7xl gap-12 md:grid-cols-[1.3fr_1fr] md:items-end">
           <div>
             <p className="mb-3 text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
-              River Valley Haven
+              The house
             </p>
-            <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3rem)]">Stay with the land, not a programme</h2>
+            <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3rem)]">Stay with the land, not a programme.</h2>
             <p className="max-w-[48ch] text-lg text-shale">
-              Overnight rooms as a quieter doorway into Unearthself — for those who want the valley, the rest,
-              and a kitchen of their own. Full-service apartments: custom kitchens, fireplaces, air
-              conditioning. Walkable downtown Drumheller.
+              Full kitchens, fireplaces, air conditioning. On-site parking. Downtown Drumheller.
+              Basecamp spa is next door when you want heat or hands.
             </p>
           </div>
           <ul className="grid grid-cols-2 gap-3 text-sm text-shale">
@@ -78,7 +79,7 @@ function HavenPage() {
               <h2 className="font-display text-[clamp(2rem,4vw,3rem)]">Four suites</h2>
             </div>
             <p className="max-w-[36ch] text-shale">
-              Descriptions and rates will be set with you. For now: the rooms, the stay, a request to hold dates.
+              Pick a room. Request dates. We confirm what is free and send the rate before anything is charged.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
@@ -89,14 +90,14 @@ function HavenPage() {
                     <img
                       src={room.images[0]}
                       alt=""
-                      className="h-full w-full object-cover saturate-[0.78] contrast-[1.05] brightness-[0.93] transition-transform duration-500 hover:scale-[1.03]"
+                      className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
                     />
                   </div>
                 </Link>
                 <div className="p-6 md:p-8">
                   <p className="mb-1 text-[0.72rem] font-semibold tracking-[0.14em] text-sandstone uppercase">
-                    Sleeps {room.sleeps} · {room.bedrooms}
-                    {room.size ? ` · ${room.size}` : ""}
+                    Sleeps {room.sleeps} / {room.bedrooms}
+                    {room.size ? ` / ${room.size}` : ""}
                   </p>
                   <h3 className="font-display mb-2 text-3xl">{room.name}</h3>
                   <p className="mb-6 max-w-[42ch] text-shale">{room.tagline}</p>
@@ -105,7 +106,7 @@ function HavenPage() {
                     params={{ slug: room.slug }}
                     className="text-[0.85rem] font-semibold text-ember hover:text-ember-soft"
                   >
-                    View {room.name} →
+                    View {room.name}
                   </Link>
                 </div>
               </article>
@@ -122,8 +123,8 @@ function HavenPage() {
             </p>
             <h2 className="font-display mb-4 text-[clamp(2rem,4vw,3rem)]">Request a stay</h2>
             <p className="mb-6 max-w-[40ch] text-fossil/75">
-              Choose dates and a room if you have a preference. We’ll confirm what’s free and send rates before
-              anything is charged.
+              Choose dates and a room if you have a preference. We confirm what is free and send the rate
+              before anything is charged.
             </p>
             <p className="text-sm text-fossil/55">{HAVEN_ADDRESS}</p>
           </div>
