@@ -8,6 +8,7 @@ export type BookLine = {
   treatmentId: string;
   name: string;
   mins: string;
+  price: number;
   date: string;
   time: string;
 };
@@ -41,6 +42,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         treatmentId: t.id,
         name: t.name,
         mins: t.mins,
+        price: t.price,
         date: "",
         time: "",
       },
