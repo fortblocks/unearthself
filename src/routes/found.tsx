@@ -24,22 +24,22 @@ const marks = [
   {
     slug: "play",
     name: "Play",
-    line: "The valley’s first joke is scale. Permission to be unexpert. Climb because the hoodoo is there.",
+    line: "Found in the hoodoo’s shadow, by the one who laughed first. The valley is larger than the plan. Climb anyway.",
   },
   {
     slug: "adaptability",
     name: "Adaptability",
-    line: "What looked simple from the rim is a different animal underfoot. Weather, hill, the self that will not stay still.",
+    line: "Found where the trail lied. What was simple from the rim is a different animal underfoot. The stone was not there at dawn.",
   },
   {
     slug: "connection",
     name: "Connection",
-    line: "The fire. The other bodies. The companion you have been walking beside without speaking to.",
+    line: "Found in the ring of the fire, still warm. A place already set. The companion who has been walking beside you without speaking.",
   },
   {
     slug: "experience",
     name: "Experience",
-    line: "What you cannot unread. The fossil under the hand. The name of the house: unearth.",
+    line: "Found under the hand, in the striped rock. Once you have touched it you cannot unread the valley. You carry it out.",
   },
 ];
 
@@ -68,24 +68,32 @@ function FoundPage() {
 
       <article id="story" className="found-story">
         <p className="found-drop">
-          The marks travel the bottom of every page. Most eyes slide past. Yours
-          did not. That is the first evidence. Not luck. Attention.
+          There are walkers in this valley. They are not from here, not at
+          first. Something in them would not sit still, so the land took them
+          in. The town at the canyon’s mouth calls them visitors. The old ones
+          in the rock have another word. Badlanders.
         </p>
         <p>
-          Your journey of unearthing self starts here. In the land of dinosaurs.
-          Seventy million years of river and bone, then a town, then a house,
-          then a path with four names. You are not the first to come looking for
-          something you cannot quite say. You are not the last.
+          A Badlander does not arrive with a map that works. They arrive with a
+          restlessness they cannot name, and a willingness to be made smaller
+          by the hoodoos. The marks they find along the way are not issued.
+          They are unearthed — in a shadow, in a lie the trail tells, in the
+          warmth of a fire someone else has already lit.
         </p>
 
-        <h2>Deep time keeps a valley.</h2>
+        <h2>The valley keeps a slower clock.</h2>
         <p>
-          Drumheller is small. The landscape is not. Hoodoos stacked like
-          unfinished sentences. Coulees cut as if a giant had practised
-          handwriting and left the drafts. The Red Deer River still argues with
-          the same rock the Albertosaurus walked when an inland sea still
-          breathed here. The bones are not a theme. They are the fact of the
-          place.
+          Hoodoos stacked like unfinished sentences. Coulees cut as if a giant
+          had practised handwriting and left the drafts. A river that has been
+          arguing with the same rock since an inland sea still breathed here.
+          The Albertosaurus walked this cut when the days were longer. The
+          bones remember. So does the dust.
+        </p>
+        <p>
+          If you have the eyes, the old tenants are not gone. They drink at the
+          water. They take the switchback with you because the trail is narrow
+          and courtesy is older than speech. They are not monsters. They are
+          the valley, moving.
         </p>
       </article>
 
@@ -97,20 +105,19 @@ function FoundPage() {
       />
 
       <article className="found-story">
-        <h2>Not a backdrop. A partner.</h2>
+        <h2>At the rim, someone laughs.</h2>
         <p>
-          Unearth Self is a practice that needed a landscape that would not
-          flatter you. Banff will hold your photograph. This canyon will hold
-          your nerve. We did not bring a method and hunt for scenery. We came
-          because the land was already doing the work — stripping, revealing,
-          asking what remains when the performance is tired.
+          It is always the rim that starts it. A Badlander stands in the wind
+          with the whole cut below them and feels, for a moment, ridiculous —
+          the pack, the plan, the self they brought from the city, all of it
+          the size of a pebble. Some turn back. The ones who stay make a sound
+          that surprises them. Not a strategy. A laugh.
         </p>
         <p>
-          Four partners. No chief. A house for heat and cold. Four suites for
-          sleep. An expedition for the ones who want the land to have them for a
-          few days and send them back altered. Year one is this town and this
-          cut in the earth. The long game is a language people keep using after
-          they leave.
+          In the hoodoo’s shadow they find a mark cut so simply it could be a
+          child’s. The valley’s first joke is scale. Permission to be unexpert.
+          Climb because the stone is there. They pocket it without knowing they
+          have begun.
         </p>
       </article>
 
@@ -121,35 +128,41 @@ function FoundPage() {
       />
 
       <article className="found-story">
-        <h2>They walked here first.</h2>
+        <h2>The water does not hurry.</h2>
         <p>
-          Imagine, for a moment, that the valley remembers its old tenants not
-          as monsters but as neighbours of a slower clock. Edmontosaurus at the
-          water. Ankylosaur like a hill that learned to breathe. Albertosaurus
-          on the switchback, matching your pace because the trail is narrow and
-          courtesy is older than us.
+          By the second day the river has them. Edmontosaurus at the mud,
+          unbothered. Two walkers on the near bank, smaller than they meant to
+          be. The old herd does not startle. Neither, after a while, do the
+          Badlanders. There is a long courtesy in standing still together.
         </p>
         <p>
-          This is not a children’s book and it is not a theme park. It is a way
-          of saying: you are late to a very long story, and that is the honour.
-          The dinosaurs did not come here to become metaphors. They came because
-          the river was here. So did we. So did you.
+          You are late to a very long story. That is the honour, not the
+          problem. The dinosaurs did not come here to become a lesson. They
+          came because the river was here. So did the walkers. So did you.
         </p>
       </article>
 
       <Plate
         src="/images/found/trail.jpg"
         alt="Two travellers walking a canyon trail beside a pachyrhinosaurus"
-        caption="Play is how the valley first meets you. Keep walking."
+        caption="The trail will lie. Walk it anyway."
       />
 
       <article className="found-story">
-        <h2>Four marks. One sequence.</h2>
+        <h2>The trail lies, and that is the gift.</h2>
         <p>
-          The runes you followed are PACE. Play. Adaptability. Connection.
-          Experience. They are not slogans hung on a wall for the photograph.
-          They are four ways of moving through the Badlands — practised on the
-          land, then carried when the boots come off.
+          What looked simple from the rim is a different animal underfoot.
+          Switchbacks that vanish. Weather that was not in the morning sky. A
+          pachyrhinosaurus on the path, matching pace because there is only
+          room for courtesy. The Badlander who does not change, breaks. The
+          one who does, finds a second mark in a stone that was not there at
+          dawn.
+        </p>
+        <p>
+          They do not set out with a list. The valley offers the marks in the
+          order it chooses. Most who stay long enough find four. The stone
+          never came labelled. The names came later, given by those who made it
+          out and could not stop turning the shapes in their hands.
         </p>
       </article>
 
@@ -166,36 +179,49 @@ function FoundPage() {
       <Plate
         src="/images/found/camp.jpg"
         alt="A night camp in a coulee, humans by a fire, a great ankylosaur resting nearby"
-        caption="Connection keeps a fire. Deep time sits down with you."
+        caption="A place already set. Deep time sits down with you."
       />
 
       <article className="found-story">
-        <h2>Unearth is a verb.</h2>
+        <h2>Night in the coulee.</h2>
         <p>
-          Take off what you put on to survive the city. Meet what is left — on
-          this land, with these people, in this weather. The work has a language
-          (Echo, the Human Adaptation Model, Super Self-Awareness practised
-          rather than posted). The expedition has dates. The house has a door
-          that is not hidden. This page is none of those. This page is the
-          start of an adventure you already began when you stopped on a moving
-          mark.
+          Someone has lit a fire on pale stone. Three sit. Nearby, a hill of
+          armour is breathing — an ankylosaur, or a ridge that learned how.
+          Sparks go up. The Milky Way does the rest. In the ring of the fire
+          the third mark is still warm. A place already set. The companion you
+          have been walking beside without speaking to, which may be another
+          person, or the old one, or the self you came here to meet.
+        </p>
+        <p>
+          This is the unearthing. Not a souvenir. Not a photograph of the
+          canyon. Taking off what you put on to survive the far-away rooms, and
+          sitting down with what is left. The valley will not do the becoming
+          for you. It will only refuse to lie.
         </p>
       </article>
 
       <Plate
         src="/images/found/fossil.jpg"
         alt="A hand resting on a fossil in striped Badlands rock"
-        caption="Experience is the fossil under the hand. You cannot unread it."
+        caption="Once you have touched it, you cannot unread the valley."
       />
 
       <article className="found-story found-end">
-        <h2>If you are still reading.</h2>
+        <h2>The last mark is a hand on the bone.</h2>
         <p>
-          Stay curious. That is the first rule, and you have already kept it.
-          The second is older: walk. The valley will not do the becoming for
-          you. It will only refuse to lie.
+          Striped rock. Warm sidelight. A Badlander kneels without meaning to.
+          Under the palm, the fourth mark — the one you carry out under the
+          skin. Experience is a poor word for it. It is more like this: you
+          cannot unread the valley. You go back to the far-away rooms changed,
+          and the mark goes with you, and some nights you can still smell the
+          dust.
         </p>
-        <p className="found-sign">— the house, Drumheller</p>
+        <p>
+          If you are still reading, you already know the first rule. Stay
+          curious. The second is older. Walk. The marks keep moving. They
+          always have. Yours was not luck. It was attention.
+        </p>
+        <p className="found-sign">— a Badlander, still walking</p>
         <nav className="found-doors" aria-label="Ways onward">
           <Link to="/the-work">The work</Link>
           <Link to="/bootcamp">The expedition</Link>
