@@ -37,8 +37,8 @@ function TheWorkPage() {
     <main className="bg-coal text-fossil">
       <section className="relative h-[70vh] min-h-[28rem] overflow-hidden">
         <img
-          src="/images/work/horseshoe.jpg"
-          alt="A small group walking the floor of Horseshoe Canyon"
+          src="/images/exp-hoodoos.jpg"
+          alt="Badlands canyon"
           className="absolute inset-0 h-full w-full object-cover"
         />
       </section>
