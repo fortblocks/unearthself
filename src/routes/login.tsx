@@ -30,7 +30,7 @@ function LoginPage() {
       const result = await staffLogin({
         data: {
           email: String(data.get("email") || "").trim(),
-          password: String(data.get("password") || ""),
+          password: String(data.get("password") || "").trim(),
         },
       });
       if (!result.ok) {
@@ -54,9 +54,12 @@ function LoginPage() {
             name="email"
             type="email"
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             defaultValue={STAFF_EMAIL}
-            className="border-fossil/20 bg-coal text-fossil placeholder:text-fossil/30 focus:border-ember"
+            className="desk-field"
           />
         </label>
         <label>
@@ -65,8 +68,11 @@ function LoginPage() {
             name="password"
             type="password"
             autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
-            className="border-fossil/20 bg-coal text-fossil placeholder:text-fossil/30 focus:border-ember"
+            className="desk-field"
           />
         </label>
         {error ? <p className="text-sm text-ember">{error}</p> : null}

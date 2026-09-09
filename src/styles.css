@@ -75,3 +75,27 @@
     scroll-behavior: auto;
   }
 }
+
+/* Login fields: coal on white, including Chrome autofill. */
+.desk-field {
+  color-scheme: light;
+  background-color: #ffffff !important;
+  color: #161718 !important;
+  caret-color: #161718 !important;
+  -webkit-text-fill-color: #161718 !important;
+  border-color: rgba(248, 240, 237, 0.4) !important;
+  font-weight: 500;
+}
+.desk-field::placeholder {
+  color: #6b5d57 !important;
+  -webkit-text-fill-color: #6b5d57 !important;
+  opacity: 1;
+}
+.desk-field:-webkit-autofill,
+.desk-field:-webkit-autofill:hover,
+.desk-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: #161718 !important;
+  caret-color: #161718;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-out;
+}

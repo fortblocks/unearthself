@@ -3,14 +3,26 @@ import { STAFF_EMAIL } from "@/lib/staff";
 
 const COOKIE = "us_desk";
 
-function cookieOpts(maxAge: number) {
-  return {
+function cookieOpts(maxAge: number, host?: string) {
+  const opts: {
+    httpOnly: boolean;
+    sameSite: "lax";
+    path: string;
+    maxAge: number;
+    secure: boolean;
+    domain?: string;
+  } = {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     path: "/",
     maxAge,
     secure: process.env.NODE_ENV === "production",
   };
+  const hostname = (host ?? "").split(":")[0].toLowerCase();
+  if (hostname === "unearthself.xyz" || hostname.endsWith(".unearthself.xyz")) {
+    opts.domain = ".unearthself.xyz";
+  }
+  return opts;
 }
 
 export const getStaffSession = createServerFn({ method: "GET" }).handler(async () => {
@@ -37,7 +49,8 @@ export const staffLogin = createServerFn({ method: "POST" })
   .validator((d: { email: string; password: string }) => d)
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data.password));
+    const password = data.password.trim();
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
     const digest = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
     if (
       email !== STAFF_EMAIL ||
@@ -45,7 +58,7 @@ export const staffLogin = createServerFn({ method: "POST" })
     ) {
       return { ok: false as const };
     }
-    const { setCookie } = await import("@tanstack/react-start/server");
+    const { setCookie, getRequestHeader } = await import("@tanstack/react-start/server");
     const { SignJWT } = await import("jose");
     const secret = new TextEncoder().encode(
       process.env.STAFF_SESSION_SECRET?.trim() || "unearth-desk-staff-2026",
@@ -55,12 +68,14 @@ export const staffLogin = createServerFn({ method: "POST" })
       .setIssuedAt()
       .setExpirationTime("7d")
       .sign(secret);
-    setCookie(COOKIE, token, cookieOpts(60 * 60 * 24 * 7));
+    const host = getRequestHeader("x-forwarded-host") || getRequestHeader("host") || "";
+    setCookie(COOKIE, token, cookieOpts(60 * 60 * 24 * 7, host));
     return { ok: true as const };
   });
 
 export const staffLogout = createServerFn({ method: "POST" }).handler(async () => {
-  const { deleteCookie } = await import("@tanstack/react-start/server");
-  deleteCookie(COOKIE, cookieOpts(0));
+  const { deleteCookie, getRequestHeader } = await import("@tanstack/react-start/server");
+  const host = getRequestHeader("x-forwarded-host") || getRequestHeader("host") || "";
+  deleteCookie(COOKIE, cookieOpts(0, host));
   return { ok: true as const };
 });
