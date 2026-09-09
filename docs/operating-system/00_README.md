@@ -31,7 +31,7 @@ This folder is the single source of truth for every Grok chat, Grok Bot and huma
 ## Workstream index
 
 | Code | File | Owner (working) | Priority to Nov 2026 |
-|---|---|---|---|
+|---|---|---|
 | GOV | `02_GOVERNANCE_AND_DOC_RULES.md` | Christopher | P0 |
 | BRAND | `03_BRAND_SYSTEM.md` | Christopher (Tess on rune meaning) | P0 |
 | RETREAT | `04_WS_PRODUCT_RETREAT.md` | Tess (Lisa on the day) | P0 |
@@ -67,8 +67,8 @@ Team-shareable files:
 - App: **Trail Quest**
 - Reflection tool in the MVP: **Echo Mirror**
 - Deep model: **Echo System** and **HAM (Human Adaptation Model)**
-- First Rune sequence: **PACE** = Play, Adaptability, Connection, Existence
-- Fourth Rune is **Existence**, not Experience and not Presence. Presence is the previously forged Rune that Existence evolves. “Experience” in older briefs is a drift — do not print it.
+- First Rune sequence: **PACE** = Play, Adaptability, Connection, Experience
+- Fourth Rune is **Experience**. Presence is the predecessor. Existence was an interim name — do not print it.
 - Self-awareness is a **cross-cutting Echo capacity**, not a fifth Rune.
 - Safety line: **Notice, don’t excavate.** The Echo Mirror is not therapy.
 - Grammar: *Runes offer orientation. Challenges create friction. The Echo Mirror reveals our response. Awareness creates choice.*
