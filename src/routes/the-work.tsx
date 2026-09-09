@@ -16,18 +16,22 @@ export const Route = createFileRoute("/the-work")({
 const runes = [
   {
     name: "Play",
+    slug: "play",
     line: "Start before you have the right answer. The land rewards people who will try the next step.",
   },
   {
     name: "Adaptability",
+    slug: "adaptability",
     line: "The plan will not survive the coulee. That is information, not failure.",
   },
   {
     name: "Connection",
+    slug: "connection",
     line: "You find out who you are with when the map and the weather disagree.",
   },
   {
     name: "Experience",
+    slug: "experience",
     line: "Be in the thing that is happening. Not the story you brought from the car.",
   },
 ];
@@ -65,7 +69,14 @@ function TheWorkPage() {
           <div className="grid gap-10 md:grid-cols-2">
             {runes.map((r) => (
               <article key={r.name} className="border-t border-fossil/15 pt-5">
-                <h3 className="font-display mb-3 text-3xl uppercase">{r.name}</h3>
+                <div className="mb-3 flex items-center gap-4">
+                  <img
+                    src={`/runes/${r.slug}.svg`}
+                    alt=""
+                    className="size-12 shrink-0"
+                  />
+                  <h3 className="font-display text-3xl uppercase">{r.name}</h3>
+                </div>
                 <p className="max-w-[40ch] text-fossil/70">{r.line}</p>
               </article>
             ))}
