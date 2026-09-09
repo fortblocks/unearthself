@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { BookPanel } from "@/components/booking/BookPanel";
+import { BookButton } from "@/components/site/BookButton";
 
 const links = [
   { to: "/the-work", label: "The Work" },
@@ -31,7 +33,6 @@ export function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onHaven = pathname.startsWith("/haven");
   const onD14 = pathname.startsWith("/d14");
-  const bookTo = pathname.startsWith("/for") || pathname.startsWith("/bootcamp") ? "/book/retreat" : "/haven";
 
   if (onD14) {
     return <>{children}</>;
@@ -55,22 +56,15 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               {l.label}
             </Link>
           ))}
-          <Link
-            to={bookTo}
-            className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft"
-          >
-            Book
-          </Link>
+          <BookButton />
         </nav>
-        <Link
-          to={bookTo}
-          className="rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft md:hidden"
-        >
-          Book
-        </Link>
+        <div className="md:hidden">
+          <BookButton />
+        </div>
       </header>
 
       <main className="pt-0">{children}</main>
+      <BookPanel />
 
       <footer className="bg-coal px-4 pt-16 pb-10 text-[0.9rem] text-fossil/70">
         <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
@@ -102,7 +96,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Connect</h4>
             <ul className="space-y-2">
               <li><Link to="/about" className="hover:text-fossil">About</Link></li>
-              <li><Link to="/book/retreat" className="hover:text-fossil">Hold a date</Link></li>
+              <li><Link to="/for/teams" className="hover:text-fossil">Hold a date</Link></li>
               <li>
                 <a href="mailto:hello@unearthself.xyz" className="hover:text-fossil">
                   hello@unearthself.xyz
