@@ -149,6 +149,26 @@ Draft to rewrite: [PASTE OR NAME THE FILE]
 **Repo:** `fortblocks/unearthself` — PWA lives at `/quest`. Last CoS ship: commit `4de94a4`.  
 **Rule:** This is the only chat that edits Trail Quest code. CoS (this thread’s parent) does not. Paste returns back here so the OS stays current.
 
+**Repo fence (same repo, not a second one):** Isolation is by **path**, not by repository. A dedicated Trail Quest repo would fork the PWA in a week.
+
+May touch:
+- `src/routes/quest*.tsx`
+- `src/components/quest/`
+- `src/data/quest/`
+- `src/lib/quest/`
+- `public/quest/` and `public/quest-sw.js`
+- quest-namespaced CSS only (`.quest` / `[data-quest]`)
+- `native/` (Capacitor config, `ios/`, `android/`, icons, splashes). Create this folder. Do not dump `ios/` on the repo root if you can help it.
+- `package.json` only to add Capacitor / native scripts. Do not bump unrelated deps.
+
+Must not touch:
+- marketing routes, `/spring`, `/found`, Haven, spa, desk/admin, booking
+- `SiteChrome` (the `/quest` skip already exists)
+- `docs/operating-system/` except `09` and a recommend-only note in `17` / one line in `10`
+- brand tokens, prices, global CSS outside the quest namespace
+
+Git: `git pull --rebase` before every push. Do not force-push `main`. If CoS is shipping the same day, work on branch `quest` and say so in the return. Capacitor wraps `/quest`; the guest start screen is the quest join, not the marketing homepage.
+
 ```
 [PASTE UNIVERSAL PREAMBLE]
 
@@ -170,6 +190,7 @@ Job:
 4. Do not invent Horsethief radii. Do not copy them onto Horseshoe.
 5. Paper pack stays in lockstep with digital beats.
 6. If Christopher also pastes APP-02 into this thread, do the store wrap here. Do not open a third Trail Quest chat.
+7. Obey the repo fence: quest paths + `native/` only. Pull --rebase. No force-push. No second repository.
 
 Must preserve: the loop, Field Recorder, land wins, digital specimens only, Mirror with no AI, Rune whether or not every bone is found, D02 unnamed.
 
@@ -203,7 +224,7 @@ Job:
 5. Confirm in the WebView: join code, offline pack, haptics, geolocation (stand-in until walked), IndexedDB notes, Field Recorder rotation, paper token unlock. If a permission dies in the shell, fix the shell, not the quest.
 6. Bundle id recommendation only (do not treat as closed): xyz.unearthself.quest. Display name: Unearth Self. D05 still open.
 7. Produce:
-   - capacitor config + iOS/Android project files in repo
+   - capacitor config + iOS/Android project files under `native/` (not a second repo; not sprinkled through `src/`)
    - icon + splash from brand (Coal / Fossil / Ember)
    - Info.plist / AndroidManifest permissions: location, (precise location), haptic; no camera in v1
    - a Mac build sheet Christopher can follow in Xcode: archive → App Store Connect → TestFlight
@@ -261,3 +282,4 @@ CoS job:
 - 2026-09-10 — APP-01 added (spec + PWA; Christopher override). RETREAT-01 added.
 - 2026-09-10 — APP-01 marked merged (PWA shipped in CoS). APP-01-CONT and APP-02 added. Trail Quest code leaves this CoS thread.
 - 2026-09-10 — Christopher confirmed Apple Developer, Play Console, Mac/Xcode. APP-02 uploads from his Mac.
+- 2026-09-10 — Same repo, path fence. No second Trail Quest repository. Native lives under `native/`.
