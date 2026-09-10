@@ -31,7 +31,7 @@ Christopher spawns. CoS tracks whether the return was merged into the assigned f
 | 5 | PLACE-01 | Spa menu + Haven house / booking rules | Norah + Lisa | `06_WS_SPA_HAVEN.md` |
 | 6 | APP-01 | Trail Quest PWA spec (guest + facilitator) | Christopher (Tess on quest copy) | `09_WS_TRAIL_QUEST.md` |
 
-WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01: Christopher overrode the “after paying outdoor day” hold on 10 Sep — **spec**, then PWA, not native.
+WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01 **returned 10 Sep** — spec merged into `09`. Build waits on Christopher saying **go**.
 
 ## Grok threads — next
 
@@ -42,7 +42,7 @@ WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 
 | ECHO-01 | Facilitator Mirror card (two pages) | Week 2 — Tess |
 | WEB-02 | Build brief + CMS + embeds | After D14 hybrid is chosen |
 | OPS-01 | Safety pack templates | Week 3 — Lisa |
-| APP-01 | Trail Quest PWA spec | Opened 10 Sep. Spec in `09`. Spawn from `16`. |
+| APP-01 | Trail Quest PWA spec | Returned 10 Sep. Merged into `09`. Build waits on go. |
 | PART-01 | Canalta + canyon one-pagers | Week 3 — Lisa |
 | VOICE-01 | Humanizer pass on a named draft | When a page or mail is about to ship |
 
@@ -79,3 +79,4 @@ Put these four on the wall until they move:
 - 2026-09-08 — File created from CoS stand-up grid. Human seats all open. Thread jobs taken from `16`, not guessed. PART-01 holds canyon/Canalta. OPS-01 is safety pack, not FOH.
 - 2026-09-10 — VOICE-01 added. Skill in `skills/humanizer`.
 - 2026-09-10 — APP-01 opened (Christopher). Spec ingested from MVP PDF into `09`. Spawn prompt in `16`.
+- 2026-09-10 — APP-01 return merged into `09`. Screen IDs, pack v0.1, paper nine, Horsethief walk. D02 / D10 / D18 left open.

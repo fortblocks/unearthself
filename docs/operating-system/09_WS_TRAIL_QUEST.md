@@ -1,7 +1,8 @@
 # Workstream — Trail Quest App
 
 **Code:** APP  
-**Status:** Specified from *Unearth Self MVP.pdf* (118 pp, 10 Sep 2026). Not built. Tweaks expected in the field.  
+**Status:** Specified. APP-01 returned 10 Sep 2026 and is merged below. **Not built.** Say go in the systems thread to implement against this file.  
+**Working host (does not close D05):** `quest.unearthself.xyz`  
 **Rule:** The app preserves immersion. If it fights the canyon, paper wins. If an instruction conflicts with safety, conditions or a physical limit, the app instruction does not take priority.
 
 Guest-facing chrome may say **Unearth Self**. The product name in this OS is **Trail Quest**.
@@ -60,6 +61,7 @@ The team travels without a facilitator in the canyon. Trail Quest guides.
 - That person carries one active device, reads discoveries aloud, warns when a station is coming. They do not lead the team or decide for it.
 - Everyone else keeps a phone accessible but in a pocket.
 - About every 20 minutes the app asks the team to pick a new Recorder.
+- **Claim-watch** if the Recorder’s phone dies: any teammate can take the watch from the paper token; the app does not elect a leader.
 - At a challenge station, everyone opens their own device.
 - On the marked trail, stay on the loop unless Trail Quest opens an approved recovery area. Inside it, stay inside the drawn boundary.
 - No one travels alone. Do not run on uneven ground. Failure Bow is in play for mistakes, not for injuries.
@@ -121,7 +123,7 @@ Device check **before the descent**, not at Station 1 unless a phone actually fa
 - clock is accurate
 - Trail Quest can stay open during a challenge
 
-Site and geofence are **field-tested**, not desktop-drawn. Boundary: stable, visible from the trail, no cliffs, large enough to search, small enough to hear each other, finishable in ten minutes. Capture zones large enough for offline GPS drift; two people can stand in them. Radius set on site.
+Site and geofence are **field-tested**, not desktop-drawn. APP-01: walk **Horsethief** first (target 15 Oct), write radii into the pack, **do not copy them onto Horseshoe**. Product setting stays Horseshoe Canyon (`04`). `lat`/`lng` stay `null` until walked. Boundary: stable, visible from the trail, no cliffs, large enough to search, small enough to hear each other, finishable in ten minutes. Capture zones large enough for offline GPS drift; two people can stand in them.
 
 ### During the day
 
@@ -148,59 +150,67 @@ Digital Rune activation is a facilitator prompt on the shuttle, not an automatic
 
 ### After
 
-- Optional encrypted sync of **non-private** progress when the guest is back on Basecamp Wi-Fi (D10 still open for notes)
+- October / first test: **no sync endpoint** unless Christopher says otherwise. Progress and notes stay on the phone.
+- Later: optional encrypted sync of **non-private** progress on Basecamp Wi-Fi. D10 still open for notes. Working default: on-device only.
 - 30-day check scheduled from the instance end date
 - After-action: what the pack got wrong, written into this file, not into a second spec
 
 ---
 
-## Screens (pilot)
+## Screens (pilot) — APP-01 lock
+
+Same PWA. Guest code vs admin code. Not a second app. No coach, no leaderboard, no feed.
 
 ### Guest
 
-| Screen | Job |
-|---|---|
-| Join | Code + first name. No mid-quest login wall. |
-| Today | Sequence for this instance. What is open, what is locked. |
-| Offline banner | Always honest. Pack is local. |
-| Active quest | Field transmission, “Simply:” plain-language line, no spoiler of the Rune. |
-| Map / boundary | Approved area only. No pin on the prize. Optional; paper map is valid. |
-| Specimen alert | Haptic + sound + full screen. Stable GPS before confirm. |
-| Authenticate | Two people, same geofence, each on their own phone. |
-| Field Recorder | Who holds the watch; rotate prompt. |
-| Echo Mirror | One prompt at a time. Multi-choice + optional note. Template echo-back. |
-| Experiment | One choice, carried privately into the replay. |
-| My Runes | Empty until activated. Then glyph + principle + carried-forward set. |
-| Shuttle / evening note | Short. Then lock the phone. |
-| 30-day | One screen, one question. |
+| ID | Screen | Job |
+|---|---|---|
+| G01 | Join | Code + first name. Privacy sheet. No mid-quest login wall. |
+| G02 | Today | Sequence for this instance. What is open, what is locked. |
+| — | Offline banner | Always honest. Pack is local. Overlay on every screen. |
+| G03 | Quest card | Field transmission + *Simply:* line. No Rune name until reveal. |
+| G04 | Boundary | Approved area only. No pin on the prize. Paper map is valid. |
+| G05 | Specimen | Haptic + sound + full screen. Stable GPS window before confirm. |
+| G06 | Authenticate | Two people, same geofence, each on their own phone. |
+| G07 | Field Recorder | Who holds the watch; rotate ~20 min; claim-watch if the phone dies. |
+| G08 | Echo Mirror | Notice → Orient → Choose. One prompt at a time. Template echo-back. |
+| G09 | Experiment | One choice, carried privately into the replay. |
+| G10 | My Runes | Empty until activated. Then glyph + principle + carried-forward set. |
+| G11 | Shuttle | Digital chip after the physical Rune. Short note, then lock. |
+| G12 | 30-day | One screen, one question. |
+| — | Land-wins overlay | “If this fights the land, put the phone away.” |
 
 ### Facilitator / admin
 
-| Screen | Job |
-|---|---|
-| Instances | Create, clone yesterday’s pack, archive. |
-| Roster | Names, teams, join codes, paper reprint. |
-| Pack editor | JSON with a human form in front of it. Concealment flags. |
-| Live | Teams on course. Station, timer, dead-phone flag. No note text. |
-| Broadcast | Condition change, Recorder rotation, unlock reveal. |
-| Safety | Emergency copy, late-team procedure, “app loses to the land”. |
-| After | Export non-private completion. Schedule 30-day. |
+| ID | Screen | Job |
+|---|---|---|
+| A01 | Instances | Create, clone yesterday’s pack, archive. |
+| A02 | Roster | Names, teams, join codes. |
+| A03 | Pack editor | JSON with a human form. Concealment flags. `lat`/`lng` null until walked. |
+| A04 | Live | Station, timer, specimen count, Mirror Y/N, Recorder name. **Never note text.** |
+| A05 | Broadcast | Condition change, Recorder rotation, unlock reveal. Falls back to voice + printed tokens. |
+| A06 | Safety | Emergency copy, late-team procedure, land-wins. |
+| A07 | After | Export non-private completion. Schedule 30-day. |
+| A08 | Paper / reprint | Nine sheets. Join codes reprintable on the day (who reprints: Christopher + Lisa). |
 
 ---
 
-## Content pack (shape)
+## Content pack JSON v0.1
 
-One pack per retreat instance. Versioned. Pre-downloaded.
+One **instance pack** per retreat, versioned. A **derived guest pack** is cut from it at download: that device only receives *its* detection target, not the whole chain. Concealment sits behind a **reveal token** that also lives on paper. Unlock modes: `facilitator` | `geofence` | `timer` | `sequence`. Every bone has `requiredForRune: false`.
 
 ```json
 {
+  "packVersion": "0.1",
   "instanceId": "pace-2026-11-xx",
   "product": "pace-expedition",
+  "host": "quest.unearthself.xyz",
   "days": [
     {
       "id": "day-1-play",
       "runeId": "play",
       "concealUntil": "reveal",
+      "unlock": "facilitator",
       "beats": ["welcome", "mirror-1", "impossible-expedition", "mirror-2", "replay", "receive", "reveal", "activate"],
       "mirror": { "prompts": [] },
       "geofences": []
@@ -211,7 +221,9 @@ One pack per retreat instance. Versioned. Pre-downloaded.
       "fieldRecorderMinutes": 20,
       "stations": ["transit-specimens", "station-1", "station-2", "mirror", "station-3-replay", "silent-walk", "reveal"],
       "detectionChain": [["alex", "brianna"], ["brianna", "carlos"]],
-      "geofences": [],
+      "geofences": [
+        { "id": "horsethief-skeleton", "lat": null, "lng": null, "radiusM": null, "requiredForRune": false }
+      ],
       "timers": { "station3": 600 }
     }
   ],
@@ -221,11 +233,29 @@ One pack per retreat instance. Versioned. Pre-downloaded.
 }
 ```
 
-Copy in the pack uses two registers, as the PDF does: **field voice** and **Simply:** (the plain sentence someone can read aloud). APP-01 does not invent a third voice. D18 (Tessellate) stays closed as guest-facing.
+Copy uses two registers only: **field voice** and **Simply:**. No third voice. D18 stays internal. *Simply:* lines and Mirror option lists are Tess’s to write — placeholders only in the pack until she does.
 
 GPS where it has been walked. Facilitator unlock where GPS is a liar. Timed beats as backup.
 
-Local-first. Sync of progress — not notes — on Basecamp Wi-Fi. D10 decides whether notes ever leave the device.
+**Offline:** one download at Basecamp. IndexedDB for notes and progress. Service worker for the shell. GPS needs a stability window or the facilitator unlocks. Broadcast falls back to voice + printed tokens. October test can run with **no sync endpoint**.
+
+Connection town fences and the fourth-day route stay **stubs**. Dunning is not an app object.
+
+---
+
+## Paper pack (nine sheets)
+
+Facilitator is the geofence when silicon fails. Two dead phones still finish the day.
+
+1. Join codes / roster
+2. Today’s sequence
+3. Field transmissions + *Simply:* lines
+4. Boundary map (no prize pins)
+5. Station / specimen cards
+6. Echo Mirror prompts
+7. Reveal tokens (same ids as digital)
+8. Safety / land-wins / emergency
+9. Facilitator run sheet (unlocks, late-team, claim-watch)
 
 ---
 
@@ -234,7 +264,8 @@ Local-first. Sync of progress — not notes — on Basecamp Wi-Fi. D10 decides w
 - Notice, don’t excavate.
 - Pass is always available. A pass counts as a turn.
 - No forced dancing, running, disclosure, alcohol, purchase, or approaching an unbriefed stranger.
-- Personal Echo observations stay private unless the person shares.
+- Personal Echo observations stay private unless the person shares. Working default: **on-device only** (D10 not closed). Facilitator sees progress, not sentences. Bots never read Echo notes. No camera roll in v1.
+- Privacy sheet on G01 `/join` and on paper sheet 8.
 - Town partners are collaborators, not props.
 - App vs land: land wins.
 - Under-18 is D19 — adult default until partners say otherwise.
@@ -251,8 +282,8 @@ Local-first. Sync of progress — not notes — on Basecamp Wi-Fi. D10 decides w
 | Tessellate as a character | D18 |
 | Social / team feed of notes | Privacy |
 | Connection town geofences | Partners and D08 not closed; pack can stub |
-| Existence day route | D07 |
-| Public Rune name if D02 flips | Existence is current in the PDF and `04`; `00_README` still says Experience. Do not print a fourth-Rune word until D02 is closed. |
+| Fourth-day route | D07. APP-01 stubbed it; do not invent Last Chance timing |
+| Public fourth-Rune word | D02 still open. PDF and `04` say Existence. `00_README` says Experience. APP-01 used “Experience-day” as a stub label only. **Do not print either word as locked.** |
 
 ---
 
@@ -268,7 +299,20 @@ Local-first. Sync of progress — not notes — on Basecamp Wi-Fi. D10 decides w
 
 Build will tweak timings, copy and geofence radii. It should not tweak the loop: experience → friction → Mirror → experiment → receive / reveal / activate.
 
+## APP-01 recommendations (not closed)
+
+| Need | Owner | Note |
+|---|---|---|
+| Final *Simply:* lines and Mirror option lists | Tess | Placeholders until she writes them |
+| D18 stays internal | Tess | Recommend. Still open. |
+| D10 stays on-device for v1 | Tess + Christopher | Working default. Still open. |
+| Walk Horsethief 15 Oct; do not copy radii onto Horseshoe | Lisa + Tess + Christopher | Radii after the walk |
+| D06 / D07 / D08 remain stubs | as in `17` | |
+| Who reprints join codes on the day | Christopher + Lisa | A08 |
+| October test: no sync server | Christopher | Default unless you say otherwise |
+
 ## Changelog
 
 - 2026-09-08 — PWA + paper fallback chosen over native-first.
-- 2026-09-10 — Ingested *Unearth Self MVP.pdf*. Guest and facilitator views written. Field Recorder, concealment, digital specimens, local Mirror. APP-01 may spec screens and JSON; it may not close D02, D06, D07, D08, D10, D18.
+- 2026-09-10 — Ingested *Unearth Self MVP.pdf*. Guest and facilitator views written.
+- 2026-09-10 — APP-01 specified in 09: guest and admin screen lists, content-pack JSON v0.1, offline behaviour, paper fallback, privacy sheet. Working default for notes is on-device; facilitator sees progress not text. Build waits on “go”.

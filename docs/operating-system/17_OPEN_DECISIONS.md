@@ -5,22 +5,22 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | ID | Decision | Options / notes | Blocks | Owner |
 |---|---|---|---|---|
 | D01 | Public prices for Haven, spa, Bootcamp | Haven BAR is now the house card (four seasons, suite cleaning) as of 10 Sep 2026 — Christopher confirmed. Spa and Bootcamp package prices still unpublished. Norah still signs the rest. | Website, bots, one-pager | Norah + partners |
-| D02 | Fourth Rune public name | Existence is current canon; “Experience” appeared in one brief | Copy, glyphs, app | Christopher / Tess |
+| D02 | Fourth Rune public name | Existence is current in the PDF and `04`; `00_README` still says Experience. APP-01 stubbed the fourth day without printing a locked word. **Not closed.** | Copy, glyphs, app | Christopher / Tess |
 | D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
 | D04 | CRM choice | HubSpot speed vs Attio taste | Bots, pipeline | Christopher |
-| D05 | Domain strategy | xyz only vs add .com/.ca | Print, ads | Christopher |
-| D06 | Dunning format and name | Field-test required | Adaptability morning | Tess |
-| D07 | Final-day route | Rosedale → fossil shop → Eleven Bridges → Last Chance | Existence day | Lisa + Tess |
+| D05 | Domain strategy | xyz only vs add .com/.ca. APP-01 working host `quest.unearthself.xyz` is a PWA URL, not a close. | Print, ads, app | Christopher |
+| D06 | Dunning format and name | Field-test required. Not an app object. | Adaptability morning | Tess |
+| D07 | Final-day route | Rosedale → fossil shop → Eleven Bridges → Last Chance. APP-01 left this a stub. | Fourth day | Lisa + Tess |
 | D08 | Alcohol policy | Default non-alcoholic before thermal | Connection quest | Partners |
 | D09 | Local 12-week programme timing | After first corporate season | Sales focus | Partners |
-| D10 | Echo note storage | On-device only vs encrypted sync | App privacy | Tess + Christopher |
+| D10 | Echo note storage | APP-01 recommends on-device for v1. Working default in `09`. **Not closed.** | App privacy | Tess + Christopher |
 | D11 | Primary corporate price metric | Per person vs team package | Proposals | Norah + Christopher + Tess |
 | D12 | Canalta commercial terms | File the signed version | Large groups | Lisa |
 | D13 | Insurance product | Confirm adventure cover | First paid outdoor day | Lisa |
 | D14 | Website design route mix | A/B/C recommendation in WEB file | Visual build | Christopher |
 | D15 | Escalation money threshold for bots | Proposed CAD 5,000 | Automation | Christopher |
 | D17 | Brand PDF update | Ember swatch still shows old hex | External designers | Christopher |
-| D18 | Tessellate persona | Keep as internal metaphor vs guest-facing | App copy | Tess |
+| D18 | Tessellate persona | APP-01 recommends internal only. **Not closed.** | App copy | Tess |
 | D19 | Under-18 policy | Adult default | Legal, web | Partners |
 | D20 | Second language / US spelling on site | UK English in this OS; Canadian public site may prefer Canadian spelling | Copy | Christopher |
 
