@@ -3,8 +3,10 @@ import { useState } from "react";
 import {
   Banknote,
   BarChart3,
+  Bot,
   CalendarDays,
   ClipboardList,
+  Radio,
   TriangleAlert,
   Warehouse,
 } from "lucide-react";
@@ -21,6 +23,8 @@ import { useDesk } from "@/lib/desk-store";
 const NAV = [
   { to: "/admin", label: "Today", icon: CalendarDays },
   { to: "/admin/pipeline", label: "Pipeline", icon: ClipboardList },
+  { to: "/admin/bots", label: "Bots", icon: Bot },
+  { to: "/admin/socials", label: "Socials", icon: Radio },
   { to: "/admin/inventory", label: "Inventory", icon: Warehouse },
   { to: "/admin/money", label: "Money", icon: Banknote },
   { to: "/admin/risk", label: "Risk", icon: TriangleAlert },
@@ -30,6 +34,8 @@ const NAV = [
 const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
   "/admin/pipeline": { kicker: "Sales book", title: "Pipeline" },
+  "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
+  "/admin/socials": { kicker: "Content on the book", title: "Socials" },
   "/admin/inventory": { kicker: "Haven and Basecamp", title: "Inventory" },
   "/admin/money": { kicker: "Deposits, invoices, refunds", title: "Money" },
   "/admin/risk": { kicker: "Waivers, weather, cover", title: "Risk" },
@@ -42,6 +48,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const setLookingAs = useDesk((s) => s.setLookingAs);
   const riskAll = useDesk((s) => s.risk);
   const moneyAll = useDesk((s) => s.money);
+  const queued = useDesk((s) => s.threads.filter((m) => m.dir === "draft").length);
+  const inFlight = useDesk(
+    (s) => s.posts.filter((p) => p.status === "draft" || p.status === "queued").length,
+  );
   const partner = PARTNERS.find((p) => p.id === lookingAs);
   const openRisk = riskAll.filter((r) => r.open).length;
   const overdue = moneyAll.filter((m) => m.status === "overdue").length;
@@ -50,6 +60,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const counts: Record<string, number> = {
     "/admin/risk": openRisk,
     "/admin/money": overdue,
+    "/admin/bots": queued,
+    "/admin/socials": inFlight,
   };
 
   return (

@@ -1,6 +1,7 @@
 export type Partner = "christopher" | "tess" | "lisa" | "norah";
 export type LeadStatus = "new" | "hold" | "proposal" | "won" | "lost";
 export type LeadKind = "bootcamp" | "haven" | "basecamp";
+export type LeadSource = "web" | "scout" | "direct" | "referral" | "form";
 export type MoneyKind = "deposit" | "invoice" | "refund";
 export type MoneyStatus = "due" | "sent" | "paid" | "overdue";
 export type RiskKind = "waiver" | "weather" | "staffing";
@@ -27,6 +28,7 @@ export type Lead = {
   kind: LeadKind;
   org: string;
   contact: string;
+  email: string;
   owner: Partner;
   headcount: number;
   value: number;
@@ -35,6 +37,10 @@ export type Lead = {
   next: string;
   dates: string;
   note: string;
+  source: LeadSource;
+  nudges: number;
+  lastTouch: string;
+  stopped: boolean;
 };
 
 export type Stay = {
@@ -104,6 +110,7 @@ export const SEED_LEADS: Lead[] = [
     kind: "bootcamp",
     org: "Apex Energy",
     contact: "Priya Shah · People",
+    email: "priya.shah@apexenergy.example",
     owner: "christopher",
     headcount: 18,
     value: 54000,
@@ -112,12 +119,17 @@ export const SEED_LEADS: Lead[] = [
     next: "Send one-pager Friday",
     dates: "12–14 Nov",
     note: "18 pax. Haven takes the lead rooms; Canalta 20-room hold. 30% deposit to lock. Do not sell outdoor until D13 is signed.",
+    source: "direct",
+    nudges: 1,
+    lastTouch: "2026-09-08",
+    stopped: false,
   },
   {
     id: "L-038",
     kind: "bootcamp",
     org: "Drumheller Health",
     contact: "Mara Quinn · Nursing",
+    email: "mara.quinn@dhhealth.example",
     owner: "tess",
     headcount: 8,
     value: 16800,
@@ -126,12 +138,17 @@ export const SEED_LEADS: Lead[] = [
     next: "Confirm facilitator",
     dates: "late Oct",
     note: "Nursing team. Indoor / land-walk only until insurance closes. Tess holds the facilitator question.",
+    source: "referral",
+    nudges: 0,
+    lastTouch: "2026-09-05",
+    stopped: false,
   },
   {
     id: "L-044",
     kind: "haven",
     org: "Water Mark weekend",
     contact: "James Holt",
+    email: "james.holt@example.com",
     owner: "lisa",
     headcount: 2,
     value: 590,
@@ -140,12 +157,17 @@ export const SEED_LEADS: Lead[] = [
     next: "Confirm 19–21 Sep",
     dates: "19–21 Sep",
     note: "Asked for Hidden Hollow. Direct. No deposit yet.",
+    source: "web",
+    nudges: 0,
+    lastTouch: "2026-09-09",
+    stopped: false,
   },
   {
     id: "L-040",
     kind: "basecamp",
     org: "Local circuit pack",
     contact: "Elena Voss",
+    email: "elena.voss@example.com",
     owner: "norah",
     headcount: 1,
     value: 320,
@@ -154,12 +176,17 @@ export const SEED_LEADS: Lead[] = [
     next: "Book Fire & Ice Thu",
     dates: "11 Sep",
     note: "Won. Invoice sent. Unearthed Bodyworks today, circuit Thursday.",
+    source: "direct",
+    nudges: 0,
+    lastTouch: "2026-09-09",
+    stopped: true,
   },
   {
     id: "L-036",
     kind: "bootcamp",
     org: "Calgary stagette",
     contact: "Sophie Grant",
+    email: "sophie.grant@example.com",
     owner: "tess",
     headcount: 12,
     value: 21600,
@@ -168,12 +195,17 @@ export const SEED_LEADS: Lead[] = [
     next: "Call back this week",
     dates: "spring 2027",
     note: "Friends group. Not a humiliation brief. Spring 2027 — do not let it eat a facilitator day this year.",
+    source: "web",
+    nudges: 0,
+    lastTouch: "2026-09-07",
+    stopped: false,
   },
   {
     id: "L-029",
     kind: "bootcamp",
     org: "Northwind Logistics",
     contact: "Dan Reid · HR",
+    email: "dan.reid@northwind.example",
     owner: "christopher",
     headcount: 22,
     value: 66000,
@@ -182,6 +214,10 @@ export const SEED_LEADS: Lead[] = [
     next: "Closed — Banff lodge",
     dates: "Oct",
     note: "Lost to a Banff lodge. Keep on the book so we do not chase the corpse.",
+    source: "scout",
+    nudges: 3,
+    lastTouch: "2026-08-22",
+    stopped: true,
   },
 ];
 

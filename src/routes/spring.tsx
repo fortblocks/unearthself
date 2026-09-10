@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { submitSpringEnquiry, mailSpringEnquiry } from "@/lib/enquiry";
+import { ingestSpringEnquiry } from "@/lib/desk-store";
 
 type Search = {
   utm_source: string;
@@ -233,6 +234,11 @@ function Enquire() {
     };
     try {
       const mailed = await mailSpringEnquiry(payload);
+      try {
+        ingestSpringEnquiry(payload);
+      } catch {
+        /* desk book is client-only */
+      }
       try {
         await submitSpringEnquiry({ data: payload });
       } catch {

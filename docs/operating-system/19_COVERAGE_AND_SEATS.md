@@ -37,7 +37,7 @@ WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 
 
 | Code | Job | When |
 |---|---|---|
-| SALES-02 | Bot playbooks | Week 2 |
+| SALES-02 | Bot playbooks | Playable 10 Sep on `/admin/bots`. Gmail send still open. |
 | RETREAT-01 | PACE run-of-show | Week 2 — Tess |
 | ECHO-01 | Facilitator Mirror card (two pages) | Week 2 — Tess |
 | WEB-02 | Build brief + CMS + embeds | After D14 hybrid is chosen |
@@ -84,3 +84,4 @@ Put these four on the wall until they move:
 - 2026-09-10 — APP-01 return merged into `09`. Screen IDs, pack v0.1, paper nine, Horsethief walk. D02 / D10 / D18 left open.
 - 2026-09-10 — Trail Quest PWA shipped at `/quest` (guest + facilitator). October test: no sync, GPS stand-in.
 - 2026-09-10 — APP-01-CONT and APP-02 opened. Trail Quest code leaves CoS. Store wrap requested; C05 holds.
+- 2026-09-10 — SALES-02 started on the house book: `/admin/bots`, `/admin/socials`. Gmail send still open.

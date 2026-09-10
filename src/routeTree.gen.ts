@@ -27,11 +27,13 @@ import { Route as SpringRouteImport } from './routes/spring'
 import { Route as TheWorkRouteImport } from './routes/the-work'
 import { Route as VisitRouteImport } from './routes/visit'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBotsRouteImport } from './routes/admin.bots'
 import { Route as AdminFridayRouteImport } from './routes/admin.friday'
 import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
 import { Route as AdminMoneyRouteImport } from './routes/admin.money'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminRiskRouteImport } from './routes/admin.risk'
+import { Route as AdminSocialsRouteImport } from './routes/admin.socials'
 import { Route as BookRetreatRouteImport } from './routes/book.retreat'
 import { Route as BookTreatmentRouteImport } from './routes/book.treatment'
 import { Route as D14IndexRouteImport } from './routes/d14.index'
@@ -155,6 +157,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBotsRoute = AdminBotsRouteImport.update({
+  id: '/bots',
+  path: '/bots',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFridayRoute = AdminFridayRouteImport.update({
   id: '/friday',
   path: '/friday',
@@ -178,6 +185,11 @@ const AdminPipelineRoute = AdminPipelineRouteImport.update({
 const AdminRiskRoute = AdminRiskRouteImport.update({
   id: '/risk',
   path: '/risk',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSocialsRoute = AdminSocialsRouteImport.update({
+  id: '/socials',
+  path: '/socials',
   getParentRoute: () => AdminRoute,
 } as any)
 const BookRetreatRoute = BookRetreatRouteImport.update({
@@ -359,11 +371,13 @@ export interface FileRoutesByFullPath {
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -411,11 +425,13 @@ export interface FileRoutesByTo {
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -468,11 +484,13 @@ export interface FileRoutesById {
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
+  '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
+  '/admin/socials': typeof AdminSocialsRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -527,11 +545,13 @@ export interface FileRouteTypes {
     | '/spring'
     | '/the-work'
     | '/visit'
+    | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
+    | '/admin/socials'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -579,11 +599,13 @@ export interface FileRouteTypes {
     | '/spring'
     | '/the-work'
     | '/visit'
+    | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
+    | '/admin/socials'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -635,11 +657,13 @@ export interface FileRouteTypes {
     | '/spring'
     | '/the-work'
     | '/visit'
+    | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
+    | '/admin/socials'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -826,6 +850,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/bots': {
+      id: '/admin/bots'
+      path: '/bots'
+      fullPath: '/admin/bots'
+      preLoaderRoute: typeof AdminBotsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/friday': {
       id: '/admin/friday'
       path: '/friday'
@@ -859,6 +890,13 @@ declare module '@tanstack/react-router' {
       path: '/risk'
       fullPath: '/admin/risk'
       preLoaderRoute: typeof AdminRiskRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/socials': {
+      id: '/admin/socials'
+      path: '/socials'
+      fullPath: '/admin/socials'
+      preLoaderRoute: typeof AdminSocialsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/book/retreat': {
@@ -1089,20 +1127,24 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBotsRoute: typeof AdminBotsRoute
   AdminFridayRoute: typeof AdminFridayRoute
   AdminInventoryRoute: typeof AdminInventoryRoute
   AdminMoneyRoute: typeof AdminMoneyRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminRiskRoute: typeof AdminRiskRoute
+  AdminSocialsRoute: typeof AdminSocialsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBotsRoute: AdminBotsRoute,
   AdminFridayRoute: AdminFridayRoute,
   AdminInventoryRoute: AdminInventoryRoute,
   AdminMoneyRoute: AdminMoneyRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminRiskRoute: AdminRiskRoute,
+  AdminSocialsRoute: AdminSocialsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

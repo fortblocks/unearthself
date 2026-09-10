@@ -89,3 +89,4 @@ Working lines:
 ## Changelog
 
 - 2026-09-08 — Sales workstream opened. Booking before brand theatre.
+- 2026-09-10 — House-book bots + socials. `/spring` files Concierge. Outbound still human-send until Gmail.

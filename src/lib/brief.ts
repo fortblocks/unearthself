@@ -2,7 +2,7 @@ import { TODAY, type Lead, type MoneyRow, type Partner, type RiskRow, type Stay,
 import { cad } from "@/lib/format";
 import { openPipeline, partnerFirst, weightedPipeline } from "@/lib/desk-store";
 
-export type Pull = { label: string; to: "/admin" | "/admin/pipeline" | "/admin/inventory" | "/admin/money" | "/admin/risk" };
+export type Pull = { label: string; to: "/admin" | "/admin/pipeline" | "/admin/inventory" | "/admin/money" | "/admin/risk" | "/admin/bots" | "/admin/socials" };
 
 export type Brief = {
   kicker: string;
@@ -89,6 +89,7 @@ export function buildBrief(args: {
       : `${openPipeline(leads).length} files open, ${cad(weightedPipeline(leads))} weighted.`,
     pulls: [
       { label: apex ? "Apex Energy" : "Pipeline", to: "/admin/pipeline" },
+      { label: "Bots", to: "/admin/bots" },
       ...mineRisk.slice(0, 1).map((r) => ({ label: r.title, to: "/admin/risk" as const })),
     ],
   };

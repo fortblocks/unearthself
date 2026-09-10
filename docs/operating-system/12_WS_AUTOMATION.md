@@ -42,6 +42,11 @@ Week 2: Follow-up + Friday Digest.
 Week 3: Stay & Spa once inventory exists.  
 Week 4: Corporate AE with the one-pager attached.
 
+House book `/admin/bots` is the working roster as of 10 Sep 2026. Send is queued on the thread and opened as mailto until Gmail is connected. Scout files research cards without named people — Concierge will not send those. Hard cap: three unanswered nudges.
+
+Grok Automations (Christopher’s account): Evening Digest 17:00 America/Edmonton; Social Scout weekday 09:00. They notify him. They do not write the house book until a webhook exists.
+
 ## Changelog
 
 - 2026-09-08 — Roster named. Guest-facing AI during quests banned.
+- 2026-09-10 — Roster playable on `/admin/bots`. Threads on pipeline files. Scout list. Gmail still the missing send pipe. Social desk is `/admin/socials`.

@@ -28,6 +28,8 @@ Looking-as is a view label, not a login. Switch partner and **Today** rewrites t
 |---|---|---|---|
 | `/admin` | **Today** — briefing, keys, diary, next programme, open risk | Lisa / FOH | Partner briefing + Apex run-of-show |
 | `/admin/pipeline` | **Pipeline** — every enquiry, owner, next action, value | Christopher + Tess | File an enquiry, change status, filter mine/kind |
+| `/admin/bots` | **Bots** — Grok roster, threads, scout, send queue | Christopher | Draft / send / log reply / file scout |
+| `/admin/socials` | **Socials** — ideas, queue, logged performance | Christopher | File copy, mark posted, log numbers |
 | `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta overflow | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
 | `/admin/money` | **Money** — deposits due, invoices sent, refunds | Norah | Mark paid, file a line |
 | `/admin/risk` | **Risk** — unsigned waivers, weather flags, under-staffed days | Lisa (Tess on programme days) | Close / reopen / flag |
@@ -55,13 +57,15 @@ Keep it to one page. The roadmap workbook holds the longer view.
 
 - Wire public Book panel into this book (same records)
 - PMS + Stripe (D03)
-- CRM (D04)
+- CRM (D04) — house book is the working CRM until then. `/spring` files a lead + Concierge thread.
 - One account per partner, not a shared desk login
-- Bot threads as a comms log
+- Gmail send (connector). Until connected, send opens mailto and logs the thread.
+- Live social APIs. Until then, performance is logged by hand.
 - Door codes never in git
 
 ## Changelog
 
 - 2026-09-09 — `/admin` gated with email/password. Shared staff account for team walkthroughs. Live on unearthself.xyz/admin.
 - 2026-09-09 — `/admin` house book shipped: Today, Pipeline, Inventory, Money, Risk, Friday. Looking-as rewrites Today.
+- 2026-09-10 — `/admin/bots` and `/admin/socials`. Pipeline threads. `/spring` writes a lead. Gmail send not connected; mailto + log. Social numbers logged by hand. D04 not closed.
 - 2026-09-08 — MVP ops desk defined as views, not as a software brand.

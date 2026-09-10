@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { Chip } from "@/components/desk/Chip";
@@ -131,16 +131,31 @@ function LeadCard({
         <h2 className="mt-2 font-display text-3xl font-black uppercase leading-none">{lead.org}</h2>
         <p className="mt-2 text-sm text-muted">
           {lead.contact} · {lead.dates} · {lead.headcount} head
+          {lead.email ? ` · ${lead.email}` : ""}
         </p>
         <p className="mt-2 text-sm">
           <span className="tabular-nums font-semibold">{cad(lead.value)}</span>
-          <span className="text-muted"> · {Math.round(lead.weight * 100)}% · {partnerFirst(lead.owner)}</span>
+          <span className="text-muted">
+            {" "}
+            · {Math.round(lead.weight * 100)}% · {partnerFirst(lead.owner)} · {lead.source}
+            {lead.nudges ? ` · ${lead.nudges}/3` : ""}
+            {lead.stopped ? " · stopped" : ""}
+          </span>
         </p>
         <p className="mt-3 text-sm">
           <span className="text-sandstone">Next · </span>
           {lead.next}
         </p>
         {lead.note ? <p className="mt-2 max-w-prose text-sm text-pretty text-muted">{lead.note}</p> : null}
+        <p className="mt-3">
+          <Link
+            to="/admin/bots"
+            search={{ lead: lead.id }}
+            className="text-sm font-semibold text-ember hover:underline"
+          >
+            Thread
+          </Link>
+        </p>
       </div>
       <NativeSelect
         value={lead.status}
