@@ -1,32 +1,33 @@
-# Trail Quest store shell — Mac + Play sheet
+# Trail Quest store shell — Mac sheet
 
-APP-02. Wrapper only. C05 is not closed. Public store listing is out of scope.
+C05 holds. Capacitor is a distribution shell around a bundled `/quest` pack. It does not load the live website in the canyon.
 
-Display name: **Unearth Self**  
-Bundle / application id (recommendation, D05 open): **xyz.unearthself.quest**  
-Product URL the WebView loads: **https://unearthself.xyz/quest**
+Display name: Unearth Self
+Bundle id (recommendation, D05 open): xyz.unearthself.quest
 
-A Linux sandbox cannot sign or upload an IPA. Christopher uploads from his Mac.
+## Offline decision
 
-## Wrap choice
+Bundle the `/quest` shell into the app binary. The day runs with the radio off. Paper is the fallback when the phone dies, not when the radio dies.
 
-Capacitor 8 over the existing `/quest` PWA. Not React Native. Not Flutter. Not a TWA.
-TWA rejected: canyon radio is poor. Capacitor gives native geo, haptics, and `allowBackup=false`.
-First open on Basecamp Wi-Fi so the service worker caches `/quest`. Paper still wins.
+A live server.url to unearthself.xyz fails below the rim. Service workers inside WKWebView are unreliable. Add to Home Screen is kinder than a thin live WebView, and remains the no-store path. It is not kinder than a bundled binary for Horsethief.
 
-## Mac one-time
+## Mac
 
 ```bash
-git pull
+git fetch && git checkout quest && git pull --rebase origin quest
 npm install
+npm run quest:shell
 npx cap add ios
 npx cap add android
 bash quest-native/apply-permissions.sh
-npx cap sync
-npx cap open ios     # Xcode
-npx cap open android # Studio, optional
+npm run quest:native:sync
+npx cap open ios
 ```
 
-Full TestFlight + Play Internal steps are in this file in the repo after pull. Version 0.1.0 / build 1. Internal tracks only. No App Review. No production track.
+Xcode: team, bundle xyz.unearthself.quest, version 0.1.0 build 1. Archive → App Store Connect → TestFlight Internal. No App Review.
 
-Demo codes: ALEX BRIA CARL DANA. Facilitator FACIL. Paper token e.g. GAM2.
+Play: signed AAB → Internal testing only. allowBackup must stay false.
+
+Join is /quest. Codes ALEX / BRIA / CARL / DANA. Facilitator FACIL. Paper token GAM2. Airplane mode after launch — pack still there.
+
+A04 is this phone only. No sync server in October.
