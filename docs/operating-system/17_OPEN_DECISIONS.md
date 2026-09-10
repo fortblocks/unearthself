@@ -37,6 +37,6 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | C07 | Friday numbers owned by Norah | 2026-09-08 |
 | C08 | Partner remits restated (Tess product; Lisa ops/guests; Norah finance/treatments; Christopher systems/brand/market) | 2026-09-08 |
 
-APP-02 wraps the C05 PWA for TestFlight and Play Internal. It does not reopen or close C05.
+APP-02: guest surface is the store app (App Store first, Play same shell). That does not close C05. Paper remains the dead-phone fallback. PWA is the engine inside Capacitor, not a website door.
 
-APP-02 recommendation (not a close): bundle the `/quest` shell; do not load the live site in the WebView. Keep D05 open; working bundle id `xyz.unearthself.quest`. Keep D10 on-device. October live view is this-phone-only. Do not print a fourth-Rune word (D02).
+Recommendation (not a close): public App Store listing for v1 with **no location permission** until Horsethief is walked. Working bundle id `xyz.unearthself.quest` (D05 open). D10 on-device. D02 unnamed. Privacy URL required before Review.
