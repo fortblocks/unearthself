@@ -1,6 +1,12 @@
 "use client";
 
-export const FIELD_GPS = false;
+export const FIELD_GPS = true;
+
+export type FieldFix = {
+  ok: boolean;
+  accuracyM: number | null;
+  stable: boolean;
+};
 
 export function isNativeShell(): boolean {
   if (typeof window === "undefined") return false;
@@ -49,5 +55,31 @@ export async function requestFieldLocation(): Promise<"ok" | "denied" | "missing
     return "ok";
   } catch {
     return "missing";
+  }
+}
+
+export async function readFieldFix(): Promise<FieldFix> {
+  const empty: FieldFix = { ok: false, accuracyM: null, stable: false };
+  if (!FIELD_GPS) return empty;
+  try {
+    if (isNativeShell()) {
+      const { Geolocation } = await import("@capacitor/geolocation");
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 8000,
+      });
+      const accuracyM = pos.coords.accuracy ?? null;
+      return { ok: true, accuracyM, stable: accuracyM !== null && accuracyM <= 25 };
+    }
+    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+      });
+    });
+    const accuracyM = pos.coords.accuracy ?? null;
+    return { ok: true, accuracyM, stable: accuracyM !== null && accuracyM <= 25 };
+  } catch {
+    return empty;
   }
 }
