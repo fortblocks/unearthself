@@ -139,39 +139,81 @@ Draft to rewrite: [PASTE OR NAME THE FILE]
 
 **Assign:** `09_WS_TRAIL_QUEST.md` + `04_WS_PRODUCT_RETREAT.md`  
 **Source:** *Unearth Self MVP.pdf* (guest + facilitator views already ingested into `09`, 10 Sep 2026).  
-**Override:** Christopher opened this before a paying outdoor day. Spec first. Build the PWA in that same thread if the spec holds. Native is still Phase 2.
+**Status:** Merged. PWA built in the CoS thread 10 Sep after Christopher said “go” here. Do not respawn this block.
+
+---
+
+## APP-01-CONT — Trail Quest build thread (ongoing)
+
+**Assign:** `09_WS_TRAIL_QUEST.md`  
+**Repo:** `fortblocks/unearthself` — PWA lives at `/quest`. Last CoS ship: commit `4de94a4`.  
+**Rule:** This is the only chat that edits Trail Quest code. CoS (this thread’s parent) does not. Paste returns back here so the OS stays current.
 
 ```
 [PASTE UNIVERSAL PREAMBLE]
 
-Workstream: APP-01.
+Workstream: APP-01-CONT.
 Files you may update: 09_WS_TRAIL_QUEST.md only. A note in 17 if you recommend on D10 or D18 — do not close them.
+Code: the existing PWA in fortblocks/unearthself at /quest. Do not start a second app.
+
+State as of 10 Sep 2026:
+- Spec is 09. Guest G01–G12, facilitator A01–A08.
+- Demo instance pace-demo-2026. Guest codes ALEX / BRIA / CARL / DANA. Facilitator FACIL.
+- IndexedDB notes. Service worker. BroadcastChannel live view. Paper token stand-in (e.g. GAM2).
+- GPS stand-in until Horsethief is walked (target 15 Oct). No sync server.
+- C05 holds: the product is a PWA + paper. Native stores are APP-02, a shell, not a rewrite.
 
 Job:
-1. Read 09 in full. It is the spec. The PDF is background; do not fork a second spec.
-2. Articulate guest flow and facilitator/admin flow as screens. Both are in scope.
-3. Specify the content-pack JSON (quest, geofence, copy, rune id, concealment, Field Recorder, detection chain).
-4. Offline / no-signal behaviour. Paper fallback so the day still runs if two phones die.
-5. Privacy: Echo notes on-device. Facilitator sees progress, not note text. D10 still open.
-6. Build a PWA against that spec if Christopher says go in-thread. Do not start native iOS/Android.
+1. Own every Trail Quest tweak from here. CoS will not implement /quest.
+2. After each ship: changelog line in 09, what a facilitator would notice, what is still paper.
+3. Tess copy (*Simply:* lines, Mirror option lists) lands here when she sends it. Placeholders until then.
+4. Do not invent Horsethief radii. Do not copy them onto Horseshoe.
+5. Paper pack stays in lockstep with digital beats.
+6. If Christopher also pastes APP-02 into this thread, do the store wrap here. Do not open a third Trail Quest chat.
 
-Must preserve:
-- Experience first; Rune unnamed until receive → reveal → activate
-- Field Recorder: one phone watched on the trail, rotate ~20 min
-- App loses to the land, to safety, to a physical limit
-- Digital specimens only
-- Mirror is Notice → Orient → Choose, one question at a time, template echo-back, no AI
-- They get the Rune whether or not every specimen was recovered
+Must preserve: the loop, Field Recorder, land wins, digital specimens only, Mirror with no AI, Rune whether or not every bone is found, D02 unnamed.
 
-Do not:
-- Close D02, D06, D07, D08, D10, D18
-- Invent town partners or the Existence route
-- Build a guest-facing AI coach or Tessellate character
-- Put private notes on a team feed
-- Diagnose Echoes
-- Print “Experience” or “Existence” as a locked public name (D02)
+Do not: close D02 / D06 / D07 / D08 / D10 / D18 / C05. Guest-facing AI. Tessellate on a phone. Camera roll. Notes on a team feed.
 
-Return: (1) what you read, (2) what you will not touch, (3) screen list + JSON shape + paper fallback, (4) decisions you need from a partner, (5) changelog line for 09.
+Return each turn: (1) what changed, (2) what a guest or facilitator should tap to see it, (3) changelog line for 09, (4) anything CoS must merge elsewhere.
+```
+
+---
+
+## APP-02 — Store shells (TestFlight + Play Internal)
+
+**Assign:** `09_WS_TRAIL_QUEST.md` + `10_WS_TECH_ARCHITECTURE.md`  
+**Override:** Christopher, 10 Sep 2026 — wants phones to install from TestFlight and Play Internal as soon as the accounts exist. This does **not** close C05. The product remains the PWA. Stores are a wrapper.
+
+**Hard limit:** A Linux Grok sandbox cannot produce a signed iOS IPA or upload to TestFlight. iOS still needs a Mac, Xcode, and an Apple Developer Programme membership. Android AAB can be prepared in Linux. The job is to wrap the existing `/quest` PWA (Capacitor, one codebase) and hand Christopher the exact build/upload steps for his Mac.
+
+```
+[PASTE UNIVERSAL PREAMBLE]
+
+Workstream: APP-02. Same Trail Quest chat as APP-01-CONT. Do not spawn a third app thread.
+Files you may update: 09_WS_TRAIL_QUEST.md. A recommend-only note in 17. A one-line note in 10 if the wrap changes the landscape diagram. Do not close C05, D05, D10.
+
+Job:
+1. Wrap the existing /quest PWA. Capacitor is the default (one web codebase → iOS + Android). Trusted Web Activity is acceptable for Play if it is genuinely faster and GPS/haptics/offline still work.
+2. Do not rewrite G01–G12 or A01–A08. Do not start a React Native or Flutter fork.
+3. iOS target: TestFlight (external testers later; start with Internal).
+4. Android target: Play Console Internal testing.
+5. Confirm in the WebView: join code, offline pack, haptics, geolocation (stand-in until walked), IndexedDB notes, Field Recorder rotation, paper token unlock. If a permission dies in the shell, fix the shell, not the quest.
+6. Bundle id recommendation only (do not treat as closed): xyz.unearthself.quest. Display name: Unearth Self. D05 still open.
+7. Produce:
+   - capacitor config + iOS/Android project files in repo
+   - icon + splash from brand (Coal / Fossil / Ember)
+   - Info.plist / AndroidManifest permissions: location, (precise location), haptic; no camera in v1
+   - a Mac build sheet Christopher can follow in Xcode: archive → App Store Connect → TestFlight
+   - a Play Internal sheet: AAB → internal track
+8. If Apple Developer or Play Console is missing, stop at a signed-local / internal-track-ready project and list the account blockers. Do not fake a store listing.
+9. Privacy sheet still on join. Notes stay on-device. No tracking SDK.
+
+Must preserve: C05 (PWA is the product), paper fallback, land wins, no guest-facing AI.
+
+Do not: close C05; submit a public App Store / Play listing; invent a native-only feature the PWA does not have; put Echo notes in iCloud or Google backup by accident.
+
+Return: (1) wrap choice, (2) what builds on Linux vs what needs Christopher’s Mac, (3) TestFlight and Play steps, (4) account blockers, (5) changelog line for 09.
 ```
 
 ---
@@ -203,9 +245,10 @@ Return the run-of-show and a list of holes Tess or Lisa must walk.
 CoS job:
 
 1. Read the deliverable.
-2. Do not close D01 / D03 / D04 / D13.
+2. Do not close D01 / D03 / D04 / D13 / C05.
 3. Merge accepted text into the relevant workstream file.
 4. Log a dated changelog line.
+5. Trail Quest: merge APP-01-CONT / APP-02 returns into `09`. Do not implement `/quest` in this CoS thread.
 
 ---
 
@@ -214,3 +257,4 @@ CoS job:
 - 2026-09-08 — Spawn library created.
 - 2026-09-08 — FIN-01 added. Steward is CoS, not CEO. WEB-01 marked merged.
 - 2026-09-10 — APP-01 added (spec + PWA; Christopher override). RETREAT-01 added.
+- 2026-09-10 — APP-01 marked merged (PWA shipped in CoS). APP-01-CONT and APP-02 added. Trail Quest code leaves this CoS thread.

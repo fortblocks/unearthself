@@ -73,7 +73,7 @@ Everything else is important. Those five are load-bearing.
 | Item | Why it waits |
 |---|---|
 | Full Echo taxonomy | Forged in the field, not at the desk |
-| Native Trail Quest apps | PWA + paper is enough for pilots |
+| Native Trail Quest apps | PWA + paper is the product (C05). TestFlight / Play Internal is a requested wrapper (APP-02), not a rewrite. |
 | Online course | No alumni yet |
 | Community / Badlanders layer | Do not fake a congregation |
 | Local 12-week Transformation Programme | After the corporate engine is turning (D09) |
@@ -89,3 +89,4 @@ Everything else is important. Those five are load-bearing.
 ## Changelog
 
 - 2026-09-08 — Roadmap opened. Critical path of five named.
+- 2026-09-10 — Native stores requested as a shell on the PWA. C05 holds.

@@ -1,7 +1,7 @@
 # Workstream — Trail Quest App
 
 **Code:** APP  
-**Status:** Pilot PWA built 10 Sep 2026 at `/quest`. Not a native app. Tweaks expected in the field.  
+**Status:** Pilot PWA built 10 Sep 2026 at `/quest`. Not a native app. Tweaks expected in the field. **Build chat:** APP-01-CONT (not CoS). Store shells: APP-02, wrapper only, C05 not closed.  
 **Working host (does not close D05):** `quest.unearthself.xyz`  
 **Rule:** The app preserves immersion. If it fights the canyon, paper wins. If an instruction conflicts with safety, conditions or a physical limit, the app instruction does not take priority.
 
@@ -276,7 +276,7 @@ Facilitator is the geofence when silicon fails. Two dead phones still finish the
 
 | Item | Why |
 |---|---|
-| Native iOS / Android | PWA + paper is the November path (C05) |
+| Native iOS / Android stores | Product stays PWA + paper (C05). Christopher asked 10 Sep for TestFlight + Play Internal **as a wrapper** (APP-02). Not a rewrite. |
 | Full Echo taxonomy | Forged in rooms, not in the pack |
 | Guest-facing AI | C04 |
 | Tessellate as a character | D18 |
@@ -317,3 +317,4 @@ Build will tweak timings, copy and geofence radii. It should not tweak the loop:
 - 2026-09-10 — Ingested *Unearth Self MVP.pdf*. Guest and facilitator views written.
 - 2026-09-10 — APP-01 specified in 09: guest and admin screen lists, content-pack JSON v0.1, offline behaviour, paper fallback, privacy sheet. Working default for notes is on-device; facilitator sees progress not text. Build waits on “go”.
 - 2026-09-10 — PWA built at `/quest` (guest G01–G12, facilitator A01–A08). IndexedDB notes. Service worker. Demo instance `pace-demo-2026`. GPS stand-in until Horsethief is walked. No sync endpoint.
+- 2026-09-10 — Build leaves CoS. Ongoing code: APP-01-CONT. Store shells requested (APP-02) as Capacitor wrap for TestFlight + Play Internal. C05 not closed. iOS still needs a Mac + Apple Developer Programme; a Grok Linux sandbox cannot upload to TestFlight.

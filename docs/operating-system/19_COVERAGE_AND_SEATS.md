@@ -31,7 +31,7 @@ Christopher spawns. CoS tracks whether the return was merged into the assigned f
 | 5 | PLACE-01 | Spa menu + Haven house / booking rules | Norah + Lisa | `06_WS_SPA_HAVEN.md` |
 | 6 | APP-01 | Trail Quest PWA spec (guest + facilitator) | Christopher (Tess on quest copy) | `09_WS_TRAIL_QUEST.md` |
 
-WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01 **built 10 Sep** at `/quest`. GPS stand-in until Horsethief is walked. No sync.
+WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01 **built 10 Sep** at `/quest`. GPS stand-in until Horsethief is walked. No sync. Further Trail Quest code lives in the APP-01-CONT chat, not CoS.
 
 ## Grok threads — next
 
@@ -42,11 +42,13 @@ WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 
 | ECHO-01 | Facilitator Mirror card (two pages) | Week 2 — Tess |
 | WEB-02 | Build brief + CMS + embeds | After D14 hybrid is chosen |
 | OPS-01 | Safety pack templates | Week 3 — Lisa |
-| APP-01 | Trail Quest PWA spec | Built 10 Sep at `/quest`. Spec in `09`. |
+| APP-01 | Trail Quest PWA spec | Built 10 Sep at `/quest`. Spec in `09`. Do not respawn. |
+| APP-01-CONT | Trail Quest build thread | Open. Owns `/quest` from here. |
+| APP-02 | TestFlight + Play Internal shells | Open. Wrapper on the PWA. Same chat as APP-01-CONT. C05 not closed. |
 | PART-01 | Canalta + canyon one-pagers | Week 3 — Lisa |
 | VOICE-01 | Humanizer pass on a named draft | When a page or mail is about to ship |
 
-Do not spawn a HAM taxonomy chat, a course chat, or a second-site chat before a paying outdoor day. APP-01 is the exception (spec + PWA only).
+Do not spawn a HAM taxonomy chat, a course chat, or a second-site chat before a paying outdoor day. APP-01 was the exception (spec + PWA). APP-01-CONT / APP-02 stay in **one** Trail Quest chat.
 
 ## Five load-bearing items
 
@@ -81,3 +83,4 @@ Put these four on the wall until they move:
 - 2026-09-10 — APP-01 opened (Christopher). Spec ingested from MVP PDF into `09`. Spawn prompt in `16`.
 - 2026-09-10 — APP-01 return merged into `09`. Screen IDs, pack v0.1, paper nine, Horsethief walk. D02 / D10 / D18 left open.
 - 2026-09-10 — Trail Quest PWA shipped at `/quest` (guest + facilitator). October test: no sync, GPS stand-in.
+- 2026-09-10 — APP-01-CONT and APP-02 opened. Trail Quest code leaves CoS. Store wrap requested; C05 holds.

@@ -52,7 +52,7 @@
 | Email / SMS | Customer.io, Loops, or HubSpot | Copy only |
 | Accounting | QuickBooks / Xero | — |
 | Files | Shared Drive with this Source of Truth copied in | — |
-| Trail Quest | — | Yes, as a PWA |
+| Trail Quest | — | Yes, as a PWA. Store shells (APP-02) wrap that PWA; they are not a second product. |
 | Rune renderer | Port artsu seed JSON into a small component | Yes |
 | Automation | Grok Bots + a thin webhook layer | Prompt library, not a new platform |
 | Identity | Clerk / Auth.js later | Not for v1 guest book flows |
@@ -95,3 +95,4 @@ GitHub + Vercel are already in the operator’s toolkit. Use them.
 ## Decision log
 
 - 2026-09-08 — Composable stack chosen over a custom all-in-one. Trail Quest is the only greenfield product app.
+- 2026-09-10 — APP-02 requested: Capacitor (or TWA on Play) wraps `/quest`. C05 not closed. iOS upload is Mac + Apple Developer, not the Linux sandbox.

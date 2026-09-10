@@ -36,3 +36,5 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | C06 | Source of Truth is this folder, not the 1,248-page index | 2026-09-08 |
 | C07 | Friday numbers owned by Norah | 2026-09-08 |
 | C08 | Partner remits restated (Tess product; Lisa ops/guests; Norah finance/treatments; Christopher systems/brand/market) | 2026-09-08 |
+
+APP-02 (10 Sep) wraps the C05 PWA for TestFlight and Play Internal. It does not reopen or close C05. Bundle id and public store listings stay unset (D05).
