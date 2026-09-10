@@ -1,11 +1,6 @@
 "use client";
 
-/**
- * APP-02 shell adapter. Screens do not change.
- * On the web PWA this is a no-op wrapper around the browser.
- * Inside Capacitor it uses native geolocation and haptics.
- * No camera. Notes stay in IndexedDB.
- */
+export const FIELD_GPS = false;
 
 export function isNativeShell(): boolean {
   if (typeof window === "undefined") return false;
@@ -39,7 +34,8 @@ export async function hapticPulse(): Promise<void> {
   }
 }
 
-export async function requestFieldLocation(): Promise<"ok" | "denied" | "missing"> {
+export async function requestFieldLocation(): Promise<"ok" | "denied" | "missing" | "off"> {
+  if (!FIELD_GPS) return "off";
   try {
     if (isNativeShell()) {
       const { Geolocation } = await import("@capacitor/geolocation");
