@@ -317,4 +317,4 @@ Build will tweak timings, copy and geofence radii. It should not tweak the loop:
 - 2026-09-10 — Ingested *Unearth Self MVP.pdf*. Guest and facilitator views written.
 - 2026-09-10 — APP-01 specified in 09: guest and admin screen lists, content-pack JSON v0.1, offline behaviour, paper fallback, privacy sheet. Working default for notes is on-device; facilitator sees progress not text. Build waits on “go”.
 - 2026-09-10 — PWA built at `/quest` (guest G01–G12, facilitator A01–A08). IndexedDB notes. Service worker. Demo instance `pace-demo-2026`. GPS stand-in until Horsethief is walked. No sync endpoint.
-- 2026-09-10 — Build leaves CoS. Ongoing code: APP-01-CONT. Store shells requested (APP-02) as Capacitor wrap for TestFlight + Play Internal. C05 not closed. iOS still needs a Mac + Apple Developer Programme; a Grok Linux sandbox cannot upload to TestFlight.
+- 2026-09-10 — Build leaves CoS. Ongoing code: APP-01-CONT. Store shells requested (APP-02) as Capacitor wrap for TestFlight + Play Internal. C05 not closed. Christopher confirmed Apple Developer, Play Console, and a Mac with Xcode — he uploads; the sandbox still cannot.

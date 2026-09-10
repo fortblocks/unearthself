@@ -183,7 +183,9 @@ Return each turn: (1) what changed, (2) what a guest or facilitator should tap t
 ## APP-02 — Store shells (TestFlight + Play Internal)
 
 **Assign:** `09_WS_TRAIL_QUEST.md` + `10_WS_TECH_ARCHITECTURE.md`  
-**Override:** Christopher, 10 Sep 2026 — wants phones to install from TestFlight and Play Internal as soon as the accounts exist. This does **not** close C05. The product remains the PWA. Stores are a wrapper.
+**Override:** Christopher, 10 Sep 2026 — wants phones to install from TestFlight and Play Internal as soon as a binary exists. This does **not** close C05. The product remains the PWA. Stores are a wrapper.
+
+**Accounts (Christopher, 10 Sep):** Apple Developer Programme — enrolled. Google Play Console — exists. Mac with Xcode — exists. Do not stop at account blockers. Produce the wrap and the upload steps. He uploads from the Mac.
 
 **Hard limit:** A Linux Grok sandbox cannot produce a signed iOS IPA or upload to TestFlight. iOS still needs a Mac, Xcode, and an Apple Developer Programme membership. Android AAB can be prepared in Linux. The job is to wrap the existing `/quest` PWA (Capacitor, one codebase) and hand Christopher the exact build/upload steps for his Mac.
 
@@ -206,7 +208,7 @@ Job:
    - Info.plist / AndroidManifest permissions: location, (precise location), haptic; no camera in v1
    - a Mac build sheet Christopher can follow in Xcode: archive → App Store Connect → TestFlight
    - a Play Internal sheet: AAB → internal track
-8. If Apple Developer or Play Console is missing, stop at a signed-local / internal-track-ready project and list the account blockers. Do not fake a store listing.
+8. Christopher has the three accounts (Apple Developer, Play Console, Mac/Xcode). Do not stop at blockers. Hand him the Xcode archive → TestFlight steps and the AAB → Play Internal steps. He runs those on the Mac. Do not fake a public store listing.
 9. Privacy sheet still on join. Notes stay on-device. No tracking SDK.
 
 Must preserve: C05 (PWA is the product), paper fallback, land wins, no guest-facing AI.
@@ -258,3 +260,4 @@ CoS job:
 - 2026-09-08 — FIN-01 added. Steward is CoS, not CEO. WEB-01 marked merged.
 - 2026-09-10 — APP-01 added (spec + PWA; Christopher override). RETREAT-01 added.
 - 2026-09-10 — APP-01 marked merged (PWA shipped in CoS). APP-01-CONT and APP-02 added. Trail Quest code leaves this CoS thread.
+- 2026-09-10 — Christopher confirmed Apple Developer, Play Console, Mac/Xcode. APP-02 uploads from his Mac.
