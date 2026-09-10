@@ -59,7 +59,7 @@ function VisitPage() {
             <h2 className="font-display mb-4 text-3xl uppercase">Haven first. Canalta when you overflow.</h2>
             <p className="mb-4 text-fossil/75">
               Four suites on the same block as Basecamp: Elowen, Hidden Hollow, River Blossom, Water Mark.
-              Kitchens, quiet, the house next door for heat and cold.
+              Kitchens, quiet, the house next door for heat and cold. Direct rates from $165 a night.
             </p>
             <p className="text-fossil/75">
               Groups larger than the four suites go to Canalta. We hold those rooms; you do not book them

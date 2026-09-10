@@ -13,7 +13,7 @@
 
 ## What it fails
 
-- No real-time booking, no prices, no contact, no footer of record
+- No real-time booking, no contact, no footer of record
 - Philosophy before commerce
 - Retreat Builder is a concept, not an inventory system
 - No spa menu
@@ -82,3 +82,4 @@ Next design chat should produce low-fidelity frames for Home, Haven suite, Spa m
 ## Changelog
 
 - 2026-09-08 — Three design routes named. Booking declared v1 job.
+- 2026-09-10 — Haven BAR and suite copy on `/haven`. Working numbers from the model, not the house PDF. D01 still open.

@@ -43,6 +43,7 @@ Status of all five: **not spawned** until Christopher pastes the prompt from `16
 | OPS-01 | Safety pack templates | Week 3 — Lisa |
 | APP-01 | Trail Quest PWA spec | Week 3–4. Not launch-critical. |
 | PART-01 | Canalta + canyon one-pagers | Week 3 — Lisa |
+| VOICE-01 | Humanizer pass on a named draft | When a page or mail is about to ship |
 
 Do not spawn APP-01, a HAM taxonomy chat, a course chat, or a second-site chat before a paying outdoor day.
 
@@ -75,3 +76,4 @@ Put these four on the wall until they move:
 ## Changelog
 
 - 2026-09-08 — File created from CoS stand-up grid. Human seats all open. Thread jobs taken from `16`, not guessed. PART-01 holds canyon/Canalta. OPS-01 is safety pack, not FOH.
+- 2026-09-10 — VOICE-01 added. Skill in `skills/humanizer`.

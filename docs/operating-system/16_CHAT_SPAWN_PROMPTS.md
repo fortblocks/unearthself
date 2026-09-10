@@ -113,6 +113,28 @@ Held. See 20 and 21.
 
 ---
 
+## VOICE-01 — Humanizer pass on a named draft
+
+**Assign:** `25_WS_VOICE.md` + `03_BRAND_SYSTEM.md` + `skills/humanizer/SKILL.md`
+
+```
+[PASTE UNIVERSAL PREAMBLE]
+
+Workstream: VOICE.
+Files: 25_WS_VOICE.md, 03_BRAND_SYSTEM.md, skills/humanizer/SKILL.md.
+
+Job:
+1. Read the skill. Do not improvise a second style guide.
+2. Rewrite the named draft. Keep every fact, number, suite name and price.
+3. House pass: would Lisa send this from the front desk? Would Tess let this sit next to PACE?
+4. Return the rewrite and a short list of tells you cut.
+5. Do not invent warmth. Do not add a testimonial. Do not touch rune names or the safety line.
+
+Draft to rewrite: [PASTE OR NAME THE FILE]
+```
+
+---
+
 ## After the spawn returns
 
 CoS job:

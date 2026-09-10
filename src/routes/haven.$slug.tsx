@@ -1,7 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
+import { RateTable } from "@/components/haven/RateTable";
 import { StayRequest } from "@/components/haven/StayRequest";
+import { fromNight } from "@/data/havenRates";
 import { getRoom, HAVEN_ADDRESS, HAVEN_SHARED, type RoomSlug } from "@/data/rooms";
+import { cad } from "@/lib/format";
 
 export const Route = createFileRoute("/haven/$slug")({
   component: RoomPage,
@@ -28,6 +31,7 @@ function RoomPage() {
   const { room } = Route.useLoaderData();
   const [active, setActive] = useState(0);
   const image = room.images[active] ?? room.images[0];
+  const slug = room.slug as RoomSlug;
 
   return (
     <>
@@ -40,6 +44,7 @@ function RoomPage() {
           </Link>
           <h1 className="font-display mt-4 text-[clamp(2.5rem,6vw,4.5rem)] tracking-wide uppercase">{room.name}</h1>
           <p className="mt-2 max-w-[48ch] text-lg text-fossil/80">{room.tagline}</p>
+          <p className="mt-4 text-sm text-fossil/70">From {cad(fromNight(slug))} a night</p>
         </div>
       </section>
 
@@ -77,6 +82,10 @@ function RoomPage() {
                 <dt className="text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">Layout</dt>
                 <dd className="mt-1 text-lg">{room.bedrooms}</dd>
               </div>
+              <div className="border border-coal/10 px-4 py-3">
+                <dt className="text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">Baths</dt>
+                <dd className="mt-1 text-lg">{room.baths}</dd>
+              </div>
               {room.size && (
                 <div className="border border-coal/10 px-4 py-3">
                   <dt className="text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">Size</dt>
@@ -89,7 +98,18 @@ function RoomPage() {
                   <dd className="mt-1 text-lg">{room.floor}</dd>
                 </div>
               )}
+              <div className="border border-coal/10 px-4 py-3">
+                <dt className="text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">Beds</dt>
+                <dd className="mt-1 text-lg">{room.beds}</dd>
+              </div>
             </dl>
+            <ul className="mb-8 flex flex-wrap gap-2">
+              {room.extras.map((item) => (
+                <li key={item} className="border border-coal/10 px-3 py-1.5 text-sm text-shale">
+                  {item}
+                </li>
+              ))}
+            </ul>
             <p className="text-sm text-shale/80">{HAVEN_ADDRESS}</p>
             <ul className="mt-8 flex flex-wrap gap-2">
               {HAVEN_SHARED.map((item) => (
@@ -99,12 +119,20 @@ function RoomPage() {
               ))}
             </ul>
           </div>
-          <div id="stay" className="border border-coal/10 bg-white p-6 md:p-8">
-            <h2 className="font-display mb-2 text-2xl uppercase">Request {room.name}</h2>
-            <p className="mb-6 text-sm text-shale">
-              Tell us the dates. We confirm what is free and send the rate before anything is charged.
-            </p>
-            <StayRequest presetSlug={room.slug as RoomSlug} />
+          <div>
+            <div id="stay" className="border border-coal/10 bg-white p-6 md:p-8">
+              <h2 className="font-display mb-2 text-2xl uppercase">Request {room.name}</h2>
+              <p className="mb-6 text-sm text-shale">
+                Tell us the dates. We confirm what is free and send the total before anything is charged.
+              </p>
+              <StayRequest presetSlug={slug} />
+            </div>
+            <div className="mt-8">
+              <p className="mb-3 text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
+                Direct rates
+              </p>
+              <RateTable slug={slug} />
+            </div>
           </div>
         </div>
       </section>

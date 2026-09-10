@@ -61,6 +61,8 @@ Public promise (working):
 
 Working line, not locked: *Find your PACE in the Badlands.*
 
+Guest-facing drafts go through `skills/humanizer/SKILL.md` before they ship. See `25_WS_VOICE.md`. The skill may not rewrite PACE names, the safety line, or Echo Mirror.
+
 ## Website and product UI principles
 
 - Simple, not sparse-to-the-point-of-precious.
@@ -72,3 +74,4 @@ Working line, not locked: *Find your PACE in the Badlands.*
 ## Changelog
 
 - 2026-09-08 — Ember locked to `#F2684C`. Coal + Fossil declared primary pair.
+- 2026-09-10 — Voice skill linked. Guest-facing copy runs through `skills/humanizer`.

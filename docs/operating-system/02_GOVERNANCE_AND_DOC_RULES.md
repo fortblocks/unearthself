@@ -54,6 +54,7 @@ A Bootcamp day needs all four. Tess designs what happens. Lisa makes the house a
 | OPS | Lisa | Tess on psychological safety |
 | COM | Norah | Christopher on package architecture |
 | PART | Lisa | Christopher on commercial terms |
+| VOICE | Christopher | Tess on product language |
 
 ## Source-of-truth rules
 
@@ -87,3 +88,4 @@ Use the prompt in `16_CHAT_SPAWN_PROMPTS.md`. Every spawned chat must:
 - 2026-09-08 — Spawn prompt library (`16`) and master roadmap (`18`) added. Team pack published.
 - 2026-09-08 — Partner remits restated: Tess product/modality; Lisa site ops and guest relations; Norah finance and treatments; Christopher systems, brand, marketing and sales (with Tess).
 - 2026-09-08 — “CEO” removed from the operating system. Flat partnership. No public title.
+- 2026-09-10 — VOICE workstream added. Guest-facing copy runs through `skills/humanizer`.

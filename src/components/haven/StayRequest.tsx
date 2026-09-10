@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
+import { quoteStay } from "@/data/havenRates";
+import { cad } from "@/lib/format";
 
 type Props = {
   presetSlug?: RoomSlug;
@@ -29,6 +31,10 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
+  const quote = useMemo(
+    () => (room && checkIn && checkOut ? quoteStay(room, checkIn, checkOut) : null),
+    [room, checkIn, checkOut],
+  );
   const dark = tone === "dark";
   const field =
     "w-full rounded-[2px] border bg-transparent px-3 py-2.5 text-[0.95rem] outline-none focus:border-ember " +
@@ -56,6 +62,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
         checkOut,
         nights,
         guests,
+        indicativeTotal: quote?.total ?? null,
         name: name.trim(),
         email: email.trim(),
         notes: notes.trim(),
@@ -133,9 +140,19 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
           />
         </label>
       </div>
-      {nights > 0 && (
+      {quote && (
         <p className={"text-sm " + (dark ? "text-fossil/70" : "text-shale")}>
-          {nights} night{nights === 1 ? "" : "s"} · rates on request
+          {quote.nights} night{quote.nights === 1 ? "" : "s"} · about {cad(quote.total)}
+          <span className={dark ? " text-fossil/45" : " text-shale/70"}>
+            {" "}
+            ({cad(quote.subtotal)} + {cad(quote.clean)} clean)
+          </span>
+          . We confirm the total with the dates.
+        </p>
+      )}
+      {nights > 0 && !quote && (
+        <p className={"text-sm " + (dark ? "text-fossil/70" : "text-shale")}>
+          {nights} night{nights === 1 ? "" : "s"} · pick a room to see an indicative total
         </p>
       )}
       <label className="block">

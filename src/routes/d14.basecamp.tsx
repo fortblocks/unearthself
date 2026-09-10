@@ -22,7 +22,7 @@ function BasecampRoute() {
         <p className="mb-1 text-[0.7rem] tracking-[0.22em] text-shale uppercase">Route C · inventory first</p>
         <h1 className="font-display text-4xl md:text-5xl">Haven + spa</h1>
         <p className="mt-2 max-w-[42ch] text-shale">
-          Four suites. Treatments on the same book. Locals welcome. Rates on request until D01.
+          Four suites. Treatments on the same book. Locals welcome. Direct rates live on Haven.
         </p>
       </header>
 
