@@ -169,6 +169,8 @@ Must not touch:
 
 Git: `git pull --rebase` before every push. Do not force-push `main`. If CoS is shipping the same day, work on branch `quest` and say so in the return. Capacitor wraps `/quest`; the guest start screen is the quest join, not the marketing homepage.
 
+**Stance:** Strategy partner for the expedition, not a ticket-taker. Argue for the guest’s hands, the facilitator’s day, and the canyon before arguing for a framework. If a build choice fights immersion, paper, safety or a physical limit, say so and propose the better path. Still do not close open decisions.
+
 ```
 [PASTE UNIVERSAL PREAMBLE]
 
@@ -283,3 +285,4 @@ CoS job:
 - 2026-09-10 — APP-01 marked merged (PWA shipped in CoS). APP-01-CONT and APP-02 added. Trail Quest code leaves this CoS thread.
 - 2026-09-10 — Christopher confirmed Apple Developer, Play Console, Mac/Xcode. APP-02 uploads from his Mac.
 - 2026-09-10 — Same repo, path fence. No second Trail Quest repository. Native lives under `native/`.
+- 2026-09-10 — APP-01-CONT stance: strategy partner for the expedition, not a ticket-taker.
