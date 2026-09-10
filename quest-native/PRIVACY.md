@@ -4,20 +4,21 @@ Host this text at a public URL before App Review. Suggested: https://unearthself
 
 Unearth Self / Trail Quest is a facilitated retreat instrument for Badlands Bootcamp in Drumheller, Alberta.
 
-## What the app stores on the phone
+## What the app uses
 
-- Join code, first name, retreat progress
+- Join code, first name, retreat progress — on this device
 - Echo notes and Mirror answers — on this device only
+- Precise location while you use the app, to confirm you are in an approved field area and that the signal is stable enough for a digital specimen. There is no map arrow. We do not follow you after you leave the app. Coordinates are not written into Echo notes and are not sent to a server in v1.
 - A public field card (beats done, specimen count, Mirror yes/no, Rune received). Not the words you wrote.
 
 ## What the app does not do in v1
 
 - Create an account
-- Request your location
 - Use the camera
+- Request Always or background location
 - Sell data
 - Back Echo notes up to iCloud or Google
-- Send Echo notes to Unearth Self, a facilitator feed, or a bot
+- Send Echo notes or a location track to Unearth Self, a facilitator feed, or a bot
 
 ## What may leave the phone later
 
