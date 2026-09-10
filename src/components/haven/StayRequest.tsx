@@ -142,7 +142,8 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
       </div>
       {quote && (
         <p className={"text-sm " + (dark ? "text-fossil/70" : "text-shale")}>
-          {quote.nights} night{quote.nights === 1 ? "" : "s"} · about {cad(quote.total)}
+          {quote.nights} night{quote.nights === 1 ? "" : "s"}
+          {quote.monthly ? " · monthly rate" : ""} · about {cad(quote.total)}
           <span className={dark ? " text-fossil/45" : " text-shale/70"}>
             {" "}
             ({cad(quote.subtotal)} + {cad(quote.clean)} clean)

@@ -83,3 +83,4 @@ Next design chat should produce low-fidelity frames for Home, Haven suite, Spa m
 
 - 2026-09-08 — Three design routes named. Booking declared v1 job.
 - 2026-09-10 — Haven BAR and suite copy on `/haven`. Working numbers from the model, not the house PDF. D01 still open.
+- 2026-09-10 — Haven BAR switched to the house card (four seasons, $65/$85 clean).

@@ -53,3 +53,4 @@ A Drumheller flagship that is cash-flow positive, with IP clean enough to take t
 
 - 2026-09-08 — Rate card flagged as an open decision that blocks public prices.
 - 2026-09-10 — Haven BAR drafted live from the working model. D01 still open. House PDF does not match — see `20`.
+- 2026-09-10 — House card is the public Haven BAR. Working model Haven BAR tab to match.

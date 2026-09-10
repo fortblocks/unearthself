@@ -22,7 +22,7 @@ Contribution the model claims: **1,407 / 3-day guest** and **112 / 1-day guest**
 
 ## How this meets the Haven rate card
 
-The house card in `20` is suite-specific (165–295 night). The model’s 300 is a planning blend, not the public BAR.
+The house card in `20` is suite-specific (165–295 night, cleaning $65 or $85). The model’s 300 is a planning blend, not the public BAR.
 
 ## Volume conflict
 

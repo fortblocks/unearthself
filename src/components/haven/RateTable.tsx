@@ -53,7 +53,7 @@ export function RateTable({ slug }: { slug?: RoomSlug }) {
 
   return (
     <div className="overflow-x-auto border border-coal/10">
-      <table className="w-full min-w-[36rem] text-left text-sm">
+      <table className="w-full min-w-[52rem] text-left text-sm">
         <thead>
           <tr className="border-b border-coal/10 bg-white text-[0.72rem] font-semibold tracking-[0.12em] text-shale uppercase">
             <th className="px-4 py-3 font-semibold">Suite</th>

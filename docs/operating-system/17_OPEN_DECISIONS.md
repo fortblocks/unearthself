@@ -4,7 +4,7 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 
 | ID | Decision | Options / notes | Blocks | Owner |
 |---|---|---|---|---|
-| D01 | Public prices for Haven, spa, Bootcamp | Need owner actuals. Norah leads the inputs. Working Haven BAR drafted to `/haven` on 10 Sep 2026 from the working model (not the house PDF). Spa and Bootcamp still unpublished as packages. | Website, bots, one-pager | Norah + partners |
+| D01 | Public prices for Haven, spa, Bootcamp | Haven BAR is now the house card (four seasons, suite cleaning) as of 10 Sep 2026 — Christopher confirmed. Spa and Bootcamp package prices still unpublished. Norah still signs the rest. | Website, bots, one-pager | Norah + partners |
 | D02 | Fourth Rune public name | Existence is current canon; “Experience” appeared in one brief | Copy, glyphs, app | Christopher / Tess |
 | D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
 | D04 | CRM choice | HubSpot speed vs Attio taste | Bots, pipeline | Christopher |

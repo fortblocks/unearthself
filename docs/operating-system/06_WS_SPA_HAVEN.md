@@ -24,7 +24,7 @@
 
 Amenities: full kitchen, fireplace, A/C, Wi-Fi, parking, washer-dryer.
 
-Direct BAR is on `/haven` (working model, 10 Sep 2026). House PDF diverges — see `20`. D01 still needs Norah.
+Direct BAR is on `/haven` from the house card (10 Sep 2026). Four seasons, cleaning $65 or $85. D01 still open for spa and Bootcamp packages.
 
 Current booking pattern: request dates → email confirmation of rates → no charge at request. Form now shows an indicative total from the BAR. Still not a PMS.
 
@@ -47,3 +47,4 @@ Haven is a quieter doorway into the land, not a motel annex. Basecamp is a retre
 
 - 2026-09-08 — Suites named from live site. Booking upgrade flagged as P0.
 - 2026-09-10 — Suite facts from house descriptions. BAR published as working numbers. PDF vs model table in `20`.
+- 2026-09-10 — House card declared canon. Four-season BAR + suite cleaning on `/haven`.

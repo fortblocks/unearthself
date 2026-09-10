@@ -125,8 +125,8 @@ function HavenPage() {
             </p>
             <h2 className="font-display mb-4 text-[clamp(2rem,4vw,3rem)]">What a night costs.</h2>
             <p className="text-shale">
-              CAD. Cleaning once per stay. Weekend is Friday and Saturday night. October follows March–May.
-              We still confirm the total when we confirm the dates.
+              CAD. Cleaning once per stay ($65 or $85, by suite). Weekend is Friday and Saturday night.
+              Peak is 20 June to 6 September. We still confirm the total when we confirm the dates.
             </p>
           </div>
           <RateTable />
