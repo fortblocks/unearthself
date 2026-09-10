@@ -8,12 +8,12 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | D02 | Fourth Rune public name | Existence is current in the PDF and `04`; `00_README` still says Experience. APP-01 stubbed the fourth day without printing a locked word. **Not closed.** | Copy, glyphs, app | Christopher / Tess |
 | D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
 | D04 | CRM choice | HubSpot speed vs Attio taste | Bots, pipeline | Christopher |
-| D05 | Domain strategy | xyz only vs add .com/.ca. APP-01 working host `quest.unearthself.xyz` is a PWA URL, not a close. | Print, ads, app | Christopher |
+| D05 | Domain strategy | xyz only vs add .com/.ca. APP-01 working host `quest.unearthself.xyz` is a PWA URL, not a close. APP-02 working bundle id `xyz.unearthself.quest` is a recommendation, not a close. | Print, ads, app | Christopher |
 | D06 | Dunning format and name | Field-test required. Not an app object. | Adaptability morning | Tess |
 | D07 | Final-day route | Rosedale → fossil shop → Eleven Bridges → Last Chance. APP-01 left this a stub. | Fourth day | Lisa + Tess |
 | D08 | Alcohol policy | Default non-alcoholic before thermal | Connection quest | Partners |
 | D09 | Local 12-week programme timing | After first corporate season | Sales focus | Partners |
-| D10 | Echo note storage | APP-01 recommends on-device for v1. Working default in `09`. **Not closed.** | App privacy | Tess + Christopher |
+| D10 | Echo note storage | APP-01 recommends on-device for v1. Working default in `09`. Android wrap sets allowBackup=false. **Not closed.** | App privacy | Tess + Christopher |
 | D11 | Primary corporate price metric | Per person vs team package | Proposals | Norah + Christopher + Tess |
 | D12 | Canalta commercial terms | File the signed version | Large groups | Lisa |
 | D13 | Insurance product | Confirm adventure cover | First paid outdoor day | Lisa |
@@ -38,3 +38,5 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | C08 | Partner remits restated (Tess product; Lisa ops/guests; Norah finance/treatments; Christopher systems/brand/market) | 2026-09-08 |
 
 APP-02 (10 Sep) wraps the C05 PWA for TestFlight and Play Internal. It does not reopen or close C05. Bundle id and public store listings stay unset (D05).
+
+APP-02 recommendation (not a close): keep D05 open; use `xyz.unearthself.quest` as the working bundle id until a partner says otherwise. Keep D10 on-device; Android `allowBackup` is false so notes are not copied into a Google backup. Do not print a fourth-Rune word (D02).

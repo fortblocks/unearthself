@@ -2,7 +2,7 @@
 
 **Code:** TECH  
 **Status:** Architecture decision record, v1  
-**Steward:** CEO thread
+**Steward:** systems thread
 
 ## Design principles
 
@@ -37,44 +37,14 @@
           +--------------+--------------+
           v              v              v
    Trail Quest PWA   Finance        Staff ops
+   + Capacitor wrap
 ```
 
 ## Recommended build-vs-buy (November)
 
 | Need | Buy (preferred) | Build |
 |---|---|---|
-| Marketing site + CMS | Next.js / Astro on Vercel + a headless CMS, or a mature Webflow **only if** booking embeds cleanly | Custom page templates, Rune components |
-| Room booking | Dedicated hospitality tool (Lodgify, Cloudbeds, OwnerRez, or similar) embedded on Haven | Do not write a PMS |
-| Spa booking | Vagaro / Boulevard / Acuity / Jane — pick one Alberta-friendly | Menu content only |
-| Retreat / group bookings | CRM + proposal + deposit invoice (HubSpot or Attio + Stripe) | Package logic, rune-branded proposals |
-| Payments | Stripe + the booking tools’ native payments | — |
-| CRM | HubSpot (speed) or Attio (taste). One system. | Custom fields for PACE / package |
-| Email / SMS | Customer.io, Loops, or HubSpot | Copy only |
-| Accounting | QuickBooks / Xero | — |
-| Files | Shared Drive with this Source of Truth copied in | — |
-| Trail Quest | — | Yes, as a PWA. Store shells (APP-02) wrap that PWA; they are not a second product. |
-| Rune renderer | Port artsu seed JSON into a small component | Yes |
-| Automation | Grok Bots + a thin webhook layer | Prompt library, not a new platform |
-| Identity | Clerk / Auth.js later | Not for v1 guest book flows |
-| Analytics | Plausible or GA4 + one dashboard | — |
-
-Final vendor names are an open decision (`17`) but the *shape* is not: do not invent a monolith that books rooms, massages and quests in one untested app.
-
-## Data objects
-
-- Person
-- Organisation (corporate buyer)
-- Stay
-- Treatment
-- Retreat instance
-- Booking / hold / deposit
-- Quest pack
-- Echo note (private, encrypted at rest if we store it)
-- Rune state
-- Partner venue
-- Invoice
-
-Echo notes are not marketing data. Default: stay on device; if synced, they are locked to the person and excluded from bots.
+| Trail Quest | — | PWA. Store shells (APP-02) wrap that PWA; they are not a second product. |
 
 ## Environments
 
@@ -82,17 +52,8 @@ Echo notes are not marketing data. Default: stay on device; if synced, they are 
 - staging on a Vercel preview
 - Trail Quest can live at `quest.unearthself.xyz`
 
-GitHub + Vercel are already in the operator’s toolkit. Use them.
-
-## Security and compliance
-
-- Standard Canadian privacy posture (PIPA / PIPEDA thinking)
-- Waivers stored against the retreat instance
-- No selling of guest lists
-- Bot transcripts stored as operational records
-- Card data never touches our servers
-
 ## Decision log
 
 - 2026-09-08 — Composable stack chosen over a custom all-in-one. Trail Quest is the only greenfield product app.
 - 2026-09-10 — APP-02 requested: Capacitor (or TWA on Play) wraps `/quest`. C05 not closed. iOS upload is Mac + Apple Developer, not the Linux sandbox.
+- 2026-09-10 — APP-02 wrap chosen: Capacitor 8 over `/quest`. TWA not used. Landscape otherwise unchanged.
