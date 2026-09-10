@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { submitSpringEnquiry } from "@/lib/enquiry";
+import { submitSpringEnquiry, mailSpringEnquiry } from "@/lib/enquiry";
 
 type Search = {
   utm_source: string;
@@ -218,23 +218,27 @@ function Enquire() {
     const form = e.currentTarget;
     const data = new FormData(form);
     setStatus("sending");
+    const payload = {
+      name: String(data.get("name") || ""),
+      email: String(data.get("email") || ""),
+      company: String(data.get("company") || ""),
+      role: String(data.get("role") || ""),
+      headcount: String(data.get("headcount") || ""),
+      window: String(data.get("window") || ""),
+      notes: String(data.get("notes") || ""),
+      honey: String(data.get("website") || ""),
+      utmSource: search.utm_source,
+      utmMedium: search.utm_medium,
+      utmCampaign: search.utm_campaign,
+    };
     try {
-      const result = await submitSpringEnquiry({
-        data: {
-          name: String(data.get("name") || ""),
-          email: String(data.get("email") || ""),
-          company: String(data.get("company") || ""),
-          role: String(data.get("role") || ""),
-          headcount: String(data.get("headcount") || ""),
-          window: String(data.get("window") || ""),
-          notes: String(data.get("notes") || ""),
-          honey: String(data.get("website") || ""),
-          utmSource: search.utm_source,
-          utmMedium: search.utm_medium,
-          utmCampaign: search.utm_campaign,
-        },
-      });
-      if (!result.ok) {
+      const mailed = await mailSpringEnquiry(payload);
+      try {
+        await submitSpringEnquiry({ data: payload });
+      } catch {
+        /* webhook is optional until D04 */
+      }
+      if (!mailed) {
         setStatus("error");
         return;
       }
