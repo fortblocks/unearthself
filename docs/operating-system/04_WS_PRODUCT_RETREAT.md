@@ -2,8 +2,8 @@
 
 **Code:** RETREAT  
 **Status:** Working MVP — sellable, still being forged  
-**Primary source:** *Unearth Self MVP.pdf* pp. 1–19  
-**Do not treat as current:** earlier five-principle drafts and seed Rune names
+**Primary source:** *Unearth Self MVP.pdf* (118 pp, current as of 10 Sep 2026). Architecture pp. 1–19. Day 1 run-of-show from p. 34. Adaptability field quest from pp. 56–110.  
+**Do not treat as current:** p. 21 five-principle schedule (Play / Self-awareness / Adaptability / Connection / Presence). Self-awareness is an Echo capacity. Fourth Rune is Existence unless D02 closes otherwise.
 
 ## Job of this workstream
 
@@ -35,14 +35,53 @@ Existence is the evolution of the forged Rune **Presence**. Self-awareness is no
 
 ### Experience loop (every Rune)
 
-1. Reveal the Rune (glyph, name, principle)
-2. Enter the experience
-3. Meet friction
-4. Look into the Echo Mirror
-5. Reorient and choose
-6. Activate and carry the Rune (physical and/or digital)
+1. Enter the experience (language comes after)
+2. Meet friction
+3. Look into the Echo Mirror (Notice → Orient → Choose)
+4. Reorient and test one other response (replay)
+5. Receive → Reveal → Activate the Rune (physical, then digital)
 
 The challenge is an environment that makes something visible. It is not a test of who wins.
+
+**Receive → Reveal → Activate** (do not collapse these):
+
+- **Receive** — unnamed artifact in the hand
+- **Reveal** — name and principle, after the Mirror
+- **Activate** — they choose to wear it; the app adds it later (often on the shuttle)
+
+If they receive and wear it immediately, the Rune looks earned before awareness.
+
+## Run-of-show skeleton (from the PDF — timings will move)
+
+### Day 1 — Unearth Play (Basecamp)
+
+16:00 check-in, app join, snack → welcome (app as companion, phones down until asked) → Zip Zap Zop → Failure Bow → Counting Game → Yes, Let’s → Return to the Body → Echo Mirror intro (private) → break → optional share → Chicken Monster → Impossible Expedition (Yes-But then Yes-And) → receive artifact → reveal Play → Mirror (Notice → Orient → Choose) → five-minute replay → activate → dinner at Vintage, no more facilitation.
+
+Practical outcome: they experience Play, recognise one habitual response around uncertainty or social exposure, and test another.
+
+### Day 2 morning — Adaptability (Horseshoe Canyon)
+
+Phone charged, pack offline, Play on the Rune Keeper. Shuttle. Warm-up (Zip Zap Zop + Kapow). Brief: they travel without a facilitator; **Field Recorder** watches the app; everyone else pockets the phone; digital bones only; app loses to the land.
+
+Stations: transit specimens → Station 1 (countdown before the team has a plan) → Station 2 (chosen direction stops confirming) → field Mirror (Rune still unnamed) → pick a private experiment → Station 3 replay (cross-calibrated fragments: your phone finds theirs, theirs finds yours) → silent walk → physical ritual (Play + Adaptability) → shuttle digital activation.
+
+They get the Rune whether or not every specimen was recovered.
+
+Dunning (jog / movement with music) is a **working concept**, not locked. D06.
+
+### Day 2 afternoon — Connection (town)
+
+Geofenced scavenger with briefed partners. Optional purchase, optional stranger contact, default non-alcoholic before thermal (D08). Return: Mirror, Rune review, thermal, food. Deeper interpretation happens at Basecamp, not in the canyon.
+
+Town pack is thinner than Adaptability. Do not invent businesses.
+
+### Final day — Existence
+
+Rosedale acreage → fossil shop → Eleven Bridges → Last Chance as a possible close. Route, permits, access: D07. Grounding, not religious, not overwhelming.
+
+## Trail Quest in the product
+
+The app is specified in `09_WS_TRAIL_QUEST.md`. Product rule: the land is the experience; the app is the companion. Paper pack is the fallback. Guest and facilitator views live there — do not fork a second spec in this file.
 
 ## Corporate outcomes we sell against
 
@@ -79,15 +118,15 @@ Local 12-week Transformation Programme is Phase 2, not the November sales object
 
 - Final teaching sentences for each Rune
 - PACE glyph assignment from the seed family
-- Exact exercise sequence and timings
-- Dunning (name, format, safety, public-land issues)
-- Horseshoe Canyon route + planned change mechanic
-- Town partners, geofences, expedition credit
+- Dunning (name, format, safety, public-land) — D06
+- Horseshoe Canyon walked geofences + change mechanic (PDF has a design; field test still required)
+- Town partners, geofences, expedition credit — D08 on alcohol
 - Thermal circuit flow
-- Final-day route verification (access, season, permits)
-- Physical Rune objects
-- Facilitator scripts
-- Pre/post measures
+- Final-day route verification — D07
+- Physical Rune objects and Rune Keeper
+- Facilitator named + backup
+- Pre/post 9-question pulse in the instance
+- Exact Connection and Existence app beats (Adaptability is the only fully written field quest)
 
 ## Definition of done for first paid pilot
 
@@ -101,3 +140,4 @@ Local 12-week Transformation Programme is Phase 2, not the November sales object
 ## Changelog
 
 - 2026-09-08 — PACE + Existence declared current. Presence demoted to predecessor of Existence. Self-awareness locked as Echo capacity.
+- 2026-09-10 — Full MVP PDF ingested. Day 1 and Adaptability field quest pulled into this file. Receive / Reveal / Activate locked. App detail lives in `09`. p. 21 five-principle schedule marked archive.

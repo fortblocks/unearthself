@@ -135,6 +135,69 @@ Draft to rewrite: [PASTE OR NAME THE FILE]
 
 ---
 
+## APP-01 — Trail Quest PWA spec (and first build)
+
+**Assign:** `09_WS_TRAIL_QUEST.md` + `04_WS_PRODUCT_RETREAT.md`  
+**Source:** *Unearth Self MVP.pdf* (guest + facilitator views already ingested into `09`, 10 Sep 2026).  
+**Override:** Christopher opened this before a paying outdoor day. Spec first. Build the PWA in that same thread if the spec holds. Native is still Phase 2.
+
+```
+[PASTE UNIVERSAL PREAMBLE]
+
+Workstream: APP-01.
+Files you may update: 09_WS_TRAIL_QUEST.md only. A note in 17 if you recommend on D10 or D18 — do not close them.
+
+Job:
+1. Read 09 in full. It is the spec. The PDF is background; do not fork a second spec.
+2. Articulate guest flow and facilitator/admin flow as screens. Both are in scope.
+3. Specify the content-pack JSON (quest, geofence, copy, rune id, concealment, Field Recorder, detection chain).
+4. Offline / no-signal behaviour. Paper fallback so the day still runs if two phones die.
+5. Privacy: Echo notes on-device. Facilitator sees progress, not note text. D10 still open.
+6. Build a PWA against that spec if Christopher says go in-thread. Do not start native iOS/Android.
+
+Must preserve:
+- Experience first; Rune unnamed until receive → reveal → activate
+- Field Recorder: one phone watched on the trail, rotate ~20 min
+- App loses to the land, to safety, to a physical limit
+- Digital specimens only
+- Mirror is Notice → Orient → Choose, one question at a time, template echo-back, no AI
+- They get the Rune whether or not every specimen was recovered
+
+Do not:
+- Close D02, D06, D07, D08, D10, D18
+- Invent town partners or the Existence route
+- Build a guest-facing AI coach or Tessellate character
+- Put private notes on a team feed
+- Diagnose Echoes
+- Print “Experience” or “Existence” as a locked public name (D02)
+
+Return: (1) what you read, (2) what you will not touch, (3) screen list + JSON shape + paper fallback, (4) decisions you need from a partner, (5) changelog line for 09.
+```
+
+---
+
+## RETREAT-01 — PACE run-of-show
+
+**Assign:** `04_WS_PRODUCT_RETREAT.md` + `13_WS_OPERATIONS_SAFETY.md`  
+**Owner of the day:** Tess. Lisa on the land.
+
+```
+[PASTE UNIVERSAL PREAMBLE]
+
+Workstream: RETREAT.
+File you may update: 04_WS_PRODUCT_RETREAT.md only.
+
+Job:
+1. Turn the Day 1 and Adaptability skeletons in 04 into a facilitator-facing run-of-show (timings, weather variant, who holds the spare Runes).
+2. Mark every line that still needs a field test.
+3. Do not invent Connection businesses or close D06 / D07 / D08.
+4. Paper Echo Mirror pack is in scope. App screens are APP-01’s job.
+
+Return the run-of-show and a list of holes Tess or Lisa must walk.
+```
+
+---
+
 ## After the spawn returns
 
 CoS job:
@@ -150,3 +213,4 @@ CoS job:
 
 - 2026-09-08 — Spawn library created.
 - 2026-09-08 — FIN-01 added. Steward is CoS, not CEO. WEB-01 marked merged.
+- 2026-09-10 — APP-01 added (spec + PWA; Christopher override). RETREAT-01 added.

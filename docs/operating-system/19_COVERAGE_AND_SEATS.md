@@ -29,8 +29,9 @@ Christopher spawns. CoS tracks whether the return was merged into the assigned f
 | 3 | SALES-01 | Corporate one-pager + outreach structure | Christopher + Tess | `07_WS_SALES_MARKETING.md` |
 | 4 | COM-01 | Rate-card model with empty inputs | Norah leads | `14_WS_COMMERCIAL.md` |
 | 5 | PLACE-01 | Spa menu + Haven house / booking rules | Norah + Lisa | `06_WS_SPA_HAVEN.md` |
+| 6 | APP-01 | Trail Quest PWA spec (guest + facilitator) | Christopher (Tess on quest copy) | `09_WS_TRAIL_QUEST.md` |
 
-Status of all five: **not spawned** until Christopher pastes the prompt from `16`.
+WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01: Christopher overrode the “after paying outdoor day” hold on 10 Sep — **spec**, then PWA, not native.
 
 ## Grok threads — next
 
@@ -41,11 +42,11 @@ Status of all five: **not spawned** until Christopher pastes the prompt from `16
 | ECHO-01 | Facilitator Mirror card (two pages) | Week 2 — Tess |
 | WEB-02 | Build brief + CMS + embeds | After D14 hybrid is chosen |
 | OPS-01 | Safety pack templates | Week 3 — Lisa |
-| APP-01 | Trail Quest PWA spec | Week 3–4. Not launch-critical. |
+| APP-01 | Trail Quest PWA spec | Opened 10 Sep. Spec in `09`. Spawn from `16`. |
 | PART-01 | Canalta + canyon one-pagers | Week 3 — Lisa |
 | VOICE-01 | Humanizer pass on a named draft | When a page or mail is about to ship |
 
-Do not spawn APP-01, a HAM taxonomy chat, a course chat, or a second-site chat before a paying outdoor day.
+Do not spawn a HAM taxonomy chat, a course chat, or a second-site chat before a paying outdoor day. APP-01 is the exception (spec + PWA only).
 
 ## Five load-bearing items
 
@@ -77,3 +78,4 @@ Put these four on the wall until they move:
 
 - 2026-09-08 — File created from CoS stand-up grid. Human seats all open. Thread jobs taken from `16`, not guessed. PART-01 holds canyon/Canalta. OPS-01 is safety pack, not FOH.
 - 2026-09-10 — VOICE-01 added. Skill in `skills/humanizer`.
+- 2026-09-10 — APP-01 opened (Christopher). Spec ingested from MVP PDF into `09`. Spawn prompt in `16`.
