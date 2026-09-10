@@ -12,6 +12,7 @@ const links = [
   { to: "/quest/admin/live", label: "Live" },
   { to: "/quest/admin/broadcast", label: "Call" },
   { to: "/quest/admin/safety", label: "Safety" },
+  { to: "/quest/admin/hall", label: "Hall" },
   { to: "/quest/admin/after", label: "After" },
   { to: "/quest/admin/paper", label: "Paper" },
 ];
