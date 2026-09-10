@@ -49,12 +49,14 @@ export type Experiment = { id: string; label: string };
 
 export type Geofence = {
   id: string;
-  kind: "boundary" | "specimen" | "fragment";
+  kind: "boundary" | "specimen" | "fragment" | "station";
   lat: number | null;
   lng: number | null;
   radiusM: number | null;
   requiredForRune: false;
   label: string;
+  beatId?: string;
+  active?: boolean;
   forParticipantId?: string;
 };
 
