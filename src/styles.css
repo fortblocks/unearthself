@@ -400,3 +400,358 @@
   }
 }
 
+/* ——— Trail Quest field kit ——— */
+.quest-app {
+  min-height: 100dvh;
+  background: var(--color-coal);
+  color: var(--color-fossil);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 4.5rem;
+}
+.quest-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 1rem 1.1rem 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 12%, transparent);
+}
+.quest-mark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 1.05rem;
+  color: var(--color-fossil);
+  text-decoration: none;
+}
+.quest-who {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-fossil) 55%, transparent);
+}
+.quest-banner {
+  margin: 0;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.82rem;
+  background: color-mix(in oklab, var(--color-fossil) 10%, transparent);
+}
+.quest-banner-quiet {
+  color: color-mix(in oklab, var(--color-fossil) 60%, transparent);
+  background: transparent;
+  padding-top: 0.4rem;
+  padding-bottom: 0;
+}
+.quest-banner-call {
+  background: var(--color-ember);
+  color: var(--color-coal);
+  font-weight: 600;
+}
+.quest-main {
+  flex: 1;
+  padding: 1.25rem 1.1rem 2rem;
+  max-width: 34rem;
+  width: 100%;
+  margin: 0 auto;
+}
+.quest-loading {
+  color: color-mix(in oklab, var(--color-fossil) 55%, transparent);
+}
+.quest-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 0;
+  background: var(--color-coal);
+  border-top: 1px solid color-mix(in oklab, var(--color-fossil) 14%, transparent);
+  padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
+  z-index: 20;
+}
+.quest-nav a,
+.quest-nav button {
+  flex: 1;
+  min-height: 2.75rem;
+  background: none;
+  border: 0;
+  color: color-mix(in oklab, var(--color-fossil) 50%, transparent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.quest-nav a.is-on,
+.quest-nav a[data-status="active"] {
+  color: var(--color-fossil);
+}
+.quest-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-sandstone);
+}
+.quest-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.1rem, 8vw, 3.1rem);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0 0 1rem;
+}
+.quest-copy {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.quest-field {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+.quest-simply {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  border-left: 2px solid var(--color-sandstone);
+  color: color-mix(in oklab, var(--color-fossil) 82%, transparent);
+  font-size: 0.95rem;
+}
+.quest-simply span {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-sandstone);
+  margin-bottom: 0.25rem;
+}
+.quest-token {
+  font-size: 0.78rem;
+  color: color-mix(in oklab, var(--color-fossil) 50%, transparent);
+}
+.quest-token kbd {
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  color: var(--color-fossil);
+  border: 1px solid color-mix(in oklab, var(--color-fossil) 22%, transparent);
+  padding: 0.1rem 0.4rem;
+  margin-left: 0.35rem;
+}
+.quest-btn {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.1rem;
+  border: 0;
+  background: var(--color-ember);
+  color: var(--color-coal);
+  font-weight: 600;
+  font-size: 0.92rem;
+  width: 100%;
+}
+.quest-btn-ghost {
+  background: transparent;
+  color: var(--color-fossil);
+  border: 1px solid color-mix(in oklab, var(--color-fossil) 22%, transparent);
+}
+.quest-btn-row {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+.quest-input,
+.quest-area {
+  width: 100%;
+  background: var(--color-fossil);
+  color: var(--color-coal);
+  border: 0;
+  min-height: 2.85rem;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+.quest-area {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+.quest-label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-fossil) 70%, transparent);
+  margin-bottom: 0.85rem;
+}
+.quest-stack {
+  display: grid;
+  gap: 0.65rem;
+}
+.quest-beat {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
+  color: inherit;
+  text-decoration: none;
+}
+.quest-beat.is-lock {
+  opacity: 0.38;
+  pointer-events: none;
+}
+.quest-beat small {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: var(--color-sandstone);
+}
+.quest-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
+  font-size: 0.95rem;
+}
+.quest-choice input {
+  margin-top: 0.3rem;
+  accent-color: var(--color-ember);
+}
+.quest-echo {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: color-mix(in oklab, var(--color-fossil) 7%, transparent);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.quest-rune {
+  width: 7rem;
+  height: 7rem;
+  margin: 0.5rem 0 1rem;
+  filter: invert(1);
+}
+.quest-rune-empty {
+  width: 7rem;
+  height: 7rem;
+  border: 1px solid color-mix(in oklab, var(--color-fossil) 28%, transparent);
+  border-radius: 50%;
+  margin: 0.5rem 0 1rem;
+}
+.quest-muted {
+  color: color-mix(in oklab, var(--color-fossil) 58%, transparent);
+  font-size: 0.9rem;
+}
+.quest-warn {
+  color: var(--color-ember);
+  font-size: 0.88rem;
+}
+.quest-map {
+  aspect-ratio: 1.3;
+  border: 1px solid color-mix(in oklab, var(--color-fossil) 18%, transparent);
+  position: relative;
+  margin: 1rem 0 1.25rem;
+  overflow: hidden;
+}
+.quest-map-field {
+  position: absolute;
+  inset: 18% 14%;
+  border: 1px dashed color-mix(in oklab, var(--color-sandstone) 80%, transparent);
+}
+.quest-map caption,
+.quest-map p {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 0.7rem;
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-sandstone);
+}
+.quest-land {
+  position: fixed;
+  inset: 0;
+  background: var(--color-coal);
+  z-index: 30;
+  display: grid;
+  place-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+.quest-land p:first-child {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  line-height: 0.95;
+  text-transform: uppercase;
+  margin: 0;
+}
+.quest-privacy {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--color-fossil) 80%, transparent);
+}
+.quest-privacy ul {
+  padding-left: 1.1rem;
+}
+.quest-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.quest-table th,
+.quest-table td {
+  text-align: left;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
+}
+.quest-paper {
+  color: var(--color-coal);
+  background: var(--color-fossil);
+  padding: 1.25rem;
+}
+.quest-paper h2 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: 1.8rem;
+  margin: 1.5rem 0 0.4rem;
+}
+@media print {
+  .quest-top,
+  .quest-nav,
+  .quest-banner,
+  .quest-no-print {
+    display: none !important;
+  }
+  .quest-app {
+    background: white;
+    color: black;
+    padding: 0;
+  }
+  .quest-paper {
+    background: white;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quest-app * {
+    transition: none !important;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .found-plate img,
+  .found-plate:hover img {
+    transform: none;
+    transition: none;
+  }
+}
+

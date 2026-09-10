@@ -17,14 +17,15 @@ import { Route as BootcampRouteImport } from './routes/bootcamp'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as D14RouteImport } from './routes/d14'
+import { Route as FoundRouteImport } from './routes/found'
 import { Route as HavenRouteImport } from './routes/haven'
 import { Route as JournalRouteImport } from './routes/journal'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as QuestRouteImport } from './routes/quest'
 import { Route as ShopRouteImport } from './routes/shop'
+import { Route as SpringRouteImport } from './routes/spring'
 import { Route as TheWorkRouteImport } from './routes/the-work'
 import { Route as VisitRouteImport } from './routes/visit'
-import { Route as FoundRouteImport } from './routes/found'
-import { Route as SpringRouteImport } from './routes/spring'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminFridayRouteImport } from './routes/admin.friday'
 import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
@@ -42,6 +43,27 @@ import { Route as HavenIndexRouteImport } from './routes/haven.index'
 import { Route as HavenSlugRouteImport } from './routes/haven.$slug'
 import { Route as JournalIndexRouteImport } from './routes/journal.index'
 import { Route as JournalSlugRouteImport } from './routes/journal.$slug'
+import { Route as QuestIndexRouteImport } from './routes/quest.index'
+import { Route as QuestAdminRouteImport } from './routes/quest.admin'
+import { Route as QuestBoundaryRouteImport } from './routes/quest.boundary'
+import { Route as QuestExperimentRouteImport } from './routes/quest.experiment'
+import { Route as QuestMirrorRouteImport } from './routes/quest.mirror'
+import { Route as QuestPlayRouteImport } from './routes/quest.play'
+import { Route as QuestRecorderRouteImport } from './routes/quest.recorder'
+import { Route as QuestRecoverRouteImport } from './routes/quest.recover'
+import { Route as QuestRunesRouteImport } from './routes/quest.runes'
+import { Route as QuestShuttleRouteImport } from './routes/quest.shuttle'
+import { Route as QuestSpecimenRouteImport } from './routes/quest.specimen'
+import { Route as QuestThirtyRouteImport } from './routes/quest.thirty'
+import { Route as QuestTodayRouteImport } from './routes/quest.today'
+import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
+import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
+import { Route as QuestAdminBroadcastRouteImport } from './routes/quest.admin.broadcast'
+import { Route as QuestAdminLiveRouteImport } from './routes/quest.admin.live'
+import { Route as QuestAdminPackRouteImport } from './routes/quest.admin.pack'
+import { Route as QuestAdminPaperRouteImport } from './routes/quest.admin.paper'
+import { Route as QuestAdminRosterRouteImport } from './routes/quest.admin.roster'
+import { Route as QuestAdminSafetyRouteImport } from './routes/quest.admin.safety'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,6 +105,11 @@ const D14Route = D14RouteImport.update({
   path: '/d14',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FoundRoute = FoundRouteImport.update({
+  id: '/found',
+  path: '/found',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HavenRoute = HavenRouteImport.update({
   id: '/haven',
   path: '/haven',
@@ -98,9 +125,19 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QuestRoute = QuestRouteImport.update({
+  id: '/quest',
+  path: '/quest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpringRoute = SpringRouteImport.update({
+  id: '/spring',
+  path: '/spring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TheWorkRoute = TheWorkRouteImport.update({
@@ -111,16 +148,6 @@ const TheWorkRoute = TheWorkRouteImport.update({
 const VisitRoute = VisitRouteImport.update({
   id: '/visit',
   path: '/visit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FoundRoute = FoundRouteImport.update({
-  id: '/found',
-  path: '/found',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SpringRoute = SpringRouteImport.update({
-  id: '/spring',
-  path: '/spring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -208,6 +235,111 @@ const JournalSlugRoute = JournalSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => JournalRoute,
 } as any)
+const QuestIndexRoute = QuestIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestAdminRoute = QuestAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestBoundaryRoute = QuestBoundaryRouteImport.update({
+  id: '/boundary',
+  path: '/boundary',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestExperimentRoute = QuestExperimentRouteImport.update({
+  id: '/experiment',
+  path: '/experiment',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestMirrorRoute = QuestMirrorRouteImport.update({
+  id: '/mirror',
+  path: '/mirror',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestPlayRoute = QuestPlayRouteImport.update({
+  id: '/play',
+  path: '/play',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestRecorderRoute = QuestRecorderRouteImport.update({
+  id: '/recorder',
+  path: '/recorder',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestRecoverRoute = QuestRecoverRouteImport.update({
+  id: '/recover',
+  path: '/recover',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestRunesRoute = QuestRunesRouteImport.update({
+  id: '/runes',
+  path: '/runes',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestShuttleRoute = QuestShuttleRouteImport.update({
+  id: '/shuttle',
+  path: '/shuttle',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestSpecimenRoute = QuestSpecimenRouteImport.update({
+  id: '/specimen',
+  path: '/specimen',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestThirtyRoute = QuestThirtyRouteImport.update({
+  id: '/thirty',
+  path: '/thirty',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestTodayRoute = QuestTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => QuestRoute,
+} as any)
+const QuestAdminIndexRoute = QuestAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminAfterRoute = QuestAdminAfterRouteImport.update({
+  id: '/after',
+  path: '/after',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminBroadcastRoute = QuestAdminBroadcastRouteImport.update({
+  id: '/broadcast',
+  path: '/broadcast',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminLiveRoute = QuestAdminLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminPackRoute = QuestAdminPackRouteImport.update({
+  id: '/pack',
+  path: '/pack',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminPaperRoute = QuestAdminPaperRouteImport.update({
+  id: '/paper',
+  path: '/paper',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminRosterRoute = QuestAdminRosterRouteImport.update({
+  id: '/roster',
+  path: '/roster',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
+const QuestAdminSafetyRoute = QuestAdminSafetyRouteImport.update({
+  id: '/safety',
+  path: '/safety',
+  getParentRoute: () => QuestAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -218,14 +350,15 @@ export interface FileRoutesByFullPath {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
   '/journal': typeof JournalRouteWithChildren
   '/login': typeof LoginRoute
+  '/quest': typeof QuestRouteWithChildren
   '/shop': typeof ShopRoute
+  '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
-  '/found': typeof FoundRoute
-  '/spring': typeof SpringRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -239,10 +372,31 @@ export interface FileRoutesByFullPath {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/quest/admin': typeof QuestAdminRouteWithChildren
+  '/quest/boundary': typeof QuestBoundaryRoute
+  '/quest/experiment': typeof QuestExperimentRoute
+  '/quest/mirror': typeof QuestMirrorRoute
+  '/quest/play': typeof QuestPlayRoute
+  '/quest/recorder': typeof QuestRecorderRoute
+  '/quest/recover': typeof QuestRecoverRoute
+  '/quest/runes': typeof QuestRunesRoute
+  '/quest/shuttle': typeof QuestShuttleRoute
+  '/quest/specimen': typeof QuestSpecimenRoute
+  '/quest/thirty': typeof QuestThirtyRoute
+  '/quest/today': typeof QuestTodayRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
+  '/quest/': typeof QuestIndexRoute
+  '/quest/admin/after': typeof QuestAdminAfterRoute
+  '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
+  '/quest/admin/live': typeof QuestAdminLiveRoute
+  '/quest/admin/pack': typeof QuestAdminPackRoute
+  '/quest/admin/paper': typeof QuestAdminPaperRoute
+  '/quest/admin/roster': typeof QuestAdminRosterRoute
+  '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/quest/admin/': typeof QuestAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -251,12 +405,12 @@ export interface FileRoutesByTo {
   '/bootcamp': typeof BootcampRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
+  '/found': typeof FoundRoute
   '/login': typeof LoginRoute
   '/shop': typeof ShopRoute
+  '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
-  '/found': typeof FoundRoute
-  '/spring': typeof SpringRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -270,10 +424,30 @@ export interface FileRoutesByTo {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/quest/boundary': typeof QuestBoundaryRoute
+  '/quest/experiment': typeof QuestExperimentRoute
+  '/quest/mirror': typeof QuestMirrorRoute
+  '/quest/play': typeof QuestPlayRoute
+  '/quest/recorder': typeof QuestRecorderRoute
+  '/quest/recover': typeof QuestRecoverRoute
+  '/quest/runes': typeof QuestRunesRoute
+  '/quest/shuttle': typeof QuestShuttleRoute
+  '/quest/specimen': typeof QuestSpecimenRoute
+  '/quest/thirty': typeof QuestThirtyRoute
+  '/quest/today': typeof QuestTodayRoute
   '/admin': typeof AdminIndexRoute
   '/d14': typeof D14IndexRoute
   '/haven': typeof HavenIndexRoute
   '/journal': typeof JournalIndexRoute
+  '/quest': typeof QuestIndexRoute
+  '/quest/admin/after': typeof QuestAdminAfterRoute
+  '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
+  '/quest/admin/live': typeof QuestAdminLiveRoute
+  '/quest/admin/pack': typeof QuestAdminPackRoute
+  '/quest/admin/paper': typeof QuestAdminPaperRoute
+  '/quest/admin/roster': typeof QuestAdminRosterRoute
+  '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/quest/admin': typeof QuestAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -285,14 +459,15 @@ export interface FileRoutesById {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
   '/journal': typeof JournalRouteWithChildren
   '/login': typeof LoginRoute
+  '/quest': typeof QuestRouteWithChildren
   '/shop': typeof ShopRoute
+  '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
   '/visit': typeof VisitRoute
-  '/found': typeof FoundRoute
-  '/spring': typeof SpringRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/money': typeof AdminMoneyRoute
@@ -306,10 +481,31 @@ export interface FileRoutesById {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/quest/admin': typeof QuestAdminRouteWithChildren
+  '/quest/boundary': typeof QuestBoundaryRoute
+  '/quest/experiment': typeof QuestExperimentRoute
+  '/quest/mirror': typeof QuestMirrorRoute
+  '/quest/play': typeof QuestPlayRoute
+  '/quest/recorder': typeof QuestRecorderRoute
+  '/quest/recover': typeof QuestRecoverRoute
+  '/quest/runes': typeof QuestRunesRoute
+  '/quest/shuttle': typeof QuestShuttleRoute
+  '/quest/specimen': typeof QuestSpecimenRoute
+  '/quest/thirty': typeof QuestThirtyRoute
+  '/quest/today': typeof QuestTodayRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
+  '/quest/': typeof QuestIndexRoute
+  '/quest/admin/after': typeof QuestAdminAfterRoute
+  '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
+  '/quest/admin/live': typeof QuestAdminLiveRoute
+  '/quest/admin/pack': typeof QuestAdminPackRoute
+  '/quest/admin/paper': typeof QuestAdminPaperRoute
+  '/quest/admin/roster': typeof QuestAdminRosterRoute
+  '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/quest/admin/': typeof QuestAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -322,14 +518,15 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/found'
     | '/haven'
     | '/journal'
     | '/login'
+    | '/quest'
     | '/shop'
+    | '/spring'
     | '/the-work'
     | '/visit'
-    | '/found'
-    | '/spring'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -343,10 +540,31 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/quest/admin'
+    | '/quest/boundary'
+    | '/quest/experiment'
+    | '/quest/mirror'
+    | '/quest/play'
+    | '/quest/recorder'
+    | '/quest/recover'
+    | '/quest/runes'
+    | '/quest/shuttle'
+    | '/quest/specimen'
+    | '/quest/thirty'
+    | '/quest/today'
     | '/admin/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
+    | '/quest/'
+    | '/quest/admin/after'
+    | '/quest/admin/broadcast'
+    | '/quest/admin/live'
+    | '/quest/admin/pack'
+    | '/quest/admin/paper'
+    | '/quest/admin/roster'
+    | '/quest/admin/safety'
+    | '/quest/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -355,12 +573,12 @@ export interface FileRouteTypes {
     | '/bootcamp'
     | '/builder'
     | '/community'
+    | '/found'
     | '/login'
     | '/shop'
+    | '/spring'
     | '/the-work'
     | '/visit'
-    | '/found'
-    | '/spring'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -374,10 +592,30 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/quest/boundary'
+    | '/quest/experiment'
+    | '/quest/mirror'
+    | '/quest/play'
+    | '/quest/recorder'
+    | '/quest/recover'
+    | '/quest/runes'
+    | '/quest/shuttle'
+    | '/quest/specimen'
+    | '/quest/thirty'
+    | '/quest/today'
     | '/admin'
     | '/d14'
     | '/haven'
     | '/journal'
+    | '/quest'
+    | '/quest/admin/after'
+    | '/quest/admin/broadcast'
+    | '/quest/admin/live'
+    | '/quest/admin/pack'
+    | '/quest/admin/paper'
+    | '/quest/admin/roster'
+    | '/quest/admin/safety'
+    | '/quest/admin'
   id:
     | '__root__'
     | '/'
@@ -388,14 +626,15 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/found'
     | '/haven'
     | '/journal'
     | '/login'
+    | '/quest'
     | '/shop'
+    | '/spring'
     | '/the-work'
     | '/visit'
-    | '/found'
-    | '/spring'
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/money'
@@ -409,10 +648,31 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/quest/admin'
+    | '/quest/boundary'
+    | '/quest/experiment'
+    | '/quest/mirror'
+    | '/quest/play'
+    | '/quest/recorder'
+    | '/quest/recover'
+    | '/quest/runes'
+    | '/quest/shuttle'
+    | '/quest/specimen'
+    | '/quest/thirty'
+    | '/quest/today'
     | '/admin/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
+    | '/quest/'
+    | '/quest/admin/after'
+    | '/quest/admin/broadcast'
+    | '/quest/admin/live'
+    | '/quest/admin/pack'
+    | '/quest/admin/paper'
+    | '/quest/admin/roster'
+    | '/quest/admin/safety'
+    | '/quest/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -424,14 +684,15 @@ export interface RootRouteChildren {
   BuilderRoute: typeof BuilderRoute
   CommunityRoute: typeof CommunityRoute
   D14Route: typeof D14RouteWithChildren
+  FoundRoute: typeof FoundRoute
   HavenRoute: typeof HavenRouteWithChildren
   JournalRoute: typeof JournalRouteWithChildren
   LoginRoute: typeof LoginRoute
+  QuestRoute: typeof QuestRouteWithChildren
   ShopRoute: typeof ShopRoute
+  SpringRoute: typeof SpringRoute
   TheWorkRoute: typeof TheWorkRoute
   VisitRoute: typeof VisitRoute
-  FoundRoute: typeof FoundRoute
-  SpringRoute: typeof SpringRoute
   BookRetreatRoute: typeof BookRetreatRoute
   BookTreatmentRoute: typeof BookTreatmentRoute
   ForTeamsRoute: typeof ForTeamsRoute
@@ -495,6 +756,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof D14RouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/found': {
+      id: '/found'
+      path: '/found'
+      fullPath: '/found'
+      preLoaderRoute: typeof FoundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/haven': {
       id: '/haven'
       path: '/haven'
@@ -516,11 +784,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/quest': {
+      id: '/quest'
+      path: '/quest'
+      fullPath: '/quest'
+      preLoaderRoute: typeof QuestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop': {
       id: '/shop'
       path: '/shop'
       fullPath: '/shop'
       preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/spring': {
+      id: '/spring'
+      path: '/spring'
+      fullPath: '/spring'
+      preLoaderRoute: typeof SpringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/the-work': {
@@ -535,20 +817,6 @@ declare module '@tanstack/react-router' {
       path: '/visit'
       fullPath: '/visit'
       preLoaderRoute: typeof VisitRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/found': {
-      id: '/found'
-      path: '/found'
-      fullPath: '/found'
-      preLoaderRoute: typeof FoundRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/spring': {
-      id: '/spring'
-      path: '/spring'
-      fullPath: '/spring'
-      preLoaderRoute: typeof SpringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -670,6 +938,153 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JournalSlugRouteImport
       parentRoute: typeof JournalRoute
     }
+    '/quest/': {
+      id: '/quest/'
+      path: '/'
+      fullPath: '/quest/'
+      preLoaderRoute: typeof QuestIndexRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/admin': {
+      id: '/quest/admin'
+      path: '/admin'
+      fullPath: '/quest/admin'
+      preLoaderRoute: typeof QuestAdminRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/boundary': {
+      id: '/quest/boundary'
+      path: '/boundary'
+      fullPath: '/quest/boundary'
+      preLoaderRoute: typeof QuestBoundaryRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/experiment': {
+      id: '/quest/experiment'
+      path: '/experiment'
+      fullPath: '/quest/experiment'
+      preLoaderRoute: typeof QuestExperimentRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/mirror': {
+      id: '/quest/mirror'
+      path: '/mirror'
+      fullPath: '/quest/mirror'
+      preLoaderRoute: typeof QuestMirrorRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/play': {
+      id: '/quest/play'
+      path: '/play'
+      fullPath: '/quest/play'
+      preLoaderRoute: typeof QuestPlayRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/recorder': {
+      id: '/quest/recorder'
+      path: '/recorder'
+      fullPath: '/quest/recorder'
+      preLoaderRoute: typeof QuestRecorderRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/recover': {
+      id: '/quest/recover'
+      path: '/recover'
+      fullPath: '/quest/recover'
+      preLoaderRoute: typeof QuestRecoverRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/runes': {
+      id: '/quest/runes'
+      path: '/runes'
+      fullPath: '/quest/runes'
+      preLoaderRoute: typeof QuestRunesRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/shuttle': {
+      id: '/quest/shuttle'
+      path: '/shuttle'
+      fullPath: '/quest/shuttle'
+      preLoaderRoute: typeof QuestShuttleRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/specimen': {
+      id: '/quest/specimen'
+      path: '/specimen'
+      fullPath: '/quest/specimen'
+      preLoaderRoute: typeof QuestSpecimenRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/thirty': {
+      id: '/quest/thirty'
+      path: '/thirty'
+      fullPath: '/quest/thirty'
+      preLoaderRoute: typeof QuestThirtyRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/today': {
+      id: '/quest/today'
+      path: '/today'
+      fullPath: '/quest/today'
+      preLoaderRoute: typeof QuestTodayRouteImport
+      parentRoute: typeof QuestRoute
+    }
+    '/quest/admin/': {
+      id: '/quest/admin/'
+      path: '/'
+      fullPath: '/quest/admin/'
+      preLoaderRoute: typeof QuestAdminIndexRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/after': {
+      id: '/quest/admin/after'
+      path: '/after'
+      fullPath: '/quest/admin/after'
+      preLoaderRoute: typeof QuestAdminAfterRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/broadcast': {
+      id: '/quest/admin/broadcast'
+      path: '/broadcast'
+      fullPath: '/quest/admin/broadcast'
+      preLoaderRoute: typeof QuestAdminBroadcastRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/live': {
+      id: '/quest/admin/live'
+      path: '/live'
+      fullPath: '/quest/admin/live'
+      preLoaderRoute: typeof QuestAdminLiveRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/pack': {
+      id: '/quest/admin/pack'
+      path: '/pack'
+      fullPath: '/quest/admin/pack'
+      preLoaderRoute: typeof QuestAdminPackRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/paper': {
+      id: '/quest/admin/paper'
+      path: '/paper'
+      fullPath: '/quest/admin/paper'
+      preLoaderRoute: typeof QuestAdminPaperRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/roster': {
+      id: '/quest/admin/roster'
+      path: '/roster'
+      fullPath: '/quest/admin/roster'
+      preLoaderRoute: typeof QuestAdminRosterRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
+    '/quest/admin/safety': {
+      id: '/quest/admin/safety'
+      path: '/safety'
+      fullPath: '/quest/admin/safety'
+      preLoaderRoute: typeof QuestAdminSafetyRouteImport
+      parentRoute: typeof QuestAdminRoute
+    }
   }
 }
 
@@ -734,6 +1149,66 @@ const JournalRouteChildren: JournalRouteChildren = {
 const JournalRouteWithChildren =
   JournalRoute._addFileChildren(JournalRouteChildren)
 
+interface QuestAdminRouteChildren {
+  QuestAdminAfterRoute: typeof QuestAdminAfterRoute
+  QuestAdminBroadcastRoute: typeof QuestAdminBroadcastRoute
+  QuestAdminLiveRoute: typeof QuestAdminLiveRoute
+  QuestAdminPackRoute: typeof QuestAdminPackRoute
+  QuestAdminPaperRoute: typeof QuestAdminPaperRoute
+  QuestAdminRosterRoute: typeof QuestAdminRosterRoute
+  QuestAdminSafetyRoute: typeof QuestAdminSafetyRoute
+  QuestAdminIndexRoute: typeof QuestAdminIndexRoute
+}
+
+const QuestAdminRouteChildren: QuestAdminRouteChildren = {
+  QuestAdminAfterRoute: QuestAdminAfterRoute,
+  QuestAdminBroadcastRoute: QuestAdminBroadcastRoute,
+  QuestAdminLiveRoute: QuestAdminLiveRoute,
+  QuestAdminPackRoute: QuestAdminPackRoute,
+  QuestAdminPaperRoute: QuestAdminPaperRoute,
+  QuestAdminRosterRoute: QuestAdminRosterRoute,
+  QuestAdminSafetyRoute: QuestAdminSafetyRoute,
+  QuestAdminIndexRoute: QuestAdminIndexRoute,
+}
+
+const QuestAdminRouteWithChildren = QuestAdminRoute._addFileChildren(
+  QuestAdminRouteChildren,
+)
+
+interface QuestRouteChildren {
+  QuestAdminRoute: typeof QuestAdminRouteWithChildren
+  QuestBoundaryRoute: typeof QuestBoundaryRoute
+  QuestExperimentRoute: typeof QuestExperimentRoute
+  QuestMirrorRoute: typeof QuestMirrorRoute
+  QuestPlayRoute: typeof QuestPlayRoute
+  QuestRecorderRoute: typeof QuestRecorderRoute
+  QuestRecoverRoute: typeof QuestRecoverRoute
+  QuestRunesRoute: typeof QuestRunesRoute
+  QuestShuttleRoute: typeof QuestShuttleRoute
+  QuestSpecimenRoute: typeof QuestSpecimenRoute
+  QuestThirtyRoute: typeof QuestThirtyRoute
+  QuestTodayRoute: typeof QuestTodayRoute
+  QuestIndexRoute: typeof QuestIndexRoute
+}
+
+const QuestRouteChildren: QuestRouteChildren = {
+  QuestAdminRoute: QuestAdminRouteWithChildren,
+  QuestBoundaryRoute: QuestBoundaryRoute,
+  QuestExperimentRoute: QuestExperimentRoute,
+  QuestMirrorRoute: QuestMirrorRoute,
+  QuestPlayRoute: QuestPlayRoute,
+  QuestRecorderRoute: QuestRecorderRoute,
+  QuestRecoverRoute: QuestRecoverRoute,
+  QuestRunesRoute: QuestRunesRoute,
+  QuestShuttleRoute: QuestShuttleRoute,
+  QuestSpecimenRoute: QuestSpecimenRoute,
+  QuestThirtyRoute: QuestThirtyRoute,
+  QuestTodayRoute: QuestTodayRoute,
+  QuestIndexRoute: QuestIndexRoute,
+}
+
+const QuestRouteWithChildren = QuestRoute._addFileChildren(QuestRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -743,14 +1218,15 @@ const rootRouteChildren: RootRouteChildren = {
   BuilderRoute: BuilderRoute,
   CommunityRoute: CommunityRoute,
   D14Route: D14RouteWithChildren,
+  FoundRoute: FoundRoute,
   HavenRoute: HavenRouteWithChildren,
   JournalRoute: JournalRouteWithChildren,
   LoginRoute: LoginRoute,
+  QuestRoute: QuestRouteWithChildren,
   ShopRoute: ShopRoute,
+  SpringRoute: SpringRoute,
   TheWorkRoute: TheWorkRoute,
   VisitRoute: VisitRoute,
-  FoundRoute: FoundRoute,
-  SpringRoute: SpringRoute,
   BookRetreatRoute: BookRetreatRoute,
   BookTreatmentRoute: BookTreatmentRoute,
   ForTeamsRoute: ForTeamsRoute,

@@ -1,7 +1,7 @@
 # Workstream — Trail Quest App
 
 **Code:** APP  
-**Status:** Specified. APP-01 returned 10 Sep 2026 and is merged below. **Not built.** Say go in the systems thread to implement against this file.  
+**Status:** Pilot PWA built 10 Sep 2026 at `/quest`. Not a native app. Tweaks expected in the field.  
 **Working host (does not close D05):** `quest.unearthself.xyz`  
 **Rule:** The app preserves immersion. If it fights the canyon, paper wins. If an instruction conflicts with safety, conditions or a physical limit, the app instruction does not take priority.
 
@@ -316,3 +316,4 @@ Build will tweak timings, copy and geofence radii. It should not tweak the loop:
 - 2026-09-08 — PWA + paper fallback chosen over native-first.
 - 2026-09-10 — Ingested *Unearth Self MVP.pdf*. Guest and facilitator views written.
 - 2026-09-10 — APP-01 specified in 09: guest and admin screen lists, content-pack JSON v0.1, offline behaviour, paper fallback, privacy sheet. Working default for notes is on-device; facilitator sees progress not text. Build waits on “go”.
+- 2026-09-10 — PWA built at `/quest` (guest G01–G12, facilitator A01–A08). IndexedDB notes. Service worker. Demo instance `pace-demo-2026`. GPS stand-in until Horsethief is walked. No sync endpoint.

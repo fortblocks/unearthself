@@ -1,0 +1,18 @@
+{
+  "name": "Trail Quest",
+  "short_name": "Trail Quest",
+  "description": "Expedition companion for Unearth Self. Pack stays on this device.",
+  "start_url": "/quest",
+  "scope": "/quest",
+  "display": "standalone",
+  "background_color": "#161718",
+  "theme_color": "#161718",
+  "icons": [
+    {
+      "src": "/quest/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -31,7 +31,7 @@ Christopher spawns. CoS tracks whether the return was merged into the assigned f
 | 5 | PLACE-01 | Spa menu + Haven house / booking rules | Norah + Lisa | `06_WS_SPA_HAVEN.md` |
 | 6 | APP-01 | Trail Quest PWA spec (guest + facilitator) | Christopher (Tess on quest copy) | `09_WS_TRAIL_QUEST.md` |
 
-WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01 **returned 10 Sep** — spec merged into `09`. Build waits on Christopher saying **go**.
+WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 partly landed via the house card. APP-01 **built 10 Sep** at `/quest`. GPS stand-in until Horsethief is walked. No sync.
 
 ## Grok threads — next
 
@@ -42,7 +42,7 @@ WEB-01 is merged into the live site (awaiting team feedback). PLACE-01 / COM-01 
 | ECHO-01 | Facilitator Mirror card (two pages) | Week 2 — Tess |
 | WEB-02 | Build brief + CMS + embeds | After D14 hybrid is chosen |
 | OPS-01 | Safety pack templates | Week 3 — Lisa |
-| APP-01 | Trail Quest PWA spec | Returned 10 Sep. Merged into `09`. Build waits on go. |
+| APP-01 | Trail Quest PWA spec | Built 10 Sep at `/quest`. Spec in `09`. |
 | PART-01 | Canalta + canyon one-pagers | Week 3 — Lisa |
 | VOICE-01 | Humanizer pass on a named draft | When a page or mail is about to ship |
 
@@ -80,3 +80,4 @@ Put these four on the wall until they move:
 - 2026-09-10 — VOICE-01 added. Skill in `skills/humanizer`.
 - 2026-09-10 — APP-01 opened (Christopher). Spec ingested from MVP PDF into `09`. Spawn prompt in `16`.
 - 2026-09-10 — APP-01 return merged into `09`. Screen IDs, pack v0.1, paper nine, Horsethief walk. D02 / D10 / D18 left open.
+- 2026-09-10 — Trail Quest PWA shipped at `/quest` (guest + facilitator). October test: no sync, GPS stand-in.
