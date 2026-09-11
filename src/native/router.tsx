@@ -21,6 +21,7 @@ import { Route as QuestExperiment } from "@/routes/quest.experiment";
 import { Route as QuestRunes } from "@/routes/quest.runes";
 import { Route as QuestShuttle } from "@/routes/quest.shuttle";
 import { Route as QuestThirty } from "@/routes/quest.thirty";
+import { Route as QuestMap } from "@/routes/quest.map";
 import { Route as QuestAdmin } from "@/routes/quest.admin";
 import { Route as QuestAdminIndex } from "@/routes/quest.admin.index";
 import { Route as QuestAdminLive } from "@/routes/quest.admin.live";
@@ -87,6 +88,7 @@ const routeTree = rootRoute.addChildren([
     child(questRoute, "experiment", QuestExperiment),
     child(questRoute, "runes", QuestRunes),
     child(questRoute, "shuttle", QuestShuttle),
+    child(questRoute, "map", QuestMap),
     child(questRoute, "thirty", QuestThirty),
     adminRoute.addChildren([
       adminChild("/", QuestAdminIndex),
@@ -106,6 +108,12 @@ const router = createRouter({
   history: createHashHistory(),
   defaultPreload: false,
 });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
 
 export function QuestNativeApp() {
   return <RouterProvider router={router} />;
