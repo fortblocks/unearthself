@@ -19,45 +19,52 @@ function TodayScreen() {
   const [token, setToken] = useState("");
   const [tokenMsg, setTokenMsg] = useState("");
   const days = pack.days.filter((d) => !d.stub);
+  const open = pack.beats.find((b) => isUnlocked(progress, b.id) && !progress.completedBeatIds.includes(b.id));
 
   return (
     <>
-      <p className="quest-kicker">Today · shell 11b</p>
-      <h1 className="quest-title">Sequence</h1>
-      <p className="quest-muted">Stations are buttons. Locked stays put.</p>
-      {days.map((day) => (
-        <section key={day.id} style={{ marginTop: "1.35rem" }}>
-          <p className="quest-kicker">{day.label}</p>
-          <p className="quest-muted">{day.setting}</p>
-          <div className="quest-stack">
-            {pack.beats
-              .filter((b) => b.dayId === day.id)
-              .map((beat) => {
-                const open = isUnlocked(progress, beat.id);
-                const done = progress.completedBeatIds.includes(beat.id);
+      <p className="quest-kicker">Today · shell 11c</p>
+      <h1 className="quest-title">Now</h1>
+      {open ? (
+        <button
+          type="button"
+          className="quest-now"
+          onClick={() => void navigate({ to: beatPath(open.screen), search: { beat: open.id } })}
+        >
+          <span className="quest-chip">Open</span>
+          <strong>{open.title}</strong>
+          <em>{open.simply}</em>
+        </button>
+      ) : (
+        <p className="quest-muted">Nothing open. Token below, or wait for the facilitator.</p>
+      )}
+      {days.map((day) => {
+        const beats = pack.beats.filter((b) => b.dayId === day.id);
+        return (
+          <section key={day.id} className="quest-chapter">
+            <p className="quest-kicker">{day.label}</p>
+            <p className="quest-muted">{day.setting}</p>
+            <ol className="quest-later">
+              {beats.map((b) => {
+                const done = progress.completedBeatIds.includes(b.id);
+                const isOpen = isUnlocked(progress, b.id);
                 return (
-                  <button
-                    key={beat.id}
-                    type="button"
-                    className={open ? "quest-station" : "quest-station is-lock"}
-                    disabled={!open}
-                    onClick={() => void navigate({ to: beatPath(beat.screen), search: { beat: beat.id } })}
-                  >
-                    <span>{beat.title}</span>
-                    <small>{done ? "Done" : open ? "Open" : "Locked"}</small>
-                  </button>
+                  <li key={b.id} className={done ? "is-done" : isOpen ? "is-open" : undefined}>
+                    {b.title}
+                    <span>{done ? "Done" : isOpen ? "Now" : ""}</span>
+                  </li>
                 );
               })}
-          </div>
-        </section>
-      ))}
+            </ol>
+          </section>
+        );
+      })}
       <form
         className="quest-stack"
         style={{ marginTop: "1.5rem" }}
         onSubmit={(e) => {
           e.preventDefault();
-          const res = unlockWithToken(token);
-          setTokenMsg(res.ok ? "Opened." : "Not a token in this pack.");
+          setTokenMsg(unlockWithToken(token).ok ? "Opened." : "Not a token in this pack.");
           setToken("");
         }}
       >
