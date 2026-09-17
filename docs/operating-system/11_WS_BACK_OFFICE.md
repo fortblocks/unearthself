@@ -27,8 +27,9 @@ Looking-as is a view label, not a login. Switch partner and **Today** rewrites t
 | Route | View | Primary human | Playable now |
 |---|---|---|---|
 | `/admin` | **Today** — briefing, keys, diary, next programme, open risk | Lisa / FOH | Partner briefing + Apex run-of-show |
-| `/admin/pipeline` | **Pipeline** — every enquiry, owner, next action, value | Christopher + Tess | File an enquiry, change status, filter mine/kind |
-| `/admin/bots` | **Bots** — Grok roster, threads, scout, send queue | Christopher | Draft / send / log reply / file scout |
+| `/admin/pipeline` | **Pipeline** — live files only: named enquiry, owner, next action, value | Christopher + Tess | File an enquiry, change status, filter mine/kind |
+| `/admin/leads` | **Leads** — long company list, scored. Not the pipeline | Christopher | Rank, draft, Access, scout ingest, promote |
+| `/admin/bots` | **Bots** — Grok roster, threads, send queue | Christopher | Draft / send / log reply. Scout JSON is on Leads |
 | `/admin/socials` | **Socials** — ideas, queue, logged performance | Christopher | File copy, mark posted, log numbers |
 | `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta overflow | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
 | `/admin/money` | **Money** — deposits due, invoices sent, refunds | Norah | Mark paid, file a line |
@@ -48,6 +49,7 @@ The five views above. HubSpot/Attio still acceptable as the *sales* CRM until D0
 - Occupancy (Haven)
 - Treatment hours sold
 - Retreat pipeline (count, weighted CAD)
+- Research list: size / sendable / in sequence / stopped
 - Cash in / cash promised
 - Issues
 
@@ -57,7 +59,7 @@ Keep it to one page. The roadmap workbook holds the longer view.
 
 - Wire public Book panel into this book (same records)
 - PMS + Stripe (D03)
-- CRM (D04) — house book is the working CRM until then. `/spring` files a lead + Concierge thread.
+- CRM (D04) — house book is the working CRM until then. `/admin/leads` is the research list. `/spring` files a live lead + Concierge thread, and promotes a matching domain. **D04 is not closed.**
 - One account per partner, not a shared desk login
 - Gmail send (connector). Until connected, send opens mailto and logs the thread.
 - Live social APIs. Until then, performance is logged by hand.
@@ -65,6 +67,7 @@ Keep it to one page. The roadmap workbook holds the longer view.
 
 ## Changelog
 
+- 2026-09-17 — `/admin/leads` next to Pipeline. Research list, not live files. Friday pack: list size / sendable / in sequence / stopped. Promote on first approved send, `/spring` domain match, or hand file. D04 not closed.
 - 2026-09-09 — `/admin` gated with email/password. Shared staff account for team walkthroughs. Live on unearthself.xyz/admin.
 - 2026-09-09 — `/admin` house book shipped: Today, Pipeline, Inventory, Money, Risk, Friday. Looking-as rewrites Today.
 - 2026-09-10 — `/admin/bots` and `/admin/socials`. Pipeline threads. `/spring` writes a lead. Gmail send not connected; mailto + log. Social numbers logged by hand. D04 not closed.

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   Radio,
+  Target,
   TriangleAlert,
   Warehouse,
 } from "lucide-react";
@@ -18,11 +19,12 @@ import { signOut } from "@/lib/auth/client";
 import { hasGateSessionMarker } from "@/lib/auth/gate-session-marker";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/cn";
-import { useDesk } from "@/lib/desk-store";
+import { companyStats, useDesk } from "@/lib/desk-store";
 
 const NAV = [
   { to: "/admin", label: "Today", icon: CalendarDays },
   { to: "/admin/pipeline", label: "Pipeline", icon: ClipboardList },
+  { to: "/admin/leads", label: "Leads", icon: Target },
   { to: "/admin/bots", label: "Bots", icon: Bot },
   { to: "/admin/socials", label: "Socials", icon: Radio },
   { to: "/admin/inventory", label: "Inventory", icon: Warehouse },
@@ -33,7 +35,8 @@ const NAV = [
 
 const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
-  "/admin/pipeline": { kicker: "Sales book", title: "Pipeline" },
+  "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
+  "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
   "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
   "/admin/socials": { kicker: "Content on the book", title: "Socials" },
   "/admin/inventory": { kicker: "Haven and Basecamp", title: "Inventory" },
@@ -49,6 +52,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const riskAll = useDesk((s) => s.risk);
   const moneyAll = useDesk((s) => s.money);
   const queued = useDesk((s) => s.threads.filter((m) => m.dir === "draft").length);
+  const leadCount = useDesk((s) => companyStats(s.companies).sendable);
   const inFlight = useDesk(
     (s) => s.posts.filter((p) => p.status === "draft" || p.status === "queued").length,
   );
@@ -62,6 +66,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     "/admin/money": overdue,
     "/admin/bots": queued,
     "/admin/socials": inFlight,
+    "/admin/leads": leadCount,
   };
 
   return (

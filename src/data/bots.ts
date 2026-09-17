@@ -24,6 +24,7 @@ export type ThreadDir = "in" | "out" | "draft" | "note";
 export type ThreadMsg = {
   id: string;
   leadId: string;
+  companyId?: string;
   bot: BotId;
   dir: ThreadDir;
   at: string;

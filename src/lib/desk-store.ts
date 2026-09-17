@@ -8,6 +8,7 @@ import {
   type ThreadDir,
   type ThreadMsg,
 } from "@/data/bots";
+import { SEED_COMPANIES } from "@/data/leads";
 import {
   PARTNERS,
   SEED_CANALTA,
@@ -37,6 +38,18 @@ import {
 } from "@/data/desk";
 import { SEED_POSTS, type PostStatus, type SocialChannel, type SocialPost } from "@/data/socials";
 import { draftFor } from "@/lib/bot-copy";
+import { draftForCompany, draftProblems } from "@/lib/lead-copy";
+import {
+  hasAccess,
+  isSendable,
+  mergeScoutRows,
+  normalizeDomain,
+  parseScoutBatch,
+  scoreCompany,
+  type Company,
+  type CompanyStatus,
+  type ScoreBreak,
+} from "@/lib/lead-score";
 
 type DeskState = {
   lookingAs: Partner;
@@ -49,6 +62,7 @@ type DeskState = {
   canalta: CanaltaHold[];
   threads: ThreadMsg[];
   scout: ScoutTarget[];
+  companies: Company[];
   posts: SocialPost[];
   paused: Record<BotId, boolean>;
   setLookingAs: (p: Partner) => void;
@@ -63,6 +77,7 @@ type DeskState = {
     owner: Partner;
     note?: string;
     source?: LeadSource;
+    companyId?: string;
   }) => string;
   setLeadStatus: (id: string, status: LeadStatus) => void;
   addStay: (input: {
@@ -105,6 +120,17 @@ type DeskState = {
   stopLead: (leadId: string) => void;
   fileScout: (id: string) => string | null;
   skipScout: (id: string) => void;
+  ingestScout: (raw: string) => { added: number; merged: number; skipped: number; error: string | null };
+  saveCompanyDraft: (id: string, subject: string, body: string) => string | null;
+  generateCompanyDraft: (id: string) => string | null;
+  approveCompanyDraft: (id: string) => string | null;
+  sendCompany: (id: string) => string | null;
+  stopCompany: (id: string) => void;
+  fileCompany: (id: string) => string | null;
+  setCompanyAccess: (
+    id: string,
+    input: { buyerName: string; buyerTitle: string; email: string; emailSource: string; sourceUrl: string },
+  ) => string | null;
   setPostStatus: (id: string, status: PostStatus) => void;
   queueIdea: (channel: SocialChannel, title: string, body: string) => void;
   logPostMetrics: (id: string, impressions: number, likes: number, replies: number) => void;
@@ -122,6 +148,7 @@ const seed = {
   canalta: SEED_CANALTA,
   threads: SEED_THREADS,
   scout: SEED_SCOUT,
+  companies: SEED_COMPANIES,
   posts: SEED_POSTS,
   paused: {
     concierge: false,
@@ -188,6 +215,7 @@ export const useDesk = create<DeskState>()(
               nudges: 0,
               lastTouch: today(),
               stopped: false,
+              companyId: input.companyId,
             },
             ...s.leads,
           ],
@@ -271,7 +299,6 @@ export const useDesk = create<DeskState>()(
         if (lead.stopped || lead.status === "lost" || lead.status === "won") return "closed";
         if (get().paused[bot]) return "paused";
         if (bot === "followup" && lead.nudges >= 3) return "cap";
-        if (lead.source === "scout" && !lead.email) return "unnamed";
         const copy = draftFor(bot, lead);
         set((s) => ({
           threads: [
@@ -299,6 +326,10 @@ export const useDesk = create<DeskState>()(
         if (get().paused[bot]) return "paused";
         if (lead.nudges >= 3 && bot === "followup") return "cap";
         if (lead.source === "scout" && !lead.email) return "unnamed";
+        if (lead.companyId) {
+          const company = get().companies.find((c) => c.id === lead.companyId);
+          if (company && !hasAccess(company)) return "access";
+        }
         let draft = get().threads.find((m) => m.leadId === leadId && m.dir === "draft" && m.bot === bot);
         if (!draft) {
           const fail = get().draftMail(leadId, bot);
@@ -404,6 +435,237 @@ export const useDesk = create<DeskState>()(
         set((s) => ({
           scout: s.scout.map((x) => (x.id === id ? { ...x, status: "skip" as const } : x)),
         })),
+      ingestScout: (raw) => {
+        const parsed = parseScoutBatch(raw);
+        if (parsed.error) return { added: 0, merged: 0, skipped: 0, error: parsed.error };
+        let added = 0;
+        let merged = 0;
+        let skipped = 0;
+        set((s) => {
+          const result = mergeScoutRows(s.companies, parsed.rows, {
+            batch: `scout-${today()}`,
+            today: today(),
+          });
+          added = result.added;
+          merged = result.merged;
+          skipped = result.skipped;
+          const companies = result.companies.map((c) => {
+            if (c.draftBody) return c;
+            const draft = draftForCompany(c);
+            return { ...c, draftSubject: draft.subject, draftBody: draft.body };
+          });
+          return { companies };
+        });
+        return { added, merged, skipped, error: null };
+      },
+      saveCompanyDraft: (id, subject, body) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        if (c.status === "stopped") return "closed";
+        set((s) => ({
+          companies: s.companies.map((x) =>
+            x.id === id ? { ...x, draftSubject: subject.trim(), draftBody: body.trim(), lastTouch: today() } : x,
+          ),
+        }));
+        return null;
+      },
+      generateCompanyDraft: (id) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        const copy = draftForCompany(c);
+        set((s) => ({
+          companies: s.companies.map((x) =>
+            x.id === id ? { ...x, draftSubject: copy.subject, draftBody: copy.body, lastTouch: today() } : x,
+          ),
+        }));
+        return null;
+      },
+      approveCompanyDraft: (id) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        if (c.status === "stopped") return "closed";
+        const problems = draftProblems(c.draftBody);
+        if (problems.length) return problems[0] ?? "copy";
+        const score = scoreCompany(c);
+        if (score.band === "hold") return "band";
+        set((s) => {
+          const already = s.threads.find(
+            (m) => m.companyId === id && m.dir === "draft" && m.subject === c.draftSubject,
+          );
+          const threads = already
+            ? s.threads.map((m) =>
+                m.id === already.id
+                  ? { ...m, subject: c.draftSubject, body: c.draftBody, at: stamp() }
+                  : m,
+              )
+            : [
+                {
+                  id: nextCode("M", s.threads),
+                  leadId: c.filedLeadId,
+                  companyId: id,
+                  bot: "corporate" as BotId,
+                  dir: "draft" as ThreadDir,
+                  at: stamp(),
+                  subject: c.draftSubject,
+                  body: c.draftBody,
+                },
+                ...s.threads,
+              ];
+          return {
+            threads,
+            companies: s.companies.map((x) =>
+              x.id === id
+                ? { ...x, status: x.status === "watch" && score.band !== "watch" ? "sequence" : x.status, lastTouch: today() }
+                : x,
+            ),
+          };
+        });
+        return null;
+      },
+      sendCompany: (id) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        if (c.status === "stopped") return "closed";
+        const score = scoreCompany(c);
+        if (score.band === "hold") return "band";
+        if (!hasAccess(c)) return "access";
+        if (!isSendable(c, score)) return "band";
+        const problems = draftProblems(c.draftBody);
+        if (problems.length) return problems[0] ?? "copy";
+        if (get().paused.corporate) return "paused";
+        let leadId = c.filedLeadId;
+        if (!leadId) {
+          leadId = get().addLead({
+            org: c.org,
+            contact: c.buyerTitle ? `${c.buyerName} · ${c.buyerTitle}` : c.buyerName,
+            email: c.email,
+            kind: "bootcamp",
+            headcount: 12,
+            value: 18000,
+            dates: "spring 2027",
+            owner: "christopher",
+            note: `${c.city}. ${c.why} First send from the research list.`,
+            source: "scout",
+            companyId: c.id,
+          });
+        }
+        const fail = get().approveCompanyDraft(id);
+        if (fail) return fail;
+        const draft = get().threads.find((m) => m.companyId === id && m.dir === "draft");
+        set((s) => ({
+          companies: s.companies.map((x) =>
+            x.id === id ? { ...x, status: "filed" as CompanyStatus, filedLeadId: leadId, lastTouch: today() } : x,
+          ),
+          threads: s.threads.map((m) =>
+            draft && m.id === draft.id
+              ? { ...m, dir: "out" as ThreadDir, leadId, at: stamp() }
+              : m.companyId === id
+                ? { ...m, leadId }
+                : m,
+          ),
+          leads: s.leads.map((l) =>
+            l.id === leadId
+              ? {
+                  ...l,
+                  email: c.email,
+                  contact: c.buyerTitle ? `${c.buyerName} · ${c.buyerTitle}` : c.buyerName,
+                  nudges: l.nudges + 1,
+                  lastTouch: today(),
+                  next: "Wait 48h, then 7d",
+                  companyId: c.id,
+                }
+              : l,
+          ),
+        }));
+        if (c.email && typeof window !== "undefined") {
+          const subject = draft?.subject ?? c.draftSubject;
+          const body = draft?.body ?? c.draftBody;
+          const url = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          window.open(url, "_self");
+        }
+        return null;
+      },
+      stopCompany: (id) =>
+        set((s) => ({
+          companies: s.companies.map((x) => (x.id === id ? { ...x, status: "stopped" as const, lastTouch: today() } : x)),
+          threads: [
+            {
+              id: nextCode("M", s.threads),
+              leadId: s.companies.find((x) => x.id === id)?.filedLeadId ?? "",
+              companyId: id,
+              bot: "followup",
+              dir: "note",
+              at: stamp(),
+              subject: "Stopped",
+              body: "Research list: do not email. Sequence stopped on the book.",
+            },
+            ...s.threads,
+          ],
+        })),
+      fileCompany: (id) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        if (c.filedLeadId) return c.filedLeadId;
+        const leadId = get().addLead({
+          org: c.org,
+          contact: c.buyerName
+            ? c.buyerTitle
+              ? `${c.buyerName} · ${c.buyerTitle}`
+              : c.buyerName
+            : "Named contact pending",
+          email: c.email,
+          kind: "bootcamp",
+          headcount: 12,
+          value: 18000,
+          dates: "spring 2027",
+          owner: "christopher",
+          note: `${c.city}. ${c.why} Hand-filed from the research list. Do not send until Access is complete.`,
+          source: "scout",
+          companyId: c.id,
+        });
+        set((s) => ({
+          companies: s.companies.map((x) =>
+            x.id === id ? { ...x, status: "filed" as const, filedLeadId: leadId, lastTouch: today() } : x,
+          ),
+          threads: [
+            {
+              id: nextCode("M", s.threads),
+              leadId,
+              companyId: id,
+              bot: "corporate",
+              dir: "note",
+              at: stamp(),
+              subject: "Hand filed",
+              body: `Moved from the research list. ${hasAccess(c) ? "Access is complete." : "Access incomplete — named person, published email, and source URL required before send."}`,
+            },
+            ...s.threads,
+          ],
+        }));
+        return leadId;
+      },
+      setCompanyAccess: (id, input) => {
+        const c = get().companies.find((x) => x.id === id);
+        if (!c) return "missing";
+        const email = input.email.trim().toLowerCase();
+        const emailSource = input.emailSource.trim();
+        if (email && !emailSource) return "unsourced";
+        set((s) => ({
+          companies: s.companies.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  buyerName: input.buyerName.trim(),
+                  buyerTitle: input.buyerTitle.trim(),
+                  email: email && emailSource ? email : "",
+                  emailSource: email && emailSource ? emailSource : "",
+                  sourceUrl: input.sourceUrl.trim() || x.sourceUrl,
+                  lastTouch: today(),
+                }
+              : x,
+          ),
+        }));
+        return null;
+      },
       setPostStatus: (id, status) =>
         set((s) => ({
           posts: s.posts.map((p) =>
@@ -438,7 +700,7 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 3,
+      version: 4,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
         return {
@@ -451,9 +713,11 @@ export const useDesk = create<DeskState>()(
             nudges: l.nudges ?? 0,
             lastTouch: l.lastTouch ?? "",
             stopped: l.stopped ?? false,
+            companyId: l.companyId,
           })),
           threads: p.threads ?? seed.threads,
           scout: p.scout ?? seed.scout,
+          companies: p.companies?.length ? p.companies : seed.companies,
           posts: p.posts ?? seed.posts,
           paused: { ...seed.paused, ...p.paused },
         };
@@ -480,6 +744,18 @@ export function openPipeline(leads: Lead[]) {
   return leads.filter((l) => l.status !== "lost" && l.status !== "won");
 }
 
+export function companyStats(companies: Company[]) {
+  const scored = companies.map((c) => ({ c, s: scoreCompany(c) }));
+  return {
+    list: companies.length,
+    sendable: scored.filter(({ c, s }) => isSendable(c, s)).length,
+    sequence: companies.filter((c) => c.status === "sequence").length,
+    stopped: companies.filter((c) => c.status === "stopped").length,
+    pursue: scored.filter(({ s }) => s.band === "pursue").length,
+    filed: companies.filter((c) => c.status === "filed").length,
+  };
+}
+
 export function ingestSpringEnquiry(input: {
   name: string;
   email: string;
@@ -490,8 +766,10 @@ export function ingestSpringEnquiry(input: {
   notes: string;
 }) {
   const heads = Number(String(input.headcount).replace(/\D/g, "")) || 8;
+  const domain = normalizeDomain(input.email);
+  const match = domain ? useDesk.getState().companies.find((c) => c.domain === domain) : undefined;
   const id = useDesk.getState().addLead({
-    org: input.company,
+    org: input.company || match?.org || "Untitled",
     contact: input.role ? `${input.name} · ${input.role}` : input.name,
     email: input.email,
     kind: "bootcamp",
@@ -499,14 +777,16 @@ export function ingestSpringEnquiry(input: {
     value: 18000,
     dates: input.window || "spring 2027",
     owner: "christopher",
-    note: input.notes || "From /spring.",
+    note: input.notes || (match ? `From /spring. Matched research card ${match.org}.` : "From /spring."),
     source: "form",
+    companyId: match?.id,
   });
   useDesk.setState((s) => ({
     threads: [
       {
         id: nextCode("M", s.threads),
         leadId: id,
+        companyId: match?.id,
         bot: "concierge",
         dir: "in",
         at: stamp(),
@@ -516,6 +796,24 @@ export function ingestSpringEnquiry(input: {
       ...s.threads,
     ],
     leads: s.leads.map((l) => (l.id === id ? { ...l, next: "Concierge draft" } : l)),
+    companies: match
+      ? s.companies.map((c) =>
+          c.id === match.id
+            ? {
+                ...c,
+                status: "filed" as CompanyStatus,
+                filedLeadId: id,
+                buyerName: c.buyerName || input.name,
+                buyerTitle: c.buyerTitle || input.role,
+                email: c.email || input.email.toLowerCase(),
+                emailSource: c.emailSource || "https://unearthself.xyz/spring",
+                lastTouch: today(),
+              }
+            : c,
+        )
+      : s.companies,
   }));
   return id;
 }
+
+export type { Company, ScoreBreak };

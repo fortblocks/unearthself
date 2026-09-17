@@ -40,6 +40,14 @@ function PipelinePage() {
 
   return (
     <div className="grid gap-10">
+      <p className="max-w-prose text-pretty text-muted">
+        Live files only — named enquiries, holds, proposals. The long company list lives on{" "}
+        <Link to="/admin/leads" className="font-semibold text-ember hover:underline">
+          Leads
+        </Link>
+        . A research card lands here on first approved send, a /spring domain match, or a hand file.
+      </p>
+
       <section className="grid gap-6 sm:grid-cols-3">
         <Stat label="Open files" value={String(open.length)} hint="Not won, not lost" />
         <Stat label="Weighted" value={cad(weightedPipeline(leads))} hint="Probability × value" />
@@ -147,7 +155,7 @@ function LeadCard({
           {lead.next}
         </p>
         {lead.note ? <p className="mt-2 max-w-prose text-sm text-pretty text-muted">{lead.note}</p> : null}
-        <p className="mt-3">
+        <p className="mt-3 flex flex-wrap gap-3">
           <Link
             to="/admin/bots"
             search={{ lead: lead.id }}
@@ -155,6 +163,15 @@ function LeadCard({
           >
             Thread
           </Link>
+          {lead.companyId ? (
+            <Link
+              to="/admin/leads"
+              search={{ company: lead.companyId }}
+              className="text-sm font-semibold text-ember hover:underline"
+            >
+              Research card
+            </Link>
+          ) : null}
         </p>
       </div>
       <NativeSelect

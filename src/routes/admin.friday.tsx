@@ -6,7 +6,7 @@ import { Stat } from "@/components/desk/Stat";
 import { Button } from "@/components/ui/button";
 import { FRIDAY } from "@/data/desk";
 import { cad } from "@/lib/format";
-import { openPipeline, useDesk, weightedPipeline } from "@/lib/desk-store";
+import { openPipeline, companyStats, useDesk, weightedPipeline } from "@/lib/desk-store";
 
 export const Route = createFileRoute("/admin/friday")({
   component: FridayPage,
@@ -23,6 +23,7 @@ const TREND = [
 
 function FridayPage() {
   const leads = useDesk((s) => s.leads);
+  const companies = useDesk((s) => s.companies);
   const money = useDesk((s) => s.money);
   const risk = useDesk((s) => s.risk);
   const reset = useDesk((s) => s.reset);
@@ -33,12 +34,14 @@ function FridayPage() {
     .reduce((s, m) => s + m.amount, 0);
   const issues = risk.filter((r) => r.open);
   const bootcamp = open.filter((l) => l.kind === "bootcamp");
+  const list = companyStats(companies);
 
   return (
     <div className="grid gap-10">
       <p className="max-w-prose text-pretty text-muted">
-        One page. Occupancy, treatment hours, retreat pipeline, cash, issues. Norah owns Friday
-        numbers. This is the working pack for week of {FRIDAY.week}.
+        One page. Occupancy, treatment hours, retreat pipeline, cash, issues. Research list: size,
+        sendable, in sequence, stopped. Norah owns Friday numbers. This is the working pack for week
+        of {FRIDAY.week}.
       </p>
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -51,6 +54,13 @@ function FridayPage() {
         />
         <Stat label="Cash in" value={cad(cashIn)} hint="Paid this book" />
         <Stat label="Promised" value={cad(promised)} hint="Due or overdue" />
+      </section>
+
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="List size" value={String(list.list)} hint="Research cards" />
+        <Stat label="Sendable" value={String(list.sendable)} hint="Access + 70+" />
+        <Stat label="In sequence" value={String(list.sequence)} hint="Approved, not filed" />
+        <Stat label="Stopped" value={String(list.stopped)} hint="Do not email" />
       </section>
 
       <section className="border border-line bg-paper p-5">

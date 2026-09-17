@@ -37,11 +37,14 @@ Pricing is still an open decision (`17` + `14`). Until locked, the site collects
 
 **Days 1–14**
 
-- CRM live (even if it is HubSpot free + spreadsheet)
-- Enquiry forms write to CRM
+- CRM live (even if it is HubSpot free + spreadsheet). **D04 stays open.** The house book is the working CRM until a partner closes it.
+- Enquiry forms write to the house book. `/spring` files a live lead; a matching research-card domain promotes the company.
+- `/admin/leads` — long list of Alberta first-wave companies. Not the pipeline. Score 100 = Fit 60 + Access 25 + Timing 15 (Calgary / Edmonton / Red Deer, headcount 80–800, first-wave industries, named buyer, published email).
+- Bands: 90+ pursue · 70–89 sequence if sendable · 50–69 watch · <50 do not email.
+- Access gate: no named person + published email + source URL = draft allowed, send blocked. Do not invent emails. Do not buy Apollo.
 - Grok Bot: qualify, answer FAQs, propose three dates, book a call
 - One-pager PDF for corporate
-- List of 80 Calgary / Edmonton target accounts
+- Seed list of ~30 Calgary / Edmonton / Red Deer target accounts on `/admin/leads`. Scout JSON ingest on that page. Pipeline stays live files only.
 
 **Days 15–45**
 
@@ -88,5 +91,6 @@ Working lines:
 
 ## Changelog
 
+- 2026-09-17 — `/admin/leads` is the research list. Pipeline is live files only. Score and Access gate as specified. Scout ingest on the page. D04 not closed. No Apollo. No invented emails.
 - 2026-09-08 — Sales workstream opened. Booking before brand theatre.
 - 2026-09-10 — House-book bots + socials. `/spring` files Concierge. Outbound still human-send until Gmail.

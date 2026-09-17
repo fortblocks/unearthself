@@ -32,6 +32,10 @@
 ├── /book/{stay,treatment,retreat}
 ├── /legal/*
 └── /admin                staff
+      ├── /admin/pipeline
+      ├── /admin/leads
+      ├── /admin/bots
+      └── /admin/friday
 ```
 
 ## Email landers

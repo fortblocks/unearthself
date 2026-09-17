@@ -41,6 +41,7 @@ export type Lead = {
   nudges: number;
   lastTouch: string;
   stopped: boolean;
+  companyId?: string;
 };
 
 export type Stay = {

@@ -30,6 +30,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBotsRouteImport } from './routes/admin.bots'
 import { Route as AdminFridayRouteImport } from './routes/admin.friday'
 import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
+import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminMoneyRouteImport } from './routes/admin.money'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminRiskRouteImport } from './routes/admin.risk'
@@ -170,6 +171,11 @@ const AdminFridayRoute = AdminFridayRouteImport.update({
 const AdminInventoryRoute = AdminInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeadsRoute = AdminLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMoneyRoute = AdminMoneyRouteImport.update({
@@ -374,6 +380,7 @@ export interface FileRoutesByFullPath {
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
+  '/admin/leads': typeof AdminLeadsRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
@@ -428,6 +435,7 @@ export interface FileRoutesByTo {
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
+  '/admin/leads': typeof AdminLeadsRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
@@ -487,6 +495,7 @@ export interface FileRoutesById {
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
+  '/admin/leads': typeof AdminLeadsRoute
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
@@ -548,6 +557,7 @@ export interface FileRouteTypes {
     | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
+    | '/admin/leads'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
@@ -602,6 +612,7 @@ export interface FileRouteTypes {
     | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
+    | '/admin/leads'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
@@ -660,6 +671,7 @@ export interface FileRouteTypes {
     | '/admin/bots'
     | '/admin/friday'
     | '/admin/inventory'
+    | '/admin/leads'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
@@ -869,6 +881,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/admin/inventory'
       preLoaderRoute: typeof AdminInventoryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leads': {
+      id: '/admin/leads'
+      path: '/leads'
+      fullPath: '/admin/leads'
+      preLoaderRoute: typeof AdminLeadsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/money': {
@@ -1130,6 +1149,7 @@ interface AdminRouteChildren {
   AdminBotsRoute: typeof AdminBotsRoute
   AdminFridayRoute: typeof AdminFridayRoute
   AdminInventoryRoute: typeof AdminInventoryRoute
+  AdminLeadsRoute: typeof AdminLeadsRoute
   AdminMoneyRoute: typeof AdminMoneyRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminRiskRoute: typeof AdminRiskRoute
@@ -1141,6 +1161,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBotsRoute: AdminBotsRoute,
   AdminFridayRoute: AdminFridayRoute,
   AdminInventoryRoute: AdminInventoryRoute,
+  AdminLeadsRoute: AdminLeadsRoute,
   AdminMoneyRoute: AdminMoneyRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminRiskRoute: AdminRiskRoute,

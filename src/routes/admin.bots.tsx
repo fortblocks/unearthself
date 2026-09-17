@@ -25,6 +25,7 @@ const SEND_ERR: Record<string, string> = {
   paused: "That bot is paused.",
   cap: "Three nudges already. Sequence stopped.",
   unnamed: "Research card. Name a person before you send.",
+  access: "Send blocked. Named person, published email, and source URL.",
 };
 
 function BotsPage() {
@@ -38,7 +39,6 @@ function BotsPage() {
   const sendMail = useDesk((s) => s.sendMail);
   const logReply = useDesk((s) => s.logReply);
   const stopLead = useDesk((s) => s.stopLead);
-  const fileScout = useDesk((s) => s.fileScout);
   const skipScout = useDesk((s) => s.skipScout);
   const [leadId, setLeadId] = useState(search.lead || leads[0]?.id || "");
   const [tab, setTab] = useState<"queue" | "roster" | "scout">("queue");
@@ -116,10 +116,14 @@ function BotsPage() {
       ) : null}
 
       {tab === "scout" ? (
-        <Section kicker="Calgary / Edmonton — research only">
+        <Section kicker="Research list moved">
           <p className="mb-4 max-w-prose text-sm text-pretty text-muted">
-            These are sectors, not contacts. Filing puts a card on the pipeline. Concierge will
-            refuse to send until someone has a name.
+            The long company list is{" "}
+            <Link to="/admin/leads" className="font-semibold text-ember hover:underline">
+              /admin/leads
+            </Link>
+            . Pipeline stays live files. Scout JSON ingest lives on that page. These six sector
+            cards are leftovers — skip them. Do not dump unnamed research onto the pipeline.
           </p>
           <ul className="grid gap-3">
             {scout.map((t) => (
@@ -136,19 +140,12 @@ function BotsPage() {
                 </div>
                 {t.status === "watch" ? (
                   <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        const id = fileScout(t.id);
-                        if (id) {
-                          setLeadId(id);
-                          setTab("queue");
-                          toast(`Filed ${t.org}`);
-                        }
-                      }}
+                    <Link
+                      to="/admin/leads"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xs bg-ember px-4 text-sm font-semibold text-white hover:bg-ember/90"
                     >
-                      File
-                    </Button>
+                      Open list
+                    </Link>
                     <Button type="button" variant="outline" onClick={() => skipScout(t.id)}>
                       Skip
                     </Button>

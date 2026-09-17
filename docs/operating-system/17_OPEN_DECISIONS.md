@@ -7,7 +7,7 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | D01 | Public prices for Haven, spa, Bootcamp | Haven BAR is now the house card (four seasons, suite cleaning) as of 10 Sep 2026 — Christopher confirmed. Spa and Bootcamp package prices still unpublished. Norah still signs the rest. | Website, bots, one-pager | Norah + partners |
 | D02 | Fourth Rune public name | Existence is current in the PDF and `04`; `00_README` still says Experience. APP-01 stubbed the fourth day without printing a locked word. **Not closed.** | Copy, glyphs, app | Christopher / Tess |
 | D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
-| D04 | CRM choice | HubSpot speed vs Attio taste | Bots, pipeline | Christopher |
+| D04 | CRM choice | HubSpot speed vs Attio taste. House book is the working CRM until a partner closes this. `/admin/leads` is the research list; pipeline is live files. **Not closed.** | Bots, pipeline | Christopher |
 | D05 | Domain strategy | xyz only vs add .com/.ca. APP-01 working host `quest.unearthself.xyz` is a PWA URL, not a close. APP-02 working bundle id `xyz.unearthself.quest` is a recommendation, not a close. | Print, ads, app | Christopher |
 | D06 | Dunning format and name | Field-test required. Not an app object. | Adaptability morning | Tess |
 | D07 | Final-day route | Rosedale → fossil shop → Eleven Bridges → Last Chance. APP-01 left this a stub. | Fourth day | Lisa + Tess |
