@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { cad } from "@/data/treatments";
-import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
 import { useBooking, type BookFace } from "@/lib/booking/context";
+import { StayRequest } from "@/components/haven/StayRequest";
 
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
 
@@ -104,7 +104,7 @@ export function BookPanel() {
                   <div className="pb-6">
                     {f.id === "bootcamp" && <BootcampFace />}
                     {f.id === "basecamp" && <BasecampFace />}
-                    {f.id === "haven" && <HavenFace />}
+                    {f.id === "haven" && <StayRequest tone="light" />}
                   </div>
                 )}
               </div>
@@ -360,87 +360,6 @@ function BasecampFace() {
       <button type="submit" disabled={lines.length === 0} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">
         Request these times
       </button>
-    </form>
-  );
-}
-
-function HavenFace() {
-  const [room, setRoom] = useState<RoomSlug | "">("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState(2);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<"idle" | "done">("idle");
-  const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    try {
-      const existing = JSON.parse(localStorage.getItem("unearthself-haven-requests") || "[]") as unknown[];
-      localStorage.setItem(
-        "unearthself-haven-requests",
-        JSON.stringify(
-          [{ receivedAt: new Date().toISOString(), room: room || "any", checkIn, checkOut, nights, guests, name, email, notes }, ...existing].slice(0, 50),
-        ),
-      );
-    } catch {
-      /* ignore */
-    }
-    const body = [`Room: ${room || "any"}`, `Check-in: ${checkIn}`, `Check-out: ${checkOut}`, `Nights: ${nights}`, `Guests: ${guests}`, `Name: ${name}`, `Email: ${email}`, notes].join("\n");
-    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent("Haven stay request")}&body=${encodeURIComponent(body)}`;
-    setStatus("done");
-  }
-
-  if (status === "done") {
-    return <p className="text-sm text-coal/60">Request sent. We confirm what is free and send the rate.</p>;
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="grid gap-3">
-      <label>
-        <span className={label}>Room</span>
-        <select className={field} value={room} onChange={(e) => setRoom(e.target.value as RoomSlug | "")}>
-          <option value="">Any available</option>
-          {ROOMS.map((r) => (
-            <option key={r.slug} value={r.slug}>
-              {r.name} · sleeps {r.sleeps}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        <label>
-          <span className={label}>Check-in</span>
-          <input type="date" min={todayIso()} className={field} value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
-        </label>
-        <label>
-          <span className={label}>Check-out</span>
-          <input type="date" min={checkIn || todayIso()} className={field} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-        </label>
-      </div>
-      <label>
-        <span className={label}>Guests</span>
-        <input type="number" min={1} max={8} className={field} value={guests} onChange={(e) => setGuests(Number(e.target.value) || 1)} />
-      </label>
-      {nights > 0 && <p className="text-sm text-coal/50">{nights} night{nights === 1 ? "" : "s"} · rates on request</p>}
-      <label>
-        <span className={label}>Name</span>
-        <input required className={field} value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <label>
-        <span className={label}>Email</span>
-        <input required type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} />
-      </label>
-      <label>
-        <span className={label}>Notes</span>
-        <textarea rows={2} className={field} value={notes} onChange={(e) => setNotes(e.target.value)} />
-      </label>
-      <button type="submit" className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white">
-        Request a stay
-      </button>
-      <p className="text-xs text-coal/45">No payment yet. Availability first.</p>
     </form>
   );
 }
