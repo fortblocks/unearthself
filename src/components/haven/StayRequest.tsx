@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
 import { quoteStay } from "@/data/havenRates";
 import { cad } from "@/lib/format";
@@ -11,6 +11,7 @@ type Props = {
 };
 
 const STORAGE_KEY = "unearthself-haven-requests";
+const ROOMBOX = "https://roombox.app";
 
 function todayIso() {
   const d = new Date();
@@ -29,6 +30,8 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const frame = useRef<HTMLIFrameElement>(null);
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
   const quote = useMemo(
@@ -41,7 +44,18 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
     (dark ? "border-fossil/25 text-fossil placeholder:text-fossil/40" : "border-coal/15 text-coal placeholder:text-shale/50");
   const label = "mb-1.5 block text-[0.72rem] font-semibold tracking-[0.12em] uppercase " + (dark ? "text-sandstone" : "text-shale");
 
-  function onSubmit(e: FormEvent) {
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== ROOMBOX) return;
+      const data = event.data as { roombox?: string; ok?: boolean; code?: string };
+      if (data?.roombox !== "result") return;
+      if (data.ok && data.code) setCode(data.code);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!name.trim() || !email.trim()) {
@@ -53,27 +67,36 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
       return;
     }
     setStatus("sending");
+    const request = {
+      id: `stay_${Date.now()}`,
+      receivedAt: new Date().toISOString(),
+      room: room || "any",
+      checkIn,
+      checkOut,
+      nights,
+      guests,
+      indicativeTotal: quote?.total ?? null,
+      name: name.trim(),
+      email: email.trim(),
+      notes: notes.trim(),
+    };
     try {
-      const request = {
-        id: `stay_${Date.now()}`,
-        receivedAt: new Date().toISOString(),
-        room: room || "any",
-        checkIn,
-        checkOut,
-        nights,
-        guests,
-        indicativeTotal: quote?.total ?? null,
-        name: name.trim(),
-        email: email.trim(),
-        notes: notes.trim(),
-      };
       const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as unknown[];
       localStorage.setItem(STORAGE_KEY, JSON.stringify([request, ...existing].slice(0, 50)));
-      setStatus("done");
     } catch {
-      setStatus("error");
-      setError("Could not send the request. Try again, or email hello@unearthself.xyz.");
+      /* keep going */
     }
+    frame.current?.contentWindow?.postMessage({ roombox: "request", request }, ROOMBOX);
+    try {
+      await fetch(`${ROOMBOX}/api/v1/requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+    } catch {
+      /* catcher still ran */
+    }
+    setStatus("done");
   }
 
   if (status === "done") {
@@ -83,7 +106,8 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
         <p className={"mt-3 max-w-[42ch] " + (dark ? "text-fossil/75" : "text-shale")}>
           We’ll reply to confirm availability
           {room ? ` for ${ROOMS.find((r) => r.slug === room)?.name}` : ""}
-          {nights ? ` · ${nights} night${nights === 1 ? "" : "s"}` : ""}. Rates and final details come next.
+          {nights ? ` · ${nights} night${nights === 1 ? "" : "s"}` : ""}
+          {code ? ` · ${code}` : ""}. Rates and final details come next. Rooms only — treatments stay a separate book.
         </p>
       </div>
     );
@@ -91,6 +115,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
+      <iframe ref={frame} title="" src={`${ROOMBOX}/embed/catch`} style={{ display: "none" }} />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className={label}>Room</span>
@@ -189,7 +214,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
         {status === "sending" ? "Sending…" : "Request a stay"}
       </button>
       <p className={"text-[0.8rem] " + (dark ? "text-fossil/50" : "text-shale/80")}>
-        No payment yet. This is an availability request — we’ll confirm by email.
+        No payment yet. This is an availability request — we’ll confirm by email. Rooms only.
       </p>
     </form>
   );
