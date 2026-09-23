@@ -86,6 +86,8 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
     } catch {
       /* keep going */
     }
+    const packed = encodeURIComponent(JSON.stringify(request));
+    window.open(`${ROOMBOX}/embed/catch?in=${packed}`, "roombox-in", "popup=yes,width=480,height=320");
     frame.current?.contentWindow?.postMessage({ roombox: "request", request }, ROOMBOX);
     try {
       await fetch(`${ROOMBOX}/api/v1/requests`, {
@@ -94,7 +96,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
         body: JSON.stringify(request),
       });
     } catch {
-      /* catcher still ran */
+      /* catcher window is the book */
     }
     setStatus("done");
   }
