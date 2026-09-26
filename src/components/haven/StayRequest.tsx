@@ -11,7 +11,7 @@ type Props = {
 };
 
 const STORAGE_KEY = "unearthself-haven-requests";
-const ROOMBOX = "https://roombox.app";
+const ROOMBOX = "https://www.roombox.app";
 
 function todayIso() {
   const d = new Date();
