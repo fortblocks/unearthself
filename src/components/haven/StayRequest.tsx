@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
 import { quoteStay } from "@/data/havenRates";
 import { cad } from "@/lib/format";
@@ -30,8 +30,6 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState<string | null>(null);
-  const frame = useRef<HTMLIFrameElement>(null);
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
   const quote = useMemo(
@@ -43,17 +41,6 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
     "w-full rounded-[2px] border bg-transparent px-3 py-2.5 text-[0.95rem] outline-none focus:border-ember " +
     (dark ? "border-fossil/25 text-fossil placeholder:text-fossil/40" : "border-coal/15 text-coal placeholder:text-shale/50");
   const label = "mb-1.5 block text-[0.72rem] font-semibold tracking-[0.12em] uppercase " + (dark ? "text-sandstone" : "text-shale");
-
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== ROOMBOX) return;
-      const data = event.data as { roombox?: string; ok?: boolean; code?: string };
-      if (data?.roombox !== "result") return;
-      if (data.ok && data.code) setCode(data.code);
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -86,17 +73,20 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
     } catch {
       /* keep going */
     }
-    const packed = encodeURIComponent(JSON.stringify(request));
-    window.open(`${ROOMBOX}/embed/catch?in=${packed}`, "roombox-in", "popup=yes,width=480,height=320");
-    frame.current?.contentWindow?.postMessage({ roombox: "request", request }, ROOMBOX);
+    let posted = false;
     try {
-      await fetch(`${ROOMBOX}/api/v1/requests`, {
+      const res = await fetch(`${ROOMBOX}/api/v1/requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
       });
+      posted = res.ok;
     } catch {
-      /* catcher window is the book */
+      posted = false;
+    }
+    if (!posted) {
+      const packed = encodeURIComponent(JSON.stringify(request));
+      window.open(`${ROOMBOX}/embed/catch?in=${packed}`, "roombox-in", "popup=yes,width=480,height=320");
     }
     setStatus("done");
   }
@@ -108,8 +98,8 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
         <p className={"mt-3 max-w-[42ch] " + (dark ? "text-fossil/75" : "text-shale")}>
           We’ll reply to confirm availability
           {room ? ` for ${ROOMS.find((r) => r.slug === room)?.name}` : ""}
-          {nights ? ` · ${nights} night${nights === 1 ? "" : "s"}` : ""}
-          {code ? ` · ${code}` : ""}. Rates and final details come next. Rooms only — treatments stay a separate book.
+          {nights ? ` · ${nights} night${nights === 1 ? "" : "s"}` : ""}. Rates and final details come next. Rooms
+          only — treatments stay a separate book.
         </p>
       </div>
     );
@@ -117,7 +107,6 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <iframe ref={frame} title="" src={`${ROOMBOX}/embed/catch`} style={{ display: "none" }} />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className={label}>Room</span>
