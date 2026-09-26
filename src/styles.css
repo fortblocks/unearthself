@@ -755,3 +755,36 @@
   }
 }
 
+@utility tracking-lockup {
+  letter-spacing: 0.34em;
+}
+
+@utility tracking-place {
+  letter-spacing: 0.22em;
+}
+
+.brand-checker {
+  background-color: var(--color-fossil);
+  background-image:
+    linear-gradient(45deg, color-mix(in oklab, var(--color-shale) 16%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in oklab, var(--color-shale) 16%, transparent) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, color-mix(in oklab, var(--color-shale) 16%, transparent) 75%),
+    linear-gradient(-45deg, transparent 75%, color-mix(in oklab, var(--color-shale) 16%, transparent) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.brand-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand-crop-circle {
+  inset: 4%;
+}
+
+.brand-crop-square {
+  inset: 7%;
+}
+

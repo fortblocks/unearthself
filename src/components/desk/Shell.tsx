@@ -124,6 +124,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             ))}
           </NativeSelect>
           <p className="mt-2 text-xs text-fossil/45">{partner?.seat}</p>
+          <Link to="/brand" className="mt-6 inline-block text-xs tracking-widest text-fossil/55 uppercase hover:text-ember">
+            Brand book
+          </Link>
           <SignOutLink />
         </div>
       </aside>
