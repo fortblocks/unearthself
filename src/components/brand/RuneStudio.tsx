@@ -16,7 +16,7 @@ import {
   contrast,
   downloadBlob,
   framedSvg,
-  rasterPng,
+  rasterFrame,
   type Depth,
   type Lettering,
 } from "@/brand/frame";
@@ -214,7 +214,7 @@ export function RuneStudio() {
     setNotice(null);
     try {
       const photo = await embedPhoto(ground.photo);
-      const fileSvg = framedSvg({
+      const fileOpts = {
         d: drawn.d,
         bounds: drawn.bounds,
         fill,
@@ -228,13 +228,13 @@ export function RuneStudio() {
         lineBelow,
         typeSize,
         depth,
-        pixels: true,
-      });
+        pixels: true as const,
+      };
       const name = `unearth-self-${format.file}${depth === "relief" ? "-relief" : ""}`;
       if (kind === "svg") {
-        downloadBlob(new Blob([fileSvg], { type: "image/svg+xml;charset=utf-8" }), `${name}.svg`);
+        downloadBlob(new Blob([framedSvg(fileOpts)], { type: "image/svg+xml;charset=utf-8" }), `${name}.svg`);
       } else {
-        downloadBlob(await rasterPng(fileSvg, pngSize), `${name}-${pngSize}.png`);
+        downloadBlob(await rasterFrame(fileOpts), `${name}-${pngSize}.png`);
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Could not export.");

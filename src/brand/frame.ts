@@ -299,55 +299,160 @@ export function clampFit(fit: number): number {
   return Math.min(1, Math.max(0.45, fit));
 }
 
-/** Raster at 4× then downsample so edges stay tight at profile sizes. */
-export function rasterPng(svg: string, size: number): Promise<Blob> {
-  const scale = Math.min(6, Math.max(4, Math.ceil(2048 / Math.max(size, 1))));
-  const hi = Math.min(8192, size * scale);
-  const sized = svg
-    .replace(/width="\d+"/, `width="${hi}"`)
-    .replace(/height="\d+"/, `height="${hi}"`)
-    .replace(/viewBox="0 0 1000 1000"/, `viewBox="0 0 1000 1000" width="${hi}" height="${hi}"`);
+/** Paint the frame to a PNG without going through SVG-as-image. */
+export async function rasterFrame(opts: FrameOpts): Promise<Blob> {
+  const size = Math.max(32, Math.round(opts.size));
+  const hi = Math.min(4096, Math.max(size * 2, size));
+  const canvas = document.createElement("canvas");
+  canvas.width = hi;
+  canvas.height = hi;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not open a canvas.");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  const vb = 1000;
+  ctx.setTransform(hi / vb, 0, 0, hi / vb, 0, 0);
+
+  if (opts.photo) {
+    try {
+      const img = await loadImage(opts.photo);
+      ctx.drawImage(img, 0, 0, vb, vb);
+      ctx.fillStyle = "rgba(22,23,24,0.28)";
+      ctx.fillRect(0, 0, vb, vb);
+    } catch {
+      ctx.fillStyle = "#161718";
+      ctx.fillRect(0, 0, vb, vb);
+    }
+  } else if (opts.background) {
+    ctx.fillStyle = paint(opts.background);
+    ctx.fillRect(0, 0, vb, vb);
+  }
+
+  const ink = inkFrame(opts.d, opts.bounds);
+  const letterPad = opts.lettering === "none" ? 1 : opts.lettering === "under" ? 0.78 : 0.62;
+  const inset = opts.crop === "circle" ? 0.72 : 0.86;
+  const safe = inset * vb * clampFit(opts.fit) * letterPad;
+  const reach =
+    opts.crop === "circle" ? ink.radius : Math.max(ink.halfW, ink.halfH, 1e-6);
+  const scale = safe / 2 / Math.max(reach, 1e-6);
+  const lift = opts.lettering === "under" ? -36 : 0;
+  const fill = paint(opts.fill);
+
+  ctx.save();
+  ctx.translate(500, 500 + lift);
+  ctx.scale(scale, scale);
+  ctx.translate(-ink.cx, -ink.cy);
+  if (opts.depth === "relief") {
+    for (let i = 1; i <= 14; i++) {
+      const t = i / 14;
+      ctx.save();
+      ctx.translate(18 * t, 26 * t);
+      ctx.fillStyle = mix(fill, "#161718", 0.35 + t * 0.4);
+      ctx.fill(new Path2D(opts.d), "nonzero");
+      ctx.restore();
+    }
+  }
+  ctx.fillStyle = fill;
+  ctx.fill(new Path2D(opts.d), "nonzero");
+  ctx.restore();
+
+  paintLettering(ctx, opts.lettering, opts.line, opts.lineBelow ?? "", fill, opts.typeSize ?? 1);
+
+  if (hi === size) {
+    const blob = await canvasToBlob(canvas);
+    if (!blob) throw new Error("Could not encode the PNG.");
+    return blob;
+  }
+  const out = document.createElement("canvas");
+  out.width = size;
+  out.height = size;
+  const octx = out.getContext("2d");
+  if (!octx) throw new Error("Could not open a canvas.");
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = "high";
+  octx.drawImage(canvas, 0, 0, size, size);
+  const blob = await canvasToBlob(out);
+  if (!blob) throw new Error("Could not encode the PNG.");
+  return blob;
+}
+
+function paintLettering(
+  ctx: CanvasRenderingContext2D,
+  kind: Lettering,
+  above: string,
+  below: string,
+  fill: string,
+  typeSize: number,
+) {
+  const top = (above || "").trim().toUpperCase();
+  const bot = (below || "").trim().toUpperCase();
+  const scale = Math.min(1.6, Math.max(0.6, typeSize));
+  ctx.fillStyle = fill;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (kind === "under") {
+    const main = top || "UNEARTH SELF";
+    ctx.font = `800 ${Math.round(88 * scale)}px Morganite, Oswald, Arial Narrow, sans-serif`;
+    ctx.fillText(main, 500, bot ? 868 : 910);
+    if (bot) {
+      ctx.font = `600 ${Math.round(28 * scale)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+      ctx.fillText(bot, 500, 938);
+    }
+    return;
+  }
+  if (kind === "ring") {
+    const size = Math.round(36 * scale);
+    ctx.font = `600 ${size}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+    drawArcText(ctx, top || "UNEARTH SELF", 500, 500, 332, Math.PI, 0);
+    if (bot) {
+      ctx.font = `600 ${Math.round(size * 0.72)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+      drawArcText(ctx, bot, 500, 500, 332, 0, Math.PI);
+    }
+  }
+}
+
+function drawArcText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  cx: number,
+  cy: number,
+  radius: number,
+  from: number,
+  to: number,
+) {
+  const letters = text.split("");
+  if (!letters.length) return;
+  const span = to - from;
+  const mid = (from + to) / 2;
+  ctx.save();
+  const widths = letters.map((ch) => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + Math.max(0, letters.length - 1) * 8;
+  let offset = -total / 2;
+  for (let i = 0; i < letters.length; i++) {
+    const w = widths[i]!;
+    const at = mid + ((offset + w / 2) / radius) * Math.sign(span || 1);
+    ctx.save();
+    ctx.translate(cx + Math.cos(at) * radius, cy + Math.sin(at) * radius);
+    ctx.rotate(at + Math.PI / 2);
+    ctx.fillText(letters[i]!, 0, 0);
+    ctx.restore();
+    offset += w + 8;
+  }
+  ctx.restore();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.decoding = "sync";
-    const url = URL.createObjectURL(new Blob([sized], { type: "image/svg+xml;charset=utf-8" }));
-    img.onload = () => {
-      const big = document.createElement("canvas");
-      big.width = hi;
-      big.height = hi;
-      const bctx = big.getContext("2d");
-      if (!bctx) {
-        URL.revokeObjectURL(url);
-        reject(new Error("Could not open a canvas."));
-        return;
-      }
-      bctx.imageSmoothingEnabled = true;
-      bctx.imageSmoothingQuality = "high";
-      bctx.drawImage(img, 0, 0, hi, hi);
-      const out = document.createElement("canvas");
-      out.width = size;
-      out.height = size;
-      const ctx = out.getContext("2d");
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        reject(new Error("Could not open a canvas."));
-        return;
-      }
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(big, 0, 0, size, size);
-      URL.revokeObjectURL(url);
-      out.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error("Could not encode the PNG."));
-      }, "image/png");
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not draw the mark."));
-    };
-    img.src = url;
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not load the ground photograph."));
+    img.src = src;
   });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
