@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./builder.css";
 
 @font-face {
   font-family: "Morganite";
@@ -12,30 +11,44 @@
 @font-face {
   font-family: "Morganite";
   src: url("/fonts/Morganite-Black.woff2") format("woff2");
-  font-weight: 800;
+  font-weight: 900;
   font-style: normal;
   font-display: swap;
 }
 
 @theme {
   --color-coal: #161718;
+  --color-fossil: #f8f0ed;
+  --color-ember: #f2684c;
   --color-shale: #423530;
   --color-sandstone: #c99a4a;
-  --color-ember: #f2684c;
-  --color-ember-soft: #f47d66;
-  --color-fossil: #f8f0ed;
   --color-paper: #fffdfa;
+  --color-ink: #161718;
   --color-muted: #6b5d57;
   --color-line: color-mix(in oklab, var(--color-coal) 12%, transparent);
   --color-line-strong: color-mix(in oklab, var(--color-coal) 22%, transparent);
   --color-ok: #3d6b4f;
   --color-warn: #9a6b2f;
   --color-bad: #a33b2c;
-  --font-display: "Morganite", "Oswald", system-ui, sans-serif;
-  --font-sans: "aktiv-grotesk", "Aktiv Grotesk", system-ui, sans-serif;
-  --ease-brand: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  --font-display: "Morganite", "Oswald", "Arial Narrow", sans-serif;
+  --font-sans: "aktiv-grotesk", "Aktiv Grotesk", "Source Sans 3", "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
   --radius-xs: 2px;
   --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-panel: 0 1px 0 color-mix(in oklab, var(--color-coal) 8%, transparent);
+}
+
+@utility tracking-lockup {
+  letter-spacing: 0.34em;
+}
+
+@utility tracking-place {
+  letter-spacing: 0.22em;
 }
 
 @layer base {
@@ -44,35 +57,34 @@
     cursor: pointer;
   }
 
-  html {
-    scroll-behavior: smooth;
-    scroll-padding-top: 5.5rem;
+  html,
+  body,
+  #app {
+    min-height: 100%;
   }
 
   body {
-    font-family: var(--font-sans);
-    color: var(--color-coal);
-    background: var(--color-fossil);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
     margin: 0;
+    background: var(--color-fossil);
+    color: var(--color-coal);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-wrap: pretty;
   }
 
-  .font-display {
-    letter-spacing: -0.02em;
-    font-weight: 800;
-  }
-
-  img {
-    max-width: 100%;
-    height: auto;
-    display: block;
+  h1, h2, h3 {
+    text-wrap: balance;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -100,669 +112,6 @@
   transition: background-color 9999s ease-out;
 }
 
-.rune-tape {
-  display: flex;
-  width: max-content;
-  will-change: transform;
-  animation: rune-tape 56s linear infinite;
-}
-
-.rune-tape-mask {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 5%,
-    #000 95%,
-    transparent
-  );
-  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
-}
-
-.rune-tape-mask:hover .rune-tape {
-  animation-play-state: paused;
-}
-
-@keyframes rune-tape {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rune-tape {
-    animation: none;
-  }
-}
-
-.rune-door {
-  cursor: pointer;
-}
-.rune-door img {
-  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease, filter 0.35s ease;
-}
-.rune-door:hover img,
-.rune-door:focus-visible img {
-  transform: scale(1.14);
-  opacity: 1;
-  filter: brightness(0) invert(1) drop-shadow(0 0 12px rgba(242, 104, 76, 0.9));
-}
-
-.found-page {
-  --found-parchment: #efe4cf;
-  --found-ink: #241c14;
-  --found-rust: #b24a28;
-  --found-dusk: #1c242e;
-  --found-moss: #3f5340;
-  min-height: 100dvh;
-  background: var(--found-parchment);
-  color: var(--found-ink);
-  font-family: "Source Serif 4", "Palatino Linotype", Palatino, serif;
-}
-
-.found-home {
-  position: fixed;
-  top: 1.1rem;
-  left: 1.25rem;
-  z-index: 20;
-  margin: 0;
-  font-family: "Fraunces", "Iowan Old Style", serif;
-  font-size: 0.82rem;
-  font-style: italic;
-  letter-spacing: 0.04em;
-}
-.found-home a {
-  display: inline-block;
-  padding: 0.28rem 0.7rem;
-  color: var(--found-ink);
-  background: color-mix(in oklab, var(--found-parchment) 88%, transparent);
-  text-decoration: none;
-  text-shadow: none;
-  backdrop-filter: blur(8px);
-}
-.found-home a:hover {
-  color: var(--found-rust);
-}
-
-.found-hero {
-  position: relative;
-  height: 100dvh;
-  min-height: 100dvh;
-  overflow: hidden;
-  background: var(--found-dusk);
-}
-.found-hero img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: center 40%;
-}
-.found-hero-veil {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(28, 36, 46, 0.92) 0%,
-    rgba(28, 36, 46, 0.25) 42%,
-    rgba(28, 36, 46, 0.12) 100%
-  );
-}
-.found-hero-copy {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 6rem 1.5rem 4.5rem;
-  max-width: 46rem;
-  color: #f8f0ed;
-}
-.found-kicker {
-  margin: 0 0 0.85rem;
-  font-family: "Fraunces", serif;
-  font-size: 0.78rem;
-  font-style: italic;
-  letter-spacing: 0.18em;
-  text-transform: lowercase;
-  color: #e2c7a0;
-}
-.found-hero h1 {
-  margin: 0 0 1rem;
-  font-family: "Fraunces", "Iowan Old Style", serif;
-  font-size: clamp(2.6rem, 7vw, 5.4rem);
-  font-weight: 650;
-  font-style: italic;
-  line-height: 1.02;
-  letter-spacing: -0.02em;
-  text-transform: none;
-}
-.found-lede {
-  margin: 0;
-  max-width: 36ch;
-  font-size: 1.2rem;
-  line-height: 1.45;
-  color: rgba(248, 240, 237, 0.88);
-}
-
-.found-story {
-  width: min(42rem, calc(100% - 2.5rem));
-  margin: 0 auto;
-  padding: 4.5rem 0 1.5rem;
-  font-size: 1.18rem;
-  line-height: 1.65;
-}
-.found-story p {
-  margin: 0 0 1.25rem;
-}
-.found-story h2 {
-  margin: 2.4rem 0 1rem;
-  font-family: "Fraunces", "Iowan Old Style", serif;
-  font-size: clamp(1.7rem, 3.4vw, 2.35rem);
-  font-weight: 650;
-  font-style: italic;
-  line-height: 1.2;
-  color: var(--found-rust);
-  letter-spacing: -0.015em;
-  text-transform: none;
-}
-.found-drop::first-letter {
-  float: left;
-  padding: 0.08em 0.12em 0 0;
-  font-family: "Fraunces", serif;
-  font-size: 4.4rem;
-  font-weight: 650;
-  font-style: italic;
-  line-height: 0.78;
-  color: var(--found-rust);
-}
-
-.found-plate {
-  position: relative;
-  width: 100%;
-  height: min(78vh, 52rem);
-  margin: 1.5rem 0 0;
-  overflow: hidden;
-  background: #3a2a20;
-}
-.found-plate-tall {
-  height: min(92vh, 58rem);
-}
-.found-plate img {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  transition: transform 1.4s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-.found-plate-tall img {
-  object-position: center 20%;
-}
-.found-plate:hover img {
-  transform: scale(1.03);
-}
-.found-plate figcaption {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  padding: 2.5rem 1.5rem 1.3rem;
-  font-family: "Fraunces", serif;
-  font-size: 1.02rem;
-  font-style: italic;
-  color: #f8f0ed;
-  background: linear-gradient(to top, rgba(28, 36, 46, 0.78), transparent);
-}
-
-.found-pace {
-  width: min(68rem, calc(100% - 2.5rem));
-  margin: 1rem auto 3rem;
-  display: grid;
-  gap: 1.75rem;
-}
-@media (min-width: 720px) {
-  .found-pace {
-    grid-template-columns: 1fr 1fr;
-    gap: 2.25rem 2.5rem;
-  }
-}
-.found-pace-item {
-  padding-top: 1.1rem;
-  border-top: 1px solid color-mix(in oklab, var(--found-ink) 18%, transparent);
-}
-.found-pace-item img {
-  width: 2.6rem;
-  height: 2.6rem;
-  margin-bottom: 0.7rem;
-}
-.found-pace-item h3 {
-  margin: 0 0 0.45rem;
-  font-family: "Fraunces", serif;
-  font-size: 1.55rem;
-  font-weight: 650;
-  font-style: italic;
-  color: var(--found-rust);
-  text-transform: none;
-}
-.found-pace-item p {
-  margin: 0;
-  max-width: 36ch;
-  font-size: 1.05rem;
-  line-height: 1.55;
-  color: color-mix(in oklab, var(--found-ink) 82%, transparent);
-}
-
-.found-end {
-  padding-bottom: 5.5rem;
-}
-.found-sign {
-  margin-top: 2rem;
-  font-family: "Fraunces", serif;
-  font-style: italic;
-  color: var(--found-moss);
-}
-.found-doors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem 1.75rem;
-  margin: 2.4rem 0 2rem;
-}
-.found-doors a {
-  font-family: "Fraunces", serif;
-  font-size: 1.15rem;
-  font-style: italic;
-  color: var(--found-rust);
-  text-decoration: none;
-  border-bottom: 1px solid color-mix(in oklab, var(--found-rust) 45%, transparent);
-}
-.found-doors a:hover {
-  border-bottom-color: var(--found-rust);
-}
-.found-aside {
-  font-size: 0.92rem;
-  font-style: italic;
-  color: color-mix(in oklab, var(--found-ink) 55%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .found-plate img,
-  .found-plate:hover img {
-    transform: none;
-    transition: none;
-  }
-}
-
-/* ——— Trail Quest field kit ——— */
-.quest-app {
-  min-height: 100dvh;
-  background: var(--color-coal);
-  color: var(--color-fossil);
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 4.5rem;
-}
-.quest-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 1rem 1.1rem 0.75rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 12%, transparent);
-}
-.quest-mark {
-  font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-size: 1.05rem;
-  color: var(--color-fossil);
-  text-decoration: none;
-}
-.quest-who {
-  margin: 0;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--color-fossil) 55%, transparent);
-}
-.quest-banner {
-  margin: 0;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.82rem;
-  background: color-mix(in oklab, var(--color-fossil) 10%, transparent);
-}
-.quest-banner-quiet {
-  color: color-mix(in oklab, var(--color-fossil) 60%, transparent);
-  background: transparent;
-  padding-top: 0.4rem;
-  padding-bottom: 0;
-}
-.quest-banner-call {
-  background: var(--color-ember);
-  color: var(--color-coal);
-  font-weight: 600;
-}
-.quest-main {
-  flex: 1;
-  padding: 1.25rem 1.1rem 2rem;
-  max-width: 34rem;
-  width: 100%;
-  margin: 0 auto;
-}
-.quest-loading {
-  color: color-mix(in oklab, var(--color-fossil) 55%, transparent);
-}
-.quest-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 0;
-  background: var(--color-coal);
-  border-top: 1px solid color-mix(in oklab, var(--color-fossil) 14%, transparent);
-  padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
-  z-index: 20;
-}
-.quest-nav a,
-.quest-nav button {
-  flex: 1;
-  min-height: 2.75rem;
-  background: none;
-  border: 0;
-  color: color-mix(in oklab, var(--color-fossil) 50%, transparent);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.quest-nav a.is-on,
-.quest-nav a[data-status="active"] {
-  color: var(--color-fossil);
-}
-.quest-kicker {
-  margin: 0 0 0.4rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-sandstone);
-}
-.quest-title {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(2.1rem, 8vw, 3.1rem);
-  line-height: 0.9;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  margin: 0 0 1rem;
-}
-.quest-copy {
-  display: grid;
-  gap: 0.85rem;
-  margin-bottom: 1.5rem;
-}
-.quest-field {
-  margin: 0;
-  font-size: 1.02rem;
-  line-height: 1.55;
-}
-.quest-simply {
-  margin: 0;
-  padding: 0.85rem 0.95rem;
-  border-left: 2px solid var(--color-sandstone);
-  color: color-mix(in oklab, var(--color-fossil) 82%, transparent);
-  font-size: 0.95rem;
-}
-.quest-simply span {
-  display: block;
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-sandstone);
-  margin-bottom: 0.25rem;
-}
-.quest-token {
-  font-size: 0.78rem;
-  color: color-mix(in oklab, var(--color-fossil) 50%, transparent);
-}
-.quest-token kbd {
-  font-family: ui-monospace, monospace;
-  letter-spacing: 0.12em;
-  color: var(--color-fossil);
-  border: 1px solid color-mix(in oklab, var(--color-fossil) 22%, transparent);
-  padding: 0.1rem 0.4rem;
-  margin-left: 0.35rem;
-}
-.quest-btn {
-  display: inline-flex;
-  min-height: 2.85rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0 1.1rem;
-  border: 0;
-  background: var(--color-ember);
-  color: var(--color-coal);
-  font-weight: 600;
-  font-size: 0.92rem;
-  width: 100%;
-}
-.quest-btn-ghost {
-  background: transparent;
-  color: var(--color-fossil);
-  border: 1px solid color-mix(in oklab, var(--color-fossil) 22%, transparent);
-}
-.quest-btn-row {
-  display: grid;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-}
-.quest-input,
-.quest-area {
-  width: 100%;
-  background: var(--color-fossil);
-  color: var(--color-coal);
-  border: 0;
-  min-height: 2.85rem;
-  padding: 0.7rem 0.85rem;
-  font: inherit;
-}
-.quest-area {
-  min-height: 6.5rem;
-  resize: vertical;
-}
-.quest-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--color-fossil) 70%, transparent);
-  margin-bottom: 0.85rem;
-}
-.quest-stack {
-  display: grid;
-  gap: 0.65rem;
-}
-.quest-beat {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
-  color: inherit;
-  text-decoration: none;
-}
-.quest-beat.is-lock {
-  opacity: 0.38;
-  pointer-events: none;
-}
-.quest-beat small {
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.68rem;
-  color: var(--color-sandstone);
-}
-.quest-choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
-  font-size: 0.95rem;
-}
-.quest-choice input {
-  margin-top: 0.3rem;
-  accent-color: var(--color-ember);
-}
-.quest-echo {
-  margin: 1rem 0;
-  padding: 1rem;
-  background: color-mix(in oklab, var(--color-fossil) 7%, transparent);
-  font-size: 0.95rem;
-  line-height: 1.55;
-}
-.quest-rune {
-  width: 7rem;
-  height: 7rem;
-  margin: 0.5rem 0 1rem;
-  filter: invert(1);
-}
-.quest-rune-empty {
-  width: 7rem;
-  height: 7rem;
-  border: 1px solid color-mix(in oklab, var(--color-fossil) 28%, transparent);
-  border-radius: 50%;
-  margin: 0.5rem 0 1rem;
-}
-.quest-muted {
-  color: color-mix(in oklab, var(--color-fossil) 58%, transparent);
-  font-size: 0.9rem;
-}
-.quest-warn {
-  color: var(--color-ember);
-  font-size: 0.88rem;
-}
-.quest-map {
-  aspect-ratio: 1.3;
-  border: 1px solid color-mix(in oklab, var(--color-fossil) 18%, transparent);
-  position: relative;
-  margin: 1rem 0 1.25rem;
-  overflow: hidden;
-}
-.quest-map-field {
-  position: absolute;
-  inset: 18% 14%;
-  border: 1px dashed color-mix(in oklab, var(--color-sandstone) 80%, transparent);
-}
-.quest-map caption,
-.quest-map p {
-  position: absolute;
-  bottom: 0.6rem;
-  left: 0.7rem;
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-sandstone);
-}
-.quest-land {
-  position: fixed;
-  inset: 0;
-  background: var(--color-coal);
-  z-index: 30;
-  display: grid;
-  place-content: center;
-  gap: 1rem;
-  padding: 2rem;
-  text-align: center;
-}
-.quest-land p:first-child {
-  font-family: var(--font-display);
-  font-size: 2.4rem;
-  line-height: 0.95;
-  text-transform: uppercase;
-  margin: 0;
-}
-.quest-privacy {
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: color-mix(in oklab, var(--color-fossil) 80%, transparent);
-}
-.quest-privacy ul {
-  padding-left: 1.1rem;
-}
-.quest-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-.quest-table th,
-.quest-table td {
-  text-align: left;
-  padding: 0.45rem 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-fossil) 10%, transparent);
-}
-.quest-paper {
-  color: var(--color-coal);
-  background: var(--color-fossil);
-  padding: 1.25rem;
-}
-.quest-paper h2 {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  font-size: 1.8rem;
-  margin: 1.5rem 0 0.4rem;
-}
-@media print {
-  .quest-top,
-  .quest-nav,
-  .quest-banner,
-  .quest-no-print {
-    display: none !important;
-  }
-  .quest-app {
-    background: white;
-    color: black;
-    padding: 0;
-  }
-  .quest-paper {
-    background: white;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .quest-app * {
-    transition: none !important;
-  }
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-  .found-plate img,
-  .found-plate:hover img {
-    transform: none;
-    transition: none;
-  }
-}
-
-@utility tracking-lockup {
-  letter-spacing: 0.34em;
-}
-
-@utility tracking-place {
-  letter-spacing: 0.22em;
-}
-
 .brand-checker {
   background-color: var(--color-fossil);
   background-image:
@@ -781,13 +130,13 @@
 }
 
 .brand-crop-circle {
-  inset: 4%;
+  inset: 0;
+  border-radius: 999px;
 }
 
 .brand-crop-square {
-  inset: 7%;
+  inset: 0;
 }
-
 
 .brand-relief svg {
   transform: perspective(1200px) rotateX(12deg) rotateY(-16deg);

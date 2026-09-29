@@ -189,8 +189,10 @@ export const OFFICIAL: { id: string; label: string; seed: ShapeSeed }[] = [
 ];
 
 export const LINES = ["UNEARTH SELF", "BADLANDS BOOTCAMP", "ADVENTURE TOURISM"] as const;
+export const PLACES = ["DRUMHELLER", "ALBERTA. CAN", "DRUMHELLER · ALBERTA"] as const;
 
 export const GROUNDS = [
+  { id: "room", label: "Room", hex: "#FFFDFA", photo: null },
   { id: "fossil", label: "Fossil", hex: "#F8F0ED", photo: null },
   { id: "coal", label: "Coal", hex: "#161718", photo: null },
   { id: "shale", label: "Shale", hex: "#423530", photo: null },

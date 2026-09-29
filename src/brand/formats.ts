@@ -7,6 +7,8 @@ export type PlatformFormat = {
   size: number;
   crop: Crop;
   file: string;
+  /** Mark size inside the crop. Circle profiles stay inside the platform disc. */
+  fit: number;
 };
 
 /**
@@ -22,6 +24,7 @@ export const FORMATS: PlatformFormat[] = [
     size: 320,
     crop: "circle",
     file: "instagram-profile-320",
+    fit: 0.72,
   },
   {
     id: "google",
@@ -30,6 +33,7 @@ export const FORMATS: PlatformFormat[] = [
     size: 720,
     crop: "circle",
     file: "google-business-720",
+    fit: 0.68,
   },
   {
     id: "linkedin",
@@ -38,6 +42,7 @@ export const FORMATS: PlatformFormat[] = [
     size: 400,
     crop: "circle",
     file: "linkedin-profile-400",
+    fit: 0.72,
   },
   {
     id: "linkedin-co",
@@ -46,6 +51,7 @@ export const FORMATS: PlatformFormat[] = [
     size: 300,
     crop: "square",
     file: "linkedin-company-300",
+    fit: 0.82,
   },
   {
     id: "x",
@@ -54,5 +60,15 @@ export const FORMATS: PlatformFormat[] = [
     size: 400,
     crop: "circle",
     file: "x-profile-400",
+    fit: 0.72,
+  },
+  {
+    id: "master",
+    platform: "Master",
+    use: "Square, 2048",
+    size: 2048,
+    crop: "square",
+    file: "master-2048",
+    fit: 0.86,
   },
 ];

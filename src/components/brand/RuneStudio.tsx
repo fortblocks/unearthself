@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   CANVAS_FILL_SPREAD,
+  analyzeSeed,
   buildExportScene,
   generate,
   generateRandomSeed,
@@ -8,7 +9,6 @@ import {
   type RoutePeg,
   type RuneGrid,
   type ShapeSeed,
-  type WrapSide,
 } from "@/brand/engine";
 import { FORMATS, type PlatformFormat } from "@/brand/formats";
 import {
@@ -21,7 +21,7 @@ import {
   type Lettering,
 } from "@/brand/frame";
 import { MARK_BOUNDS, MARK_D } from "@/brand/mark";
-import { GROUNDS, LINES, OFFICIAL } from "@/brand/official";
+import { GROUNDS, LINES, OFFICIAL, PLACES } from "@/brand/official";
 import { HEX, SWATCHES, isHex } from "@/brand/palette";
 import { cn } from "@/lib/cn";
 
@@ -58,14 +58,16 @@ export function RuneStudio() {
   const [source, setSource] = useState<"mark" | "rune">("mark");
   const [seed, setSeed] = useState<ShapeSeed>(houseSeed);
   const [fill, setFill] = useState(HEX.coal);
-  const [groundId, setGroundId] = useState<(typeof GROUNDS)[number]["id"]>("fossil");
-  const [fit, setFit] = useState(1);
-  const [formatId, setFormatId] = useState(FORMATS[0]!.id);
+  const [groundId, setGroundId] = useState<(typeof GROUNDS)[number]["id"]>("room");
+  const [fit, setFit] = useState(FORMATS[1]?.fit ?? 0.68);
+  const [formatId, setFormatId] = useState("google");
   const [code, setCode] = useState("badlands");
   const [json, setJson] = useState("");
   const [official, setOfficial] = useState("");
   const [lettering, setLettering] = useState<Lettering>("none");
   const [line, setLine] = useState<string>(LINES[0]);
+  const [lineBelow, setLineBelow] = useState<string>("");
+  const [typeSize, setTypeSize] = useState(1);
   const [depth, setDepth] = useState<Depth>("flat");
   const [pngSize, setPngSize] = useState(2048);
   const [busy, setBusy] = useState<"png" | "svg" | null>(null);
@@ -77,6 +79,17 @@ export function RuneStudio() {
   const grid = (seed.grid.rune ?? 4) as RuneGrid;
   const ground = GROUNDS.find((g) => g.id === groundId) ?? GROUNDS[0]!;
   const background = ground.hex;
+  const solids = GROUNDS.filter((item) => !item.photo);
+  const photos = GROUNDS.filter((item) => item.photo);
+
+  const analysis = useMemo(() => {
+    if (source !== "rune" || route.length < 2) return null;
+    try {
+      return analyzeSeed(seed);
+    } catch {
+      return null;
+    }
+  }, [source, seed, route.length]);
 
   const drawn = useMemo(() => {
     if (source === "mark") return { d: MARK_D, bounds: MARK_BOUNDS, error: null as string | null };
@@ -107,8 +120,11 @@ export function RuneStudio() {
         crop: format.crop,
         lettering,
         line,
+        lineBelow,
+        typeSize,
         depth,
         pixels: false,
+        optical: source === "mark",
       })
     : "";
 
@@ -147,15 +163,6 @@ export function RuneStudio() {
     } else {
       next[from] = { ...current, cell: [col, row] };
     }
-    setRoute(next);
-  }
-
-  function flipPeg(index: number) {
-    const order: WrapSide[] = ["auto", "a", "b"];
-    const peg = route[index];
-    if (!peg) return;
-    const i = order.indexOf(peg.side);
-    const next = route.map((item, n) => (n === index ? { ...item, side: order[(i + 1) % order.length]! } : item));
     setRoute(next);
   }
 
@@ -220,8 +227,11 @@ export function RuneStudio() {
         crop: format.crop,
         lettering,
         line,
+        lineBelow,
+        typeSize,
         depth,
         pixels: true,
+        optical: source === "mark",
       });
       const name = `unearth-self-${format.file}${depth === "relief" ? "-relief" : ""}`;
       if (kind === "svg") {
@@ -245,6 +255,13 @@ export function RuneStudio() {
             background == null && !ground.photo && "brand-checker",
             depth === "relief" && "brand-relief",
           )}
+          style={
+            ground.photo
+              ? undefined
+              : background
+                ? { background }
+                : undefined
+          }
         >
           {svg ? (
             <div className="h-full w-full" dangerouslySetInnerHTML={{ __html: svg }} />
@@ -318,6 +335,7 @@ export function RuneStudio() {
                 const index = route.findIndex((peg) => peg.cell[0] === col && peg.cell[1] === row);
                 const on = index >= 0;
                 const side = on ? route[index]!.side : "auto";
+                const nodes = on ? analysis?.pegs[index]?.nodes : undefined;
                 return (
                   <button
                     key={`${col}-${row}`}
@@ -333,31 +351,65 @@ export function RuneStudio() {
                       setDrag(null);
                     }}
                     onClick={() => onPeg(col, row)}
-                    onDoubleClick={(e) => {
-                      e.preventDefault();
-                      if (on) flipPeg(index);
-                    }}
                     aria-label={on ? `Peg ${index + 1}, wrap ${side}` : `Empty ${col + 1},${row + 1}`}
                     className={cn(
-                      "relative grid h-11 place-items-center rounded-full border text-xs font-bold",
+                      "relative grid h-14 place-items-center rounded-full border text-xs font-bold",
                       on ? "border-coal bg-coal text-fossil" : "border-line bg-paper text-muted",
                       drag === index && "opacity-50",
                     )}
                   >
                     {on ? index + 1 : ""}
-                    {on && side !== "auto" ? (
-                      <span className="absolute right-0.5 bottom-0.5 text-[0.55rem] tracking-widest uppercase">{side}</span>
-                    ) : null}
+                    {on && nodes
+                      ? nodes.map((node) => (
+                          <span
+                            key={node.side}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Wrap ${node.side}${node.valid ? "" : " unavailable"}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!node.valid) return;
+                              const next = route.map((item, n) =>
+                                n === index ? { ...item, side: node.side } : item,
+                              );
+                              setRoute(next);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!node.valid) return;
+                                const next = route.map((item, n) =>
+                                  n === index ? { ...item, side: node.side } : item,
+                                );
+                                setRoute(next);
+                              }
+                            }}
+                            className={cn(
+                              "absolute size-2.5 rounded-full border",
+                              node.side === "a" ? "top-1 left-1" : "top-1 right-1",
+                              side === node.side ? "border-ember bg-ember" : "border-fossil/70 bg-fossil/30",
+                              !node.valid && "opacity-30",
+                            )}
+                          />
+                        ))
+                      : null}
                   </button>
                 );
               })}
             </div>
             <p className="text-sm text-muted">
-              Click in visit order. Drag a number onto another cell to move it, or onto another number
-              to change the order. Double-click a peg to flip the wrap (auto / a / b).
+              Click pegs in visit order. Drag a number to move it. The two dots flip the wrap
+              (a / b), same as the original tool. {route.length} pegs
+              {analysis?.enclosedHole ? " · hole in the silhouette" : ""}.
             </p>
             <label className="block text-sm">
-              <span className="text-xs tracking-widest text-muted uppercase">Lobe radius</span>
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="text-xs tracking-widest text-muted uppercase">Lobe radius</span>
+                <span className="font-mono text-xs">
+                  rune — radiusRatio = {(seed.params.rune?.radiusRatio ?? 0.37).toFixed(2)}
+                </span>
+              </span>
               <input
                 type="range"
                 min={0.34}
@@ -442,21 +494,31 @@ export function RuneStudio() {
 
         <fieldset>
           <legend className="text-xs tracking-widest text-sandstone uppercase">Ground</legend>
-          <div className="mt-2 grid grid-cols-4 gap-2">
-            {GROUNDS.map((item) => (
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {solids.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setGroundId(item.id)}
-                className={cn(
-                  "h-11 border text-xs",
-                  groundId === item.id ? "border-coal" : "border-line",
-                )}
-                style={
-                  item.photo
-                    ? { backgroundImage: `url(${item.photo})`, backgroundSize: "cover", color: "#F8F0ED" }
-                    : { background: item.hex ?? "transparent", color: item.hex === "#161718" || item.hex === "#423530" ? "#F8F0ED" : "#161718" }
-                }
+                className={cn("h-11 border text-xs", groundId === item.id ? "border-coal" : "border-line")}
+                style={{
+                  background: item.hex ?? "transparent",
+                  color: item.hex === "#161718" || item.hex === "#423530" ? "#F8F0ED" : "#161718",
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs tracking-widest text-muted uppercase">Photograph</p>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {photos.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setGroundId(item.id)}
+                className={cn("h-11 border bg-cover bg-center text-xs text-fossil", groundId === item.id ? "border-coal" : "border-line")}
+                style={{ backgroundImage: `url(${item.photo})` }}
               >
                 {item.label}
               </button>
@@ -474,18 +536,61 @@ export function RuneStudio() {
             ))}
           </div>
           {lettering !== "none" && (
-            <div className="mt-2 flex flex-col gap-2">
-              {LINES.map((item) => (
-                <Toggle key={item} on={line === item} onClick={() => setLine(item)}>
-                  {item}
-                </Toggle>
-              ))}
-              <input
-                value={line}
-                onChange={(e) => setLine(e.target.value.toUpperCase())}
-                className="h-11 border border-line bg-paper px-3 text-sm"
-                aria-label="Wordmark line"
-              />
+            <div className="mt-2 flex flex-col gap-3">
+              <label className="block text-sm">
+                <span className="text-xs tracking-widest text-muted uppercase">
+                  {lettering === "ring" ? "Above" : "Wordmark"}
+                </span>
+                <div className="mt-2 flex flex-col gap-2">
+                  {LINES.map((item) => (
+                    <Toggle key={item} on={line === item} onClick={() => setLine(item)}>
+                      {item}
+                    </Toggle>
+                  ))}
+                  <input
+                    value={line}
+                    onChange={(e) => setLine(e.target.value.toUpperCase())}
+                    className="h-11 border border-line bg-paper px-3 text-sm"
+                    aria-label="Line above"
+                  />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs tracking-widest text-muted uppercase">
+                  {lettering === "ring" ? "Below" : "Place line"}
+                </span>
+                <div className="mt-2 flex flex-col gap-2">
+                  <Toggle on={lineBelow === ""} onClick={() => setLineBelow("")}>
+                    None
+                  </Toggle>
+                  {PLACES.map((item) => (
+                    <Toggle key={item} on={lineBelow === item} onClick={() => setLineBelow(item)}>
+                      {item}
+                    </Toggle>
+                  ))}
+                  <input
+                    value={lineBelow}
+                    onChange={(e) => setLineBelow(e.target.value.toUpperCase())}
+                    className="h-11 border border-line bg-paper px-3 text-sm"
+                    aria-label="Line below"
+                  />
+                </div>
+              </label>
+              <label className="block text-sm">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs tracking-widest text-muted uppercase">Type size</span>
+                  <span className="font-mono text-xs">{Math.round(typeSize * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={0.7}
+                  max={1.4}
+                  step={0.05}
+                  value={typeSize}
+                  onChange={(e) => setTypeSize(Number(e.target.value))}
+                  className="mt-2 w-full accent-ember"
+                />
+              </label>
             </div>
           )}
         </fieldset>
@@ -497,16 +602,21 @@ export function RuneStudio() {
               Flat
             </Toggle>
             <Toggle on={depth === "relief"} onClick={() => setDepth("relief")}>
-              3D relief
+              Stamp
             </Toggle>
           </div>
           <p className="mt-2 text-sm text-muted">
-            Relief is a stacked extrusion for lockups and posts.{" "}
-            <a className="underline underline-offset-2" href="https://badlands.artsu.com/" target="_blank" rel="noreferrer">
-              Open the original 3D export
-            </a>{" "}
-            when you need STL or GLB.
+            Stamp is a flat extrusion for a post. The real 3D tool — orbit, STL, GLB — lives on
+            the original builder. Copy the seed first if you want that rune in the viewer.
           </p>
+          <a
+            className="mt-2 inline-flex h-11 items-center justify-center border border-coal px-3 text-sm"
+            href="https://badlands.artsu.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open 3D export
+          </a>
         </fieldset>
 
         <label className="block text-sm">
@@ -528,9 +638,18 @@ export function RuneStudio() {
         <fieldset>
           <legend className="text-xs tracking-widest text-sandstone uppercase">Export</legend>
           <div className="mt-2 flex flex-col gap-1">
-            {FORMATS.map((item) => (
-              <FormatButton key={item.id} item={item} on={item.id === format.id} onClick={() => setFormatId(item.id)} />
-            ))}
+          {FORMATS.map((item) => (
+            <FormatButton
+              key={item.id}
+              item={item}
+              on={item.id === format.id}
+              onClick={() => {
+                setFormatId(item.id);
+                setFit(item.fit);
+                setPngSize(item.size < 1024 ? 2048 : item.size);
+              }}
+            />
+          ))}
           </div>
           <div className="mt-3 flex gap-2">
             {PNG_SIZES.map((size) => (
