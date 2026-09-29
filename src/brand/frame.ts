@@ -1,6 +1,5 @@
 import type { Bounds } from "@/brand/engine";
 import type { Crop } from "@/brand/formats";
-import { MARK_ORIGIN } from "@/brand/mark";
 import { isHex } from "@/brand/palette";
 
 export type Lettering = "none" | "under" | "ring";
@@ -23,6 +22,158 @@ function xml(value: string): string {
     .replaceAll("\u0022", "\u0026quot;");
 }
 
+type InkFrame = { cx: number; cy: number; radius: number; halfW: number; halfH: number };
+
+/** Mass centre of a filled path, then the reach from that centre to the ink. */
+function inkFrame(d: string, bounds: Bounds): InkFrame {
+  const box = {
+    cx: bounds.minX + bounds.width / 2,
+    cy: bounds.minY + bounds.height / 2,
+    radius: Math.hypot(bounds.width, bounds.height) / 2,
+    halfW: bounds.width / 2,
+    halfH: bounds.height / 2,
+  };
+  const rings = pathRings(d);
+  if (!rings.length) return box;
+
+  let area = 0;
+  let mx = 0;
+  let my = 0;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const ring of rings) {
+    if (ring.length < 3) continue;
+    let a = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const [x0, y0] = ring[i]!;
+      const [x1, y1] = ring[(i + 1) % ring.length]!;
+      const cross = x0 * y1 - x1 * y0;
+      a += cross;
+      cx += (x0 + x1) * cross;
+      cy += (y0 + y1) * cross;
+      if (x0 < minX) minX = x0;
+      if (y0 < minY) minY = y0;
+      if (x0 > maxX) maxX = x0;
+      if (y0 > maxY) maxY = y0;
+    }
+    area += a;
+    mx += cx;
+    my += cy;
+  }
+  const cx = Math.abs(area) > 1e-12 ? mx / (3 * area) : box.cx;
+  const cy = Math.abs(area) > 1e-12 ? my / (3 * area) : box.cy;
+  let radius = 0;
+  let halfW = 0;
+  let halfH = 0;
+  for (const ring of rings) {
+    for (const [x, y] of ring) {
+      radius = Math.max(radius, Math.hypot(x - cx, y - cy));
+      halfW = Math.max(halfW, Math.abs(x - cx));
+      halfH = Math.max(halfH, Math.abs(y - cy));
+    }
+  }
+  if (!Number.isFinite(cx) || !Number.isFinite(cy) || radius < 1e-6) return box;
+  return { cx, cy, radius, halfW, halfH };
+}
+
+function pathRings(d: string): [number, number][][] {
+  const rings: [number, number][][] = [];
+  let ring: [number, number][] = [];
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|-?\d*\.?\d+(?:e[-+]?\d+)?/g) ?? [];
+  let i = 0;
+  let cmd = "L";
+  let x = 0;
+  let y = 0;
+  let sx = 0;
+  let sy = 0;
+  const take = () => Number(tokens[i++]);
+  const push = (nx: number, ny: number) => {
+    x = nx;
+    y = ny;
+    ring.push([x, y]);
+  };
+  while (i < tokens.length) {
+    const tok = tokens[i]!;
+    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
+      cmd = tok;
+      i += 1;
+      if (cmd === "Z" || cmd === "z") {
+        if (ring.length) {
+          ring.push([sx, sy]);
+          rings.push(ring);
+          ring = [];
+        }
+        x = sx;
+        y = sy;
+        continue;
+      }
+    }
+    if (cmd === "M" || cmd === "m") {
+      if (ring.length) rings.push(ring);
+      ring = [];
+      const rel = cmd === "m";
+      const nx = take() + (rel ? x : 0);
+      const ny = take() + (rel ? y : 0);
+      push(nx, ny);
+      sx = x;
+      sy = y;
+      cmd = cmd === "M" ? "L" : "l";
+      continue;
+    }
+    if (cmd === "L") push(take(), take());
+    else if (cmd === "l") push(x + take(), y + take());
+    else if (cmd === "H") push(take(), y);
+    else if (cmd === "h") push(x + take(), y);
+    else if (cmd === "V") push(x, take());
+    else if (cmd === "v") push(x, y + take());
+    else if (cmd === "C") {
+      take();
+      take();
+      take();
+      take();
+      push(take(), take());
+    } else if (cmd === "c") {
+      take();
+      take();
+      take();
+      take();
+      push(x + take(), y + take());
+    } else if (cmd === "S" || cmd === "Q") {
+      take();
+      take();
+      push(take(), take());
+    } else if (cmd === "s" || cmd === "q") {
+      take();
+      take();
+      push(x + take(), y + take());
+    } else if (cmd === "T") push(take(), take());
+    else if (cmd === "t") push(x + take(), y + take());
+    else if (cmd === "A") {
+      take();
+      take();
+      take();
+      take();
+      take();
+      push(take(), take());
+    } else if (cmd === "a") {
+      take();
+      take();
+      take();
+      take();
+      take();
+      push(x + take(), y + take());
+    } else {
+      i += 1;
+    }
+  }
+  if (ring.length) rings.push(ring);
+  return rings;
+}
+
 export type FrameOpts = {
   d: string;
   bounds: Bounds;
@@ -39,8 +190,6 @@ export type FrameOpts = {
   depth: Depth;
   /** When false, omit pixel width so the on-page preview stays a live vector. */
   pixels?: boolean;
-  /** Use the house-mark optical origin instead of the bbox centre. */
-  optical?: boolean;
 };
 
 /**
@@ -50,15 +199,17 @@ export type FrameOpts = {
 export function framedSvg(opts: FrameOpts): string {
   const vb = 1000;
   const fill = paint(opts.fill);
-  const longer = Math.max(opts.bounds.width, opts.bounds.height, 1e-6);
+  const ink = inkFrame(opts.d, opts.bounds);
   const letterPad = opts.lettering === "none" ? 1 : opts.lettering === "under" ? 0.78 : 0.62;
   const inset = opts.crop === "circle" ? 0.72 : 0.86;
   const safe = inset * vb * clampFit(opts.fit) * letterPad;
-  const scale = safe / Math.max(longer, 1e-6);
-  const cx = opts.optical ? MARK_ORIGIN.x : opts.bounds.minX + opts.bounds.width / 2;
-  const cy = opts.optical ? MARK_ORIGIN.y : opts.bounds.minY + opts.bounds.height / 2;
+  const reach =
+    opts.crop === "circle"
+      ? ink.radius
+      : Math.max(ink.halfW, ink.halfH, 1e-6);
+  const scale = safe / 2 / Math.max(reach, 1e-6);
   const lift = opts.lettering === "under" ? -36 : 0;
-  const transform = `translate(500 ${500 + lift}) scale(${fmt(scale)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
+  const transform = `translate(500 ${500 + lift}) scale(${fmt(scale)}) translate(${fmt(-ink.cx)} ${fmt(-ink.cy)})`;
 
   const bg =
     opts.photo != null

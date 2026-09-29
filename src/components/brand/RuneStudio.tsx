@@ -124,7 +124,6 @@ export function RuneStudio() {
         typeSize,
         depth,
         pixels: false,
-        optical: source === "mark",
       })
     : "";
 
@@ -231,7 +230,6 @@ export function RuneStudio() {
         typeSize,
         depth,
         pixels: true,
-        optical: source === "mark",
       });
       const name = `unearth-self-${format.file}${depth === "relief" ? "-relief" : ""}`;
       if (kind === "svg") {
