@@ -187,6 +187,7 @@ export type FrameOpts = {
   line: string;
   lineBelow?: string;
   typeSize?: number;
+  typeSizeBelow?: number;
   depth: Depth;
   /** When false, omit pixel width so the on-page preview stays a live vector. */
   pixels?: boolean;
@@ -231,7 +232,14 @@ export function framedSvg(opts: FrameOpts): string {
       : "";
 
   const mark = `<g transform="${transform}">${relief}<path d="${opts.d}" fill="${fill}" fill-rule="nonzero" shape-rendering="geometricPrecision"/></g>`;
-  const type = letteringSvg(opts.lettering, opts.line, opts.lineBelow ?? "", fill, opts.typeSize ?? 1);
+  const type = letteringSvg(
+    opts.lettering,
+    opts.line,
+    opts.lineBelow ?? "",
+    fill,
+    opts.typeSize ?? 1,
+    opts.typeSizeBelow ?? opts.typeSize ?? 1,
+  );
 
   const sizeAttr = opts.pixels === false ? "" : ` width="${opts.size}" height="${opts.size}"`;
   return (
@@ -243,13 +251,21 @@ export function framedSvg(opts: FrameOpts): string {
   );
 }
 
-function letteringSvg(kind: Lettering, above: string, below: string, fill: string, typeSize: number): string {
+function letteringSvg(
+  kind: Lettering,
+  above: string,
+  below: string,
+  fill: string,
+  typeSize: number,
+  typeSizeBelow: number,
+): string {
   const top = xml((above || "").trim().toUpperCase());
   const bot = xml((below || "").trim().toUpperCase());
-  const scale = Math.min(1.6, Math.max(0.6, typeSize));
+  const scaleTop = Math.min(1.8, Math.max(0.5, typeSize));
+  const scaleBot = Math.min(1.8, Math.max(0.5, typeSizeBelow));
   if (kind === "under") {
-    const size = Math.round(88 * scale);
-    const small = Math.round(28 * scale);
+    const size = Math.round(88 * scaleTop);
+    const small = Math.round(28 * scaleBot);
     const mid = bot ? 868 : 910;
     const place = bot
       ? `<text x="500" y="938" text-anchor="middle" fill="${fill}" ` +
@@ -264,21 +280,22 @@ function letteringSvg(kind: Lettering, above: string, below: string, fill: strin
     );
   }
   if (kind === "ring") {
-    const size = Math.round(36 * scale);
+    const topSize = Math.round(36 * scaleTop);
+    const botSize = Math.round(36 * scaleBot);
     const topLine = top || "UNEARTH SELF";
     const botLine = bot;
     const topPath =
       `<defs>` +
       `<path id="brand-arc-top" d="M168,500 A332,332 0 0,1 832,500"/>` +
-      `<path id="brand-arc-bot" d="M832,500 A332,332 0 0,1 168,500"/>` +
+      `<path id="brand-arc-bot" d="M168,500 A332,332 0 0,0 832,500"/>` +
       `</defs>`;
     const topText =
       `<text fill="${fill}" font-family="aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif" ` +
-      `font-size="${size}" font-weight="600" letter-spacing="10">` +
+      `font-size="${topSize}" font-weight="600" letter-spacing="10">` +
       `<textPath href="#brand-arc-top" startOffset="50%" text-anchor="middle">${topLine}</textPath></text>`;
     const botText = botLine
       ? `<text fill="${fill}" font-family="aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif" ` +
-        `font-size="${Math.round(size * 0.72)}" font-weight="600" letter-spacing="8">` +
+        `font-size="${botSize}" font-weight="600" letter-spacing="8">` +
         `<textPath href="#brand-arc-bot" startOffset="50%" text-anchor="middle">${botLine}</textPath></text>`
       : "";
     return topPath + topText + botText;
@@ -357,7 +374,15 @@ export async function rasterFrame(opts: FrameOpts): Promise<Blob> {
   ctx.fill(new Path2D(opts.d), "nonzero");
   ctx.restore();
 
-  paintLettering(ctx, opts.lettering, opts.line, opts.lineBelow ?? "", fill, opts.typeSize ?? 1);
+  paintLettering(
+    ctx,
+    opts.lettering,
+    opts.line,
+    opts.lineBelow ?? "",
+    fill,
+    opts.typeSize ?? 1,
+    opts.typeSizeBelow ?? opts.typeSize ?? 1,
+  );
 
   if (hi === size) {
     const blob = await canvasToBlob(canvas);
@@ -384,30 +409,31 @@ function paintLettering(
   below: string,
   fill: string,
   typeSize: number,
+  typeSizeBelow: number,
 ) {
   const top = (above || "").trim().toUpperCase();
   const bot = (below || "").trim().toUpperCase();
-  const scale = Math.min(1.6, Math.max(0.6, typeSize));
+  const scaleTop = Math.min(1.8, Math.max(0.5, typeSize));
+  const scaleBot = Math.min(1.8, Math.max(0.5, typeSizeBelow));
   ctx.fillStyle = fill;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   if (kind === "under") {
     const main = top || "UNEARTH SELF";
-    ctx.font = `800 ${Math.round(88 * scale)}px Morganite, Oswald, Arial Narrow, sans-serif`;
+    ctx.font = `800 ${Math.round(88 * scaleTop)}px Morganite, Oswald, Arial Narrow, sans-serif`;
     ctx.fillText(main, 500, bot ? 868 : 910);
     if (bot) {
-      ctx.font = `600 ${Math.round(28 * scale)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+      ctx.font = `600 ${Math.round(28 * scaleBot)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
       ctx.fillText(bot, 500, 938);
     }
     return;
   }
   if (kind === "ring") {
-    const size = Math.round(36 * scale);
-    ctx.font = `600 ${size}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
-    drawArcText(ctx, top || "UNEARTH SELF", 500, 500, 332, Math.PI, 0);
+    ctx.font = `600 ${Math.round(36 * scaleTop)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+    drawArcText(ctx, top || "UNEARTH SELF", 500, 500, 332, "top");
     if (bot) {
-      ctx.font = `600 ${Math.round(size * 0.72)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
-      drawArcText(ctx, bot, 500, 500, 332, 0, Math.PI);
+      ctx.font = `600 ${Math.round(36 * scaleBot)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
+      drawArcText(ctx, bot, 500, 500, 332, "bottom");
     }
   }
 }
@@ -418,28 +444,28 @@ function drawArcText(
   cx: number,
   cy: number,
   radius: number,
-  from: number,
-  to: number,
+  side: "top" | "bottom",
 ) {
   const letters = text.split("");
   if (!letters.length) return;
-  const span = to - from;
-  const mid = (from + to) / 2;
-  ctx.save();
+  const gap = 8;
   const widths = letters.map((ch) => ctx.measureText(ch).width);
-  const total = widths.reduce((a, b) => a + b, 0) + Math.max(0, letters.length - 1) * 8;
-  let offset = -total / 2;
+  const total = widths.reduce((a, b) => a + b, 0) + Math.max(0, letters.length - 1) * gap;
+  const arcSpan = total / radius;
+  const mid = side === "top" ? -Math.PI / 2 : Math.PI / 2;
+  let traveled = 0;
   for (let i = 0; i < letters.length; i++) {
     const w = widths[i]!;
-    const at = mid + ((offset + w / 2) / radius) * Math.sign(span || 1);
+    const t = total > 0 ? (traveled + w / 2) / total : 0.5;
+    const angle =
+      side === "top" ? mid - arcSpan / 2 + t * arcSpan : mid + arcSpan / 2 - t * arcSpan;
     ctx.save();
-    ctx.translate(cx + Math.cos(at) * radius, cy + Math.sin(at) * radius);
-    ctx.rotate(at + Math.PI / 2);
+    ctx.translate(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+    ctx.rotate(side === "top" ? angle + Math.PI / 2 : angle - Math.PI / 2);
     ctx.fillText(letters[i]!, 0, 0);
     ctx.restore();
-    offset += w + 8;
+    traveled += w + gap;
   }
-  ctx.restore();
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

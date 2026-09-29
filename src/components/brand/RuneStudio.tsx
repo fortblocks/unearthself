@@ -68,6 +68,7 @@ export function RuneStudio() {
   const [line, setLine] = useState<string>(LINES[0]);
   const [lineBelow, setLineBelow] = useState<string>("");
   const [typeSize, setTypeSize] = useState(1);
+  const [typeSizeBelow, setTypeSizeBelow] = useState(1);
   const [depth, setDepth] = useState<Depth>("flat");
   const [pngSize, setPngSize] = useState(2048);
   const [busy, setBusy] = useState<"png" | "svg" | null>(null);
@@ -121,6 +122,7 @@ export function RuneStudio() {
         line,
         lineBelow,
         typeSize,
+        typeSizeBelow,
         depth,
         pixels: false,
       })
@@ -227,6 +229,7 @@ export function RuneStudio() {
         line,
         lineBelow,
         typeSize,
+        typeSizeBelow,
         depth,
         pixels: true as const,
       };
@@ -603,16 +606,35 @@ export function RuneStudio() {
               </label>
               <label className="block text-sm">
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="text-xs tracking-widest text-muted uppercase">Type size</span>
+                  <span className="text-xs tracking-widest text-muted uppercase">
+                    {lettering === "ring" ? "Above size" : "Wordmark size"}
+                  </span>
                   <span className="font-mono text-xs">{Math.round(typeSize * 100)}%</span>
                 </span>
                 <input
                   type="range"
-                  min={0.7}
-                  max={1.4}
+                  min={0.5}
+                  max={1.8}
                   step={0.05}
                   value={typeSize}
                   onChange={(e) => setTypeSize(Number(e.target.value))}
+                  className="mt-2 w-full accent-ember"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs tracking-widest text-muted uppercase">
+                    {lettering === "ring" ? "Below size" : "Place size"}
+                  </span>
+                  <span className="font-mono text-xs">{Math.round(typeSizeBelow * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={1.8}
+                  step={0.05}
+                  value={typeSizeBelow}
+                  onChange={(e) => setTypeSizeBelow(Number(e.target.value))}
                   className="mt-2 w-full accent-ember"
                 />
               </label>
