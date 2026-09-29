@@ -192,10 +192,12 @@ export const LINES = ["UNEARTH SELF", "BADLANDS BOOTCAMP", "ADVENTURE TOURISM"] 
 export const PLACES = ["DRUMHELLER", "ALBERTA. CAN", "DRUMHELLER · ALBERTA"] as const;
 
 export const GROUNDS = [
-  { id: "room", label: "Room", hex: "#FFFDFA", photo: null },
-  { id: "fossil", label: "Fossil", hex: "#F8F0ED", photo: null },
   { id: "coal", label: "Coal", hex: "#161718", photo: null },
   { id: "shale", label: "Shale", hex: "#423530", photo: null },
+  { id: "sandstone", label: "Sandstone", hex: "#C99A4A", photo: null },
+  { id: "ember", label: "Ember", hex: "#F2684C", photo: null },
+  { id: "fossil", label: "Fossil", hex: "#F8F0ED", photo: null },
+  { id: "room", label: "Room", hex: "#FFFDFA", photo: null },
   { id: "clear", label: "Clear", hex: null, photo: null },
   { id: "hoodoos", label: "Hoodoos", hex: "#161718", photo: "/images/exp-hoodoos.jpg" },
   { id: "dusk", label: "Dusk", hex: "#161718", photo: "/images/hero-badlands-dusk.jpg" },

@@ -79,7 +79,6 @@ export function RuneStudio() {
   const grid = (seed.grid.rune ?? 4) as RuneGrid;
   const ground = GROUNDS.find((g) => g.id === groundId) ?? GROUNDS[0]!;
   const background = ground.hex;
-  const solids = GROUNDS.filter((item) => !item.photo);
   const photos = GROUNDS.filter((item) => item.photo);
 
   const analysis = useMemo(() => {
@@ -492,34 +491,62 @@ export function RuneStudio() {
 
         <fieldset>
           <legend className="text-xs tracking-widest text-sandstone uppercase">Ground</legend>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {solids.map((item) => (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {SWATCHES.map((swatch) => (
               <button
-                key={item.id}
+                key={swatch.id}
                 type="button"
-                onClick={() => setGroundId(item.id)}
-                className={cn("h-11 border text-xs", groundId === item.id ? "border-coal" : "border-line")}
-                style={{
-                  background: item.hex ?? "transparent",
-                  color: item.hex === "#161718" || item.hex === "#423530" ? "#F8F0ED" : "#161718",
-                }}
-              >
-                {item.label}
-              </button>
+                aria-label={swatch.name}
+                onClick={() => setGroundId(swatch.id)}
+                className={cn("size-9 border", groundId === swatch.id ? "border-coal" : "border-line")}
+                style={{ background: swatch.hex }}
+              />
             ))}
+            <button
+              type="button"
+              aria-label="Room"
+              onClick={() => setGroundId("room")}
+              className={cn("size-9 border", groundId === "room" ? "border-coal" : "border-line")}
+              style={{ background: "#FFFDFA" }}
+            />
+            <button
+              type="button"
+              aria-label="Clear"
+              onClick={() => setGroundId("clear")}
+              className={cn(
+                "size-9 border brand-checker",
+                groundId === "clear" ? "border-coal" : "border-line",
+              )}
+            />
+            <input
+              type="color"
+              value={isHex(background ?? "") ? background! : "#FFFDFA"}
+              onChange={(e) => {
+                const hex = e.target.value;
+                const match = GROUNDS.find((item) => item.hex === hex.toUpperCase() || item.hex === hex);
+                if (match && !match.photo) setGroundId(match.id);
+                else {
+                  setGroundId("room");
+                }
+              }}
+              className="size-9 cursor-pointer border border-line bg-paper p-0"
+              aria-label="Ground picker"
+            />
           </div>
           <p className="mt-3 text-xs tracking-widest text-muted uppercase">Photograph</p>
-          <div className="mt-2 grid grid-cols-4 gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {photos.map((item) => (
               <button
                 key={item.id}
                 type="button"
+                aria-label={item.label}
                 onClick={() => setGroundId(item.id)}
-                className={cn("h-11 border bg-cover bg-center text-xs text-fossil", groundId === item.id ? "border-coal" : "border-line")}
+                className={cn(
+                  "size-9 border bg-cover bg-center",
+                  groundId === item.id ? "border-coal" : "border-line",
+                )}
                 style={{ backgroundImage: `url(${item.photo})` }}
-              >
-                {item.label}
-              </button>
+              />
             ))}
           </div>
         </fieldset>
