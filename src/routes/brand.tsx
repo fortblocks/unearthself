@@ -185,8 +185,9 @@ function BrandPage() {
             the coal mark on a photograph unless there is a plate.
           </p>
           <p className="mt-3 max-w-2xl text-sm text-pretty text-muted">
-            .01 to .03 are the public set — Unearth Self, Morganite. .04 onward are the place
-            set from the deck, including the ember accents. Pick one lockup per surface.
+            These eight are the official place set, cut from the lockup file. Coal mark, Badlands
+            Bootcamp wordmark, Drumheller when the place needs naming. Download the SVG to edit,
+            the PNG to drop onto a surface. Do not redraw them.
           </p>
           <div className="mt-8">
             <Lockups />
