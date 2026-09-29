@@ -283,27 +283,65 @@ function letteringSvg(
     const topSize = Math.round(36 * scaleTop);
     const botSize = Math.round(36 * scaleBot);
     const topLine = top || "UNEARTH SELF";
-    const botLine = bot;
-    const topPath =
-      `<defs>` +
-      `<path id="brand-arc-top" d="M168,500 A332,332 0 0,1 832,500"/>` +
-      `<path id="brand-arc-bot" d="M168,500 A332,332 0 0,0 832,500"/>` +
-      `</defs>`;
-    const topText =
-      `<text fill="${fill}" font-family="aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif" ` +
-      `font-size="${topSize}" font-weight="600" letter-spacing="10">` +
-      `<textPath href="#brand-arc-top" startOffset="50%" text-anchor="middle">${topLine}</textPath></text>`;
-    const botText = botLine
-      ? `<text fill="${fill}" font-family="aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif" ` +
-        `font-size="${botSize}" font-weight="600" letter-spacing="8">` +
-        `<textPath href="#brand-arc-bot" startOffset="50%" text-anchor="middle">${botLine}</textPath></text>`
-      : "";
-    return topPath + topText + botText;
+    const glyphs =
+      ringGlyphs(topLine, "top", topSize, 10)
+        .map((g) => ringLetter(g, fill, topSize))
+        .join("") +
+      (bot
+        ? ringGlyphs(bot, "bottom", botSize, 8)
+            .map((g) => ringLetter(g, fill, botSize))
+            .join("")
+        : "");
+    return glyphs;
   }
   return "";
 }
 
+function ringLetter(g: { ch: string; x: number; y: number; deg: number }, fill: string, size: number): string {
+  if (g.ch === " ") return "";
+  return (
+    `<text x="0" y="0" fill="${fill}" text-anchor="middle" dominant-baseline="middle" ` +
+    `font-family="aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif" font-weight="600" font-size="${size}" ` +
+    `transform="translate(${fmt(g.x)} ${fmt(g.y)}) rotate(${fmt(g.deg)})">${xml(g.ch)}</text>`
+  );
+}
+
+type RingGlyph = { ch: string; x: number; y: number; deg: number };
+
+function ringGlyphs(text: string, side: "top" | "bottom", fontSize: number, tracking: number): RingGlyph[] {
+  const letters = text.split("");
+  if (!letters.length) return [];
+  const widths = letters.map((ch) => (ch === " " ? fontSize * 0.38 : fontSize * 0.62) + tracking);
+  const total = widths.reduce((a, b) => a + b, 0);
+  const radius = 332;
+  const arcSpan = total / radius;
+  const mid = side === "top" ? -Math.PI / 2 : Math.PI / 2;
+  const out: RingGlyph[] = [];
+  let traveled = 0;
+  for (let i = 0; i < letters.length; i++) {
+    const w = widths[i]!;
+    const t = total > 0 ? (traveled + w / 2) / total : 0.5;
+    const angle =
+      side === "top" ? mid - arcSpan / 2 + t * arcSpan : mid + arcSpan / 2 - t * arcSpan;
+    const deg = ((side === "top" ? angle + Math.PI / 2 : angle - Math.PI / 2) * 180) / Math.PI;
+    out.push({
+      ch: letters[i]!,
+      x: 500 + Math.cos(angle) * radius,
+      y: 500 + Math.sin(angle) * radius,
+      deg,
+    });
+    traveled += w;
+  }
+  return out;
+}
+
 function mix(a: string, b: string, t: number): string {
+  const ch = (hex: string) => [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16));
+  const A = ch(a);
+  const B = ch(b);
+  const out = A.map((n, i) => Math.round(n + (B[i]! - n) * t));
+  return `#${out.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+}
   const ch = (hex: string) => [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16));
   const A = ch(a);
   const B = ch(b);
@@ -430,41 +468,25 @@ function paintLettering(
   }
   if (kind === "ring") {
     ctx.font = `600 ${Math.round(36 * scaleTop)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
-    drawArcText(ctx, top || "UNEARTH SELF", 500, 500, 332, "top");
+    for (const g of ringGlyphs(top || "UNEARTH SELF", "top", Math.round(36 * scaleTop), 10)) {
+      if (g.ch === " ") continue;
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate((g.deg * Math.PI) / 180);
+      ctx.fillText(g.ch, 0, 0);
+      ctx.restore();
+    }
     if (bot) {
       ctx.font = `600 ${Math.round(36 * scaleBot)}px aktiv-grotesk, Aktiv Grotesk, Helvetica, sans-serif`;
-      drawArcText(ctx, bot, 500, 500, 332, "bottom");
+      for (const g of ringGlyphs(bot, "bottom", Math.round(36 * scaleBot), 8)) {
+        if (g.ch === " ") continue;
+        ctx.save();
+        ctx.translate(g.x, g.y);
+        ctx.rotate((g.deg * Math.PI) / 180);
+        ctx.fillText(g.ch, 0, 0);
+        ctx.restore();
+      }
     }
-  }
-}
-
-function drawArcText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  cx: number,
-  cy: number,
-  radius: number,
-  side: "top" | "bottom",
-) {
-  const letters = text.split("");
-  if (!letters.length) return;
-  const gap = 8;
-  const widths = letters.map((ch) => ctx.measureText(ch).width);
-  const total = widths.reduce((a, b) => a + b, 0) + Math.max(0, letters.length - 1) * gap;
-  const arcSpan = total / radius;
-  const mid = side === "top" ? -Math.PI / 2 : Math.PI / 2;
-  let traveled = 0;
-  for (let i = 0; i < letters.length; i++) {
-    const w = widths[i]!;
-    const t = total > 0 ? (traveled + w / 2) / total : 0.5;
-    const angle =
-      side === "top" ? mid - arcSpan / 2 + t * arcSpan : mid + arcSpan / 2 - t * arcSpan;
-    ctx.save();
-    ctx.translate(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.rotate(side === "top" ? angle + Math.PI / 2 : angle - Math.PI / 2);
-    ctx.fillText(letters[i]!, 0, 0);
-    ctx.restore();
-    traveled += w + gap;
   }
 }
 
