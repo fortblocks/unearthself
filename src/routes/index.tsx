@@ -62,6 +62,43 @@ function Home() {
         </div>
       </section>
 
+      <section>
+        <div className="mx-auto max-w-5xl px-6 pt-2 pb-14">
+          <p className="border-t border-fossil/15 pt-6 font-display text-[clamp(1.35rem,2.8vw,2.15rem)] leading-[1.15] tracking-wide uppercase">
+            Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
+          </p>
+          <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-fossil/85">
+            Our flagship experience, Badlands Bootcamp, combines outdoor quests, guided reflection
+            and restorative wellness to help people reset, reconnect and respond to challenge with
+            greater flexibility and choice.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              to="/builder"
+              className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
+            >
+              Build retreat
+            </Link>
+            <Link
+              to="/bootcamp"
+              className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
+            >
+              Explore bootcamp
+            </Link>
+          </div>
+        </div>
+
+        <div className="relative h-[78vh] min-h-[480px] overflow-hidden">
+          <img
+            src="/images/bootcamp-crew.jpg"
+            alt="Four people walking a trail through the badlands"
+            className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-coal to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
+        </div>
+      </section>
+
       <section className="px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Three doors</p>
