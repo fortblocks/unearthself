@@ -342,12 +342,6 @@ function mix(a: string, b: string, t: number): string {
   const out = A.map((n, i) => Math.round(n + (B[i]! - n) * t));
   return `#${out.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
-  const ch = (hex: string) => [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16));
-  const A = ch(a);
-  const B = ch(b);
-  const out = A.map((n, i) => Math.round(n + (B[i]! - n) * t));
-  return `#${out.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
-}
 
 export function clampFit(fit: number): number {
   if (!Number.isFinite(fit)) return 1;
