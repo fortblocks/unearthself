@@ -63,16 +63,16 @@ function Home() {
       </section>
 
       <section>
-        <div className="mx-auto max-w-5xl px-6 pt-2 pb-14">
+        <div className="mx-auto max-w-5xl px-6 pt-2 pb-14 text-center">
           <p className="border-t border-fossil/15 pt-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem] md:whitespace-nowrap md:text-[1.05rem]">
             Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
           </p>
-          <p className="mx-auto mt-6 max-w-[62ch] text-center text-lg leading-relaxed text-fossil/85">
+          <p className="mx-auto mt-6 max-w-[62ch] text-lg leading-relaxed text-fossil/85">
             Our flagship experience, Badlands Bootcamp, combines outdoor quests, guided reflection
             and restorative wellness to help people reset, reconnect and respond to challenge with
             greater flexibility and choice.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
               to="/builder"
               className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
