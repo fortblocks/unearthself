@@ -49,7 +49,7 @@ function Home() {
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Canadian Badlands · Drumheller
+            Canadian Badlands · Drumheller, AB
           </p>
           <h1 className="font-display mb-5 text-[clamp(2.8rem,8vw,5.6rem)] leading-[0.9] uppercase">
             Come for
@@ -57,7 +57,7 @@ function Home() {
             the land.
           </h1>
           <p className="max-w-[38ch] text-lg text-fossil/85">
-            An expedition, four suites, and a house for heat and cold. Ninety minutes from Calgary.
+            Immersive adventure wellness retreats for corporate teams and private groups
           </p>
         </div>
       </section>
