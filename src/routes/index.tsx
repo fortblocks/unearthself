@@ -64,6 +64,9 @@ function Home() {
 
       <section>
         <div className="mx-auto max-w-5xl px-6 pt-2 pb-14 text-center">
+          <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3.25rem)] leading-none uppercase">
+            The expedition
+          </h2>
           <p className="border-t border-fossil/15 pt-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem] md:whitespace-nowrap md:text-[1.05rem]">
             Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
           </p>
