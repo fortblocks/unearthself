@@ -64,10 +64,10 @@ function Home() {
 
       <section>
         <div className="mx-auto max-w-5xl px-6 pt-2 pb-14">
-          <p className="border-t border-fossil/15 pt-6 font-display text-[clamp(1.35rem,2.8vw,2.15rem)] leading-[1.15] tracking-wide uppercase">
+          <p className="border-t border-fossil/15 pt-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem] md:whitespace-nowrap md:text-[1.05rem]">
             Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
           </p>
-          <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-fossil/85">
+          <p className="mx-auto mt-6 max-w-[62ch] text-center text-lg leading-relaxed text-fossil/85">
             Our flagship experience, Badlands Bootcamp, combines outdoor quests, guided reflection
             and restorative wellness to help people reset, reconnect and respond to challenge with
             greater flexibility and choice.
