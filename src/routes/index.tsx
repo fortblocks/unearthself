@@ -67,35 +67,43 @@ function Home() {
         </div>
       </section>
 
-      <section className="border-t border-fossil/10">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            The expedition
-          </p>
-          <h2 className="font-display mb-8 max-w-[16ch] text-[clamp(2rem,4.5vw,3.5rem)] leading-[0.95] uppercase">
-            Badlands Bootcamp
-          </h2>
-          <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
-            Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
-          </p>
-          <p className="max-w-[58ch] text-lg leading-relaxed text-fossil/85">
-            Our flagship experience combines outdoor quests, guided reflection and
-            restorative wellness to help people reset, reconnect and respond to
-            challenge with greater flexibility and choice.
-          </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Link
-              to="/builder"
-              className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
-            >
-              Build retreat
-            </Link>
-            <Link
-              to="/bootcamp"
-              className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
-            >
-              Explore bootcamp
-            </Link>
+      <section className="relative flex min-h-[100dvh] items-center overflow-hidden">
+        <img
+          src="/topo.svg"
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right opacity-90"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-coal via-coal/80 to-transparent" />
+        <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-20">
+          <div className="max-w-[52ch]">
+            <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
+              The expedition
+            </p>
+            <h2 className="font-display mb-8 text-[clamp(2rem,4.5vw,3.5rem)] leading-[0.95] uppercase">
+              Badlands Bootcamp
+            </h2>
+            <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
+              Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
+            </p>
+            <p className="text-lg leading-relaxed text-fossil/85">
+              Our flagship experience combines outdoor quests, guided reflection and
+              restorative wellness to help people reset, reconnect and respond to
+              challenge with greater flexibility and choice.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <Link
+                to="/builder"
+                className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
+              >
+                Build retreat
+              </Link>
+              <Link
+                to="/bootcamp"
+                className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
+              >
+                Explore bootcamp
+              </Link>
+            </div>
           </div>
         </div>
       </section>
