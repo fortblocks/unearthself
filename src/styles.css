@@ -795,23 +795,19 @@
   transform-origin: 50% 55%;
 }
 
-/* Hero Ken Burns — slow drift on a single still. */
-@keyframes hero-drift {
-  0% {
-    transform: scale(1.04) translate3d(0, 0, 0);
-  }
-  100% {
-    transform: scale(1.1) translate3d(-1.2%, -0.6%, 0);
-  }
+/* Hero cloud pan — sky layer only. Land stays locked. */
+@keyframes hero-clouds {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
 }
 
-.hero-drift {
-  animation: hero-drift 48s ease-in-out infinite alternate;
+.hero-clouds {
+  animation: hero-clouds 80s linear infinite;
   will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-drift {
+  .hero-clouds {
     animation: none;
   }
 }
