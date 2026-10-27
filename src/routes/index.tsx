@@ -67,14 +67,15 @@ function Home() {
         </div>
       </section>
 
-      <section className="relative flex min-h-[100dvh] items-center overflow-hidden">
+      {/* Bootcamp: topo rises out of the hero's darkness — no hard seam */}
+      <section className="relative overflow-hidden">
         <img
           src="/topo.svg"
           alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right opacity-90"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-coal via-coal/80 to-transparent" />
-        <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-20">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-coal via-coal/90 to-coal" />
+        <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24">
           <div className="max-w-[52ch]">
             <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
               The expedition
