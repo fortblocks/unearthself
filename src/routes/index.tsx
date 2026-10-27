@@ -44,7 +44,7 @@ function Home() {
         <img
           src="/images/exp-hoodoos.jpg"
           alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
+          className="hero-drift absolute inset-0 h-full w-full object-cover object-[center_65%]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
