@@ -795,19 +795,3 @@
   transform-origin: 50% 55%;
 }
 
-/* Hero cloud pan — sky layer only. Land stays locked. */
-@keyframes hero-clouds {
-  0% { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(-50%, 0, 0); }
-}
-
-.hero-clouds {
-  animation: hero-clouds 28s linear infinite;
-  will-change: transform;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-clouds {
-    animation: none;
-  }
-}

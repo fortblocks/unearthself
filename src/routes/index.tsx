@@ -41,23 +41,16 @@ function Home() {
   return (
     <main className="bg-coal text-fossil">
       <section className="relative flex min-h-[100dvh] items-end overflow-hidden">
-        <img
-          src="/images/exp-hoodoos.jpg"
-          alt=""
+        <video
           className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
-        />
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[32%] overflow-hidden"
-          style={{
-            maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 78%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 78%)",
-          }}
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/images/exp-hoodoos.jpg"
         >
-          <div className="hero-clouds flex h-full w-[200%]">
-            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-70" />
-            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-70" />
-          </div>
-        </div>
+          <source src="/images/hero-clouds.mp4" type="video/mp4" />
+        </video>
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
