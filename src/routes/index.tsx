@@ -67,20 +67,23 @@ function Home() {
         </div>
       </section>
 
-      <section>
-        <div className="mx-auto max-w-5xl px-6 pt-2 pb-14 text-center">
-          <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3.25rem)] leading-none uppercase">
+      <section className="border-t border-fossil/10">
+        <div className="mx-auto max-w-5xl px-6 py-20">
+          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
             The expedition
+          </p>
+          <h2 className="font-display mb-8 max-w-[16ch] text-[clamp(2rem,4.5vw,3.5rem)] leading-[0.95] uppercase">
+            Badlands Bootcamp
           </h2>
-          <p className="border-t border-fossil/15 pt-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem] md:whitespace-nowrap md:text-[1.05rem]">
+          <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
             Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
           </p>
-          <p className="mx-auto mt-6 max-w-[62ch] text-lg leading-relaxed text-fossil/85">
-            Our flagship experience, Badlands Bootcamp, combines outdoor quests, guided reflection
-            and restorative wellness to help people reset, reconnect and respond to challenge with
-            greater flexibility and choice.
+          <p className="max-w-[58ch] text-lg leading-relaxed text-fossil/85">
+            Our flagship experience combines outdoor quests, guided reflection and
+            restorative wellness to help people reset, reconnect and respond to
+            challenge with greater flexibility and choice.
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <div className="mt-10 flex flex-wrap gap-3">
             <Link
               to="/builder"
               className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
@@ -95,16 +98,16 @@ function Home() {
             </Link>
           </div>
         </div>
+      </section>
 
-        <div className="relative h-[78vh] min-h-[480px] overflow-hidden">
-          <img
-            src="/images/bootcamp-crew.jpg"
-            alt="Four people walking a trail through the badlands"
-            className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
-          />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-coal to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
-        </div>
+      <section className="relative h-[78vh] min-h-[480px] overflow-hidden">
+        <img
+          src="/images/bootcamp-crew.jpg"
+          alt="Four people walking a trail through the badlands"
+          className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-coal to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
       </section>
 
       <section className="px-6 py-20">
