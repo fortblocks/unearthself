@@ -802,7 +802,7 @@
 }
 
 .hero-clouds {
-  animation: hero-clouds 80s linear infinite;
+  animation: hero-clouds 28s linear infinite;
   will-change: transform;
 }
 

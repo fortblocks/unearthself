@@ -54,8 +54,8 @@ function Home() {
           }}
         >
           <div className="hero-clouds flex h-full w-[200%]">
-            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-55" />
-            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-55" />
+            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-70" />
+            <img src="/images/hero-clouds.png" alt="" className="h-full w-1/2 object-cover opacity-70" />
           </div>
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
