@@ -67,14 +67,14 @@ function Home() {
         </div>
       </section>
 
-      {/* Bootcamp: fills viewport, topo behind, no seam */}
-      <section className="relative flex min-h-[100dvh] items-center overflow-hidden">
+      <section className="relative flex h-[100dvh] items-center overflow-hidden bg-coal">
         <img
-          src="/topo.svg"
+          src="/topo.svg?v=5"
           alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[68%_center]"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-coal via-coal/85 to-coal" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#161718_0%,#161718_18%,rgba(22,23,24,0.82)_42%,rgba(22,23,24,0.2)_72%,rgba(22,23,24,0)_100%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-coal to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24">
           <div className="max-w-[52ch]">
             <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
@@ -108,6 +108,8 @@ function Home() {
           </div>
         </div>
       </section>
+
+      <div className="h-[32vh] bg-coal" aria-hidden="true" />
 
       <section className="relative h-[78vh] min-h-[480px] overflow-hidden">
         <img
