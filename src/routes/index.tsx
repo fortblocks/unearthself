@@ -47,10 +47,10 @@ function Home() {
           className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
         />
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[42%] overflow-hidden"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[32%] overflow-hidden"
           style={{
-            maskImage: "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
+            maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 78%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 78%)",
           }}
         >
           <div className="hero-clouds flex h-full w-[200%]">
