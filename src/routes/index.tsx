@@ -28,15 +28,6 @@ function Home() {
           <source src="/images/hero-clouds.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
-        
-        {/* Diagonal corner banner */}
-        <Link
-          to="/book/retreat"
-          className="absolute bottom-0 right-0 z-20 origin-bottom-right rotate-[-45deg] translate-x-[29%] translate-y-[29%] bg-ember px-12 py-3 text-center text-[0.7rem] font-bold uppercase tracking-[0.2em] text-white shadow-lg transition-all hover:bg-ember/90 hover:shadow-xl sm:px-16 sm:py-3.5 sm:text-[0.75rem]"
-        >
-          Now Planning 2027 Retreats
-        </Link>
-        
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
             Canadian Badlands · Drumheller, AB
