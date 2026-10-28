@@ -13,34 +13,10 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const doors = [
-  {
-    to: "/bootcamp" as const,
-    kicker: "The expedition",
-    title: "Bootcamp",
-    line: "Two to five days on the land. Groups of six to thirty.",
-    img: "/images/exp-hoodoos.jpg",
-  },
-  {
-    to: "/haven" as const,
-    kicker: "The house",
-    title: "Haven",
-    line: "Four suites. Sleep here whether you came for the land or the quiet.",
-    img: "/images/haven/elowen/elowen-01.jpg",
-  },
-  {
-    to: "/basecamp" as const,
-    kicker: "Treatments",
-    title: "Basecamp",
-    line: "Heat, cold and hands. Day guests welcome.",
-    img: "/images/basecamp/lounge.jpg",
-  },
-];
-
 function Home() {
   return (
     <main className="bg-coal text-fossil">
-      <section className="relative flex min-h-[100dvh] items-end overflow-hidden">
+      <section className="relative flex min-h-[100dvh] items-end">
         <video
           className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
           autoPlay
@@ -68,12 +44,22 @@ function Home() {
       </section>
 
       <section className="relative flex h-[100dvh] items-center overflow-hidden bg-coal">
-        <img
-          src="/topo.svg?v=5"
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[68%_center]"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#161718_0%,#161718_18%,rgba(22,23,24,0.82)_42%,rgba(22,23,24,0.2)_72%,rgba(22,23,24,0)_100%)]" />
+        {/* Topographic backdrop with soft right-to-left + top/bottom edge fades */}
+        <div 
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
+            maskComposite: 'intersect',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
+            WebkitMaskComposite: 'source-in'
+          }}
+        >
+          <img
+            src="/topo.png"
+            alt=""
+            className="h-full w-full object-cover object-right"
+          />
+        </div>
         <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-coal to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24">
           <div className="max-w-[52ch]">
@@ -84,7 +70,9 @@ function Home() {
               Badlands Bootcamp
             </h2>
             <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
-              Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
+              Three days · Two nights · Groups of 6–30
+              <br />
+              90 minutes from Calgary
             </p>
             <p className="text-lg leading-relaxed text-fossil/85">
               Our flagship experience combines outdoor quests, guided reflection and
@@ -93,50 +81,49 @@ function Home() {
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link
-                to="/builder"
+                to="/bootcamp"
                 className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
               >
-                Build retreat
+                Explore bootcamp
               </Link>
               <Link
-                to="/bootcamp"
+                to="/builder"
                 className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
               >
-                Explore bootcamp
+                Build retreat
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="h-[32vh] bg-coal" aria-hidden="true" />
-
-      <section className="relative h-[78vh] min-h-[480px] overflow-hidden">
-        <img
-          src="/images/bootcamp-crew.jpg"
-          alt="Four people walking a trail through the badlands"
-          className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
-        />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-coal to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
-      </section>
-
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Three doors</p>
-          <h2 className="font-display mb-12 text-4xl uppercase">Pick how you arrive.</h2>
-          <div className="grid gap-6 md:grid-cols-3">
-            {doors.map((d) => (
-              <Link key={d.to} to={d.to} className="group block">
-                <div className="aspect-[4/3] overflow-hidden bg-shale">
-                  <img src={d.img} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
-                </div>
-                <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">{d.kicker}</p>
-                <h3 className="font-display mt-1 text-3xl uppercase">{d.title}</h3>
-                <p className="mt-2 text-fossil/65">{d.line}</p>
-              </Link>
-            ))}
-          </div>
+      {/* Haven and Basecamp cards */}
+      <section className="px-6 pt-[150px] pb-[150px]">
+        <div className="mx-auto grid max-w-[58rem] gap-6 md:grid-cols-2">
+          <Link to="/basecamp" className="group block">
+            <div className="aspect-[4/3] overflow-hidden bg-shale">
+              <img 
+                src="/images/basecamp/lounge.jpg" 
+                alt="" 
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
+              />
+            </div>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Spa & Wellness Center</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
+            <p className="mt-2 text-fossil/65">Come experience our newly refurbished spa facility in the heart of downtown Drumheller. We offer red light therapy, body wraps, massage, cold plunge, infrared saunas and more.</p>
+          </Link>
+          <Link to="/haven" className="group block">
+            <div className="aspect-[4/3] overflow-hidden bg-shale">
+              <img 
+                src="/images/haven/elowen/elowen-01.jpg" 
+                alt="" 
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
+              />
+            </div>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Boutique Hotel</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
+            <p className="mt-2 text-fossil/65">Drumheller's premier hotel accommodation. Four luxury apartment suites conveniently located within a short walking distance of downtown's bars, restaurants and shopping.</p>
+          </Link>
         </div>
       </section>
     </main>

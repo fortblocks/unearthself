@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BasecampRouteImport } from './routes/basecamp'
 import { Route as BootcampRouteImport } from './routes/bootcamp'
+import { Route as BrandRouteImport } from './routes/brand'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as D14RouteImport } from './routes/d14'
@@ -91,6 +92,11 @@ const BasecampRoute = BasecampRouteImport.update({
 const BootcampRoute = BootcampRouteImport.update({
   id: '/bootcamp',
   path: '/bootcamp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrandRoute = BrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BuilderRoute = BuilderRouteImport.update({
@@ -365,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
+  '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
@@ -424,6 +431,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
+  '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/found': typeof FoundRoute
@@ -480,6 +488,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
+  '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
@@ -542,6 +551,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/basecamp'
     | '/bootcamp'
+    | '/brand'
     | '/builder'
     | '/community'
     | '/d14'
@@ -601,6 +611,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/basecamp'
     | '/bootcamp'
+    | '/brand'
     | '/builder'
     | '/community'
     | '/found'
@@ -656,6 +667,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/basecamp'
     | '/bootcamp'
+    | '/brand'
     | '/builder'
     | '/community'
     | '/d14'
@@ -717,6 +729,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   BasecampRoute: typeof BasecampRoute
   BootcampRoute: typeof BootcampRoute
+  BrandRoute: typeof BrandRoute
   BuilderRoute: typeof BuilderRoute
   CommunityRoute: typeof CommunityRoute
   D14Route: typeof D14RouteWithChildren
@@ -769,6 +782,13 @@ declare module '@tanstack/react-router' {
       path: '/bootcamp'
       fullPath: '/bootcamp'
       preLoaderRoute: typeof BootcampRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/brand': {
+      id: '/brand'
+      path: '/brand'
+      fullPath: '/brand'
+      preLoaderRoute: typeof BrandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/builder': {
@@ -1278,6 +1298,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   BasecampRoute: BasecampRoute,
   BootcampRoute: BootcampRoute,
+  BrandRoute: BrandRoute,
   BuilderRoute: BuilderRoute,
   CommunityRoute: CommunityRoute,
   D14Route: D14RouteWithChildren,

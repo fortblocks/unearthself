@@ -79,6 +79,6 @@ export const SEED_POSTS: SocialPost[] = [
     impressions: 0,
     likes: 0,
     replies: 0,
-    note: "Tess signs this before it posts. Do not add Existence/Experience.",
+    note: "Tess signs this before it posts. Do not add Experience.",
   },
 ];

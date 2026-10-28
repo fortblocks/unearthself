@@ -5,7 +5,6 @@ import { BookButton } from "@/components/site/BookButton";
 import { RuneTape } from "@/components/site/RuneTape";
 
 const links = [
-  { to: "/the-work", label: "The Work" },
   { to: "/bootcamp", label: "Bootcamp" },
   { to: "/basecamp", label: "Basecamp" },
   { to: "/haven", label: "Haven" },
@@ -52,12 +51,12 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <Link
               key={l.to}
               to={l.to}
-              className={`text-[0.8rem] font-semibold tracking-wide transition-colors ${
+              className={`text-[0.8rem] font-semibold uppercase tracking-wide transition-colors ${
                 pathname === l.to ||
                 (l.to === "/haven" && onHaven) ||
                 (l.to === "/journal" && onJournal)
-                  ? "text-fossil"
-                  : "text-fossil/55 hover:text-fossil"
+                  ? "text-ember"
+                  : "text-fossil hover:text-ember"
               }`}
             >
               {l.label}
@@ -74,40 +73,49 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       <BookPanel />
 
       <footer className="bg-coal pt-16 text-[0.9rem] text-fossil/70">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
-          <div>
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 md:flex md:flex-nowrap md:gap-10">
+          <div className="md:flex-[2_1_0]">
             <div className="mb-3">
               <Mark />
             </div>
-            <p className="max-w-sm">
-              PACE is the path. Unearth Self is the purpose. Drumheller, Alberta.
+            <p className="max-w-sm uppercase">
+              PACE is the path.
+              <br />
+              Unearth Self is the purpose.
             </p>
           </div>
-          <div>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Explore</h4>
             <ul className="space-y-2">
-              <li><Link to="/the-work" className="hover:text-fossil">The Work</Link></li>
-              <li><Link to="/for/teams" className="hover:text-fossil">For teams</Link></li>
+              <li><span className="text-fossil/70">Events</span></li>
+              <li><span className="text-fossil/70">Drumheller</span></li>
               <li><Link to="/journal" className="hover:text-fossil">Journal</Link></li>
-              <li><Link to="/visit" className="hover:text-fossil">Visit</Link></li>
             </ul>
           </div>
-          <div>
-            <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Stay</h4>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
+            <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Experiences</h4>
             <ul className="space-y-2">
-              <li><Link to="/basecamp" className="hover:text-fossil">Basecamp</Link></li>
               <li><Link to="/bootcamp" className="hover:text-fossil">Badlands Bootcamp</Link></li>
-              <li><Link to="/haven" className="hover:text-fossil">Haven</Link></li>
+              <li><Link to="/basecamp" className="hover:text-fossil">Basecamp</Link></li>
+              <li><Link to="/haven" className="hover:text-fossil">The Haven</Link></li>
+              <li><span className="text-fossil/70">Packages</span></li>
+              <li><span className="text-fossil/70">Venue Rentals</span></li>
             </ul>
           </div>
-          <div>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Connect</h4>
             <ul className="space-y-2">
               <li><Link to="/about" className="hover:text-fossil">About</Link></li>
-              <li><Link to="/for/teams" className="hover:text-fossil">Hold a date</Link></li>
+              <li><Link to="/book/retreat" className="hover:text-fossil">Inquiries</Link></li>
+              <li><span className="text-fossil/70">Find Us</span></li>
               <li>
                 <a href="mailto:hello@unearthself.xyz" className="hover:text-fossil">
                   hello@unearthself.xyz
+                </a>
+              </li>
+              <li>
+                <a href="tel:+14038234567" className="hover:text-fossil">
+                  +1 (403) 823-4567
                 </a>
               </li>
             </ul>

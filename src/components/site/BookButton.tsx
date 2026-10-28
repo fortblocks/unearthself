@@ -21,7 +21,7 @@ export function BookButton() {
     <button
       type="button"
       onClick={() => openFace(faceFromPath(pathname))}
-      className="relative rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold text-white hover:bg-ember-soft"
+      className="relative rounded-[2px] bg-ember px-[1.1rem] py-2 text-[0.85rem] font-semibold uppercase text-white hover:bg-ember-soft"
     >
       Book
       {n > 0 && (
