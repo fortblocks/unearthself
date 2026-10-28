@@ -5,7 +5,6 @@ import { BookButton } from "@/components/site/BookButton";
 import { RuneTape } from "@/components/site/RuneTape";
 
 const links = [
-  { to: "/the-work", label: "The Work" },
   { to: "/bootcamp", label: "Bootcamp" },
   { to: "/basecamp", label: "Basecamp" },
   { to: "/haven", label: "Haven" },
@@ -52,7 +51,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <Link
               key={l.to}
               to={l.to}
-              className={`text-[0.8rem] font-semibold tracking-wide transition-colors ${
+              className={`text-[0.8rem] font-semibold uppercase tracking-wide transition-colors ${
                 pathname === l.to ||
                 (l.to === "/haven" && onHaven) ||
                 (l.to === "/journal" && onJournal)

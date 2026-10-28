@@ -21,6 +21,29 @@ const facts = [
   { k: "Sleep", v: "Haven + Canalta" },
 ];
 
+const runes = [
+  {
+    name: "Play",
+    slug: "play",
+    line: "Start before you have the right answer. The land rewards people who will try the next step.",
+  },
+  {
+    name: "Adaptability",
+    slug: "adaptability",
+    line: "The plan will not survive the coulee. That is information, not failure.",
+  },
+  {
+    name: "Connection",
+    slug: "connection",
+    line: "You find out who you are with when the map and the weather disagree.",
+  },
+  {
+    name: "Experience",
+    slug: "experience",
+    line: "Be in the thing that is happening. Not the story you brought from the car.",
+  },
+];
+
 function BootcampPage() {
   return (
     <main className="bg-coal text-fossil">
@@ -118,6 +141,60 @@ function BootcampPage() {
                 spell is talked to death.
               </p>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-fossil/10 px-6 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
+          <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
+          <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
+            A Rune is a mark for a way of moving through the Badlands — a capacity you practise on the
+            land, then carry when you leave.
+          </p>
+          <p className="mb-12 max-w-[58ch] text-fossil/65">
+            PACE is the sequence: Play, Adaptability, Connection, Experience. Each day of Bootcamp
+            reveals one, puts you inside it, and asks you to choose again. The four marks below are how
+            that sequence is held — on the wall at Basecamp, in Trail Quest, on the thing you take home.
+          </p>
+          <div className="grid gap-10 md:grid-cols-2">
+            {runes.map((r) => (
+              <article key={r.name} className="border-t border-fossil/15 pt-5">
+                <div className="mb-3 flex items-center gap-4">
+                  <img
+                    src={`/runes/${r.slug}.svg`}
+                    alt=""
+                    className="size-12 shrink-0 brightness-0 invert"
+                  />
+                  <h3 className="font-display text-3xl uppercase">{r.name}</h3>
+                </div>
+                <p className="max-w-[40ch] text-fossil/70">{r.line}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-fossil/10 px-6 py-20">
+        <div className="mx-auto grid max-w-6xl gap-14 md:grid-cols-2">
+          <div>
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Echo</p>
+            <h2 className="font-display mb-4 text-3xl uppercase">What the day sends back.</h2>
+            <p className="mb-4 text-fossil/75">
+              Echo is how the work looks back at you. Short prompts after time on the land. Pattern,
+              not diagnosis. Self-awareness lives here.
+            </p>
+            <p className="text-fossil/75">The canyon does the coaching. The notes are yours.</p>
+          </div>
+          <div>
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">HAM</p>
+            <h2 className="font-display mb-4 text-3xl uppercase">Human Adaptation Model</h2>
+            <p className="mb-4 text-fossil/75">
+              How we protect, adapt, and choose again. The language a group keeps after they drive
+              home — and the body of work that will travel further when it is ready.
+            </p>
+            <p className="text-fossil/75">Trail Quest carries some of this in the field. Paper if the phone dies.</p>
           </div>
         </div>
       </section>
