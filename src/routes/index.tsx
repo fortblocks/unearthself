@@ -119,15 +119,13 @@ function Home() {
         </div>
       </section>
 
-      <div className="h-[32vh] bg-coal" aria-hidden="true" />
-
-      <section className="relative h-[78vh] min-h-[480px] overflow-hidden">
+      <section className="relative h-[78vh] min-h-[480px] overflow-hidden bg-coal">
         <img
           src="/images/bootcamp-crew.jpg"
           alt="Four people walking a trail through the badlands"
           className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
         />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-coal to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[30%] bg-gradient-to-b from-coal via-coal/60 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
       </section>
 
