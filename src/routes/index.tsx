@@ -119,6 +119,8 @@ function Home() {
         </div>
       </section>
 
+      <div className="h-24 bg-coal" aria-hidden="true" />
+
       <section className="relative h-[78vh] min-h-[480px] overflow-hidden bg-coal">
         <img
           src="/images/bootcamp-crew.jpg"
