@@ -70,7 +70,9 @@ function Home() {
               Badlands Bootcamp
             </h2>
             <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
-              Three days · Two nights · Groups of 6–30 · 90 minutes from Calgary
+              Three days · Two nights · Groups of 6–30
+              <br />
+              90 minutes from Calgary
             </p>
             <p className="text-lg leading-relaxed text-fossil/85">
               Our flagship experience combines outdoor quests, guided reflection and
