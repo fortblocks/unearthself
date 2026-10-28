@@ -73,8 +73,8 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       <BookPanel />
 
       <footer className="bg-coal pt-16 text-[0.9rem] text-fossil/70">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
-          <div>
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 md:flex md:flex-nowrap md:gap-10">
+          <div className="md:flex-[2_1_0]">
             <div className="mb-3">
               <Mark />
             </div>
@@ -84,7 +84,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               Unearth Self is the purpose.
             </p>
           </div>
-          <div>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Explore</h4>
             <ul className="space-y-2">
               <li><span className="text-fossil/70">Events</span></li>
@@ -92,7 +92,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               <li><Link to="/journal" className="hover:text-fossil">Journal</Link></li>
             </ul>
           </div>
-          <div>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Experiences</h4>
             <ul className="space-y-2">
               <li><Link to="/bootcamp" className="hover:text-fossil">Badlands Bootcamp</Link></li>
@@ -102,7 +102,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               <li><span className="text-fossil/70">Venue Rentals</span></li>
             </ul>
           </div>
-          <div>
+          <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Connect</h4>
             <ul className="space-y-2">
               <li><Link to="/about" className="hover:text-fossil">About</Link></li>
