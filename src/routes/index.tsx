@@ -95,21 +95,26 @@ function Home() {
         </div>
       </section>
 
+      <div className="h-24 bg-coal" aria-hidden="true" />
+
+      {/* Badlands promo video */}
+      <section className="px-6 pb-24">
+        <div className="mx-auto max-w-6xl">
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            poster="/video/badlands-promo-poster.jpg"
+            className="w-full"
+          >
+            <source src="/video/badlands-promo.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
       {/* Haven and Basecamp cards */}
       <section className="px-6 py-20">
         <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2">
-          <Link to="/haven" className="group block">
-            <div className="aspect-[4/3] overflow-hidden bg-shale">
-              <img 
-                src="/images/haven/elowen/elowen-01.jpg" 
-                alt="" 
-                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
-              />
-            </div>
-            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">The house</p>
-            <h3 className="font-display mt-1 text-3xl uppercase">Haven</h3>
-            <p className="mt-2 text-fossil/65">Four suites. Sleep here whether you came for the land or the quiet.</p>
-          </Link>
           <Link to="/basecamp" className="group block">
             <div className="aspect-[4/3] overflow-hidden bg-shale">
               <img 
@@ -121,6 +126,18 @@ function Home() {
             <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Treatments</p>
             <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
             <p className="mt-2 text-fossil/65">Heat, cold and hands. Day guests welcome.</p>
+          </Link>
+          <Link to="/haven" className="group block">
+            <div className="aspect-[4/3] overflow-hidden bg-shale">
+              <img 
+                src="/images/haven/elowen/elowen-01.jpg" 
+                alt="" 
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
+              />
+            </div>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">The house</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">Haven</h3>
+            <p className="mt-2 text-fossil/65">Four suites. Sleep here whether you came for the land or the quiet.</p>
           </Link>
         </div>
       </section>
