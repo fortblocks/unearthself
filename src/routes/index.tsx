@@ -68,13 +68,13 @@ function Home() {
       </section>
 
       <section className="relative flex h-[100dvh] items-center overflow-hidden bg-coal">
-        {/* Topographic backdrop with soft right-to-left + top edge fades */}
+        {/* Topographic backdrop with soft right-to-left + top/bottom edge fades */}
         <div 
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
             maskComposite: 'intersect',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 35%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 75%, black 100%)',
             WebkitMaskComposite: 'source-in'
           }}
         >
