@@ -95,26 +95,9 @@ function Home() {
         </div>
       </section>
 
-      <div className="h-24 bg-coal" aria-hidden="true" />
-
-      {/* Badlands promo video */}
-      <section className="px-6 pb-24">
-        <div className="mx-auto max-w-6xl">
-          <video
-            controls
-            playsInline
-            preload="metadata"
-            poster="/video/badlands-promo-poster.jpg"
-            className="w-full"
-          >
-            <source src="/video/badlands-promo.mp4" type="video/mp4" />
-          </video>
-        </div>
-      </section>
-
       {/* Haven and Basecamp cards */}
-      <section className="px-6 py-20">
-        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2">
+      <section className="px-6 pt-[150px] pb-[150px]">
+        <div className="mx-auto grid max-w-[58rem] gap-6 md:grid-cols-2">
           <Link to="/basecamp" className="group block">
             <div className="aspect-[4/3] overflow-hidden bg-shale">
               <img 
