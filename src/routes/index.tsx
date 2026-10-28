@@ -13,30 +13,6 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const doors = [
-  {
-    to: "/bootcamp" as const,
-    kicker: "The expedition",
-    title: "Bootcamp",
-    line: "Two to five days on the land. Groups of six to thirty.",
-    img: "/images/exp-hoodoos.jpg",
-  },
-  {
-    to: "/haven" as const,
-    kicker: "The house",
-    title: "Haven",
-    line: "Four suites. Sleep here whether you came for the land or the quiet.",
-    img: "/images/haven/elowen/elowen-01.jpg",
-  },
-  {
-    to: "/basecamp" as const,
-    kicker: "Treatments",
-    title: "Basecamp",
-    line: "Heat, cold and hands. Day guests welcome.",
-    img: "/images/basecamp/lounge.jpg",
-  },
-];
-
 function Home() {
   return (
     <main className="bg-coal text-fossil">
@@ -121,34 +97,62 @@ function Home() {
 
       <div className="h-24 bg-coal" aria-hidden="true" />
 
+      {/* Haven section */}
       <section className="relative h-[78vh] min-h-[480px] overflow-hidden bg-coal">
         <img
-          src="/images/bootcamp-crew.jpg"
-          alt="Four people walking a trail through the badlands"
-          className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
+          src="/images/haven/exterior/exterior-01.jpg"
+          alt="Haven heritage house"
+          className="absolute inset-0 h-full w-full object-cover object-center"
           style={{
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)'
           }}
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-coal via-coal/65 to-transparent" />
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-5xl items-end px-6 pb-16">
+          <div className="max-w-[48ch]">
+            <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">The house</p>
+            <h2 className="font-display mb-6 text-[clamp(2.2rem,5vw,4rem)] leading-[0.95] uppercase">Haven</h2>
+            <p className="mb-8 text-lg text-fossil/85">
+              Four suites. Sleep here whether you came for the land or the quiet.
+            </p>
+            <Link
+              to="/haven"
+              className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
+            >
+              Explore Haven
+            </Link>
+          </div>
+        </div>
       </section>
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Three doors</p>
-          <h2 className="font-display mb-12 text-4xl uppercase">Pick how you arrive.</h2>
-          <div className="grid gap-6 md:grid-cols-3">
-            {doors.map((d) => (
-              <Link key={d.to} to={d.to} className="group block">
-                <div className="aspect-[4/3] overflow-hidden bg-shale">
-                  <img src={d.img} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
-                </div>
-                <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">{d.kicker}</p>
-                <h3 className="font-display mt-1 text-3xl uppercase">{d.title}</h3>
-                <p className="mt-2 text-fossil/65">{d.line}</p>
-              </Link>
-            ))}
+      <div className="h-24 bg-coal" aria-hidden="true" />
+
+      {/* Basecamp section */}
+      <section className="relative h-[78vh] min-h-[480px] overflow-hidden bg-coal">
+        <img
+          src="/images/basecamp/building.jpg"
+          alt="Basecamp building"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)'
+          }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-coal via-coal/65 to-transparent" />
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-5xl items-end px-6 pb-16">
+          <div className="max-w-[48ch]">
+            <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">Treatments</p>
+            <h2 className="font-display mb-6 text-[clamp(2.2rem,5vw,4rem)] leading-[0.95] uppercase">Basecamp</h2>
+            <p className="mb-8 text-lg text-fossil/85">
+              Heat, cold and hands. Day guests welcome.
+            </p>
+            <Link
+              to="/basecamp"
+              className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
+            >
+              Explore Basecamp
+            </Link>
           </div>
         </div>
       </section>
