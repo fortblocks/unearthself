@@ -73,7 +73,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       <BookPanel />
 
       <footer className="bg-coal pt-16 text-[0.9rem] text-fossil/70">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr]">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
             <div className="mb-3">
               <Mark />
