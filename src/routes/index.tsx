@@ -68,12 +68,22 @@ function Home() {
       </section>
 
       <section className="relative flex h-[100dvh] items-center overflow-hidden bg-coal">
-        <img
-          src="/topo.svg?v=7"
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right"
-        />
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-[linear-gradient(90deg,#161718_0%,#161718_25%,rgba(22,23,24,0.85)_45%,rgba(22,23,24,0.35)_70%,rgba(22,23,24,0)_100%)]" />
+        {/* Topographic backdrop with soft left + top edge fades */}
+        <div 
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%), linear-gradient(to right, black 0%, black 25%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0.35) 70%, transparent 100%)',
+            maskComposite: 'intersect',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%), linear-gradient(to right, black 0%, black 25%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0.35) 70%, transparent 100%)',
+            WebkitMaskComposite: 'source-in'
+          }}
+        >
+          <img
+            src="/topo.png"
+            alt=""
+            className="h-full w-full object-cover object-right"
+          />
+        </div>
         <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-coal to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24">
           <div className="max-w-[52ch]">
