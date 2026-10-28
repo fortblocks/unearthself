@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Procedural topographic map generator
+ * Procedural topographic map generator - matches reference style
  * 
- * Generates realistic contour lines with:
- * - Organic closed loops from smooth height fields
- * - Varying stroke weights
- * - Mixed dash patterns (solid, dashed, dotted)
- * - Dense clusters on steep faces
- * - ~50% fewer lines than a typical survey map
+ * Creates smooth, organic flowing contour bands with:
+ * - Gaussian mounds creating natural height field
+ * - Marching squares contour extraction
+ * - Chaikin curve smoothing for organic flow
+ * - Dense convergence core in center-right
+ * - Empty left/top-left areas
+ * - Mixed stroke styles (solid, dashed, dotted)
  */
 
 import fs from 'fs';
@@ -22,17 +23,19 @@ const __dirname = path.dirname(__filename);
 const CONFIG = {
   width: 1600,
   height: 1000,
-  gridWidth: 140,  // Lower resolution for smoother, longer curves
-  gridHeight: 90,
-  contourLevels: 22,  // 50% fewer than reference (moderate density)
-  baseStrokeWidth: 0.4,  // Thin, delicate lines
+  gridWidth: 180,
+  gridHeight: 110,
+  contourLevels: 22,  // 50% fewer than reference
+  minContourLength: 8,  // Drop tiny fragments
+  smoothingIterations: 4,  // Chaikin smoothing passes
   backgroundColor: 'transparent',
-  lineColor: '#F8F0ED', // Fossil white
-  opacity: 0.35,  // Subtle so text remains legible
-  seed: 42
+  lineColor: '#F5F0E6',  // Fossil
+  opacity: 0.30,
+  baseStrokeWidth: 0.38,
+  seed: 456
 };
 
-// Simple seeded random number generator
+// Seeded random
 class Random {
   constructor(seed) {
     this.seed = seed;
@@ -42,311 +45,341 @@ class Random {
     this.seed = (this.seed * 9301 + 49297) % 233280;
     return this.seed / 233280;
   }
-}
-
-// 2D Perlin-like noise using gradient interpolation
-class NoiseField {
-  constructor(width, height, seed) {
-    this.width = width;
-    this.height = height;
-    this.random = new Random(seed);
-    this.gradients = {};
-  }
   
-  getGradient(x, y) {
-    const key = `${x},${y}`;
-    if (!this.gradients[key]) {
-      const angle = this.random.next() * Math.PI * 2;
-      this.gradients[key] = [Math.cos(angle), Math.sin(angle)];
-    }
-    return this.gradients[key];
-  }
-  
-  dotGridGradient(ix, iy, x, y) {
-    const gradient = this.getGradient(ix, iy);
-    const dx = x - ix;
-    const dy = y - iy;
-    return dx * gradient[0] + dy * gradient[1];
-  }
-  
-  interpolate(a, b, t) {
-    // Smoothstep interpolation
-    return a + (b - a) * (3.0 - t * 2.0) * t * t;
-  }
-  
-  noise(x, y) {
-    const x0 = Math.floor(x);
-    const x1 = x0 + 1;
-    const y0 = Math.floor(y);
-    const y1 = y0 + 1;
-    
-    const sx = x - x0;
-    const sy = y - y0;
-    
-    const n0 = this.dotGridGradient(x0, y0, x, y);
-    const n1 = this.dotGridGradient(x1, y0, x, y);
-    const ix0 = this.interpolate(n0, n1, sx);
-    
-    const n2 = this.dotGridGradient(x0, y1, x, y);
-    const n3 = this.dotGridGradient(x1, y1, x, y);
-    const ix1 = this.interpolate(n2, n3, sx);
-    
-    return this.interpolate(ix0, ix1, sy);
+  gauss() {
+    // Box-Muller transform
+    const u1 = this.next();
+    const u2 = this.next();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
   }
 }
 
-// Generate height field with flowing ridges biased to right/bottom
-function generateHeightField(width, height, seed) {
-  const field = Array(height).fill(0).map(() => Array(width).fill(0));
-  const noise1 = new NoiseField(width, height, seed);
-  const noise2 = new NoiseField(width, height, seed + 100);
-  const noise3 = new NoiseField(width, height, seed + 200);
+// Generate height field using Gaussian mounds
+function generateHeightField(config) {
+  const { gridWidth, gridHeight, seed } = config;
+  const field = Array(gridHeight).fill(0).map(() => Array(gridWidth).fill(0));
+  const random = new Random(seed);
   
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const nx = x / width;
-      const ny = y / height;
+  // Place gaussian mounds to match reference (bottom-left flowing to center-right)
+  const mounds = [
+    // Main convergence zone (center-right, creates tight nested core)
+    { x: 0.70, y: 0.52, height: 3.2, radiusX: 0.16, radiusY: 0.20 },
+    // Secondary distinct peaks (closed loops)
+    { x: 0.75, y: 0.38, height: 2.2, radiusX: 0.11, radiusY: 0.14 },
+    { x: 0.82, y: 0.65, height: 1.9, radiusX: 0.10, radiusY: 0.13 },
+    { x: 0.60, y: 0.70, height: 1.7, radiusX: 0.13, radiusY: 0.15 },
+    // Ridge-forming mounds (create flowing bands from bottom-left)
+    { x: 0.35, y: 0.85, height: 1.3, radiusX: 0.28, radiusY: 0.10 },
+    { x: 0.50, y: 0.75, height: 1.2, radiusX: 0.22, radiusY: 0.12 },
+    { x: 0.62, y: 0.58, height: 1.0, radiusX: 0.20, radiusY: 0.14 },
+    { x: 0.55, y: 0.42, height: 0.9, radiusX: 0.18, radiusY: 0.11 },
+  ];
+  
+  // Apply gaussian mounds
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const nx = x / gridWidth;
+      const ny = y / gridHeight;
       
-      // Long flowing ridges (horizontal/diagonal bands)
-      const v1 = noise1.noise(nx * 2.5, ny * 5) * 1.2;
+      let height = 0;
       
-      // Medium ridge details
-      const v2 = noise2.noise(nx * 5, ny * 8) * 0.6;
+      // Sum all gaussian mounds
+      for (const mound of mounds) {
+        const dx = (nx - mound.x) / mound.radiusX;
+        const dy = (ny - mound.y) / mound.radiusY;
+        const dist2 = dx * dx + dy * dy;
+        height += mound.height * Math.exp(-dist2 * 3);
+      }
       
-      // Fine texture
-      const v3 = noise3.noise(nx * 12, ny * 15) * 0.2;
+      // Add subtle low-frequency noise for organic variation
+      const noiseX = Math.sin(nx * Math.PI * 2.3 + ny * Math.PI * 1.7) * 0.08;
+      const noiseY = Math.cos(ny * Math.PI * 2.1 + nx * Math.PI * 1.9) * 0.06;
+      height += noiseX + noiseY;
       
-      // Strong right-side bias: left is empty, right is dense
-      // Use exponential to create sharp transition
-      const rightBias = Math.pow(nx, 2.5) * 1.5;
+      // Bias toward bottom-right
+      const rightBias = Math.pow(nx, 2.0) * 0.4;
+      const bottomBias = Math.pow(ny, 1.5) * 0.25;
+      height += rightBias + bottomBias;
       
-      // Bottom bias for additional detail
-      const bottomBias = Math.pow(ny, 1.8) * 0.4;
-      
-      // Create a steep convergence zone in the center-right/bottom
-      const centerX = 0.7;
-      const centerY = 0.6;
-      const distToCenter = Math.sqrt(Math.pow(nx - centerX, 2) * 2 + Math.pow(ny - centerY, 2));
-      const convergenceZone = Math.exp(-distToCenter * 3) * 0.8;
-      
-      field[y][x] = v1 + v2 + v3 + rightBias + bottomBias + convergenceZone;
+      field[y][x] = height;
     }
   }
   
   return field;
 }
 
-// Marching squares to extract contour lines
-function extractContours(field, level) {
+// Marching squares contour extraction with sub-pixel interpolation
+function extractContours(field, level, config) {
+  const { gridWidth, gridHeight } = config;
   const height = field.length;
   const width = field[0].length;
-  const contours = [];
   const visited = Array(height).fill(0).map(() => Array(width).fill(false));
+  const contours = [];
   
-  function getEdgePoint(x, y, dx, dy) {
-    const v1 = field[y][x];
-    const v2 = field[y + dy][x + dx];
-    const t = (level - v1) / (v2 - v1);
-    return [x + dx * t, y + dy * t];
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
   }
   
+  function getEdgePoint(x, y, dir) {
+    let x1 = x, y1 = y, x2 = x, y2 = y;
+    
+    if (dir === 0) { x2++; } // top
+    else if (dir === 1) { y2++; } // right
+    else if (dir === 2) { x2++; y1++; y2++; } // bottom
+    else { x1++; x2++; y2++; } // left
+    
+    if (x2 >= width || y2 >= height) return null;
+    
+    const v1 = field[y1][x1];
+    const v2 = field[y2][x2];
+    
+    if (Math.abs(v2 - v1) < 0.0001) return null;
+    
+    const t = (level - v1) / (v2 - v1);
+    if (t < 0 || t > 1) return null;
+    
+    if (dir === 0 || dir === 2) {
+      return [lerp(x1, x2, t), y1];
+    } else {
+      return [x1, lerp(y1, y2, t)];
+    }
+  }
+  
+  // Find all contour starting points
   for (let y = 0; y < height - 1; y++) {
     for (let x = 0; x < width - 1; x++) {
-      if (visited[y][x]) continue;
+      // Skip far left (keep it empty, but less aggressive)
+      if (x / width < 0.22) continue;
       
-      const corners = [
-        field[y][x],
-        field[y][x + 1],
-        field[y + 1][x + 1],
-        field[y + 1][x]
-      ];
+      const c00 = field[y][x] >= level;
+      const c10 = field[y][x + 1] >= level;
+      const c11 = field[y + 1][x + 1] >= level;
+      const c01 = field[y + 1][x] >= level;
       
-      // Calculate marching squares case
-      let caseIndex = 0;
-      if (corners[0] >= level) caseIndex |= 1;
-      if (corners[1] >= level) caseIndex |= 2;
-      if (corners[2] >= level) caseIndex |= 4;
-      if (corners[3] >= level) caseIndex |= 8;
+      // Check if this cell has a contour
+      const caseIdx = (c00 ? 1 : 0) | (c10 ? 2 : 0) | (c11 ? 4 : 0) | (c01 ? 8 : 0);
       
-      // Only process cells that have contour lines
-      if (caseIndex === 0 || caseIndex === 15) continue;
-      
-      // Trace contour from this cell
-      const points = traceContour(field, level, x, y, visited);
-      if (points && points.length > 3) {
-        contours.push(points);
+      if (caseIdx !== 0 && caseIdx !== 15 && !visited[y][x]) {
+        const contour = traceContour(x, y, level, field, visited);
+        if (contour && contour.length >= config.minContourLength) {
+          contours.push(contour);
+        }
       }
     }
   }
   
   return contours;
-}
-
-function traceContour(field, level, startX, startY, visited) {
-  const points = [];
-  let x = startX;
-  let y = startY;
-  const maxSteps = 10000;
-  let steps = 0;
   
-  while (steps < maxSteps) {
-    if (x < 0 || y < 0 || y >= field.length - 1 || x >= field[0].length - 1) break;
-    if (visited[y][x]) {
-      if (steps > 0) break;  // Completed loop
+  function traceContour(startX, startY, level, field, visited) {
+    const points = [];
+    let x = startX;
+    let y = startY;
+    let prevDir = -1;
+    const maxSteps = 5000;
+    
+    for (let step = 0; step < maxSteps; step++) {
+      if (x < 0 || y < 0 || x >= width - 1 || y >= height - 1) break;
+      
+      if (visited[y][x] && step > 5) break;
+      visited[y][x] = true;
+      
+      const c00 = field[y][x] >= level;
+      const c10 = field[y][x + 1] >= level;
+      const c11 = field[y + 1][x + 1] >= level;
+      const c01 = field[y + 1][x] >= level;
+      
+      const caseIdx = (c00 ? 1 : 0) | (c10 ? 2 : 0) | (c11 ? 4 : 0) | (c01 ? 8 : 0);
+      
+      // Get edge crossings for this cell
+      const edges = [];
+      
+      // Top edge
+      if ((c00 && !c10) || (!c00 && c10)) {
+        const pt = getEdgePoint(x, y, 0);
+        if (pt) edges.push({ pt, dir: 0, nextX: x, nextY: y - 1 });
+      }
+      // Right edge
+      if ((c10 && !c11) || (!c10 && c11)) {
+        const pt = getEdgePoint(x, y, 1);
+        if (pt) edges.push({ pt, dir: 1, nextX: x + 1, nextY: y });
+      }
+      // Bottom edge
+      if ((c01 && !c11) || (!c01 && c11)) {
+        const pt = getEdgePoint(x, y, 2);
+        if (pt) edges.push({ pt, dir: 2, nextX: x, nextY: y + 1 });
+      }
+      // Left edge
+      if ((c00 && !c01) || (!c00 && c01)) {
+        const pt = getEdgePoint(x, y, 3);
+        if (pt) edges.push({ pt, dir: 3, nextX: x - 1, nextY: y });
+      }
+      
+      if (edges.length === 0) break;
+      
+      // Choose edge (prefer not going back)
+      let chosenEdge = edges[0];
+      if (edges.length === 2) {
+        chosenEdge = edges[0].dir === prevDir ? edges[1] : edges[0];
+      }
+      
+      points.push(chosenEdge.pt);
+      prevDir = (chosenEdge.dir + 2) % 4;
+      x = chosenEdge.nextX;
+      y = chosenEdge.nextY;
+      
+      // Check if loop closed
+      if (step > 5 && x === startX && y === startY) {
+        break;
+      }
     }
     
-    visited[y][x] = true;
-    
-    const corners = [
-      field[y][x],
-      field[y][x + 1],
-      field[y + 1][x + 1],
-      field[y + 1][x]
-    ];
-    
-    let caseIndex = 0;
-    if (corners[0] >= level) caseIndex |= 1;
-    if (corners[1] >= level) caseIndex |= 2;
-    if (corners[2] >= level) caseIndex |= 4;
-    if (corners[3] >= level) caseIndex |= 8;
-    
-    // Get interpolated edge points
-    const mid = [x + 0.5, y + 0.5];
-    const top = [x + 0.5, y];
-    const right = [x + 1, y + 0.5];
-    const bottom = [x + 0.5, y + 1];
-    const left = [x, y + 0.5];
-    
-    // Follow contour based on case
-    switch (caseIndex) {
-      case 1: case 14: points.push(left, bottom); y++; break;
-      case 2: case 13: points.push(top, right); x++; break;
-      case 3: case 12: points.push(left, right); x++; break;
-      case 4: case 11: points.push(right, bottom); y++; break;
-      case 6: case 9: points.push(top, bottom); y++; break;
-      case 7: case 8: points.push(left, top); y--; break;
-      default: steps = maxSteps;  // Ambiguous case, stop
-    }
-    
-    steps++;
-    if (steps > 2 && x === startX && y === startY) break;  // Loop closed
+    return points.length >= config.minContourLength ? points : null;
   }
-  
-  return points.length > 0 ? points : null;
 }
 
-// Smooth contour with cubic bezier approximation
-function smoothContour(points, tension = 0.3) {
-  if (points.length < 4) return points;
+// Chaikin curve smoothing algorithm
+function smoothContour(points, iterations) {
+  if (points.length < 3) return points;
   
-  const smoothed = [];
+  let smoothed = [...points];
   
-  for (let i = 0; i < points.length - 2; i += 2) {
-    const p0 = points[i];
-    const p1 = points[i + 1] || points[i];
-    const p2 = points[i + 2] || p1;
+  for (let iter = 0; iter < iterations; iter++) {
+    const newPoints = [];
+    const isClosed = Math.hypot(
+      smoothed[0][0] - smoothed[smoothed.length - 1][0],
+      smoothed[0][1] - smoothed[smoothed.length - 1][1]
+    ) < 2;
     
-    // Calculate control points for smooth curve
-    const cp1x = p0[0] + (p1[0] - p0[0]) * tension;
-    const cp1y = p0[1] + (p1[1] - p0[1]) * tension;
-    const cp2x = p1[0] - (p2[0] - p1[0]) * tension;
-    const cp2y = p1[1] - (p2[1] - p1[1]) * tension;
+    for (let i = 0; i < smoothed.length - 1; i++) {
+      const p0 = smoothed[i];
+      const p1 = smoothed[i + 1];
+      
+      // Q point (3/4 along from p0 to p1)
+      newPoints.push([
+        p0[0] * 0.75 + p1[0] * 0.25,
+        p0[1] * 0.75 + p1[1] * 0.25
+      ]);
+      
+      // R point (1/4 along from p0 to p1)
+      newPoints.push([
+        p0[0] * 0.25 + p1[0] * 0.75,
+        p0[1] * 0.25 + p1[1] * 0.75
+      ]);
+    }
     
-    smoothed.push({ type: 'M', point: p0 });
-    smoothed.push({ type: 'C', cp1: [cp1x, cp1y], cp2: [cp2x, cp2y], point: p1 });
+    // Handle closure for closed contours
+    if (isClosed && smoothed.length > 3) {
+      const p0 = smoothed[smoothed.length - 1];
+      const p1 = smoothed[0];
+      
+      newPoints.push([
+        p0[0] * 0.75 + p1[0] * 0.25,
+        p0[1] * 0.75 + p1[1] * 0.25
+      ]);
+      newPoints.push([
+        p0[0] * 0.25 + p1[0] * 0.75,
+        p0[1] * 0.25 + p1[1] * 0.75
+      ]);
+    }
+    
+    smoothed = newPoints;
   }
   
   return smoothed;
 }
 
-// Assign line style based on elevation and steepness
-function getLineStyle(level, gradient, maxGradient, avgX) {
-  const random = new Random(level * 1000);
+// Calculate contour statistics
+function analyzeContour(points, field, config) {
+  const { gridWidth, gridHeight } = config;
+  
+  let avgX = 0;
+  let avgY = 0;
+  let maxGradient = 0;
+  
+  for (const [x, y] of points) {
+    avgX += x / gridWidth;
+    avgY += y / gridHeight;
+    
+    // Sample gradient
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    
+    if (ix > 0 && ix < gridWidth - 1 && iy > 0 && iy < gridHeight - 1) {
+      const dx = Math.abs(field[iy][ix + 1] - field[iy][ix - 1]);
+      const dy = Math.abs(field[iy + 1][ix] - field[iy - 1][ix]);
+      const grad = Math.sqrt(dx * dx + dy * dy);
+      maxGradient = Math.max(maxGradient, grad);
+    }
+  }
+  
+  avgX /= points.length;
+  avgY /= points.length;
+  
+  return { avgX, avgY, gradient: maxGradient };
+}
+
+// Assign stroke style based on contour properties
+function getStrokeStyle(stats, level, random) {
+  const { avgX, avgY, gradient } = stats;
   const r = random.next();
   
-  // Steeper areas get tighter, more varied lines
-  const steepness = gradient / maxGradient;
-  
-  // Vary stroke width - thin lines, especially in tight clusters
   let strokeWidth = CONFIG.baseStrokeWidth;
-  if (level % 6 === 0) strokeWidth *= 1.3;  // Occasional thicker line
   
-  // Aggressively thin tight convergence clusters
-  if (steepness > 0.7) strokeWidth *= 0.5;
-  else if (steepness > 0.5) strokeWidth *= 0.7;
+  // Thicker every 5th line
+  if (level % 5 === 0) strokeWidth *= 1.4;
   
-  // Vary dash pattern - more dotted in sparse left areas
+  // Aggressively thin tight convergence areas
+  if (gradient > 0.6) strokeWidth *= 0.45;
+  else if (gradient > 0.4) strokeWidth *= 0.65;
+  else if (gradient > 0.2) strokeWidth *= 0.85;
+  
+  // Dash pattern
   let dashArray = 'none';
-  const isLeftSide = avgX < 0.4;
-  const isSparse = steepness < 0.3;
+  const isLeftSparse = avgX < 0.5 && gradient < 0.3;
   
-  if (isLeftSide && isSparse && r < 0.4) {
-    dashArray = '1,2';  // Faint dotted
-    strokeWidth *= 0.7;
+  if (isLeftSparse && r < 0.35) {
+    dashArray = '0.8,2.5';  // Faint dotted in sparse areas
+    strokeWidth *= 0.6;
   } else if (r < 0.08) {
-    dashArray = '1.5,2.5';  // Subtle dotted
+    dashArray = '1.2,2.2';  // Subtle dotted
+    strokeWidth *= 0.8;
   } else if (r < 0.15) {
-    dashArray = '3,2';  // Light dashed
+    dashArray = '2.5,1.8';  // Light dashed
   }
-  // Otherwise solid (85% of lines)
   
   return { strokeWidth, dashArray };
 }
 
-// Calculate local gradient (steepness)
-function calculateGradient(field, x, y) {
-  const height = field.length;
-  const width = field[0].length;
+// Convert contour to SVG path with optimized precision
+function contourToPath(points, scaleX, scaleY, isClosed) {
+  if (points.length < 2) return '';
   
-  if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) return 0;
+  // Reduce precision to 1 decimal place to save space
+  const parts = [`M${(points[0][0] * scaleX).toFixed(1)},${(points[0][1] * scaleY).toFixed(1)}`];
   
-  const dx = field[y][x + 1] - field[y][x - 1];
-  const dy = field[y + 1][x] - field[y - 1][x];
-  
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// Convert contour to SVG path
-function contourToPath(contour, scaleX, scaleY) {
-  if (contour.length < 2) return '';
-  
-  const parts = [];
-  
-  for (let i = 0; i < contour.length; i++) {
-    const point = contour[i];
-    
-    if (typeof point[0] === 'number') {
-      // Simple point
-      const x = (point[0] * scaleX).toFixed(2);
-      const y = (point[1] * scaleY).toFixed(2);
-      parts.push(i === 0 ? `M${x},${y}` : `L${x},${y}`);
-    }
+  for (let i = 1; i < points.length; i++) {
+    const x = (points[i][0] * scaleX).toFixed(1);
+    const y = (points[i][1] * scaleY).toFixed(1);
+    parts.push(`L${x},${y}`);
   }
   
-  // Close the path if it's a loop
-  if (contour.length > 10) {
+  if (isClosed && points.length > 10) {
     parts.push('Z');
   }
   
   return parts.join(' ');
 }
 
-// Generate SVG
+// Main generation
 function generateSVG(config) {
-  console.log('Generating height field...');
-  const field = generateHeightField(config.gridWidth, config.gridHeight, config.seed);
+  console.log('Generating organic topographic pattern...');
+  console.log(`Output: ${config.width}x${config.height}px`);
+  console.log(`Grid: ${config.gridWidth}x${config.gridHeight}`);
+  console.log(`Contour levels: ${config.contourLevels}`);
   
-  // Calculate max gradient for normalization
-  console.log('Calculating gradients...');
-  let maxGradient = 0;
-  for (let y = 1; y < config.gridHeight - 1; y++) {
-    for (let x = 1; x < config.gridWidth - 1; x++) {
-      const grad = calculateGradient(field, x, y);
-      maxGradient = Math.max(maxGradient, grad);
-    }
-  }
+  const field = generateHeightField(config);
   
-  // Find min/max elevation
+  // Find elevation range
   let minElev = Infinity;
   let maxElev = -Infinity;
   for (const row of field) {
@@ -357,42 +390,34 @@ function generateSVG(config) {
   }
   
   console.log(`Elevation range: ${minElev.toFixed(2)} to ${maxElev.toFixed(2)}`);
-  console.log('Extracting contours...');
+  console.log('Extracting and smoothing contours...');
   
-  // Extract contours
   const allContours = [];
-  const levels = [];
+  const random = new Random(config.seed + 1000);
+  
   for (let i = 0; i < config.contourLevels; i++) {
     const level = minElev + (maxElev - minElev) * (i + 1) / (config.contourLevels + 1);
-    levels.push(level);
-    const contours = extractContours(field, level);
+    const rawContours = extractContours(field, level, config);
     
-    for (const contour of contours) {
-      // Skip very short contours
-      if (contour.length < 4) continue;
+    for (const raw of rawContours) {
+      // Apply Chaikin smoothing
+      const smoothed = smoothContour(raw, config.smoothingIterations);
       
-      // Calculate average gradient and position along contour
-      let avgGradient = 0;
-      let avgX = 0;
-      for (let j = 0; j < Math.min(contour.length, 10); j++) {
-        const p = contour[j];
-        const gx = Math.floor(p[0]);
-        const gy = Math.floor(p[1]);
-        avgGradient += calculateGradient(field, gx, gy);
-        avgX += gx / config.gridWidth;
+      if (smoothed.length >= config.minContourLength) {
+        const stats = analyzeContour(smoothed, field, config);
+        const style = getStrokeStyle(stats, i, random);
+        
+        const isClosed = Math.hypot(
+          smoothed[0][0] - smoothed[smoothed.length - 1][0],
+          smoothed[0][1] - smoothed[smoothed.length - 1][1]
+        ) < 2;
+        
+        allContours.push({ points: smoothed, style, isClosed });
       }
-      avgGradient /= Math.min(contour.length, 10);
-      avgX /= Math.min(contour.length, 10);
-      
-      // Skip contours that are too far left (empty left side)
-      if (avgX < 0.25) continue;
-      
-      const style = getLineStyle(i, avgGradient, maxGradient, avgX);
-      allContours.push({ contour, style });
     }
   }
   
-  console.log(`Generated ${allContours.length} contours`);
+  console.log(`Generated ${allContours.length} smooth contours`);
   
   // Build SVG
   const scaleX = config.width / config.gridWidth;
@@ -403,44 +428,37 @@ function generateSVG(config) {
 `;
   
   if (config.backgroundColor !== 'transparent') {
-    svg += `  <rect width="${config.width}" height="${config.height}" fill="${config.backgroundColor}"/>
-`;
+    svg += `  <rect width="${config.width}" height="${config.height}" fill="${config.backgroundColor}"/>\n`;
   }
   
-  svg += `  <g fill="none" stroke="${config.lineColor}" stroke-linecap="round" stroke-linejoin="round" opacity="${config.opacity}">
-`;
+  svg += `  <g fill="none" stroke="${config.lineColor}" stroke-linecap="round" stroke-linejoin="round" opacity="${config.opacity}">\n`;
   
-  for (const { contour, style } of allContours) {
-    const pathData = contourToPath(contour, scaleX, scaleY);
+  for (const { points, style, isClosed } of allContours) {
+    const pathData = contourToPath(points, scaleX, scaleY, isClosed);
     if (pathData) {
       const dashAttr = style.dashArray !== 'none' ? ` stroke-dasharray="${style.dashArray}"` : '';
-      svg += `    <path d="${pathData}" stroke-width="${style.strokeWidth}"${dashAttr}/>
-`;
+      svg += `    <path d="${pathData}" stroke-width="${style.strokeWidth.toFixed(3)}"${dashAttr}/>\n`;
     }
   }
   
-  svg += `  </g>
-</svg>`;
+  svg += `  </g>\n</svg>`;
   
   return svg;
 }
 
-// Main
-function main() {
-  console.log('Generating procedural topographic map...');
-  console.log(`Output: ${CONFIG.width}x${CONFIG.height}px`);
-  console.log(`Grid: ${CONFIG.gridWidth}x${CONFIG.gridHeight}`);
-  console.log(`Contour levels: ${CONFIG.contourLevels}`);
-  
-  const svg = generateSVG(CONFIG);
-  
-  const outputPath = path.join(__dirname, '..', 'public', 'topo.svg');
-  fs.writeFileSync(outputPath, svg, 'utf-8');
-  
-  console.log(`✓ Written to ${outputPath}`);
-  console.log(`  File size: ${(svg.length / 1024).toFixed(1)} KB`);
-}
+// Execute
+console.log('Starting generation...');
+const svg = generateSVG(CONFIG);
 
-main();
+const outputPath = path.join(__dirname, '..', 'public', 'topo.svg');
+fs.writeFileSync(outputPath, svg, 'utf-8');
+
+const sizeKB = (svg.length / 1024).toFixed(1);
+console.log(`✓ Written to ${outputPath}`);
+console.log(`  File size: ${sizeKB} KB`);
+
+if (parseFloat(sizeKB) > 150) {
+  console.warn(`⚠ Warning: File size ${sizeKB} KB exceeds 150 KB target`);
+}
 
 export { generateSVG, CONFIG };
