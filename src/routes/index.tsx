@@ -90,16 +90,16 @@ function Home() {
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link
-                to="/builder"
+                to="/bootcamp"
                 className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
               >
-                Build retreat
+                Explore bootcamp
               </Link>
               <Link
-                to="/bootcamp"
+                to="/builder"
                 className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
               >
-                Explore bootcamp
+                Build retreat
               </Link>
             </div>
           </div>

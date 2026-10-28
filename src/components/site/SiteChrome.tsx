@@ -73,13 +73,15 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       <BookPanel />
 
       <footer className="bg-coal pt-16 text-[0.9rem] text-fossil/70">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-10 md:grid-cols-[2fr_1fr_1fr]">
           <div>
             <div className="mb-3">
               <Mark />
             </div>
             <p className="max-w-sm uppercase">
-              PACE is the path. Unearth Self is the purpose.
+              PACE is the path.
+              <br />
+              Unearth Self is the purpose.
             </p>
           </div>
           <div>
@@ -117,11 +119,6 @@ export function SiteChrome({ children }: { children: ReactNode }) {
                 </a>
               </li>
             </ul>
-          </div>
-        </div>
-        <div className="border-t border-fossil/10 px-4 pt-10 pb-10">
-          <div className="mx-auto max-w-7xl">
-            <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Partners</h4>
           </div>
         </div>
         <RuneTape />
