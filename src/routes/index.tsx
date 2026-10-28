@@ -126,11 +126,9 @@ function Home() {
           src="/images/bootcamp-crew.jpg"
           alt="Four people walking a trail through the badlands"
           className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
-        />
-        <div 
-          className="pointer-events-none absolute inset-x-0 top-0 h-[35%]"
           style={{
-            background: 'linear-gradient(to bottom, #161718 0%, rgba(22,23,24,0.85) 15%, rgba(22,23,24,0.50) 30%, rgba(22,23,24,0.15) 50%, transparent 70%)'
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)'
           }}
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-coal to-transparent" />
