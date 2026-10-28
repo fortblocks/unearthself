@@ -22,13 +22,13 @@ const __dirname = path.dirname(__filename);
 const CONFIG = {
   width: 1600,
   height: 1000,
-  gridWidth: 160,  // Lower resolution for smoother curves
-  gridHeight: 100,
-  contourLevels: 30,  // ~50% fewer than typical dense maps
-  baseStrokeWidth: 0.5,
+  gridWidth: 140,  // Lower resolution for smoother, longer curves
+  gridHeight: 90,
+  contourLevels: 22,  // 50% fewer than reference (moderate density)
+  baseStrokeWidth: 0.4,  // Thin, delicate lines
   backgroundColor: 'transparent',
   lineColor: '#F8F0ED', // Fossil white
-  opacity: 0.4,  // Subtle so text remains legible
+  opacity: 0.35,  // Subtle so text remains legible
   seed: 42
 };
 
@@ -95,7 +95,7 @@ class NoiseField {
   }
 }
 
-// Generate height field with organic mounds and ridges
+// Generate height field with flowing ridges biased to right/bottom
 function generateHeightField(width, height, seed) {
   const field = Array(height).fill(0).map(() => Array(width).fill(0));
   const noise1 = new NoiseField(width, height, seed);
@@ -104,23 +104,32 @@ function generateHeightField(width, height, seed) {
   
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      // Combine multiple noise octaves for organic terrain
       const nx = x / width;
       const ny = y / height;
       
-      // Large features (mounds)
-      const v1 = noise1.noise(nx * 3, ny * 3);
+      // Long flowing ridges (horizontal/diagonal bands)
+      const v1 = noise1.noise(nx * 2.5, ny * 5) * 1.2;
       
-      // Medium features (ridges)
-      const v2 = noise2.noise(nx * 7, ny * 7) * 0.5;
+      // Medium ridge details
+      const v2 = noise2.noise(nx * 5, ny * 8) * 0.6;
       
-      // Small details
-      const v3 = noise3.noise(nx * 15, ny * 15) * 0.25;
+      // Fine texture
+      const v3 = noise3.noise(nx * 12, ny * 15) * 0.2;
       
-      // Create some prominent peaks biased toward the right side
-      const rightBias = Math.pow(nx, 1.5) * 0.3;
+      // Strong right-side bias: left is empty, right is dense
+      // Use exponential to create sharp transition
+      const rightBias = Math.pow(nx, 2.5) * 1.5;
       
-      field[y][x] = v1 + v2 + v3 + rightBias;
+      // Bottom bias for additional detail
+      const bottomBias = Math.pow(ny, 1.8) * 0.4;
+      
+      // Create a steep convergence zone in the center-right/bottom
+      const centerX = 0.7;
+      const centerY = 0.6;
+      const distToCenter = Math.sqrt(Math.pow(nx - centerX, 2) * 2 + Math.pow(ny - centerY, 2));
+      const convergenceZone = Math.exp(-distToCenter * 3) * 0.8;
+      
+      field[y][x] = v1 + v2 + v3 + rightBias + bottomBias + convergenceZone;
     }
   }
   
@@ -251,26 +260,35 @@ function smoothContour(points, tension = 0.3) {
 }
 
 // Assign line style based on elevation and steepness
-function getLineStyle(level, gradient, maxGradient) {
+function getLineStyle(level, gradient, maxGradient, avgX) {
   const random = new Random(level * 1000);
   const r = random.next();
   
   // Steeper areas get tighter, more varied lines
   const steepness = gradient / maxGradient;
   
-  // Vary stroke width
+  // Vary stroke width - thin lines, especially in tight clusters
   let strokeWidth = CONFIG.baseStrokeWidth;
-  if (level % 5 === 0) strokeWidth *= 1.5;  // Every 5th line is thicker
-  if (steepness > 0.6) strokeWidth *= 0.8;  // Thin out tight clusters
+  if (level % 6 === 0) strokeWidth *= 1.3;  // Occasional thicker line
   
-  // Vary dash pattern
+  // Aggressively thin tight convergence clusters
+  if (steepness > 0.7) strokeWidth *= 0.5;
+  else if (steepness > 0.5) strokeWidth *= 0.7;
+  
+  // Vary dash pattern - more dotted in sparse left areas
   let dashArray = 'none';
-  if (r < 0.15) {
-    dashArray = '2,2';  // Dotted
-  } else if (r < 0.30) {
-    dashArray = '4,2';  // Dashed
+  const isLeftSide = avgX < 0.4;
+  const isSparse = steepness < 0.3;
+  
+  if (isLeftSide && isSparse && r < 0.4) {
+    dashArray = '1,2';  // Faint dotted
+    strokeWidth *= 0.7;
+  } else if (r < 0.08) {
+    dashArray = '1.5,2.5';  // Subtle dotted
+  } else if (r < 0.15) {
+    dashArray = '3,2';  // Light dashed
   }
-  // Otherwise solid (70% of lines)
+  // Otherwise solid (85% of lines)
   
   return { strokeWidth, dashArray };
 }
@@ -350,17 +368,26 @@ function generateSVG(config) {
     const contours = extractContours(field, level);
     
     for (const contour of contours) {
-      // Calculate average gradient along contour
+      // Skip very short contours
+      if (contour.length < 4) continue;
+      
+      // Calculate average gradient and position along contour
       let avgGradient = 0;
+      let avgX = 0;
       for (let j = 0; j < Math.min(contour.length, 10); j++) {
         const p = contour[j];
         const gx = Math.floor(p[0]);
         const gy = Math.floor(p[1]);
         avgGradient += calculateGradient(field, gx, gy);
+        avgX += gx / config.gridWidth;
       }
       avgGradient /= Math.min(contour.length, 10);
+      avgX /= Math.min(contour.length, 10);
       
-      const style = getLineStyle(i, avgGradient, maxGradient);
+      // Skip contours that are too far left (empty left side)
+      if (avgX < 0.25) continue;
+      
+      const style = getLineStyle(i, avgGradient, maxGradient, avgX);
       allContours.push({ contour, style });
     }
   }
