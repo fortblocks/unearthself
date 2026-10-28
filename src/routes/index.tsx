@@ -16,7 +16,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   return (
     <main className="bg-coal text-fossil">
-      <section className="relative flex min-h-[100dvh] items-end overflow-hidden">
+      <section className="relative flex min-h-[100dvh] items-end">
         <video
           className="absolute inset-0 h-full w-full object-cover object-[center_65%]"
           autoPlay
@@ -28,6 +28,15 @@ function Home() {
           <source src="/images/hero-clouds.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
+        
+        {/* Diagonal corner banner */}
+        <Link
+          to="/book/retreat"
+          className="absolute bottom-0 right-0 z-20 origin-bottom-right rotate-[-45deg] translate-x-[29%] translate-y-[29%] bg-ember px-12 py-3 text-center text-[0.7rem] font-bold uppercase tracking-[0.2em] text-white shadow-lg transition-all hover:bg-ember/90 hover:shadow-xl sm:px-16 sm:py-3.5 sm:text-[0.75rem]"
+        >
+          Now Planning 2027 Retreats
+        </Link>
+        
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
             Canadian Badlands · Drumheller, AB
@@ -108,9 +117,9 @@ function Home() {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
               />
             </div>
-            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Treatments</p>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Spa & Wellness Center</p>
             <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
-            <p className="mt-2 text-fossil/65">Heat, cold and hands. Day guests welcome.</p>
+            <p className="mt-2 text-fossil/65">Come experience our newly refurbished spa facility in the heart of downtown Drumheller. We offer red light therapy, body wraps, massage, cold plunge, infrared saunas and more.</p>
           </Link>
           <Link to="/haven" className="group block">
             <div className="aspect-[4/3] overflow-hidden bg-shale">
@@ -120,9 +129,9 @@ function Home() {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
               />
             </div>
-            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">The house</p>
-            <h3 className="font-display mt-1 text-3xl uppercase">Haven</h3>
-            <p className="mt-2 text-fossil/65">Four suites. Sleep here whether you came for the land or the quiet.</p>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Boutique Hotel</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
+            <p className="mt-2 text-fossil/65">Drumheller's premier hotel accommodation. Four luxury apartment suites conveniently located within a short walking distance of downtown's bars, restaurants and shopping.</p>
           </Link>
         </div>
       </section>
