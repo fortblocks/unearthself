@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { HomeGallery } from "@/components/site/HomeGallery";
 
 export const Route = createFileRoute("/bootcamp")({
   component: BootcampPage,
@@ -98,6 +99,8 @@ function BootcampPage() {
           </p>
         </div>
       </section>
+
+      <HomeGallery />
 
       <section className="border-t border-fossil/10 px-6 py-16">
         <div className="mx-auto grid max-w-5xl gap-8 sm:grid-cols-2 md:grid-cols-4">
