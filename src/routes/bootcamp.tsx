@@ -51,14 +51,14 @@ const audiences = [
   {
     title: "Crews",
     line: "Firefighters, police services, coaching staff. Groups who already work as one.",
-    to: "/book/retreat",
-    cta: "Start a conversation",
+    to: "/for/crews",
+    cta: "For crews",
   },
   {
     title: "Friends",
     line: "Friends who want the outdoors together.",
-    to: "/book/retreat",
-    cta: "Start a conversation",
+    to: "/for/friends",
+    cta: "For friends",
   },
 ] as const;
 

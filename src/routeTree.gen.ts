@@ -42,6 +42,8 @@ import { Route as D14IndexRouteImport } from './routes/d14.index'
 import { Route as D14BasecampRouteImport } from './routes/d14.basecamp'
 import { Route as D14SeamRouteImport } from './routes/d14.seam'
 import { Route as D14SpecimenRouteImport } from './routes/d14.specimen'
+import { Route as ForCrewsRouteImport } from './routes/for.crews'
+import { Route as ForFriendsRouteImport } from './routes/for.friends'
 import { Route as ForTeamsRouteImport } from './routes/for.teams'
 import { Route as HavenIndexRouteImport } from './routes/haven.index'
 import { Route as HavenSlugRouteImport } from './routes/haven.$slug'
@@ -234,6 +236,16 @@ const D14SpecimenRoute = D14SpecimenRouteImport.update({
   path: '/specimen',
   getParentRoute: () => D14Route,
 } as any)
+const ForCrewsRoute = ForCrewsRouteImport.update({
+  id: '/for/crews',
+  path: '/for/crews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForFriendsRoute = ForFriendsRouteImport.update({
+  id: '/for/friends',
+  path: '/for/friends',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForTeamsRoute = ForTeamsRouteImport.update({
   id: '/for/teams',
   path: '/for/teams',
@@ -397,6 +409,8 @@ export interface FileRoutesByFullPath {
   '/d14/basecamp': typeof D14BasecampRoute
   '/d14/seam': typeof D14SeamRoute
   '/d14/specimen': typeof D14SpecimenRoute
+  '/for/crews': typeof ForCrewsRoute
+  '/for/friends': typeof ForFriendsRoute
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
@@ -453,6 +467,8 @@ export interface FileRoutesByTo {
   '/d14/basecamp': typeof D14BasecampRoute
   '/d14/seam': typeof D14SeamRoute
   '/d14/specimen': typeof D14SpecimenRoute
+  '/for/crews': typeof ForCrewsRoute
+  '/for/friends': typeof ForFriendsRoute
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
@@ -514,6 +530,8 @@ export interface FileRoutesById {
   '/d14/basecamp': typeof D14BasecampRoute
   '/d14/seam': typeof D14SeamRoute
   '/d14/specimen': typeof D14SpecimenRoute
+  '/for/crews': typeof ForCrewsRoute
+  '/for/friends': typeof ForFriendsRoute
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
@@ -577,6 +595,8 @@ export interface FileRouteTypes {
     | '/d14/basecamp'
     | '/d14/seam'
     | '/d14/specimen'
+    | '/for/crews'
+    | '/for/friends'
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
@@ -633,6 +653,8 @@ export interface FileRouteTypes {
     | '/d14/basecamp'
     | '/d14/seam'
     | '/d14/specimen'
+    | '/for/crews'
+    | '/for/friends'
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
@@ -693,6 +715,8 @@ export interface FileRouteTypes {
     | '/d14/basecamp'
     | '/d14/seam'
     | '/d14/specimen'
+    | '/for/crews'
+    | '/for/friends'
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
@@ -744,6 +768,8 @@ export interface RootRouteChildren {
   VisitRoute: typeof VisitRoute
   BookRetreatRoute: typeof BookRetreatRoute
   BookTreatmentRoute: typeof BookTreatmentRoute
+  ForCrewsRoute: typeof ForCrewsRoute
+  ForFriendsRoute: typeof ForFriendsRoute
   ForTeamsRoute: typeof ForTeamsRoute
 }
 
@@ -979,6 +1005,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/d14/specimen'
       preLoaderRoute: typeof D14SpecimenRouteImport
       parentRoute: typeof D14Route
+    }
+    '/for/crews': {
+      id: '/for/crews'
+      path: '/for/crews'
+      fullPath: '/for/crews'
+      preLoaderRoute: typeof ForCrewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/for/friends': {
+      id: '/for/friends'
+      path: '/for/friends'
+      fullPath: '/for/friends'
+      preLoaderRoute: typeof ForFriendsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/for/teams': {
       id: '/for/teams'
@@ -1313,6 +1353,8 @@ const rootRouteChildren: RootRouteChildren = {
   VisitRoute: VisitRoute,
   BookRetreatRoute: BookRetreatRoute,
   BookTreatmentRoute: BookTreatmentRoute,
+  ForCrewsRoute: ForCrewsRoute,
+  ForFriendsRoute: ForFriendsRoute,
   ForTeamsRoute: ForTeamsRoute,
 }
 export const routeTree = rootRouteImport
