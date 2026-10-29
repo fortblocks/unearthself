@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { HomeGallery } from "@/components/site/HomeGallery";
+import { RuneCards } from "@/components/site/RuneCards";
 
 export const Route = createFileRoute("/bootcamp")({
   component: BootcampPage,
@@ -172,21 +173,7 @@ function BootcampPage() {
             reveals one, puts you inside it, and asks you to choose again. The four marks below are how
             that sequence is held — on the wall at Basecamp, in Trail Quest, on the thing you take home.
           </p>
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-            {runes.map((r) => (
-              <article key={r.name} className="flex flex-col rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6">
-                <div className="mb-3 flex flex-col items-start gap-4">
-                  <img
-                    src={`/runes/${r.slug}.svg`}
-                    alt=""
-                    className="size-12 shrink-0 brightness-0 invert"
-                  />
-                  <h3 className="font-display text-3xl uppercase">{r.name}</h3>
-                </div>
-                <p className="max-w-[40ch] text-fossil/70">{r.line}</p>
-              </article>
-            ))}
-          </div>
+          <RuneCards runes={runes} />
         </div>
       </section>
 
