@@ -72,7 +72,7 @@ function BootcampPage() {
             to="/book/retreat"
             className="inline-flex rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white"
           >
-            Hold a date
+            Request a conversation
           </Link>
         </div>
       </section>
@@ -230,7 +230,7 @@ function BootcampPage() {
             to="/book/retreat"
             className="inline-flex rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white"
           >
-            Hold a date
+            Talk to us
           </Link>
         </div>
       </section>
