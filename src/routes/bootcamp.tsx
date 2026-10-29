@@ -102,11 +102,11 @@ function BootcampPage() {
 
       <HomeGallery />
 
-      <section className="border-t border-fossil/10 px-6 py-16">
-        <div className="mx-auto grid max-w-5xl gap-8 sm:grid-cols-2 md:grid-cols-4">
+      <section className="px-6 py-16">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-y-12 md:grid-cols-4 md:gap-y-0 md:divide-x md:divide-fossil/10">
           {facts.map((f) => (
-            <div key={f.k} className="border-t border-fossil/15 pt-4">
-              <p className="mb-1 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">{f.k}</p>
+            <div key={f.k} className="px-4 text-center">
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">{f.k}</p>
               <p className="font-display text-2xl uppercase">{f.v}</p>
             </div>
           ))}
@@ -117,25 +117,28 @@ function BootcampPage() {
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">A typical three days</p>
           <h2 className="font-display mb-10 text-4xl uppercase">Arrive as a roster. Leave as a crew.</h2>
-          <div className="grid gap-8 md:grid-cols-3">
-            <article className="border-t border-fossil/15 pt-5">
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day one — Play</p>
+          <div className="grid gap-6 md:grid-cols-3">
+            <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
+              <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day one — Play</p>
               <h3 className="font-display mb-2 text-2xl uppercase">Onto the land</h3>
               <p className="text-fossil/70">
                 Arrive, drop the office, start before anyone has the right answer. Out of the meeting
                 and into the place.
               </p>
             </article>
-            <article className="border-t border-fossil/15 pt-5">
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day two — Adapt + Connect</p>
+            <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
+              <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day two — Adapt + Connect</p>
               <h3 className="font-display mb-2 text-2xl uppercase">The plan will not survive</h3>
               <p className="text-fossil/70">
                 A longer day on the ground. Weather, route, each other. Who you are with when the map
                 and the weather disagree.
               </p>
             </article>
-            <article className="border-t border-fossil/15 pt-5">
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Day three — Experience</p>
+            <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
+              <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day three — Experience</p>
               <h3 className="font-display mb-2 text-2xl uppercase">A quiet close</h3>
               <p className="text-fossil/70">
                 Be in the thing that happened. Name what you will carry. Eat. Drive home before the
@@ -159,10 +162,10 @@ function BootcampPage() {
             reveals one, puts you inside it, and asks you to choose again. The four marks below are how
             that sequence is held — on the wall at Basecamp, in Trail Quest, on the thing you take home.
           </p>
-          <div className="grid gap-10 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             {runes.map((r) => (
-              <article key={r.name} className="border-t border-fossil/15 pt-5">
-                <div className="mb-3 flex items-center gap-4">
+              <article key={r.name} className="flex flex-col rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6">
+                <div className="mb-3 flex flex-col items-start gap-4">
                   <img
                     src={`/runes/${r.slug}.svg`}
                     alt=""
