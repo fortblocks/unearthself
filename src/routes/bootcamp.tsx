@@ -46,6 +46,22 @@ const runes = [
   },
 ];
 
+const audiences = [
+  { title: "Teams", line: "Companies and their people.", to: "/for/teams", cta: "For teams" },
+  {
+    title: "Crews",
+    line: "Firefighters, police services, coaching staff. Groups who already work as one.",
+    to: "/book/retreat",
+    cta: "Start a conversation",
+  },
+  {
+    title: "Friends",
+    line: "Friends who want the outdoors together.",
+    to: "/book/retreat",
+    cta: "Start a conversation",
+  },
+] as const;
+
 function BootcampPage() {
   return (
     <main className="bg-coal text-fossil">
@@ -111,6 +127,32 @@ function BootcampPage() {
               <p className="font-display text-2xl uppercase">{f.v}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <div aria-hidden="true" className="px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="mx-auto h-px w-1/2 bg-fossil/15" />
+        </div>
+      </div>
+
+      <section className="px-6 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-10 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Who it's for</p>
+          <div className="grid gap-6 md:grid-cols-3">
+            {audiences.map((a) => (
+              <Link
+                key={a.title}
+                to={a.to}
+                className="group relative flex flex-col rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8 transition duration-300 hover:border-ember/60 hover:shadow-[0_0_32px_rgba(242,104,76,0.35)] focus-visible:border-ember/60 focus-visible:shadow-[0_0_32px_rgba(242,104,76,0.35)] focus-visible:outline-none"
+              >
+                <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
+                <h3 className="font-display mb-2 text-2xl uppercase">{a.title}</h3>
+                <p className="mb-6 flex-1 text-fossil/70">{a.line}</p>
+                <span className="text-[0.85rem] font-semibold text-ember">{a.cta}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -208,21 +250,33 @@ function BootcampPage() {
         </div>
       </div>
       <section className="px-6 py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-3">
-          <Link to="/for/teams" className="border-t border-fossil/15 pt-5 hover:text-sandstone">
-            <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Teams</p>
-            <h3 className="font-display mb-2 text-2xl uppercase">Written for the person who books it</h3>
-            <p className="text-fossil/65">Same expedition. Calendar-invite language.</p>
+        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2">
+          <Link to="/haven" className="group block">
+            <div className="aspect-[16/9] overflow-hidden bg-shale">
+              <img
+                src="/images/haven/elowen/elowen-01.jpg"
+                alt=""
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              />
+            </div>
+            <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Sleep</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
+            <p className="mt-2 text-fossil/65">Four suites on the block. Overflow held for groups of 30.</p>
+            <p className="mt-1 text-fossil/50">Haven, then Canalta</p>
+            <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Haven</span>
           </Link>
-          <Link to="/haven" className="border-t border-fossil/15 pt-5 hover:text-sandstone">
-            <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Sleep</p>
-            <h3 className="font-display mb-2 text-2xl uppercase">Haven, then Canalta</h3>
-            <p className="text-fossil/65">Four suites on the block. Overflow held for groups of 30.</p>
-          </Link>
-          <Link to="/basecamp" className="border-t border-fossil/15 pt-5 hover:text-sandstone">
-            <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">After the day</p>
-            <h3 className="font-display mb-2 text-2xl uppercase">Basecamp</h3>
-            <p className="text-fossil/65">Heat, cold and hands. The house next door.</p>
+          <Link to="/basecamp" className="group block">
+            <div className="aspect-[16/9] overflow-hidden bg-shale">
+              <img
+                src="/images/basecamp/lounge.jpg"
+                alt=""
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              />
+            </div>
+            <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">After the day</p>
+            <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
+            <p className="mt-2 text-fossil/65">Heat, cold and hands. The house next door.</p>
+            <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Basecamp</span>
           </Link>
         </div>
       </section>
