@@ -220,7 +220,7 @@ function BootcampPage() {
       <section className="bg-fossil px-6 py-16 text-coal">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">Hold a date</p>
+            <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">Start a conversation</p>
             <h2 className="font-display text-4xl uppercase">6 to 30 people. Two to five days.</h2>
             <p className="mt-3 max-w-[42ch] text-coal/70">
               Tell us who is coming and when you can travel. Availability and a figure come back by email.
