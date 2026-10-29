@@ -113,7 +113,10 @@ function BootcampPage() {
         </div>
       </section>
 
-      <section className="border-t border-fossil/10 px-6 py-20">
+      <div aria-hidden="true" className="px-6">
+        <div className="mx-auto h-px max-w-[54rem] bg-fossil/15" />
+      </div>
+      <section className="px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">A typical three days</p>
           <h2 className="font-display mb-10 text-4xl uppercase">Arrive as a roster. Leave as a crew.</h2>
@@ -149,7 +152,10 @@ function BootcampPage() {
         </div>
       </section>
 
-      <section className="border-t border-fossil/10 px-6 py-20">
+      <div aria-hidden="true" className="px-6">
+        <div className="mx-auto h-px max-w-[54rem] bg-fossil/15" />
+      </div>
+      <section className="px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
           <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
@@ -180,7 +186,10 @@ function BootcampPage() {
         </div>
       </section>
 
-      <section className="border-t border-fossil/10 px-6 py-20">
+      <div aria-hidden="true" className="px-6">
+        <div className="mx-auto h-px max-w-[54rem] bg-fossil/15" />
+      </div>
+      <section className="px-6 py-20">
         <div className="mx-auto grid max-w-6xl gap-14 md:grid-cols-2">
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Echo</p>
@@ -203,7 +212,10 @@ function BootcampPage() {
         </div>
       </section>
 
-      <section className="border-t border-fossil/10 px-6 py-20">
+      <div aria-hidden="true" className="px-6">
+        <div className="mx-auto h-px max-w-[54rem] bg-fossil/15" />
+      </div>
+      <section className="px-6 py-20">
         <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-3">
           <Link to="/for/teams" className="border-t border-fossil/15 pt-5 hover:text-sandstone">
             <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Teams</p>
