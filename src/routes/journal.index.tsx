@@ -24,7 +24,7 @@ function JournalIndex() {
             Field notes.
           </h1>
           <p className="max-w-[46ch] text-lg text-fossil/80">
-            The town. The land. The language we are still writing. Not a blog.
+            Notes on the town, the land and the language we are still writing. This is not a blog.
           </p>
         </div>
       </section>
