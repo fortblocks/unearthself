@@ -84,7 +84,7 @@ function BootcampPage() {
             Bootcamp
           </h1>
           <p className="mb-8 max-w-[40ch] text-lg text-fossil/85">
-            A group goes onto the land. They work a sequence. They come back in. That is the product.
+            A group goes out onto the land, works through a sequence together and comes back in. That, simply, is the product.
           </p>
           <Link
             to="/book/retreat"
@@ -111,8 +111,7 @@ function BootcampPage() {
             hands.
           </p>
           <p className="text-lg text-fossil/80">
-            The point is not who is fittest. The point is a group that can see its own patterns and
-            choose again. Ninety minutes from Calgary. The town is small. The land is not.
+            The point is not who is fittest; it is a group that can see its own patterns and choose again. It all happens ninety minutes from Calgary, in a town that is small on land that is not.
           </p>
         </div>
       </section>
@@ -180,8 +179,7 @@ function BootcampPage() {
               <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day two — Adapt + Connect</p>
               <h3 className="font-display mb-2 text-2xl uppercase">The plan will not survive</h3>
               <p className="text-fossil/70">
-                A longer day on the ground. Weather, route, each other. Who you are with when the map
-                and the weather disagree.
+                A longer day on the ground, shaped by weather, route and each other, and by who you are with when the map and the weather disagree.
               </p>
             </article>
             <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
@@ -189,8 +187,7 @@ function BootcampPage() {
               <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day three — Experience</p>
               <h3 className="font-display mb-2 text-2xl uppercase">A quiet close</h3>
               <p className="text-fossil/70">
-                Be in the thing that happened. Name what you will carry. Eat. Drive home before the
-                spell is talked to death.
+                The last day is for being in the thing that happened: naming what you will carry, sharing a meal and driving home before the spell is talked to death.
               </p>
             </article>
           </div>
@@ -230,15 +227,13 @@ function BootcampPage() {
           <h2 className="font-display mb-6 text-4xl uppercase">Trail Quest</h2>
           <div className="max-w-[58ch] space-y-4 border-l-2 border-ember pl-6">
             <p className="text-lg text-fossil/80">
-              Trail Quest is the expedition system, not a wellness dashboard. It is a quest companion.
-              Most of the retreat happens away from the screen.
+              Trail Quest is the expedition system, a quest companion rather than a wellness dashboard, and most of the retreat happens away from the screen.
             </p>
             <p className="text-fossil/75">
               Each Rune is revealed after the encounter, not before. It works with poor or no signal.
             </p>
             <p className="text-fossil/75">
-              No guest-facing AI coach. No diagnosis. Private notes stay on your device. If it fights
-              the canyon, paper wins.
+              There is no guest-facing AI coach and no diagnosis, and private notes stay on your device. If the app ever fights the canyon, paper wins.
             </p>
           </div>
         </div>
@@ -261,7 +256,7 @@ function BootcampPage() {
             </div>
             <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Sleep</p>
             <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
-            <p className="mt-2 text-fossil/65">Four suites on the block. Overflow held for groups of 30.</p>
+            <p className="mt-2 text-fossil/65">Four suites on the block, with overflow held for groups of 30.</p>
             <p className="mt-1 text-fossil/50">Haven, then Canalta</p>
             <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Haven</span>
           </Link>
@@ -275,7 +270,7 @@ function BootcampPage() {
             </div>
             <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">After the day</p>
             <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
-            <p className="mt-2 text-fossil/65">Heat, cold and hands. The house next door.</p>
+            <p className="mt-2 text-fossil/65">Heat, cold and hands, in the house next door.</p>
             <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Basecamp</span>
           </Link>
         </div>

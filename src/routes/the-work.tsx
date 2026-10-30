@@ -56,8 +56,7 @@ function TheWorkPage() {
             Unearth Self is the purpose.
           </h1>
           <p className="max-w-[46ch] text-lg text-fossil/80">
-            A group goes onto the land. They work a sequence. They come back in with a language they
-            can keep using.
+            A group goes out onto the land, works through a sequence together and comes back in with a language it can keep using.
           </p>
         </div>
       </section>
@@ -99,10 +98,9 @@ function TheWorkPage() {
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Echo</p>
             <h2 className="font-display mb-4 text-3xl uppercase">What the day sends back.</h2>
             <p className="mb-4 text-fossil/75">
-              Echo is how the work looks back at you. Short prompts after time on the land. Pattern,
-              not diagnosis. Self-awareness lives here.
+              Echo is how the work looks back at you: short prompts after time on the land that look for pattern, not diagnosis. Self-awareness lives here.
             </p>
-            <p className="text-fossil/75">The canyon does the coaching. The notes are yours.</p>
+            <p className="text-fossil/75">The canyon does the coaching, and the notes are yours.</p>
           </div>
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">HAM</p>

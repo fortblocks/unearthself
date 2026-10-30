@@ -32,7 +32,7 @@ function VisitPage() {
             from Calgary.
           </h1>
           <p className="max-w-[40ch] text-lg text-fossil/85">
-            Not Banff. A small town on deep time. That is why we are here.
+            This is not Banff. It is a small town on deep time, which is exactly why we are here.
           </p>
         </div>
       </section>
@@ -78,11 +78,10 @@ function VisitPage() {
                 workable days, fewer tourists than July.
               </li>
               <li>
-                <strong className="block text-fossil">Summer.</strong> Heat, river, longer light. Book early.
+                <strong className="block text-fossil">Summer.</strong> Heat, the river and longer light, so book early.
               </li>
               <li>
-                <strong className="block text-fossil">Winter.</strong> Short days, ice, snowshoe country. Still
-                a working house. Dress for it.
+                <strong className="block text-fossil">Winter.</strong> Short days, ice and snowshoe country. It is still a working house, so dress for it.
               </li>
             </ul>
           </div>
