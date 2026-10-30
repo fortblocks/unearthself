@@ -32,7 +32,8 @@ function CrewsLander() {
         {
           title: "The plan will not survive.",
           body: "Weather, route and each other all have a say, and that is where the useful friction lives for a crew that already knows how to work when things change.",
-          image: "/images/found/trail.jpg",
+          image: "/images/work/horseshoe.jpg",
+          alt: "Four walkers heading into Horseshoe Canyon between banded slopes",
         },
         {
           title: "Nobody is elected leader.",

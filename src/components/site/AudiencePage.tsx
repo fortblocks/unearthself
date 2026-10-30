@@ -4,6 +4,7 @@ export type AudienceReason = {
   title: string;
   body: string;
   image: string;
+  alt?: string;
   source?: string;
 };
 
@@ -130,7 +131,7 @@ export function AudiencePage({
                 <p className="max-w-[46ch] text-lg leading-relaxed text-fossil/80">{r.body}</p>
               </div>
               <div className={`aspect-[4/5] overflow-hidden rounded-[4px] ${i % 2 === 1 ? "md:order-1" : ""}`}>
-                <img src={r.image} alt="" className="h-full w-full object-cover" />
+                <img src={r.image} alt={r.alt ?? ""} className="h-full w-full object-cover" />
               </div>
             </article>
           ))}

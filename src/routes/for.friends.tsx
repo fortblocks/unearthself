@@ -32,7 +32,8 @@ function FriendsLander() {
         {
           title: "Start before anyone has the right answer.",
           body: "Get out of the car, onto the land, and drop what can be dropped. Play comes first in the sequence, and the point was never who is fittest.",
-          image: "/images/found/walk.jpg",
+          image: "/images/bootcamp-crew.jpg",
+          alt: "Four people walking together into a Badlands canyon",
         },
         {
           title: "A shared story, not a tote bag.",
