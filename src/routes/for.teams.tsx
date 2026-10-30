@@ -20,26 +20,28 @@ function TeamsLander() {
     <AudiencePage
       word="Teams"
       eyebrow="For the person who sends the invite"
-      lede="Take the team somewhere the job title won’t follow. Six to thirty people. Two to five days. Ninety minutes from Calgary."
+      lede="Take the team somewhere the job title won’t follow: six to thirty people, two to five days, ninety minutes from Calgary."
+      introLabel="For corporate teams"
+      introHeading="Not a hotel with a hike."
       intro={[
-        "Badlands Bootcamp for teams is a 2–5 day expedition for six to thirty people from the same company — founders, senior teams, leadership groups who need more than a change of hotel.",
-        "Close enough that Calgary and Edmonton can leave in the morning and be on the land by lunch. Days on the land, a sequence the group can keep using on Monday, and recovery that is actually quiet. Not therapy. Not a circle that never ends.",
+        "Badlands Bootcamp for teams is a two-to-five-day expedition for six to thirty people from the same company: founders, senior teams and leadership groups who need more than a change of hotel. It sits close enough that Calgary and Edmonton can leave in the morning and be on the land by lunch.",
+        "The days are spent on the land, working through a sequence the group can keep using on Monday, and the recovery afterwards is genuinely quiet. It is not therapy, and it is not a circle that never ends.",
       ]}
       heroImage="/images/exp-hoodoos.jpg"
       reasons={[
         {
           title: "Most offsites change the scenery.",
-          body: "Almost none change the team. A rented room, a facilitator with a deck, a dinner that is pleasant and forgettable. Here the land is older than the company and indifferent to the org chart.",
+          body: "Almost none change the team. The usual pattern is a rented room, a facilitator with a deck and a dinner that is pleasant and forgettable. Out here the land is older than the company and entirely indifferent to the org chart.",
           image: "/images/bootcamp-crew.jpg",
         },
         {
           title: "Honesty under pressure.",
-          body: "You see how people decide when the script runs out. Play, Adaptability, Connection and Experience — each Rune revealed, practised on the ground, then carried.",
+          body: "You see how people decide when the script runs out. Play, Adaptability, Connection and Experience are each revealed, practised on the ground and then carried home.",
           image: "/images/exp-canyon.jpg",
         },
         {
           title: "A way to keep talking on Monday.",
-          body: "Short structured time after the land so the group can say what actually happened. A simple language for what showed up — so Monday is not a reset to silence.",
+          body: "Short, structured time after the land gives the group room to say what actually happened, and a simple language for what showed up means Monday is not a reset to silence.",
           image: "/images/basecamp/lounge.jpg",
         },
       ]}

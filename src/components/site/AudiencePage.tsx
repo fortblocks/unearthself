@@ -12,6 +12,8 @@ export type AudiencePageProps = {
   eyebrow: string;
   lede: string;
   intro?: string[];
+  introLabel?: string;
+  introHeading?: string;
   heroImage: string;
   reasons: AudienceReason[];
   quote: string;
@@ -35,6 +37,8 @@ export function AudiencePage({
   eyebrow,
   lede,
   intro,
+  introLabel,
+  introHeading,
   heroImage,
   reasons,
   quote,
@@ -96,6 +100,12 @@ export function AudiencePage({
       {intro && intro.length > 0 ? (
         <section className="px-6 py-20">
           <div className="mx-auto max-w-3xl">
+            {introLabel ? (
+              <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-ember uppercase">{introLabel}</p>
+            ) : null}
+            {introHeading ? (
+              <h2 className="font-display mb-6 text-4xl uppercase">{introHeading}</h2>
+            ) : null}
             {intro.map((para, i) => (
               <p key={i} className={`${i < intro.length - 1 ? "mb-4 " : ""}text-lg text-fossil/80`}>
                 {para}

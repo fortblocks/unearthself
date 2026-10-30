@@ -20,26 +20,28 @@ function FriendsLander() {
     <AudiencePage
       word="Friends"
       eyebrow="The outdoors, together"
-      lede="Friends who want the outdoors together. Not a race. Not a spa weekend. Not a classroom."
+      lede="For friends who want the outdoors together: not a race, not a spa weekend and not a classroom."
+      introLabel="For friends"
+      introHeading="Days on the land, together."
       intro={[
-        "Badlands Bootcamp works for groups of friends too — six to thirty people who want the outdoors together.",
-        "Not a race. Not a spa weekend. Not a classroom. Days on the land, nights at Haven or Canalta, and recovery next door at Basecamp. Ninety minutes from Calgary. The town is small. The land is not.",
+        "Badlands Bootcamp works for groups of friends too: six to thirty people who want the outdoors together. It is not a race, a spa weekend or a classroom.",
+        "Days are spent on the land, nights at Haven or Canalta, and recovery happens next door at Basecamp. It all sits ninety minutes from Calgary, in a town that is small on land that is not.",
       ]}
       heroImage="/images/hero-badlands-dusk.jpg"
       reasons={[
         {
           title: "Start before anyone has the right answer.",
-          body: "Out of the car, onto the land. Arrive, drop what can be dropped. Play comes first in the sequence, and the point is not who is fittest.",
+          body: "Get out of the car, onto the land, and drop what can be dropped. Play comes first in the sequence, and the point was never who is fittest.",
           image: "/images/found/walk.jpg",
         },
         {
           title: "A shared story, not a tote bag.",
-          body: "Each Rune is revealed after the encounter, not before. Most of it happens away from the screen. Private notes stay on your device. No guest-facing AI coach.",
+          body: "Each Rune is revealed after the encounter rather than before, and most of it happens away from the screen. Private notes stay on your device, and there is no guest-facing AI coach.",
           image: "/images/exp-hoodoos.jpg",
         },
         {
           title: "A close that is quiet on purpose.",
-          body: "Name what you will carry. Eat. Sleep at Haven, four suites on the block, with Canalta overflow. Heat, cold and hands at Basecamp.",
+          body: "Name what you will carry, then eat together. Nights are at Haven, four suites on the block, with Canalta for overflow, and Basecamp has heat, cold and hands.",
           image: "/images/haven/elowen/elowen-01.jpg",
         },
       ]}
