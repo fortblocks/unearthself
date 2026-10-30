@@ -11,6 +11,7 @@ export type AudiencePageProps = {
   word: string;
   eyebrow: string;
   lede: string;
+  intro?: string[];
   heroImage: string;
   reasons: AudienceReason[];
   quote: string;
@@ -33,6 +34,7 @@ export function AudiencePage({
   word,
   eyebrow,
   lede,
+  intro,
   heroImage,
   reasons,
   quote,
@@ -89,6 +91,19 @@ export function AudiencePage({
           ))}
         </ul>
       </section>
+
+      {/* Intro body copy (matches Bootcamp "What it is") */}
+      {intro && intro.length > 0 ? (
+        <section className="px-6 py-20">
+          <div className="mx-auto max-w-3xl">
+            {intro.map((para, i) => (
+              <p key={i} className={`${i < intro.length - 1 ? "mb-4 " : ""}text-lg text-fossil/80`}>
+                {para}
+              </p>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Numbered reasons */}
       <section className="px-6 py-24 md:py-32">

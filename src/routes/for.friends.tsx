@@ -21,16 +21,20 @@ function FriendsLander() {
       word="Friends"
       eyebrow="The outdoors, together"
       lede="Friends who want the outdoors together. Not a race. Not a spa weekend. Not a classroom."
+      intro={[
+        "Badlands Bootcamp works for groups of friends too — six to thirty people who want the outdoors together.",
+        "Not a race. Not a spa weekend. Not a classroom. Days on the land, nights at Haven or Canalta, and recovery next door at Basecamp. Ninety minutes from Calgary. The town is small. The land is not.",
+      ]}
       heroImage="/images/hero-badlands-dusk.jpg"
       reasons={[
         {
-          title: "Out of the car, onto the land.",
-          body: "Arrive, drop what can be dropped, start before anyone has the right answer.",
+          title: "Start before anyone has the right answer.",
+          body: "Out of the car, onto the land. Arrive, drop what can be dropped. Play comes first in the sequence, and the point is not who is fittest.",
           image: "/images/found/walk.jpg",
         },
         {
-          title: "Most of it happens away from the screen.",
-          body: "Trail Quest is a quest companion, not a wellness dashboard. Each Rune is revealed after the encounter, not before. No guest-facing AI coach. If it fights the canyon, paper wins.",
+          title: "A shared story, not a tote bag.",
+          body: "Each Rune is revealed after the encounter, not before. Most of it happens away from the screen. Private notes stay on your device. No guest-facing AI coach.",
           image: "/images/exp-hoodoos.jpg",
         },
         {

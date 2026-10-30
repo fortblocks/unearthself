@@ -21,21 +21,25 @@ function CrewsLander() {
       word="Crews"
       eyebrow="Groups who already work as one"
       lede="Firefighters, police services, coaching staff. The people who need to be useful to each other when the plan dies."
+      intro={[
+        "Firefighters, police services, coaching staff. Groups who already work as one, and need to be useful to each other when the plan dies.",
+        "Six to thirty people. Two to five days. Ninety minutes from Calgary. The point is not who is fittest. The point is a group that can see its own patterns and choose again. Pass on sharing is always available — notice, don’t excavate.",
+      ]}
       heroImage="/images/exp-canyon.jpg"
       reasons={[
         {
           title: "The plan will not survive.",
-          body: "Weather, route, each other. This is where the useful friction lives.",
+          body: "Weather, route, each other. This is where the useful friction lives — for a crew that already knows how to work when things change.",
           image: "/images/found/trail.jpg",
         },
         {
-          title: "No one travels alone.",
-          body: "The team travels without a facilitator in the canyon. Trail Quest guides. The Field Recorder reads discoveries aloud. They do not lead the team or decide for it.",
+          title: "Nobody is elected leader.",
+          body: "In the canyon the team travels without a facilitator. Trail Quest guides. The Field Recorder reads discoveries aloud and warns when a station is coming, but does not lead the team or decide for it. About every 20 minutes the team picks a new one.",
           image: "/images/exp-rolling.jpg",
         },
         {
-          title: "Heat, cold and hands.",
-          body: "Recovery at Basecamp, the house next door. Nights at Haven, four suites on the block, with Canalta when the group is larger.",
+          title: "No one travels alone.",
+          body: "Do not run on uneven ground. Failure Bow is in play for mistakes, not for injuries. When the day is done, Basecamp for heat, cold and hands.",
           image: "/images/basecamp/lounge.jpg",
         },
       ]}
