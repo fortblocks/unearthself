@@ -79,8 +79,13 @@ Next design chat should produce low-fidelity frames for Home, Haven suite, Spa m
 - Analytics live
 - Partners can change copy without an engineer
 
+## Open items — assets
+
+- **30 Oct 2026 — Basecamp lounge image is a temporary render.** `public/images/basecamp/lounge.jpg` is an AI render, not a final photo. The Basecamp building is still a construction site and won't be ready for another couple of months. Real interior photos will look similar to the current design style but aren't available yet, so the render stays in place for now on Teams, Crews, the homepage, Bootcamp, Spring and the treatment booking page. A real photo from Lisa or Norah will replace it site-wide once available. Note: the render's wall logo reads "BADLANDS BOOTCAMP".
+
 ## Changelog
 
 - 2026-09-08 — Three design routes named. Booking declared v1 job.
 - 2026-09-10 — Haven BAR and suite copy on `/haven`. Working numbers from the model, not the house PDF. D01 still open.
 - 2026-09-10 — Haven BAR switched to the house card (four seasons, $65/$85 clean).
+- 2026-10-30 — Logged Basecamp lounge render as a temporary asset (see Open items — assets).
