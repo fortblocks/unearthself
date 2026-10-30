@@ -32,13 +32,14 @@ function CrewsLander() {
         {
           title: "The plan will not survive.",
           body: "Weather, route and each other all have a say, and that is where the useful friction lives for a crew that already knows how to work when things change.",
-          image: "/images/work/horseshoe.jpg",
-          alt: "Four walkers heading into Horseshoe Canyon between banded slopes",
+          image: "/images/audience/crews-coulee-route.jpg",
+          alt: "A crew of six walking a coulee trail between banded Badlands slopes",
         },
         {
           title: "Nobody is elected leader.",
           body: "In the canyon the team travels without a facilitator, with Trail Quest as the guide. The Field Recorder reads discoveries aloud and warns when a station is coming, but does not lead the team or decide for it, and about every twenty minutes the team picks a new one.",
-          image: "/images/exp-rolling.jpg",
+          image: "/images/audience/crews-field-recorder.jpg",
+          alt: "A small crew gathered while one person reads from a phone in a Badlands coulee at dusk",
         },
         {
           title: "No one travels alone.",

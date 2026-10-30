@@ -32,13 +32,14 @@ function FriendsLander() {
         {
           title: "Start before anyone has the right answer.",
           body: "Get out of the car, onto the land, and drop what can be dropped. Play comes first in the sequence, and the point was never who is fittest.",
-          image: "/images/bootcamp-crew.jpg",
-          alt: "Four people walking together into a Badlands canyon",
+          image: "/images/audience/friends-canyon-trail.jpg",
+          alt: "Friends walking arm in arm down a canyon trail in the Badlands",
         },
         {
           title: "A shared story, not a tote bag.",
           body: "Each Rune is revealed after the encounter rather than before, and most of it happens away from the screen. Private notes stay on your device, and there is no guest-facing AI coach.",
-          image: "/images/exp-hoodoos.jpg",
+          image: "/images/audience/friends-hoodoo-ledge.jpg",
+          alt: "Five friends sitting on a ledge above the Horseshoe Canyon coulees and the Red Deer River valley at dusk",
         },
         {
           title: "A close that is quiet on purpose.",

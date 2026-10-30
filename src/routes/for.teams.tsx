@@ -37,7 +37,8 @@ function TeamsLander() {
         {
           title: "Honesty under pressure.",
           body: "You see how people decide when the script runs out. Play, Adaptability, Connection and Experience are each revealed, practised on the ground and then carried home.",
-          image: "/images/exp-canyon.jpg",
+          image: "/images/audience/teams-map-huddle.jpg",
+          alt: "A team huddled around a paper map on a sandstone ledge above the Badlands",
         },
         {
           title: "A way to keep talking on Monday.",
