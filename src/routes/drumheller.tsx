@@ -27,19 +27,9 @@ function Section({ label, title, children }: { label: string; title: string; chi
   );
 }
 
-function Plate({ src }: { src: string }) {
+function HistoryPlate({ src, alt, inline = false }: { src: string; alt: string; inline?: boolean }) {
   return (
-    <figure aria-hidden="true" className="px-6 py-6">
-      <div className="mx-auto aspect-[21/9] max-w-6xl overflow-hidden rounded-[4px] border border-fossil/10">
-        <img src={src} alt="" className="h-full w-full object-cover" />
-      </div>
-    </figure>
-  );
-}
-
-function HistoryPlate({ src, alt }: { src: string; alt: string }) {
-  return (
-    <figure className="px-6 py-6">
+    <figure className={inline ? "my-12" : "px-6 py-10"}>
       <div className="mx-auto aspect-[16/9] max-w-4xl overflow-hidden rounded-[4px] border border-fossil/10">
         <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover" />
       </div>
@@ -101,10 +91,6 @@ function DrumhellerPage() {
               A river, a canyon cut into the prairie, and seventy million years laid out in stripes. The story of
               a valley.
             </p>
-            <div className="relative aspect-[16/10] overflow-hidden rounded-[4px] border border-fossil/10">
-              <img src="/images/hero-badlands-dusk.jpg" alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-coal/60 to-transparent" />
-            </div>
           </div>
         </div>
       </section>
@@ -124,7 +110,6 @@ function DrumhellerPage() {
         </p>
       </Section>
 
-      <Plate src="/images/found/river.jpg" />
 
       <Section label="The land" title="Before the town">
         <p>
@@ -166,6 +151,7 @@ function DrumhellerPage() {
           began mining coal nearby. A railway station followed in 1912, and the young settlement grew fast. It
           became a village on 15 May 1913, a town on 2 March 1916 and a city on 3 April 1930.
         </p>
+        <HistoryPlate inline src="/images/drumheller/townsite-1912.jpg" alt="Sepia view of early Drumheller in the 1910s: a few wooden buildings on the valley floor beneath grassy badlands hills." />
         <p>
           The numbers tell the story of a boom: 312 people in 1916, and 2,987 by 1931. The valley filled with
           camps and hamlets strung along the river and its side valleys. Many later became part of the town
@@ -175,9 +161,7 @@ function DrumhellerPage() {
         </p>
       </Section>
 
-      <HistoryPlate src="/images/drumheller/townsite-1912.jpg" alt="Sepia view of early Drumheller in the 1910s: a few wooden buildings on the valley floor beneath grassy badlands hills." />
       <HistoryPlate src="/images/drumheller/main-street-1915.jpg" alt="Sepia view of a dirt main street in Drumheller around 1915, with horse-drawn buggies, early cars and brick storefronts, badlands hills beyond." />
-      <Plate src="/images/work/horseshoe.jpg" />
 
       <Section label="Coal" title="Black seams, bright lights">
         <p>
@@ -187,6 +171,7 @@ function DrumhellerPage() {
           Drumheller Valley over the years. Drumheller boomed until the end of the Second World War, when coal
           lost most of its value.
         </p>
+        <HistoryPlate inline src="/images/drumheller/pick-mining-1915.jpg" alt="Sepia view of coal miners in cloth caps with headlamps working a low seam with picks beside a loaded mine car." />
         <p>
           The last of those 139 is the Atlas, at East Coulee, about twenty minutes southeast of town along
           Highway 10. Its Atlas No. 3 and No. 4 mines were active from 1936 to 1984, and it reopened as a
@@ -196,19 +181,18 @@ function DrumhellerPage() {
           the country. The society that runs it is local and visitor-supported. Guided tours take people into
           the parts of the site you can't wander alone, and seasonal opening dates are listed on its website.
         </p>
+        <HistoryPlate inline src="/images/drumheller/coal-mine-tipple-1920.jpg" alt="Sepia view of a timber coal tipple and mine buildings with smokestacks at the foot of the badlands, coal cars lined up on the siding." />
         <p>
           Down the road, the coal era left a different kind of landmark. At Rosedale, the Star Mine Suspension
           Bridge crosses the Red Deer River on a 117-metre pedestrian span. It was built in 1931 for the workers
           of the Star Mine, then rebuilt in 1958 by the Alberta government to commemorate the valley's mining
           history. After nearly four years closed for repairs, it reopened in January 2024.
         </p>
+        <HistoryPlate inline src="/images/drumheller/mine-railway-1925.jpg" alt="Sepia view of a steam locomotive hauling loaded coal cars past a mine shed beneath badlands bluffs." />
       </Section>
 
       <Divider />
 
-      <HistoryPlate src="/images/drumheller/coal-mine-tipple-1920.jpg" alt="Sepia view of a timber coal tipple and mine buildings with smokestacks at the foot of the badlands, coal cars lined up on the siding." />
-      <HistoryPlate src="/images/drumheller/pick-mining-1915.jpg" alt="Sepia view of coal miners in cloth caps with headlamps working a low seam with picks beside a loaded mine car." />
-      <HistoryPlate src="/images/drumheller/mine-railway-1925.jpg" alt="Sepia view of a steam locomotive hauling loaded coal cars past a mine shed beneath badlands bluffs." />
       <Section label="Wayne" title="Eleven bridges to the Last Chance">
         <p>
           From Rosedale, Highway 10X turns south into the Rosebud River valley. It threads a deep badlands
@@ -225,7 +209,6 @@ function DrumhellerPage() {
       </Section>
 
       <HistoryPlate src="/images/drumheller/railway-badlands-1930.jpg" alt="Sepia view of a railway line and road running beside the Red Deer River below a banded badlands butte." />
-      <Plate src="/images/exp-hoodoos.jpg" />
 
       <Section label="Deep time" title="Reading the canyon walls">
         <p>
@@ -267,7 +250,6 @@ function DrumhellerPage() {
       </Section>
 
       <HistoryPlate src="/images/drumheller/horseshoe-canyon-1929.jpg" alt="Sepia view across Horseshoe Canyon: layered badlands slopes and coulees under a flat prairie horizon." />
-      <Plate src="/images/found/fossil.jpg" />
 
       <Section label="The museum" title="The Royal Tyrrell">
         <p>
@@ -308,7 +290,6 @@ function DrumhellerPage() {
         </p>
       </Section>
 
-      <Plate src="/images/exp-canyon.jpg" />
 
       <Section label="In town" title="Tyra, and the amphitheatre in the hills">
         <p>
