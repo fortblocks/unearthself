@@ -222,15 +222,16 @@ function BootcampFace() {
 
 function BasecampFace() {
   const { lines, removeLine, updateLine, clear, mode, setMode } = useBooking();
+  const [send, setSend] = useState<"idle" | "sending" | "error">("idle");
+  const [error, setError] = useState("");
+  const [honey, setHoney] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
   const [saveCard, setSaveCard] = useState(true);
-  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
-  const [error, setError] = useState("");
-  const [honey, setHoney] = useState("");
+  const [status, setStatus] = useState<"idle" | "done">("idle");
   const total = lines.reduce((sum, l) => sum + l.price, 0);
 
   async function onSubmit(e: FormEvent) {
@@ -247,7 +248,7 @@ function BasecampFace() {
       /* ignore */
     }
     void body;
-    setStatus("sending");
+    setSend("sending");
     const res = await sendEnquiryAlert({
       form: "Basecamp / spa request (Book panel)",
       subject: `Basecamp request — ${name || email}`,
@@ -255,10 +256,12 @@ function BasecampFace() {
       honey,
       fields: { mode, name, phone, treatments: list, working_total: cad(total), notes },
     });
-    if (res.ok) setStatus("done");
-    else {
+    if (res.ok) {
+      setSend("idle");
+      setStatus("done");
+    } else {
       setError(res.error);
-      setStatus("error");
+      setSend("error");
     }
   }
 
@@ -394,14 +397,14 @@ function BasecampFace() {
           <span className="tabular-nums">{cad(total)}</span>
         </p>
       )}
-      {status === "error" && (
+      {send === "error" && (
             <p className="text-sm text-ember">
               That didn’t send ({error}). Please email us at{" "}
               <a className="underline" href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
             </p>
           )}
-      <button type="submit" disabled={lines.length === 0 || status === "sending"} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">
-        {status === "sending" ? "Sending…" : "Request these times"}
+      <button type="submit" disabled={lines.length === 0 || send === "sending"} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">
+        {send === "sending" ? "Sending…" : "Request these times"}
       </button>
     </form>
   );
