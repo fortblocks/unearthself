@@ -149,8 +149,6 @@ function VenueRentals() {
           <div>
             <h2 className="font-display text-[clamp(2.5rem,6vw,5rem)] leading-[0.9] uppercase">The whole property. Drumheller.</h2>
             <p className="mt-5 max-w-[46ch] text-lg text-fossil/75">Tell us what you are planning and when.</p>
-            <p className="mt-4 text-lg text-sandstone italic">[Pricing to confirm with Chris]</p>
-            <p className="mt-2 text-lg text-sandstone italic">[Booking contact to confirm]</p>
             <p className="mt-4 text-lg text-fossil/75">
               See the suites at <Link to="/haven" className="text-ember hover:underline">the Haven</Link>.
             </p>
