@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { X } from "lucide-react";
 import { useBuilderStore } from "@/lib/store";
 import { getActivityById } from "@/data/activities";
-import { ENQUIRY_MAIL, ENQUIRY_MAILTO, sendEnquiryAlert } from "@/lib/enquiry";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 interface Props {
   open: boolean;
@@ -178,7 +178,7 @@ export function QuoteModal({ open, onClose }: Props) {
             {error && (
               <p className="form-error">
                 {error} That didn’t send. Please email us at{" "}
-                <a href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+                <a href={enquiryMailto("Package builder quote")}>{ENQUIRY_MAIL}</a>.
               </p>
             )}
             <button type="submit" className="btn-primary full-btn" disabled={status === "sending"}>

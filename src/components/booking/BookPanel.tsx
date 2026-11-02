@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { cad } from "@/data/treatments";
 import { useBooking, type BookFace } from "@/lib/booking/context";
 import { StayRequest } from "@/components/haven/StayRequest";
-import { ENQUIRY_MAIL, ENQUIRY_MAILTO, sendEnquiryAlert } from "@/lib/enquiry";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
 
@@ -209,7 +209,7 @@ function BootcampFace() {
       {status === "error" && (
             <p className="text-sm text-ember">
               That didn’t send ({error}). Please email us at{" "}
-              <a className="underline" href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+              <a className="underline" href={enquiryMailto("Retreat hold")}>{ENQUIRY_MAIL}</a>.
             </p>
           )}
       <button type="submit" disabled={status === "sending"} className="mt-1 w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-60">
@@ -400,7 +400,7 @@ function BasecampFace() {
       {send === "error" && (
             <p className="text-sm text-ember">
               That didn’t send ({error}). Please email us at{" "}
-              <a className="underline" href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+              <a className="underline" href={enquiryMailto("Basecamp request")}>{ENQUIRY_MAIL}</a>.
             </p>
           )}
       <button type="submit" disabled={lines.length === 0 || send === "sending"} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">

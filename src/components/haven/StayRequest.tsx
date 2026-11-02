@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
 import { quoteStay } from "@/data/havenRates";
 import { cad } from "@/lib/format";
-import { ENQUIRY_MAIL, ENQUIRY_MAILTO, sendEnquiryAlert } from "@/lib/enquiry";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 type Props = {
   presetSlug?: RoomSlug;
@@ -227,7 +227,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
           {status === "error" && (
             <>
               {" "}That didn’t send. Please email us at{" "}
-              <a className="underline" href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+              <a className="underline" href={enquiryMailto("Haven stay request")}>{ENQUIRY_MAIL}</a>.
             </>
           )}
         </p>

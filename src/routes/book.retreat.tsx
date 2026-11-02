@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
-import { ENQUIRY_MAIL, ENQUIRY_MAILTO, sendEnquiryAlert } from "@/lib/enquiry";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 export const Route = createFileRoute("/book/retreat")({
   component: RetreatHold,
@@ -73,7 +73,7 @@ function RetreatHold() {
           {status === "error" && (
             <p className="text-sm text-ember">
               That didn’t send ({error}). Please email us at{" "}
-              <a className="underline" href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+              <a className="underline" href={enquiryMailto("Retreat hold")}>{ENQUIRY_MAIL}</a>.
             </p>
           )}
           <button type="submit" disabled={status === "sending"} className="mt-2 rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white disabled:opacity-60">

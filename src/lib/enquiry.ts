@@ -49,46 +49,6 @@ export function validEnquiry(data: SpringEnquiry) {
   };
 }
 
-export async function mailSpringEnquiry(data: SpringEnquiry) {
-  if (clean(data.honey)) return true;
-  const enquiry = validEnquiry(data);
-  if (!enquiry) return false;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 12000);
-  try {
-    const res = await fetch(`https://formsubmit.co/ajax/${SPRING_MAIL}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        name: enquiry.name,
-        email: enquiry.email,
-        company: enquiry.company,
-        role: enquiry.role,
-        headcount: enquiry.headcount,
-        window: enquiry.window,
-        notes: enquiry.notes,
-        source: enquiry.source,
-        campaign: enquiry.campaign,
-        utm_source: enquiry.utm_source,
-        utm_medium: enquiry.utm_medium,
-        utm_campaign: enquiry.utm_campaign,
-        _subject: `Spring 2027 enquiry — ${enquiry.company}`,
-        _template: "table",
-        _captcha: "false",
-        _replyto: enquiry.email,
-      }),
-      signal: ctrl.signal,
-    });
-    const json = (await res.json().catch(() => ({}))) as { success?: boolean | string };
-    const ok = json.success === true || json.success === "true" || res.ok;
-    return ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 export const submitSpringEnquiry = createServerFn({ method: "POST" })
   .validator((d: SpringEnquiry) => d)
   .handler(async ({ data }) => {
@@ -144,53 +104,111 @@ async function postJson(url: string, body: unknown) {
   }
 }
 
-/* ── Interim email alerts ────────────────────────────────────────────────
- * Every enquiry form sends a formatted alert to ENQUIRY_MAIL through the
- * FormSubmit AJAX endpoint. Returns real success/failure so forms only show
- * "sent" when the alert actually went out. No payments are taken here.
+/* ── Enquiry email alerts (Resend, server-side) ───────────────────────────
+ * Every enquiry form posts to one server function, which sends through the
+ * Resend REST API. Env (server-only, set in Vercel):
+ *   RESEND_API_KEY  required
+ *   ENQUIRY_TO      default hello@unearthself.xyz
+ *   ENQUIRY_FROM    default "Unearth Self <enquiries@unearthself.xyz>"
+ * Returns ok only on a Resend 2xx. No payments are taken here.
  */
 export const ENQUIRY_MAIL = SPRING_MAIL;
-export const ENQUIRY_MAILTO = `mailto:${ENQUIRY_MAIL}`;
+
+/** Plain-anchor fallback href, e.g. <a href={enquiryMailto("Haven stay request")}>. */
+export function enquiryMailto(subject: string) {
+  return `mailto:${ENQUIRY_MAIL}?subject=${encodeURIComponent(subject)}`;
+}
 
 export type AlertResult = { ok: true } | { ok: false; error: string };
 
-export async function sendEnquiryAlert(opts: {
+type AlertInput = {
   form: string;
-  subject: string;
+  subject?: string;
   replyTo: string;
   fields: Record<string, unknown>;
   honey?: string;
-}): Promise<AlertResult> {
-  if (clean(opts.honey)) return { ok: true };
-  const replyTo = clean(opts.replyTo, 120).toLowerCase();
-  if (!EMAIL_RE.test(replyTo)) return { ok: false, error: "A valid email is needed." };
-  const body: Record<string, string> = { form: opts.form };
-  for (const [k, v] of Object.entries(opts.fields)) {
-    if (v === undefined || v === null || v === "") continue;
-    body[k] = typeof v === "string" ? v.trim().slice(0, 4000) : String(v);
+  page?: string;
+};
+
+const MAX_FIELDS = 30;
+
+function esc(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+function normaliseAlert(d: AlertInput) {
+  const form = clean(d.form, 80);
+  const replyTo = clean(d.replyTo, 120).toLowerCase();
+  if (form.length < 2 || !EMAIL_RE.test(replyTo)) return null;
+  const fields: [string, string][] = [];
+  for (const [k, v] of Object.entries(d.fields ?? {}).slice(0, MAX_FIELDS)) {
+    if (v === undefined || v === null) continue;
+    const val = String(v).replace(/\r\n/g, "\n").trim().slice(0, 4000);
+    if (!val) continue;
+    fields.push([clean(k, 40).replace(/_/g, " "), val]);
   }
-  body.email = replyTo;
-  body.page = typeof window !== "undefined" ? window.location.href : "";
-  body._subject = clean(opts.subject, 160);
-  body._replyto = replyTo;
-  body._template = "table";
-  body._captcha = "false";
-  body._honey = "";
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 15000);
+  return {
+    form,
+    replyTo,
+    subject: clean(d.subject || form, 160).replace(/[\r\n]/g, " "),
+    page: clean(d.page, 300),
+    fields,
+  };
+}
+
+export const sendEnquiryEmail = createServerFn({ method: "POST" })
+  .validator((d: AlertInput) => d)
+  .handler(async ({ data }): Promise<AlertResult> => {
+    if (clean(data.honey)) return { ok: true };
+    const a = normaliseAlert(data);
+    if (!a) return { ok: false, error: "Please give a valid email address." };
+    const key = process.env.RESEND_API_KEY?.trim();
+    if (!key) {
+      console.error("enquiry-email: RESEND_API_KEY is not set; alert not sent", a.form);
+      return { ok: false, error: "Our enquiry email isn't set up yet." };
+    }
+    const to = process.env.ENQUIRY_TO?.trim() || ENQUIRY_MAIL;
+    const from = process.env.ENQUIRY_FROM?.trim() || "Unearth Self <enquiries@unearthself.xyz>";
+    const rows: [string, string][] = [["Form", a.form], ["Email", a.replyTo], ...a.fields];
+    if (a.page) rows.push(["Page", a.page]);
+    rows.push(["Received", new Date().toISOString()]);
+    const html =
+      `<h2 style="font-family:sans-serif">${esc(a.subject)}</h2>` +
+      `<table cellpadding="8" style="border-collapse:collapse;font-family:sans-serif;font-size:14px">` +
+      rows
+        .map(
+          ([k, v]) =>
+            `<tr><th align="left" valign="top" style="border:1px solid #ddd;background:#f6f3ee">${esc(k)}</th>` +
+            `<td style="border:1px solid #ddd;white-space:pre-wrap">${esc(v)}</td></tr>`,
+        )
+        .join("") +
+      `</table>`;
+    const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n");
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12000);
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [to], reply_to: a.replyTo, subject: a.subject, html, text }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (res.ok) return { ok: true };
+      console.error("enquiry-email: Resend", res.status, (await res.text().catch(() => "")).slice(0, 500));
+      return { ok: false, error: "The email service refused the message." };
+    } catch (err) {
+      console.error("enquiry-email: fetch failed", err);
+      return { ok: false, error: "Could not reach the email service." };
+    }
+  });
+
+/** Client helper used by every form. */
+export async function sendEnquiryAlert(opts: AlertInput): Promise<AlertResult> {
   try {
-    const res = await fetch(`https://formsubmit.co/ajax/${ENQUIRY_MAIL}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-    const json = (await res.json().catch(() => ({}))) as { success?: boolean | string; message?: string };
-    const ok = res.ok && (json.success === true || json.success === "true");
-    return ok ? { ok: true } : { ok: false, error: clean(json.message, 200) || `Send failed (${res.status}).` };
+    const page = typeof window !== "undefined" ? window.location.href : "";
+    return await sendEnquiryEmail({ data: { ...opts, page } });
   } catch {
-    return { ok: false, error: "Could not reach the mail service." };
-  } finally {
-    clearTimeout(t);
+    return { ok: false, error: "Could not send." };
   }
 }
