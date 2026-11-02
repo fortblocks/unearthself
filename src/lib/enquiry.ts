@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { renderEnquiryEmail } from "./enquiryEmail";
 
 export type SpringEnquiry = {
   name: string;
@@ -132,10 +133,6 @@ type AlertInput = {
 
 const MAX_FIELDS = 30;
 
-function esc(s: string) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
-
 function normaliseAlert(d: AlertInput) {
   const form = clean(d.form, 80);
   const replyTo = clean(d.replyTo, 120).toLowerCase();
@@ -169,28 +166,25 @@ export const sendEnquiryEmail = createServerFn({ method: "POST" })
     }
     const to = process.env.ENQUIRY_TO?.trim() || ENQUIRY_MAIL;
     const from = process.env.ENQUIRY_FROM?.trim() || "Unearth Self <enquiries@unearthself.xyz>";
-    const rows: [string, string][] = [["Form", a.form], ["Email", a.replyTo], ...a.fields];
-    if (a.page) rows.push(["Page", a.page]);
-    rows.push(["Received", new Date().toISOString()]);
-    const html =
-      `<h2 style="font-family:sans-serif">${esc(a.subject)}</h2>` +
-      `<table cellpadding="8" style="border-collapse:collapse;font-family:sans-serif;font-size:14px">` +
-      rows
-        .map(
-          ([k, v]) =>
-            `<tr><th align="left" valign="top" style="border:1px solid #ddd;background:#f6f3ee">${esc(k)}</th>` +
-            `<td style="border:1px solid #ddd;white-space:pre-wrap">${esc(v)}</td></tr>`,
-        )
-        .join("") +
-      `</table>`;
-    const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n");
+    const nameRow = a.fields.find(([k]) => k.toLowerCase() === "name");
+    const guestName = nameRow?.[1] || a.replyTo;
+    const fields = a.fields.filter(([k]) => k.toLowerCase() !== "name");
+    fields.unshift(["Email", a.replyTo]);
+    const { subject, html, text } = renderEnquiryEmail({
+      form: a.form,
+      guestName,
+      replyTo: a.replyTo,
+      fields,
+      page: a.page,
+      receivedAt: new Date(),
+    });
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 12000);
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [to], reply_to: a.replyTo, subject: a.subject, html, text }),
+        body: JSON.stringify({ from, to: [to], reply_to: a.replyTo, subject, html, text }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
