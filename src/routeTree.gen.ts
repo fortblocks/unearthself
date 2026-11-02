@@ -32,6 +32,7 @@ import { Route as AdminBotsRouteImport } from './routes/admin.bots'
 import { Route as AdminFridayRouteImport } from './routes/admin.friday'
 import { Route as AdminInventoryRouteImport } from './routes/admin.inventory'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminMinutesRouteImport } from './routes/admin.minutes'
 import { Route as AdminMoneyRouteImport } from './routes/admin.money'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminRiskRouteImport } from './routes/admin.risk'
@@ -62,6 +63,8 @@ import { Route as QuestShuttleRouteImport } from './routes/quest.shuttle'
 import { Route as QuestSpecimenRouteImport } from './routes/quest.specimen'
 import { Route as QuestThirtyRouteImport } from './routes/quest.thirty'
 import { Route as QuestTodayRouteImport } from './routes/quest.today'
+import { Route as AdminMinutesIndexRouteImport } from './routes/admin.minutes.index'
+import { Route as AdminMinutesMeetingIdRouteImport } from './routes/admin.minutes.$meetingId'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
 import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
 import { Route as QuestAdminBroadcastRouteImport } from './routes/quest.admin.broadcast'
@@ -184,6 +187,11 @@ const AdminInventoryRoute = AdminInventoryRouteImport.update({
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMinutesRoute = AdminMinutesRouteImport.update({
+  id: '/minutes',
+  path: '/minutes',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMoneyRoute = AdminMoneyRouteImport.update({
@@ -336,6 +344,16 @@ const QuestTodayRoute = QuestTodayRouteImport.update({
   path: '/today',
   getParentRoute: () => QuestRoute,
 } as any)
+const AdminMinutesIndexRoute = AdminMinutesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminMinutesRoute,
+} as any)
+const AdminMinutesMeetingIdRoute = AdminMinutesMeetingIdRouteImport.update({
+  id: '/$meetingId',
+  path: '/$meetingId',
+  getParentRoute: () => AdminMinutesRoute,
+} as any)
 const QuestAdminIndexRoute = QuestAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -400,6 +418,7 @@ export interface FileRoutesByFullPath {
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/minutes': typeof AdminMinutesRouteWithChildren
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
@@ -431,6 +450,7 @@ export interface FileRoutesByFullPath {
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
   '/quest/': typeof QuestIndexRoute
+  '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -438,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/quest/admin/paper': typeof QuestAdminPaperRoute
   '/quest/admin/roster': typeof QuestAdminRosterRoute
   '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/admin/minutes/': typeof AdminMinutesIndexRoute
   '/quest/admin/': typeof QuestAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -488,6 +509,7 @@ export interface FileRoutesByTo {
   '/haven': typeof HavenIndexRoute
   '/journal': typeof JournalIndexRoute
   '/quest': typeof QuestIndexRoute
+  '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -495,6 +517,7 @@ export interface FileRoutesByTo {
   '/quest/admin/paper': typeof QuestAdminPaperRoute
   '/quest/admin/roster': typeof QuestAdminRosterRoute
   '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/admin/minutes': typeof AdminMinutesIndexRoute
   '/quest/admin': typeof QuestAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -521,6 +544,7 @@ export interface FileRoutesById {
   '/admin/friday': typeof AdminFridayRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/minutes': typeof AdminMinutesRouteWithChildren
   '/admin/money': typeof AdminMoneyRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
@@ -552,6 +576,7 @@ export interface FileRoutesById {
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
   '/quest/': typeof QuestIndexRoute
+  '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -559,6 +584,7 @@ export interface FileRoutesById {
   '/quest/admin/paper': typeof QuestAdminPaperRoute
   '/quest/admin/roster': typeof QuestAdminRosterRoute
   '/quest/admin/safety': typeof QuestAdminSafetyRoute
+  '/admin/minutes/': typeof AdminMinutesIndexRoute
   '/quest/admin/': typeof QuestAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -586,6 +612,7 @@ export interface FileRouteTypes {
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/leads'
+    | '/admin/minutes'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
@@ -617,6 +644,7 @@ export interface FileRouteTypes {
     | '/haven/'
     | '/journal/'
     | '/quest/'
+    | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -624,6 +652,7 @@ export interface FileRouteTypes {
     | '/quest/admin/paper'
     | '/quest/admin/roster'
     | '/quest/admin/safety'
+    | '/admin/minutes/'
     | '/quest/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -674,6 +703,7 @@ export interface FileRouteTypes {
     | '/haven'
     | '/journal'
     | '/quest'
+    | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -681,6 +711,7 @@ export interface FileRouteTypes {
     | '/quest/admin/paper'
     | '/quest/admin/roster'
     | '/quest/admin/safety'
+    | '/admin/minutes'
     | '/quest/admin'
   id:
     | '__root__'
@@ -706,6 +737,7 @@ export interface FileRouteTypes {
     | '/admin/friday'
     | '/admin/inventory'
     | '/admin/leads'
+    | '/admin/minutes'
     | '/admin/money'
     | '/admin/pipeline'
     | '/admin/risk'
@@ -737,6 +769,7 @@ export interface FileRouteTypes {
     | '/haven/'
     | '/journal/'
     | '/quest/'
+    | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -744,6 +777,7 @@ export interface FileRouteTypes {
     | '/quest/admin/paper'
     | '/quest/admin/roster'
     | '/quest/admin/safety'
+    | '/admin/minutes/'
     | '/quest/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -934,6 +968,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/admin/leads'
       preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/minutes': {
+      id: '/admin/minutes'
+      path: '/minutes'
+      fullPath: '/admin/minutes'
+      preLoaderRoute: typeof AdminMinutesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/money': {
@@ -1146,6 +1187,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuestTodayRouteImport
       parentRoute: typeof QuestRoute
     }
+    '/admin/minutes/': {
+      id: '/admin/minutes/'
+      path: '/'
+      fullPath: '/admin/minutes/'
+      preLoaderRoute: typeof AdminMinutesIndexRouteImport
+      parentRoute: typeof AdminMinutesRoute
+    }
+    '/admin/minutes/$meetingId': {
+      id: '/admin/minutes/$meetingId'
+      path: '/$meetingId'
+      fullPath: '/admin/minutes/$meetingId'
+      preLoaderRoute: typeof AdminMinutesMeetingIdRouteImport
+      parentRoute: typeof AdminMinutesRoute
+    }
     '/quest/admin/': {
       id: '/quest/admin/'
       path: '/'
@@ -1205,11 +1260,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminMinutesRouteChildren {
+  AdminMinutesMeetingIdRoute: typeof AdminMinutesMeetingIdRoute
+  AdminMinutesIndexRoute: typeof AdminMinutesIndexRoute
+}
+
+const AdminMinutesRouteChildren: AdminMinutesRouteChildren = {
+  AdminMinutesMeetingIdRoute: AdminMinutesMeetingIdRoute,
+  AdminMinutesIndexRoute: AdminMinutesIndexRoute,
+}
+
+const AdminMinutesRouteWithChildren = AdminMinutesRoute._addFileChildren(
+  AdminMinutesRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminBotsRoute: typeof AdminBotsRoute
   AdminFridayRoute: typeof AdminFridayRoute
   AdminInventoryRoute: typeof AdminInventoryRoute
   AdminLeadsRoute: typeof AdminLeadsRoute
+  AdminMinutesRoute: typeof AdminMinutesRouteWithChildren
   AdminMoneyRoute: typeof AdminMoneyRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminRiskRoute: typeof AdminRiskRoute
@@ -1222,6 +1292,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFridayRoute: AdminFridayRoute,
   AdminInventoryRoute: AdminInventoryRoute,
   AdminLeadsRoute: AdminLeadsRoute,
+  AdminMinutesRoute: AdminMinutesRouteWithChildren,
   AdminMoneyRoute: AdminMoneyRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminRiskRoute: AdminRiskRoute,
