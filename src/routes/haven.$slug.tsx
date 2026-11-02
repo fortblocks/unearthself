@@ -123,7 +123,7 @@ function RoomPage() {
             <div id="stay" className="border border-coal/10 bg-white p-6 md:p-8">
               <h2 className="font-display mb-2 text-2xl uppercase">Request {room.name}</h2>
               <p className="mb-6 text-sm text-shale">
-                Tell us the dates. We confirm what is free and send the total before anything is charged.
+                Tell us your dates and we will confirm what is free, sending the total before anything is charged.
               </p>
               <StayRequest presetSlug={slug} />
             </div>

@@ -133,8 +133,7 @@ function SpringPage() {
               <p className="text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">The expedition</p>
               <h3 className="font-display mt-1 text-3xl uppercase">Badlands Bootcamp</h3>
               <p className="mt-2 text-fossil/70">
-                Play, Adaptability, Connection, Experience — practised on the ground, then carried.
-                Weather, route, each other. Not a deck outdoors.
+                Play, Adaptability, Connection and Experience, practised on the ground and then carried through weather, route and each other. This is not a deck taken outdoors.
               </p>
             </article>
             <article>

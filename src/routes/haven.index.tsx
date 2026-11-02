@@ -78,7 +78,7 @@ function HavenPage() {
               <h2 className="font-display text-[clamp(2rem,4vw,3rem)]">Four suites</h2>
             </div>
             <p className="max-w-[36ch] text-shale">
-              Pick a room. Request dates. We confirm what is free and send the total before anything is charged.
+              Pick a room and request your dates, and we will confirm what is free and send the total before anything is charged.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">

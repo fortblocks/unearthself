@@ -55,8 +55,7 @@ function AboutPage() {
             people on.
           </p>
           <p className="max-w-[46ch] text-lg text-fossil/80">
-            Four partners. No chief. The long game is more than one location and a language people keep
-            using after they leave. Year one is this town and this canyon.
+            Four partners and no chief. The long game is more than one location: it is a language people keep using after they leave. Year one is this town and this canyon.
           </p>
         </div>
       </section>
@@ -85,8 +84,7 @@ function AboutPage() {
             We did not pick it as a backdrop. The work needs a place that will not flatter you.
           </p>
           <p className="text-lg text-fossil/80">
-            Locals use the spa. Teams come for the expedition. Overnight guests take a suite and walk
-            next door. One ecosystem. Three doors.
+            Locals use the spa, teams come for the expedition, and overnight guests take a suite and walk next door: one ecosystem with three doors.
           </p>
           <Link to="/visit" className="mt-8 inline-block text-sandstone hover:text-fossil">
             How to get here →
