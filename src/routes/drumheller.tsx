@@ -37,6 +37,16 @@ function Plate({ src }: { src: string }) {
   );
 }
 
+function HistoryPlate({ src, alt }: { src: string; alt: string }) {
+  return (
+    <figure className="px-6 py-6">
+      <div className="mx-auto aspect-[16/9] max-w-4xl overflow-hidden rounded-[4px] border border-fossil/10">
+        <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover" />
+      </div>
+    </figure>
+  );
+}
+
 const Divider = () => <div aria-hidden="true" className="mx-auto h-px w-1/2 bg-fossil/15" />;
 
 const SOURCES: { label: string; href: string }[] = [
@@ -165,6 +175,8 @@ function DrumhellerPage() {
         </p>
       </Section>
 
+      <HistoryPlate src="/images/drumheller/recreations/recreation-townsite-1912.jpg" alt="Sepia view of early Drumheller in the 1910s: a few wooden buildings on the valley floor beneath grassy badlands hills." />
+      <HistoryPlate src="/images/drumheller/recreations/recreation-main-street-1915.jpg" alt="Sepia view of a dirt main street in Drumheller around 1915, with horse-drawn buggies, early cars and brick storefronts, badlands hills beyond." />
       <Plate src="/images/work/horseshoe.jpg" />
 
       <Section label="Coal" title="Black seams, bright lights">
@@ -194,6 +206,9 @@ function DrumhellerPage() {
 
       <Divider />
 
+      <HistoryPlate src="/images/drumheller/recreations/recreation-coal-mine-tipple-1920.jpg" alt="Sepia view of a timber coal tipple and mine buildings with smokestacks at the foot of the badlands, coal cars lined up on the siding." />
+      <HistoryPlate src="/images/drumheller/recreations/recreation-pick-mining-1915.jpg" alt="Sepia view of coal miners in cloth caps with headlamps working a low seam with picks beside a loaded mine car." />
+      <HistoryPlate src="/images/drumheller/recreations/recreation-mine-railway-1925.jpg" alt="Sepia view of a steam locomotive hauling loaded coal cars past a mine shed beneath badlands bluffs." />
       <Section label="Wayne" title="Eleven bridges to the Last Chance">
         <p>
           From Rosedale, Highway 10X turns south into the Rosebud River valley. It threads a deep badlands
@@ -209,6 +224,7 @@ function DrumhellerPage() {
         </p>
       </Section>
 
+      <HistoryPlate src="/images/drumheller/recreations/recreation-railway-badlands-1930.jpg" alt="Sepia view of a railway line and road running beside the Red Deer River below a banded badlands butte." />
       <Plate src="/images/exp-hoodoos.jpg" />
 
       <Section label="Deep time" title="Reading the canyon walls">
@@ -238,6 +254,7 @@ function DrumhellerPage() {
 
       <Divider />
 
+      <HistoryPlate src="/images/drumheller/recreations/recreation-hoodoos-1939.jpg" alt="Sepia view of a man in a 1930s suit and fedora standing among capped sandstone hoodoos." />
       <Section label="Horseshoe Canyon" title="The prairie, split open">
         <p>
           About seventeen kilometres west of Drumheller on Highway 9, the farmland opens without warning into
@@ -249,6 +266,7 @@ function DrumhellerPage() {
         </p>
       </Section>
 
+      <HistoryPlate src="/images/drumheller/recreations/recreation-horseshoe-canyon-1929.jpg" alt="Sepia view across Horseshoe Canyon: layered badlands slopes and coulees under a flat prairie horizon." />
       <Plate src="/images/found/fossil.jpg" />
 
       <Section label="The museum" title="The Royal Tyrrell">
