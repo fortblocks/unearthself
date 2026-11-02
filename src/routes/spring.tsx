@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,28 +40,7 @@ const facts = [
 
 function SpringPage() {
   return (
-    <main className="bg-coal text-fossil">
-      <header className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between bg-coal/90 px-4 py-[1.1rem] backdrop-blur-sm">
-        <Link to="/" className="flex items-center gap-2.5 text-fossil">
-          <img
-            src="/logo.svg"
-            alt=""
-            width={22}
-            height={22}
-            className="size-6 shrink-0 brightness-0 invert opacity-90"
-          />
-          <span className="font-display text-[1.05rem] font-black uppercase leading-none tracking-[0.16em]">
-            Unearth<span className="text-ember">self</span>
-          </span>
-        </Link>
-        <a
-          href="#enquire"
-          className="inline-flex rounded-[2px] bg-ember px-4 py-2 text-sm font-semibold text-white"
-        >
-          Enquire
-        </a>
-      </header>
-
+    <div className="bg-coal text-fossil">
       <section className="relative flex min-h-[100dvh] items-end overflow-hidden">
         <img
           src="/images/exp-hoodoos.jpg"
@@ -186,18 +165,7 @@ function SpringPage() {
       </section>
 
       <Enquire />
-
-      <footer className="border-t border-fossil/10 px-6 py-10 text-sm text-fossil/55">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p>Unearth Self · Drumheller, Alberta</p>
-          <p>
-            <a href="mailto:hello@unearthself.xyz" className="hover:text-fossil">
-              hello@unearthself.xyz
-            </a>
-          </p>
-        </div>
-      </footer>
-    </main>
+    </div>
   );
 }
 
