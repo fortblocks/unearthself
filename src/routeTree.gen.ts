@@ -26,6 +26,7 @@ import { Route as QuestRouteImport } from './routes/quest'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SpringRouteImport } from './routes/spring'
 import { Route as TheWorkRouteImport } from './routes/the-work'
+import { Route as VenueRentalsRouteImport } from './routes/venue-rentals'
 import { Route as VisitRouteImport } from './routes/visit'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBotsRouteImport } from './routes/admin.bots'
@@ -154,6 +155,11 @@ const SpringRoute = SpringRouteImport.update({
 const TheWorkRoute = TheWorkRouteImport.update({
   id: '/the-work',
   path: '/the-work',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VenueRentalsRoute = VenueRentalsRouteImport.update({
+  id: '/venue-rentals',
+  path: '/venue-rentals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VisitRoute = VisitRouteImport.update({
@@ -395,6 +401,7 @@ export interface FileRoutesByFullPath {
   '/shop': typeof ShopRoute
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
+  '/venue-rentals': typeof VenueRentalsRoute
   '/visit': typeof VisitRoute
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
@@ -453,6 +460,7 @@ export interface FileRoutesByTo {
   '/shop': typeof ShopRoute
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
+  '/venue-rentals': typeof VenueRentalsRoute
   '/visit': typeof VisitRoute
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
@@ -516,6 +524,7 @@ export interface FileRoutesById {
   '/shop': typeof ShopRoute
   '/spring': typeof SpringRoute
   '/the-work': typeof TheWorkRoute
+  '/venue-rentals': typeof VenueRentalsRoute
   '/visit': typeof VisitRoute
   '/admin/bots': typeof AdminBotsRoute
   '/admin/friday': typeof AdminFridayRoute
@@ -581,6 +590,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/spring'
     | '/the-work'
+    | '/venue-rentals'
     | '/visit'
     | '/admin/bots'
     | '/admin/friday'
@@ -639,6 +649,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/spring'
     | '/the-work'
+    | '/venue-rentals'
     | '/visit'
     | '/admin/bots'
     | '/admin/friday'
@@ -701,6 +712,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/spring'
     | '/the-work'
+    | '/venue-rentals'
     | '/visit'
     | '/admin/bots'
     | '/admin/friday'
@@ -765,6 +777,7 @@ export interface RootRouteChildren {
   ShopRoute: typeof ShopRoute
   SpringRoute: typeof SpringRoute
   TheWorkRoute: typeof TheWorkRoute
+  VenueRentalsRoute: typeof VenueRentalsRoute
   VisitRoute: typeof VisitRoute
   BookRetreatRoute: typeof BookRetreatRoute
   BookTreatmentRoute: typeof BookTreatmentRoute
@@ -892,6 +905,13 @@ declare module '@tanstack/react-router' {
       path: '/the-work'
       fullPath: '/the-work'
       preLoaderRoute: typeof TheWorkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/venue-rentals': {
+      id: '/venue-rentals'
+      path: '/venue-rentals'
+      fullPath: '/venue-rentals'
+      preLoaderRoute: typeof VenueRentalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/visit': {
@@ -1350,6 +1370,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopRoute: ShopRoute,
   SpringRoute: SpringRoute,
   TheWorkRoute: TheWorkRoute,
+  VenueRentalsRoute: VenueRentalsRoute,
   VisitRoute: VisitRoute,
   BookRetreatRoute: BookRetreatRoute,
   BookTreatmentRoute: BookTreatmentRoute,

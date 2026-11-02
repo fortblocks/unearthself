@@ -99,7 +99,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               <li><Link to="/basecamp" className="hover:text-fossil">Basecamp</Link></li>
               <li><Link to="/haven" className="hover:text-fossil">The Haven</Link></li>
               <li><span className="text-fossil/70">Packages</span></li>
-              <li><span className="text-fossil/70">Venue Rentals</span></li>
+              <li><Link to="/venue-rentals" className="hover:text-fossil">Venue Rentals</Link></li>
             </ul>
           </div>
           <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
