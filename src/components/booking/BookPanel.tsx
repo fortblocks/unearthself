@@ -204,8 +204,6 @@ function BasecampFace() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [password, setPassword] = useState("");
-  const [saveCard, setSaveCard] = useState(true);
   const [status, setStatus] = useState<"idle" | "done">("idle");
   const total = lines.reduce((sum, l) => sum + l.price, 0);
 
@@ -335,14 +333,6 @@ function BasecampFace() {
           <label>
             <span className={label}>Email</span>
             <input required={lines.length > 0} type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <label>
-            <span className={label}>Password</span>
-            <input type="password" className={field} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Accounts not live yet" />
-          </label>
-          <label className="flex items-start gap-3 text-sm text-coal/70">
-            <input type="checkbox" checked={saveCard} onChange={(e) => setSaveCard(e.target.checked)} className="mt-1" />
-            Charge the card on file when the slot is confirmed
           </label>
           <label>
             <span className={label}>Note for the house</span>
