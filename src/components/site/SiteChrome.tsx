@@ -87,7 +87,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
           <div className="md:flex-[1_1_0] md:min-w-0 md:whitespace-nowrap">
             <h4 className="mb-4 text-[0.8rem] font-semibold tracking-widest text-fossil uppercase">Explore</h4>
             <ul className="space-y-2">
-              <li><span className="text-fossil/70">Events</span></li>
+              <li><Link to="/events" className="hover:text-fossil">Events</Link></li>
               <li><span className="text-fossil/70">Drumheller</span></li>
               <li><Link to="/journal" className="hover:text-fossil">Journal</Link></li>
             </ul>
