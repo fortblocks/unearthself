@@ -18,6 +18,7 @@ import { Route as BrandRouteImport } from './routes/brand'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as D14RouteImport } from './routes/d14'
+import { Route as FindUsRouteImport } from './routes/find-us'
 import { Route as FoundRouteImport } from './routes/found'
 import { Route as HavenRouteImport } from './routes/haven'
 import { Route as JournalRouteImport } from './routes/journal'
@@ -114,6 +115,11 @@ const CommunityRoute = CommunityRouteImport.update({
 const D14Route = D14RouteImport.update({
   id: '/d14',
   path: '/d14',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FindUsRoute = FindUsRouteImport.update({
+  id: '/find-us',
+  path: '/find-us',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FoundRoute = FoundRouteImport.update({
@@ -387,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
   '/journal': typeof JournalRouteWithChildren
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
+  '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/login': typeof LoginRoute
   '/shop': typeof ShopRoute
@@ -508,6 +516,7 @@ export interface FileRoutesById {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
   '/journal': typeof JournalRouteWithChildren
@@ -573,6 +582,7 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/find-us'
     | '/found'
     | '/haven'
     | '/journal'
@@ -634,6 +644,7 @@ export interface FileRouteTypes {
     | '/brand'
     | '/builder'
     | '/community'
+    | '/find-us'
     | '/found'
     | '/login'
     | '/shop'
@@ -693,6 +704,7 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/find-us'
     | '/found'
     | '/haven'
     | '/journal'
@@ -757,6 +769,7 @@ export interface RootRouteChildren {
   BuilderRoute: typeof BuilderRoute
   CommunityRoute: typeof CommunityRoute
   D14Route: typeof D14RouteWithChildren
+  FindUsRoute: typeof FindUsRoute
   FoundRoute: typeof FoundRoute
   HavenRoute: typeof HavenRouteWithChildren
   JournalRoute: typeof JournalRouteWithChildren
@@ -836,6 +849,13 @@ declare module '@tanstack/react-router' {
       path: '/d14'
       fullPath: '/d14'
       preLoaderRoute: typeof D14RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/find-us': {
+      id: '/find-us'
+      path: '/find-us'
+      fullPath: '/find-us'
+      preLoaderRoute: typeof FindUsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/found': {
@@ -1342,6 +1362,7 @@ const rootRouteChildren: RootRouteChildren = {
   BuilderRoute: BuilderRoute,
   CommunityRoute: CommunityRoute,
   D14Route: D14RouteWithChildren,
+  FindUsRoute: FindUsRoute,
   FoundRoute: FoundRoute,
   HavenRoute: HavenRouteWithChildren,
   JournalRoute: JournalRouteWithChildren,
