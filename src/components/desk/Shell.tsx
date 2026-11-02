@@ -31,7 +31,7 @@ const NAV = [
   { to: "/admin/inventory", label: "Inventory", icon: Warehouse },
   { to: "/admin/money", label: "Money", icon: Banknote },
   { to: "/admin/risk", label: "Risk", icon: TriangleAlert },
-  { to: "/admin/minutes", label: "MINUTES", icon: FileText },
+  { to: "/admin/minutes", label: "Minutes", icon: FileText },
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
@@ -44,7 +44,7 @@ const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin/inventory": { kicker: "Haven and Basecamp", title: "Inventory" },
   "/admin/money": { kicker: "Deposits, invoices, refunds", title: "Money" },
   "/admin/risk": { kicker: "Waivers, weather, cover", title: "Risk" },
-  "/admin/minutes": { kicker: "Badlander's Development Meetings", title: "MINUTES" },
+  "/admin/minutes": { kicker: "Badlander's Development Meetings", title: "Minutes" },
   "/admin/friday": { kicker: "Week of 1–7 September", title: "Friday pack" },
 };
 
