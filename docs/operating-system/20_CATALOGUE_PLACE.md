@@ -17,7 +17,7 @@ Do not replace these with the $300 package blend.
 
 All four: kitchen, fireplace, A/C, Wi-Fi, parking, laundry. Cottage, Gran Pacífico and La Floresta are **not** Haven.
 
-Address: 360 4 Street West, Drumheller. Downtown: restaurants and shops within a block, playground and green on the same stretch, Brew House two blocks.
+Address: 356 4 Street West, Drumheller. Downtown: restaurants and shops within a block, playground and green on the same stretch, Brew House two blocks.
 
 ## Seasonal rates (CAD) — house card
 

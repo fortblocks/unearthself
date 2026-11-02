@@ -107,7 +107,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <ul className="space-y-2">
               <li><Link to="/about" className="hover:text-fossil">About</Link></li>
               <li><Link to="/book/retreat" className="hover:text-fossil">Inquiries</Link></li>
-              <li><span className="text-fossil/70">Find Us</span></li>
+              <li><Link to="/find-us" className="hover:text-fossil">Find Us</Link></li>
               <li>
                 <a href="mailto:hello@unearthself.xyz" className="hover:text-fossil">
                   hello@unearthself.xyz

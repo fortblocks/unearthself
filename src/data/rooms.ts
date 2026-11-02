@@ -120,7 +120,7 @@ export const HAVEN_SHARED = [
   "Washer and dryer",
 ] as const;
 
-export const HAVEN_ADDRESS = "360 4 Street West, Drumheller, Alberta";
+export const HAVEN_ADDRESS = "356 4 Street West, Drumheller, Alberta";
 
 export const HAVEN_PLACE =
   "Downtown Drumheller. Restaurants and shops within a block. A playground and open green on the same stretch. The Brew House two blocks over. Basecamp is next door when you want heat or a table.";
