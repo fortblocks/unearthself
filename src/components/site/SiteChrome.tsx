@@ -113,11 +113,6 @@ export function SiteChrome({ children }: { children: ReactNode }) {
                   hello@unearthself.xyz
                 </a>
               </li>
-              <li>
-                <a href="tel:+14038234567" className="hover:text-fossil">
-                  +1 (403) 823-4567
-                </a>
-              </li>
             </ul>
           </div>
         </div>
