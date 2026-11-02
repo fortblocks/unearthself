@@ -6,6 +6,7 @@ import {
   Bot,
   CalendarDays,
   ClipboardList,
+  FileText,
   Radio,
   Target,
   TriangleAlert,
@@ -30,6 +31,7 @@ const NAV = [
   { to: "/admin/inventory", label: "Inventory", icon: Warehouse },
   { to: "/admin/money", label: "Money", icon: Banknote },
   { to: "/admin/risk", label: "Risk", icon: TriangleAlert },
+  { to: "/admin/minutes", label: "MINUTES", icon: FileText },
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
@@ -42,6 +44,7 @@ const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin/inventory": { kicker: "Haven and Basecamp", title: "Inventory" },
   "/admin/money": { kicker: "Deposits, invoices, refunds", title: "Money" },
   "/admin/risk": { kicker: "Waivers, weather, cover", title: "Risk" },
+  "/admin/minutes": { kicker: "Badlander's Development Meetings", title: "MINUTES" },
   "/admin/friday": { kicker: "Week of 1–7 September", title: "Friday pack" },
 };
 
@@ -114,7 +117,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <NativeSelect
             value={lookingAs}
             onChange={(e) => setLookingAs(e.target.value as typeof lookingAs)}
-            className="border-fossil/20 bg-coal text-fossil focus:border-ember"
+            className="border-fossil/20 bg-fossil text-coal focus:border-ember"
             aria-label="Partner view"
           >
             {PARTNERS.map((p) => (
