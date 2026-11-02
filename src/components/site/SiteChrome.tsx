@@ -98,7 +98,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               <li><Link to="/bootcamp" className="hover:text-fossil">Badlands Bootcamp</Link></li>
               <li><Link to="/basecamp" className="hover:text-fossil">Basecamp</Link></li>
               <li><Link to="/haven" className="hover:text-fossil">The Haven</Link></li>
-              <li><span className="text-fossil/70">Packages</span></li>
+              <li><Link to="/packages" className="hover:text-fossil">Packages</Link></li>
               <li><span className="text-fossil/70">Venue Rentals</span></li>
             </ul>
           </div>
