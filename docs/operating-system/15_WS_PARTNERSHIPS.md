@@ -8,7 +8,7 @@
 |---|---|---|
 | Canalta | Overflow rooms for 50–150 pax | In conversation / terms to file |
 | Town businesses | Connection quest | Not yet briefed as a set |
-| Wayne’s fossil shop | Existence day | Concept only |
+| Wayne’s fossil shop | Experience day | Concept only |
 | Last Chance Saloon | Possible close | Concept only |
 | Licensed outdoor / canyon operators | Safety and access | Required if we are not self-licensed |
 | Royal Tyrrell Museum | Credibility, possible add-on | Aspirational — do not advertise a partnership we do not have |
