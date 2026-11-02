@@ -12,10 +12,11 @@ export const Route = createFileRoute("/find-us")({
   component: FindUs,
 });
 
-// Approximate pin from OpenStreetMap (street-level match for 4 Street West, Drumheller).
-const LAT = 51.4649;
-const LON = -112.7134;
-const BBOX = [LON - 0.012, LAT - 0.006, LON + 0.012, LAT + 0.006].join(",");
+// Pin at the centroid of OSM building way 1549132263: the penultimate building on the east side
+// of 4 Street West, south of 3 Avenue West, just before the curve into 3 Street West.
+const LAT = 51.463113;
+const LON = -112.713121;
+const BBOX = [LON - 0.004, LAT - 0.002, LON + 0.004, LAT + 0.002].join(",");
 const OSM_EMBED = `https://www.openstreetmap.org/export/embed.html?bbox=${BBOX}&layer=mapnik&marker=${LAT},${LON}`;
 const Q = encodeURIComponent(HAVEN_ADDRESS);
 const GOOGLE = `https://www.google.com/maps/search/?api=1&query=${Q}`;
@@ -157,7 +158,13 @@ function FindUs() {
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-ember uppercase">In town</p>
           <h2 className="font-display mb-6 text-4xl uppercase">To the door</h2>
-          <p className="text-lg text-sandstone italic">[Directions from the edge of town to 4 Street West to confirm]</p>
+          <Steps
+            items={[
+              "In North Drumheller, turn onto 4 Street West from Riverside Drive West and head south.",
+              "Continue past 3 Avenue West to the bottom of the street.",
+              "Haven is the second-to-last building, on the left, just before the road curves round into 3 Street West.",
+            ]}
+          />
           <p className="mt-4 text-lg text-fossil/80">There is on-site parking at Haven.</p>
         </div>
       </section>
