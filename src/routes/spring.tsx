@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { submitSpringEnquiry, mailSpringEnquiry } from "@/lib/enquiry";
+import { submitSpringEnquiry, sendEnquiryAlert, enquiryMailto } from "@/lib/enquiry";
 import { ingestSpringEnquiry } from "@/lib/desk-store";
 
 type Search = {
@@ -232,7 +232,24 @@ function Enquire() {
       utmCampaign: search.utm_campaign,
     };
     try {
-      const mailed = await mailSpringEnquiry(payload);
+      const sent = await sendEnquiryAlert({
+        form: "Spring 2027 enquiry",
+        subject: `Spring 2027 enquiry — ${payload.company || payload.name}`,
+        replyTo: payload.email,
+        honey: payload.honey,
+        fields: {
+          name: payload.name,
+          company: payload.company,
+          role: payload.role,
+          headcount: payload.headcount,
+          window: payload.window,
+          notes: payload.notes,
+          utm_source: payload.utmSource,
+          utm_medium: payload.utmMedium,
+          utm_campaign: payload.utmCampaign,
+        },
+      });
+      const mailed = sent.ok;
       try {
         ingestSpringEnquiry(payload);
       } catch {
@@ -346,7 +363,7 @@ function Enquire() {
             {status === "error" ? (
               <p className="text-sm text-ember">
                 That did not send. Try again, or write{" "}
-                <a className="underline" href="mailto:hello@unearthself.xyz">
+                <a className="underline" href={enquiryMailto("Spring 2027 enquiry")}>
                   hello@unearthself.xyz
                 </a>
                 .

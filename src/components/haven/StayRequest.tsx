@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { ROOMS, nightsBetween, type RoomSlug } from "@/data/rooms";
 import { quoteStay } from "@/data/havenRates";
 import { cad } from "@/lib/format";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 type Props = {
   presetSlug?: RoomSlug;
@@ -30,6 +31,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [honey, setHoney] = useState("");
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
   const quote = useMemo(
@@ -88,7 +90,29 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
       const packed = encodeURIComponent(JSON.stringify(request));
       window.open(`${ROOMBOX}/embed/catch?in=${packed}`, "roombox-in", "popup=yes,width=480,height=320");
     }
-    setStatus("done");
+    const roomName = room ? ROOMS.find((r) => r.slug === room)?.name ?? room : "Any available";
+    const sent = await sendEnquiryAlert({
+      form: "Haven stay request",
+      subject: `Haven stay request — ${request.name}`,
+      replyTo: request.email,
+      honey,
+      fields: {
+        name: request.name,
+        room: roomName,
+        check_in: checkIn,
+        check_out: checkOut,
+        nights: nights || "",
+        guests,
+        indicative_total: quote ? cad(quote.total) : "",
+        notes: request.notes,
+        roombox_post: posted ? "accepted" : "not accepted (popup fallback opened)",
+      },
+    });
+    if (sent.ok) setStatus("done");
+    else {
+      setStatus("error");
+      setError(sent.error);
+    }
   }
 
   if (status === "done") {
@@ -196,7 +220,18 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
           placeholder="Arrival time, which room you prefer, anything we should know."
         />
       </label>
-      {error && <p className="text-sm text-ember">{error}</p>}
+      <input type="text" name="_honey" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" value={honey} onChange={(e) => setHoney(e.target.value)} />
+      {error && (
+        <p className="text-sm text-ember">
+          {error}
+          {status === "error" && (
+            <>
+              {" "}That didn’t send. Please email us at{" "}
+              <a className="underline" href={enquiryMailto("Haven stay request")}>{ENQUIRY_MAIL}</a>.
+            </>
+          )}
+        </p>
+      )}
       <button
         type="submit"
         disabled={status === "sending"}

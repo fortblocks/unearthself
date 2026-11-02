@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { cad } from "@/data/treatments";
 import { useBooking, type BookFace } from "@/lib/booking/context";
 import { StayRequest } from "@/components/haven/StayRequest";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
 
@@ -117,7 +118,9 @@ export function BookPanel() {
 }
 
 function BootcampFace() {
-  const [status, setStatus] = useState<"idle" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [error, setError] = useState("");
+  const [honey, setHoney] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [org, setOrg] = useState("");
@@ -126,7 +129,7 @@ function BootcampFace() {
   const [dates, setDates] = useState("");
   const [notes, setNotes] = useState("");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const body = [
       `Name: ${name}`,
@@ -146,8 +149,20 @@ function BootcampFace() {
     } catch {
       /* ignore */
     }
-    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent("Retreat hold — " + (org || "new"))}&body=${encodeURIComponent(body)}`;
-    setStatus("done");
+    void body;
+    setStatus("sending");
+    const res = await sendEnquiryAlert({
+      form: "Retreat hold (Book panel)",
+      subject: `Retreat hold — ${org || "new"}`,
+      replyTo: email,
+      honey,
+      fields: { name, role, organisation: org, headcount, dates, notes },
+    });
+    if (res.ok) setStatus("done");
+    else {
+      setError(res.error);
+      setStatus("error");
+    }
   }
 
   if (status === "done") {
@@ -160,6 +175,7 @@ function BootcampFace() {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-3">
+      <input type="text" name="_honey" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" value={honey} onChange={(e) => setHoney(e.target.value)} />
       <label>
         <span className={label}>Name</span>
         <input required className={field} value={name} onChange={(e) => setName(e.target.value)} />
@@ -190,8 +206,14 @@ function BootcampFace() {
         <span className={label}>Notes</span>
         <textarea rows={3} className={field} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
-      <button type="submit" className="mt-1 w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white">
-        Hold a date
+      {status === "error" && (
+            <p className="text-sm text-ember">
+              That didn’t send ({error}). Please email us at{" "}
+              <a className="underline" href={enquiryMailto("Retreat hold")}>{ENQUIRY_MAIL}</a>.
+            </p>
+          )}
+      <button type="submit" disabled={status === "sending"} className="mt-1 w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-60">
+        {status === "sending" ? "Sending…" : "Hold a date"}
       </button>
       <p className="text-xs text-coal/45">6–30 people. Two to five days. Nothing charged until we confirm.</p>
     </form>
@@ -200,6 +222,9 @@ function BootcampFace() {
 
 function BasecampFace() {
   const { lines, removeLine, updateLine, clear, mode, setMode } = useBooking();
+  const [send, setSend] = useState<"idle" | "sending" | "error">("idle");
+  const [error, setError] = useState("");
+  const [honey, setHoney] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -209,7 +234,7 @@ function BasecampFace() {
   const [status, setStatus] = useState<"idle" | "done">("idle");
   const total = lines.reduce((sum, l) => sum + l.price, 0);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const list = lines.map((l) => `${l.name} ${cad(l.price)} — ${l.date || "date TBC"} ${l.time}`).join("\n");
     const body = [`Mode: ${mode}`, `Name: ${name}`, `Email: ${email}`, `Phone: ${phone}`, "", list, `Total: ${cad(total)}`, "", notes].join("\n");
@@ -222,8 +247,22 @@ function BasecampFace() {
     } catch {
       /* ignore */
     }
-    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent("Basecamp request")}&body=${encodeURIComponent(body)}`;
-    setStatus("done");
+    void body;
+    setSend("sending");
+    const res = await sendEnquiryAlert({
+      form: "Basecamp / spa request (Book panel)",
+      subject: `Basecamp request — ${name || email}`,
+      replyTo: email,
+      honey,
+      fields: { mode, name, phone, treatments: list, working_total: cad(total), notes },
+    });
+    if (res.ok) {
+      setSend("idle");
+      setStatus("done");
+    } else {
+      setError(res.error);
+      setSend("error");
+    }
   }
 
   if (status === "done") {
@@ -247,6 +286,7 @@ function BasecampFace() {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
+      <input type="text" name="_honey" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" value={honey} onChange={(e) => setHoney(e.target.value)} />
       <div className="grid grid-cols-2 gap-1 border border-coal/10 p-1">
         <button
           type="button"
@@ -357,8 +397,14 @@ function BasecampFace() {
           <span className="tabular-nums">{cad(total)}</span>
         </p>
       )}
-      <button type="submit" disabled={lines.length === 0} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">
-        Request these times
+      {send === "error" && (
+            <p className="text-sm text-ember">
+              That didn’t send ({error}). Please email us at{" "}
+              <a className="underline" href={enquiryMailto("Basecamp request")}>{ENQUIRY_MAIL}</a>.
+            </p>
+          )}
+      <button type="submit" disabled={lines.length === 0 || send === "sending"} className="w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-40">
+        {send === "sending" ? "Sending…" : "Request these times"}
       </button>
     </form>
   );

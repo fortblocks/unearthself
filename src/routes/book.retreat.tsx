@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { ENQUIRY_MAIL, enquiryMailto, sendEnquiryAlert } from "@/lib/enquiry";
 
 export const Route = createFileRoute("/book/retreat")({
   component: RetreatHold,
@@ -9,21 +10,26 @@ export const Route = createFileRoute("/book/retreat")({
 });
 
 function RetreatHold() {
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [error, setError] = useState("");
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    const body = [
-      `Name: ${data.get("name")}`,
-      `Role: ${data.get("role")}`,
-      `Organisation: ${data.get("org")}`,
-      `Email: ${data.get("email")}`,
-      `Headcount: ${data.get("headcount")}`,
-      `Dates: ${data.get("dates")}`,
-      `Notes: ${data.get("notes")}`,
-    ].join("\n");
-    window.location.href = `mailto:hello@unearthself.xyz?subject=${encodeURIComponent(
-      "Retreat hold - " + String(data.get("org") || "new"),
-    )}&body=${encodeURIComponent(body)}`;
+    const g = (k: string) => String(data.get(k) ?? "");
+    setStatus("sending");
+    const res = await sendEnquiryAlert({
+      form: "Retreat hold (/book/retreat)",
+      subject: `Retreat hold — ${g("org") || "new"}`,
+      replyTo: g("email"),
+      honey: g("_honey"),
+      fields: { name: g("name"), role: g("role"), organisation: g("org"), headcount: g("headcount"), dates: g("dates"), notes: g("notes") },
+    });
+    if (res.ok) setStatus("done");
+    else {
+      setError(res.error);
+      setStatus("error");
+    }
   }
 
   return (
@@ -37,7 +43,11 @@ function RetreatHold() {
           Tell us who is coming and when you can travel. We reply within one working day with
           availability.
         </p>
+        {status === "done" ? (
+          <p className="text-lg">Request sent. We reply within one working day with availability.</p>
+        ) : (
         <form onSubmit={onSubmit} className="grid gap-4">
+          <input type="text" name="_honey" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
           {[
             ["name", "Your name", "text"],
             ["role", "Role", "text"],
@@ -60,10 +70,17 @@ function RetreatHold() {
             Anything we should know
             <textarea name="notes" rows={4} className="border border-coal/15 bg-white px-3 py-2.5 outline-none focus:border-ember" />
           </label>
-          <button type="submit" className="mt-2 rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white">
-            Send request
+          {status === "error" && (
+            <p className="text-sm text-ember">
+              That didn’t send ({error}). Please email us at{" "}
+              <a className="underline" href={enquiryMailto("Retreat hold")}>{ENQUIRY_MAIL}</a>.
+            </p>
+          )}
+          <button type="submit" disabled={status === "sending"} className="mt-2 rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white disabled:opacity-60">
+            {status === "sending" ? "Sending…" : "Send request"}
           </button>
         </form>
+        )}
         <p className="mt-8 text-sm text-coal/50">
           Looking for a room or a treatment?{" "}
           <Link to="/haven" className="underline">
