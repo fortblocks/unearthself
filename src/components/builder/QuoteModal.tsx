@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { X } from "lucide-react";
 import { useBuilderStore } from "@/lib/store";
+import { getActivityById } from "@/data/activities";
+import { ENQUIRY_MAIL, ENQUIRY_MAILTO, sendEnquiryAlert } from "@/lib/enquiry";
 
 interface Props {
   open: boolean;
@@ -23,8 +25,20 @@ export function QuoteModal({ open, onClose }: Props) {
   const [size, setSize] = useState(groupSize);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [honey, setHoney] = useState("");
 
   if (!open) return null;
+
+  function summarise() {
+    const lines = [`${title} — ${days.length} day${days.length === 1 ? "" : "s"}, ${size} people, season: ${season}, intensity: ${intensityPreset}`];
+    days.forEach((day) => {
+      const parts = Object.entries(day.blocks).flatMap(([block, acts]) =>
+        acts.map((a) => `${block}: ${getActivityById(a.activityId)?.name ?? a.activityId} (${a.durationMin} min)`),
+      );
+      lines.push(`${day.label}: ${parts.length ? parts.join("; ") : "(nothing placed)"}`);
+    });
+    return lines.join("\n");
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,12 +64,35 @@ export function QuoteModal({ open, onClose }: Props) {
           dayCount: days.length,
         },
       };
-      const existing = JSON.parse(localStorage.getItem("unearthself-enquiries") || "[]") as unknown[];
-      localStorage.setItem("unearthself-enquiries", JSON.stringify([enquiry, ...existing].slice(0, 50)));
-      setStatus("done");
+      try {
+        const existing = JSON.parse(localStorage.getItem("unearthself-enquiries") || "[]") as unknown[];
+        localStorage.setItem("unearthself-enquiries", JSON.stringify([enquiry, ...existing].slice(0, 50)));
+      } catch {
+        /* keep going */
+      }
+      const res = await sendEnquiryAlert({
+        form: "Package builder quote",
+        subject: `Package builder quote — ${company || name}`,
+        replyTo: email,
+        honey,
+        fields: {
+          name,
+          phone,
+          company,
+          group_size: size,
+          preferred_dates: preferredDates,
+          notes,
+          itinerary: summarise(),
+        },
+      });
+      if (res.ok) setStatus("done");
+      else {
+        setStatus("error");
+        setError(res.error);
+      }
     } catch {
       setStatus("error");
-      setError("Could not save enquiry — try again.");
+      setError("Could not send enquiry.");
     }
   }
 
@@ -137,7 +174,13 @@ export function QuoteModal({ open, onClose }: Props) {
             <p className="quote-note">
               Your current <strong>{title}</strong> ({days.length} days) will be attached automatically.
             </p>
-            {error && <p className="form-error">{error}</p>}
+            <input type="text" name="_honey" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ display: "none" }} value={honey} onChange={(e) => setHoney(e.target.value)} />
+            {error && (
+              <p className="form-error">
+                {error} That didn’t send. Please email us at{" "}
+                <a href={ENQUIRY_MAILTO}>{ENQUIRY_MAIL}</a>.
+              </p>
+            )}
             <button type="submit" className="btn-primary full-btn" disabled={status === "sending"}>
               {status === "sending" ? "Sending…" : "Send enquiry"}
             </button>

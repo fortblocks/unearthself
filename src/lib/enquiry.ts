@@ -143,3 +143,54 @@ async function postJson(url: string, body: unknown) {
     return false;
   }
 }
+
+/* ── Interim email alerts ────────────────────────────────────────────────
+ * Every enquiry form sends a formatted alert to ENQUIRY_MAIL through the
+ * FormSubmit AJAX endpoint. Returns real success/failure so forms only show
+ * "sent" when the alert actually went out. No payments are taken here.
+ */
+export const ENQUIRY_MAIL = SPRING_MAIL;
+export const ENQUIRY_MAILTO = `mailto:${ENQUIRY_MAIL}`;
+
+export type AlertResult = { ok: true } | { ok: false; error: string };
+
+export async function sendEnquiryAlert(opts: {
+  form: string;
+  subject: string;
+  replyTo: string;
+  fields: Record<string, unknown>;
+  honey?: string;
+}): Promise<AlertResult> {
+  if (clean(opts.honey)) return { ok: true };
+  const replyTo = clean(opts.replyTo, 120).toLowerCase();
+  if (!EMAIL_RE.test(replyTo)) return { ok: false, error: "A valid email is needed." };
+  const body: Record<string, string> = { form: opts.form };
+  for (const [k, v] of Object.entries(opts.fields)) {
+    if (v === undefined || v === null || v === "") continue;
+    body[k] = typeof v === "string" ? v.trim().slice(0, 4000) : String(v);
+  }
+  body.email = replyTo;
+  body.page = typeof window !== "undefined" ? window.location.href : "";
+  body._subject = clean(opts.subject, 160);
+  body._replyto = replyTo;
+  body._template = "table";
+  body._captcha = "false";
+  body._honey = "";
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(`https://formsubmit.co/ajax/${ENQUIRY_MAIL}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    const json = (await res.json().catch(() => ({}))) as { success?: boolean | string; message?: string };
+    const ok = res.ok && (json.success === true || json.success === "true");
+    return ok ? { ok: true } : { ok: false, error: clean(json.message, 200) || `Send failed (${res.status}).` };
+  } catch {
+    return { ok: false, error: "Could not reach the mail service." };
+  } finally {
+    clearTimeout(t);
+  }
+}
