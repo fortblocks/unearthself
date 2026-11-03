@@ -348,6 +348,73 @@ describe("Caching and Performance", () => {
     assert.ok(capacityInMeetings >= totalMeetings, 
       `Context limit ${MAX_CONTEXT_CHARS} must fit all ${totalMeetings} meetings (avg ${avgSize} chars)`);
   });
+
+  it("should score text relevance with keyword matching", () => {
+    const text = `
+The team discussed the spa headquarters location.
+We decided to name it Basecamp.
+Basecamp will serve as the main office.
+Some other unrelated content here.
+    `.trim();
+    
+    const query = "what was decided name for spa headquarters";
+    
+    // Simple keyword scoring
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2);
+    
+    let score = 0;
+    for (const word of queryWords) {
+      if (!['what', 'was', 'the', 'for'].includes(word) && lowerText.includes(word)) {
+        score++;
+      }
+    }
+    
+    assert.ok(score >= 3, "Should match 'decided', 'name', 'spa', 'headquarters'");
+  });
+
+  it("should extract snippets with context", () => {
+    const text = `Line 1
+Line 2 contains keyword basecamp
+Line 3 more context
+Line 4`;
+    
+    const lines = text.split('\n');
+    const matchIdx = lines.findIndex(line => line.toLowerCase().includes('basecamp'));
+    
+    assert.ok(matchIdx > 0);
+    
+    // Should capture surrounding lines for context
+    const start = Math.max(0, matchIdx - 1);
+    const end = Math.min(lines.length, matchIdx + 2);
+    const snippet = lines.slice(start, end).join('\n');
+    
+    assert.ok(snippet.includes('Line 2'));
+    assert.ok(snippet.includes('Line 3'));
+  });
+
+  it("should rank meetings by relevance score", () => {
+    const meetings = [
+      { text: "Completely unrelated meeting about something else", score: 0 },
+      { text: "spa headquarters Basecamp name decided", score: 0 },
+      { text: "Another random topic", score: 0 },
+    ];
+    
+    // Score each
+    for (const m of meetings) {
+      const query = "spa headquarters name";
+      const lowerText = m.text.toLowerCase();
+      for (const word of query.split(/\s+/)) {
+        if (lowerText.includes(word)) m.score++;
+      }
+    }
+    
+    meetings.sort((a, b) => b.score - a.score);
+    
+    assert.ok(meetings[0].score >= 3); // Top match has most keywords
+    assert.ok(meetings[0].text.includes('Basecamp'));
+  });
 });
 
 describe("getMeetingMinutes error handling", () => {

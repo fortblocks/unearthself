@@ -56,6 +56,72 @@ function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
   return Date.now() - entry.timestamp < CACHE_TTL_MS;
 }
 
+// Simple keyword scoring for meeting relevance
+interface ScoredMeeting {
+  meeting: Meeting;
+  text: string;
+  score: number;
+  matchSnippets: string[];
+}
+
+function scoreTextRelevance(text: string, query: string): { score: number; snippets: string[] } {
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  
+  // Extract keywords from query (remove common stop words)
+  const stopWords = new Set(['what', 'was', 'is', 'the', 'a', 'an', 'for', 'to', 'of', 'in', 'on', 'at', 'from', 'with', 'about']);
+  const queryWords = lowerQuery
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+  
+  if (queryWords.length === 0) {
+    return { score: 0, snippets: [] };
+  }
+  
+  let score = 0;
+  const snippets: string[] = [];
+  const lines = text.split('\n');
+  
+  // BM25-style scoring
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lowerLine = line.toLowerCase();
+    
+    let lineScore = 0;
+    let matchCount = 0;
+    
+    for (const word of queryWords) {
+      if (lowerLine.includes(word)) {
+        // TF component (term frequency with diminishing returns)
+        const tf = (lowerLine.match(new RegExp(word, 'g')) || []).length;
+        lineScore += Math.log(1 + tf) * 2;
+        matchCount++;
+      }
+    }
+    
+    // Bonus for matching multiple query terms
+    if (matchCount > 1) {
+      lineScore *= (1 + matchCount * 0.5);
+    }
+    
+    if (lineScore > 0) {
+      score += lineScore;
+      
+      // Capture snippet with context
+      if (snippets.length < 3) {
+        const start = Math.max(0, i - 1);
+        const end = Math.min(lines.length, i + 2);
+        const snippet = lines.slice(start, end).join('\n').trim();
+        if (snippet.length > 0 && snippet.length < 500) {
+          snippets.push(snippet);
+        }
+      }
+    }
+  }
+  
+  return { score, snippets };
+}
+
 function extractDateTimeFromTitle(title: string): { date: string; time: string } | null {
   // Title format: "Badlander's Development Meeting – Notes by Gemini"
   // We'll use the file's createdTime instead, but we need to parse the Gemini notes for meeting date/time
@@ -352,24 +418,32 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
 export const getMeetingMinutes = createServerFn({ method: "GET" })
   .validator((d: { meetingId: string }) => d)
   .handler(async ({ data }): Promise<MeetingMinutes | null> => {
+    const startTime = Date.now();
+    
     // Check cache first (keyed by meetingId)
+    const cacheCheckStart = Date.now();
     const cached = docExportCache.get(data.meetingId) || null;
     if (isCacheValid(cached)) {
-      console.log(`Using cached doc export for ${data.meetingId}`);
+      console.log(`[getMeetingMinutes] Cache HIT for ${data.meetingId} (${Date.now() - startTime}ms)`);
       return cached!.data;
     }
+    console.log(`[getMeetingMinutes] Cache MISS for ${data.meetingId} (check: ${Date.now() - cacheCheckStart}ms)`);
 
+    const driveStart = Date.now();
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return null;
     }
+    console.log(`[getMeetingMinutes] Drive client init: ${Date.now() - driveStart}ms`);
     
     try {
       // Get file metadata
+      const metaStart = Date.now();
       const metaResponse = await drive.files.get({
         fileId: data.meetingId,
         fields: "id, name, createdTime, modifiedTime",
       });
+      console.log(`[getMeetingMinutes] Metadata fetch: ${Date.now() - metaStart}ms`);
       
       const file = metaResponse.data;
       if (!file.id || !file.name) {
@@ -377,12 +451,15 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
       }
       
       // Export as plain text
+      const exportStart = Date.now();
       const exportResponse = await drive.files.export({
         fileId: data.meetingId,
         mimeType: "text/plain",
       }, { responseType: "text" });
+      console.log(`[getMeetingMinutes] Doc export: ${Date.now() - exportStart}ms`);
       
       const fullText = String(exportResponse.data);
+      console.log(`[getMeetingMinutes] Text size: ${fullText.length} chars`);
       
       // Parse date from filename first
       const parsedDateTime = parseDateFromFilename(file.name);
@@ -427,6 +504,7 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
         timestamp: Date.now(),
       });
 
+      console.log(`[getMeetingMinutes] TOTAL time: ${Date.now() - startTime}ms`);
       return result;
     } catch (error: any) {
       console.error("Error getting meeting minutes:", error);
@@ -442,25 +520,35 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
 export const askMinutes = createServerFn({ method: "POST" })
   .validator((d: { question: string }) => d)
   .handler(async ({ data }): Promise<AskResult | { error: string }> => {
+    const startTime = Date.now();
+    console.log(`[askMinutes] Starting query: "${data.question}"`);
+    
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { error: "XAI_API_KEY not configured" };
     }
     
+    const driveStart = Date.now();
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return { error: "Google Drive not configured" };
     }
+    console.log(`[askMinutes] Drive client init: ${Date.now() - driveStart}ms`);
     
     try {
       // First, get all meetings (cached)
+      const listStart = Date.now();
       const meetings = await listMeetings();
+      console.log(`[askMinutes] listMeetings: ${Date.now() - listStart}ms (${meetings.length} meetings)`);
       
       // Fetch meeting texts with concurrency limit (max 10 at a time)
+      const exportStart = Date.now();
       const MAX_CONCURRENT_EXPORTS = 10;
       const meetingTexts: Array<{ meeting: Meeting; text: string } | null> = [];
       
+      let batchNum = 0;
       for (let i = 0; i < meetings.length; i += MAX_CONCURRENT_EXPORTS) {
+        const batchStart = Date.now();
         const batch = meetings.slice(i, i + MAX_CONCURRENT_EXPORTS);
         const batchPromises = batch.map(async (meeting) => {
           try {
@@ -472,9 +560,43 @@ export const askMinutes = createServerFn({ method: "POST" })
         });
         const batchResults = await Promise.all(batchPromises);
         meetingTexts.push(...batchResults);
+        console.log(`[askMinutes] Batch ${++batchNum} (${batch.length} docs): ${Date.now() - batchStart}ms`);
       }
+      console.log(`[askMinutes] All exports: ${Date.now() - exportStart}ms total`);
       
       const validMeetings = meetingTexts.filter((m): m is { meeting: Meeting; text: string } => m !== null);
+      console.log(`[askMinutes] Valid meetings: ${validMeetings.length}`);
+      
+      // Score and rank meetings by relevance to query
+      const scoreStart = Date.now();
+      const scoredMeetings: ScoredMeeting[] = validMeetings.map(m => {
+        const { score, snippets } = scoreTextRelevance(m.text, data.question);
+        return {
+          meeting: m.meeting,
+          text: m.text,
+          score,
+          matchSnippets: snippets,
+        };
+      });
+      
+      // Sort by score descending
+      scoredMeetings.sort((a, b) => b.score - a.score);
+      console.log(`[askMinutes] Scored all meetings: ${Date.now() - scoreStart}ms`);
+      console.log(`[askMinutes] Top 5 scores: ${scoredMeetings.slice(0, 5).map(m => `${m.score.toFixed(1)}`).join(', ')}`);
+      
+      // Take top 8 meetings for xAI (reduces context from ~1.5MB to ~150KB)
+      const TOP_N_MEETINGS = 8;
+      const topMeetings = scoredMeetings.slice(0, TOP_N_MEETINGS).filter(m => m.score > 0);
+      
+      if (topMeetings.length === 0) {
+        console.log(`[askMinutes] No relevant meetings found via keyword search`);
+        return {
+          answer: "I couldn't find any meetings that seem relevant to this question. Try rephrasing or asking about a specific topic.",
+          citations: [],
+        };
+      }
+      
+      console.log(`[askMinutes] Selected top ${topMeetings.length} meetings for xAI (scores: ${topMeetings.map(m => m.score.toFixed(1)).join(', ')})`);
       
       if (validMeetings.length === 0) {
         return {
@@ -483,34 +605,26 @@ export const askMinutes = createServerFn({ method: "POST" })
         };
       }
       
-      // Calculate total context size (grok-4.20 supports 1M tokens ~= 4MB text)
-      // With ~83 meetings at 18KB avg = ~1.5MB total, we can fit all meetings
-      const MAX_CONTEXT_CHARS = 2000000; // 2MB - well under model limit
+      // Build context from top-ranked meetings only
+      const contextStart = Date.now();
+      const includedMeetings = topMeetings;
       let contextChars = 0;
-      const includedMeetings: typeof validMeetings = [];
-      
-      for (const meeting of validMeetings) {
-        const meetingSize = meeting.text.length + 200; // +200 for headers
-        if (contextChars + meetingSize > MAX_CONTEXT_CHARS && includedMeetings.length > 0) {
-          console.log(`Context size limit reached: ${contextChars} chars, ${includedMeetings.length}/${validMeetings.length} meetings`);
-          break;
-        }
-        includedMeetings.push(meeting);
-        contextChars += meetingSize;
+      for (const m of includedMeetings) {
+        contextChars += m.text.length + 200;
       }
+      console.log(`[askMinutes] Context built: ${Date.now() - contextStart}ms (${includedMeetings.length} meetings, ${contextChars} chars)`);
 
-      console.log(`Searching ${includedMeetings.length}/${validMeetings.length} meetings (${contextChars} chars)`);
-
-      // Use xAI to answer the question with citations (with timeout)
+      // Use xAI to answer the question with citations (with 8-second timeout)
       const prompt = `You are a meeting assistant helping answer questions about Badlander's Development Meetings. 
 
-Here are the meeting transcripts (${includedMeetings.length} meetings):
+Here are the ${includedMeetings.length} most relevant meeting transcripts (selected from ${validMeetings.length} total):
 
 ${includedMeetings.map((m, idx) => `
 === MEETING ${idx + 1} ===
 Date: ${m.meeting.date}
 Time: ${m.meeting.time} (America/Edmonton)
 ID: ${m.meeting.id}
+Relevance score: ${m.score.toFixed(1)}
 
 ${m.text}
 
@@ -549,6 +663,8 @@ If you found nothing relevant, return:
   "citations": []
 }`;
       
+      const xaiStart = Date.now();
+      console.log(`[askMinutes] Starting xAI request...`);
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -569,8 +685,9 @@ If you found nothing relevant, return:
           ],
           temperature: 0.1,
         }),
-        signal: AbortSignal.timeout(100000), // 100-second timeout for xAI call
+        signal: AbortSignal.timeout(8000), // 8-second timeout for xAI call
       });
+      console.log(`[askMinutes] xAI response received: ${Date.now() - xaiStart}ms (status: ${response.status})`);
       
       if (!response.ok) {
         const errorText = await response.text();
