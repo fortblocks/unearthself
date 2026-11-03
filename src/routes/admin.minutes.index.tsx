@@ -158,12 +158,20 @@ function MinutesIndexPage() {
         }
       }
 
+      // Use matched meetings from AI result if available, otherwise keyword results
+      const matchedMeetings = answerResult?.matchedMeetings 
+        ? answerResult.matchedMeetings.map(m => ({ 
+            meeting: m as Meeting, 
+            excerpt: undefined 
+          }))
+        : keywordResults.map(r => ({ 
+            meeting: r.meeting as Meeting, 
+            excerpt: r.excerpt 
+          }));
+      
       setSearchState({
         answer: answerResult,
-        matchedMeetings: keywordResults.map(r => ({ 
-          meeting: r.meeting as Meeting, 
-          excerpt: r.excerpt 
-        })),
+        matchedMeetings,
         error: searchError,
       });
     } catch (error) {
