@@ -483,8 +483,9 @@ export const askMinutes = createServerFn({ method: "POST" })
         };
       }
       
-      // Trim context if too large (keep most recent meetings, up to ~500K chars)
-      const MAX_CONTEXT_CHARS = 500000;
+      // Calculate total context size (grok-4.20 supports 1M tokens ~= 4MB text)
+      // With ~83 meetings at 18KB avg = ~1.5MB total, we can fit all meetings
+      const MAX_CONTEXT_CHARS = 2000000; // 2MB - well under model limit
       let contextChars = 0;
       const includedMeetings: typeof validMeetings = [];
       
@@ -498,12 +499,12 @@ export const askMinutes = createServerFn({ method: "POST" })
         contextChars += meetingSize;
       }
 
-      console.log(`Searching ${includedMeetings.length} meetings (${contextChars} chars)`);
+      console.log(`Searching ${includedMeetings.length}/${validMeetings.length} meetings (${contextChars} chars)`);
 
       // Use xAI to answer the question with citations (with timeout)
       const prompt = `You are a meeting assistant helping answer questions about Badlander's Development Meetings. 
 
-Here are the meeting transcripts (most recent ${includedMeetings.length} meetings):
+Here are the meeting transcripts (${includedMeetings.length} meetings):
 
 ${includedMeetings.map((m, idx) => `
 === MEETING ${idx + 1} ===

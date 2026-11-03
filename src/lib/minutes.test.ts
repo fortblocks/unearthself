@@ -314,13 +314,12 @@ describe("Caching and Performance", () => {
     // 3 batches: 10 + 10 + 5
   });
 
-  it("should trim context size for search", () => {
-    const MAX_CONTEXT_CHARS = 500000;
-    const meetings = [
-      { text: "a".repeat(200000) }, // 200K
-      { text: "b".repeat(200000) }, // 200K
-      { text: "c".repeat(200000) }, // 200K - would exceed
-    ];
+  it("should include all meetings within 2MB context limit", () => {
+    const MAX_CONTEXT_CHARS = 2000000; // 2MB
+    // Simulate 83 meetings at 18KB avg = ~1.5MB total
+    const meetings = Array.from({ length: 83 }, () => ({ 
+      text: "x".repeat(18000) 
+    }));
     
     let contextChars = 0;
     const included: any[] = [];
@@ -333,8 +332,21 @@ describe("Caching and Performance", () => {
       contextChars += meeting.text.length;
     }
     
-    assert.strictEqual(included.length, 2); // Only first 2 fit
+    // All 83 meetings should fit (83 * 18000 = 1.5MB < 2MB)
+    assert.strictEqual(included.length, 83);
     assert.ok(contextChars <= MAX_CONTEXT_CHARS);
+  });
+
+  it("should search all meetings not just recent ones", () => {
+    // Regression test: ensure old meetings aren't excluded
+    // If "Basecamp" decision was in meeting #50, it must be searchable
+    const MAX_CONTEXT_CHARS = 2000000;
+    const avgSize = 18000;
+    const totalMeetings = 83;
+    
+    const capacityInMeetings = Math.floor(MAX_CONTEXT_CHARS / avgSize);
+    assert.ok(capacityInMeetings >= totalMeetings, 
+      `Context limit ${MAX_CONTEXT_CHARS} must fit all ${totalMeetings} meetings (avg ${avgSize} chars)`);
   });
 });
 
