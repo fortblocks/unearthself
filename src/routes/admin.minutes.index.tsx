@@ -1,13 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Section } from "@/components/desk/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listMeetings, askMinutes, getMeetingMinutes, type Meeting, type AskResult } from "@/lib/minutes";
-import { answerQuestion, testFolderAccess, type AnswerResult } from "@/lib/minutes-archive";
-import { PARTNERS } from "@/data/desk";
-import { Search, Loader2, Filter, Sparkles } from "lucide-react";
+import { listMeetings, getMeetingMinutes, type Meeting } from "@/lib/minutes";
+import { answerQuestion, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
+import { Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/minutes/")({
   component: MinutesIndexPage,
@@ -34,7 +33,6 @@ function formatDate(dateStr: string): string {
 }
 
 function formatTime(timeStr: string): string {
-  // Convert 24h to 12h format
   try {
     const [hours, minutes] = timeStr.split(":").map(Number);
     const period = hours >= 12 ? "PM" : "AM";
@@ -45,164 +43,132 @@ function formatTime(timeStr: string): string {
   }
 }
 
-function MinutesIndexPage() {
-  const { meetings } = Route.useLoaderData();
-  const [question, setQuestion] = useState("");
-  const [asking, setAsking] = useState(false);
-  const [askResult, setAskResult] = useState<AskResult | null>(null);
-  const [askError, setAskError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Array<{
+// Check if query is simple keyword or date that can skip AI
+function isSimpleQuery(query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  // Simple if it's very short or looks like a date
+  if (trimmed.length <= 3) return true;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return true;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(trimmed)) return true;
+  return false;
+}
+
+type SearchState = {
+  answer: AnswerResult | null;
+  matchedMeetings: Array<{
     meeting: Meeting;
     excerpt?: string;
-    matchType: "title" | "date" | "content";
-  }> | null>(null);
+  }>;
+  error: string | null;
+};
+
+function MinutesIndexPage() {
+  const { meetings } = Route.useLoaderData();
+  const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [archiveAnswer, setArchiveAnswer] = useState<AnswerResult | null>(null);
-  const [archiveAsking, setArchiveAsking] = useState(false);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-
-  const handleAsk = async () => {
-    if (!question.trim()) return;
-    
-    setAsking(true);
-    setAskError(null);
-    setAskResult(null);
-    
-    try {
-      const result = await askMinutes({ data: { question: question.trim() } });
-      
-      if ("error" in result) {
-        if (result.error === "XAI_API_KEY not configured") {
-          setAskError("Ask feature requires XAI_API_KEY environment variable.");
-        } else {
-          setAskError(result.error);
-        }
-      } else {
-        setAskResult(result);
-      }
-    } catch (error) {
-      setAskError("Failed to get answer. Please try again.");
-    } finally {
-      setAsking(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void handleAsk();
-    }
-  };
-
-  const handleArchiveAsk = async () => {
-    if (!question.trim()) return;
-
-    setArchiveAsking(true);
-    setArchiveError(null);
-    setArchiveAnswer(null);
-
-    try {
-      const result = await answerQuestion({ data: { question: question.trim() } });
-
-      if ("error" in result) {
-        if (result.error === "XAI_API_KEY not configured") {
-          setArchiveError("Archive search requires XAI_API_KEY environment variable.");
-        } else {
-          setArchiveError(result.error);
-        }
-      } else {
-        setArchiveAnswer(result);
-      }
-    } catch (error) {
-      setArchiveError("Failed to search archive. Please try again.");
-    } finally {
-      setArchiveAsking(false);
-    }
-  };
+  const [searchState, setSearchState] = useState<SearchState | null>(null);
 
   const handleSearch = async () => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      setSearchResults(null);
+    const q = query.trim();
+    if (!q) {
+      setSearchState(null);
       return;
     }
 
     setSearching(true);
+    setSearchState(null);
+
     try {
-      const results: Array<{
-        meeting: Meeting;
-        excerpt?: string;
-        matchType: "title" | "date" | "content";
-      }> = [];
+      const skipAI = isSimpleQuery(q);
+      let answerResult: AnswerResult | null = null;
+      let searchError: string | null = null;
 
-      for (const meeting of meetings) {
-        // Check title match
-        if (meeting.title.toLowerCase().includes(query)) {
-          results.push({ meeting, matchType: "title" });
-          continue;
-        }
+      // Run AI answer (unless simple query) and keyword search in parallel
+      const [aiResult, keywordResults] = await Promise.all([
+        skipAI
+          ? Promise.resolve(null)
+          : answerQuestion({ data: { question: q } }).catch(() => null),
+        searchMeetings(q, meetings),
+      ]);
 
-        // Check date match (formatted)
-        const formattedDate = formatDate(meeting.date).toLowerCase();
-        if (formattedDate.includes(query) || meeting.date.includes(query)) {
-          results.push({ meeting, matchType: "date" });
-          continue;
-        }
-
-        // Check content match
-        try {
-          const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
-          if (minutes) {
-            const lowerText = minutes.fullText.toLowerCase();
-            const queryIndex = lowerText.indexOf(query);
-            
-            if (queryIndex !== -1) {
-              // Extract excerpt around the match
-              const start = Math.max(0, queryIndex - 80);
-              const end = Math.min(minutes.fullText.length, queryIndex + query.length + 80);
-              let excerpt = minutes.fullText.slice(start, end);
-              
-              // Clean up excerpt
-              if (start > 0) excerpt = "..." + excerpt;
-              if (end < minutes.fullText.length) excerpt = excerpt + "...";
-              
-              // Highlight the match
-              const excerptLower = excerpt.toLowerCase();
-              const matchStart = excerptLower.indexOf(query);
-              if (matchStart !== -1) {
-                excerpt = excerpt.slice(0, matchStart) + 
-                         "**" + excerpt.slice(matchStart, matchStart + query.length) + "**" +
-                         excerpt.slice(matchStart + query.length);
-              }
-              
-              results.push({ meeting, excerpt, matchType: "content" });
-            }
-          }
-        } catch {
-          // Skip if we can't fetch this meeting
-        }
+      // Process AI result
+      if (aiResult && !("error" in aiResult)) {
+        answerResult = aiResult;
+      } else if (aiResult && "error" in aiResult && aiResult.error !== "XAI_API_KEY not configured") {
+        searchError = aiResult.error;
       }
 
-      setSearchResults(results);
+      setSearchState({
+        answer: answerResult,
+        matchedMeetings: keywordResults,
+        error: searchError,
+      });
+    } catch (error) {
+      setSearchState({
+        answer: null,
+        matchedMeetings: [],
+        error: "Search failed",
+      });
     } finally {
       setSearching(false);
     }
   };
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       void handleSearch();
     }
   };
 
-  const displayedMeetings = useMemo(() => {
-    if (searchResults !== null) {
-      return searchResults.map((r) => r.meeting);
+  // Keyword search over meetings
+  async function searchMeetings(
+    q: string,
+    allMeetings: Meeting[]
+  ): Promise<Array<{ meeting: Meeting; excerpt?: string }>> {
+    const results: Array<{ meeting: Meeting; excerpt?: string }> = [];
+    const lowerQ = q.toLowerCase();
+
+    for (const meeting of allMeetings) {
+      // Check title
+      if (meeting.title.toLowerCase().includes(lowerQ)) {
+        results.push({ meeting });
+        continue;
+      }
+
+      // Check date
+      const formattedDate = formatDate(meeting.date).toLowerCase();
+      if (formattedDate.includes(lowerQ) || meeting.date.includes(lowerQ)) {
+        results.push({ meeting });
+        continue;
+      }
+
+      // Check content
+      try {
+        const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
+        if (minutes) {
+          const lowerText = minutes.fullText.toLowerCase();
+          const queryIndex = lowerText.indexOf(lowerQ);
+
+          if (queryIndex !== -1) {
+            // Extract excerpt
+            const start = Math.max(0, queryIndex - 80);
+            const end = Math.min(minutes.fullText.length, queryIndex + q.length + 80);
+            let excerpt = minutes.fullText.slice(start, end);
+
+            if (start > 0) excerpt = "..." + excerpt;
+            if (end < minutes.fullText.length) excerpt = excerpt + "...";
+
+            results.push({ meeting, excerpt });
+          }
+        }
+      } catch {
+        // Skip this meeting if we can't fetch it
+      }
     }
-    return meetings;
-  }, [searchResults, meetings]);
+
+    return results;
+  }
 
   if (meetings.length === 0) {
     return (
@@ -225,217 +191,19 @@ function MinutesIndexPage() {
 
   return (
     <div className="grid gap-10">
-      <Section kicker="Search full archive (answer-first)">
+      <Section kicker="Search meetings and decisions">
         <div className="border border-line bg-paper p-5">
           <div className="flex gap-2">
             <Input
               type="text"
-              placeholder="Ask a question... (e.g., 'what colour paint were we using?')"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleArchiveAsk();
-                }
-              }}
-              disabled={archiveAsking}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleArchiveAsk}
-              disabled={archiveAsking || !question.trim()}
-              className="min-w-32"
-            >
-              {archiveAsking ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  <span className="ml-2">Searching</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4" />
-                  <span className="ml-2">Ask Archive</span>
-                </>
-              )}
-            </Button>
-          </div>
-
-          {archiveError && (
-            <div className="mt-4 border-l-2 border-ember bg-ember/5 px-4 py-3">
-              <p className="text-sm text-coal">{archiveError}</p>
-            </div>
-          )}
-
-          {archiveAnswer && (
-            <div className="mt-4 space-y-4">
-              <div className="border-l-2 border-coal bg-fossil/50 px-4 py-3">
-                <p className="text-sm font-semibold leading-relaxed">{archiveAnswer.answer}</p>
-                {archiveAnswer.confidence && (
-                  <p className="mt-2 text-xs text-sandstone uppercase tracking-widest">
-                    Confidence: {archiveAnswer.confidence}
-                  </p>
-                )}
-              </div>
-
-              {archiveAnswer.sources && archiveAnswer.sources.length > 0 && (
-                <div>
-                  <p className="text-xs tracking-widest text-sandstone uppercase mb-3">
-                    Supporting evidence
-                  </p>
-                  <div className="space-y-3">
-                    {archiveAnswer.sources.map((source, idx) => (
-                      <div key={idx} className="border border-line bg-paper p-4">
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <div>
-                            <p className="font-semibold">{source.documentTitle}</p>
-                            <p className="text-xs text-sandstone mt-1">
-                              {formatDate(source.meetingDate)}
-                              {source.isDecision && (
-                                <Badge tone="won" className="ml-2">Decision</Badge>
-                              )}
-                            </p>
-                          </div>
-                          {source.documentId && (
-                            <Link
-                              to="/admin/minutes/$meetingId"
-                              params={{ meetingId: source.documentId }}
-                              className="text-xs font-semibold text-ember hover:underline"
-                            >
-                              View meeting
-                            </Link>
-                          )}
-                        </div>
-                        <blockquote className="border-l-2 border-line pl-3 text-sm text-pretty text-shale italic">
-                          "{source.excerpt}"
-                        </blockquote>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {archiveAnswer.notFound && (
-                <p className="text-xs text-muted">
-                  No decisions or discussions found in the meeting archive about this topic.
-                </p>
-              )}
-            </div>
-          )}
-
-          <p className="mt-4 text-xs text-muted">
-            Searches the complete archive of all meeting notes. Returns direct answers based on decisions
-            and action items, with citations. If no decision found, will say so clearly.
-          </p>
-        </div>
-      </Section>
-
-      <Section kicker="Ask about meetings (current list)">
-        <div className="border border-line bg-paper p-5">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Ask a question about the meetings... (e.g., 'What was said about insurance?')"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a question or search meetings..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={asking}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleAsk}
-              disabled={asking || !question.trim()}
-              className="min-w-24"
-            >
-              {asking ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  <span className="ml-2">Asking</span>
-                </>
-              ) : (
-                <>
-                  <Search className="size-4" />
-                  <span className="ml-2">Ask</span>
-                </>
-              )}
-            </Button>
-          </div>
-          
-          {askError && (
-            <div className="mt-4 border-l-2 border-ember bg-ember/5 px-4 py-3">
-              <p className="text-sm text-coal">{askError}</p>
-            </div>
-          )}
-          
-          {askResult && (
-            <div className="mt-4 space-y-4">
-              <div className="border-l-2 border-coal bg-fossil/50 px-4 py-3">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{askResult.answer}</p>
-              </div>
-              
-              {askResult.citations.length > 0 && (
-                <div>
-                  <p className="text-xs tracking-widest text-sandstone uppercase mb-3">Sources</p>
-                  <div className="space-y-3">
-                    {askResult.citations.map((citation, idx) => {
-                      const meeting = meetings.find((m) => m.id === citation.meetingId);
-                      return (
-                        <div key={idx} className="border border-line bg-paper p-4">
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <div>
-                              <p className="text-xs text-sandstone">
-                                {formatDate(citation.meetingDate)} at {formatTime(citation.meetingTime)}
-                              </p>
-                              {citation.speaker && (
-                                <p className="text-xs text-muted mt-1">Speaker: {citation.speaker}</p>
-                              )}
-                            </div>
-                            {meeting && (
-                              <Link
-                                to="/admin/minutes/$meetingId"
-                                params={{ meetingId: meeting.id }}
-                                className="text-xs font-semibold text-ember hover:underline"
-                              >
-                                View meeting
-                              </Link>
-                            )}
-                          </div>
-                          <blockquote className="border-l-2 border-line pl-3 text-sm text-pretty text-shale italic">
-                            "{citation.excerpt}"
-                          </blockquote>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <p className="mt-4 text-xs text-muted">
-            Answers are grounded in meeting transcripts only. Ask natural questions like "was this ever said
-            on June 23?" or "what did Christopher say about insurance?"
-          </p>
-        </div>
-      </Section>
-
-      <Section kicker="Search meetings">
-        <div className="border border-line bg-paper p-5">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Search by title, date, speaker, or text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
               disabled={searching}
               className="flex-1"
             />
-            <Button
-              onClick={handleSearch}
-              disabled={searching || !searchQuery.trim()}
-              className="min-w-24"
-            >
+            <Button onClick={handleSearch} disabled={searching || !query.trim()} className="min-w-32">
               {searching ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
@@ -443,60 +211,138 @@ function MinutesIndexPage() {
                 </>
               ) : (
                 <>
-                  <Filter className="size-4" />
+                  <Sparkles className="size-4" />
                   <span className="ml-2">Search</span>
                 </>
               )}
             </Button>
-            {searchResults !== null && (
-              <Button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSearchResults(null);
-                }}
-                variant="outline"
-              >
-                Clear
-              </Button>
-            )}
           </div>
-          {searchResults !== null && (
-            <p className="mt-3 text-xs text-muted">
-              Found {searchResults.length} {searchResults.length === 1 ? "meeting" : "meetings"}
-            </p>
+
+          {searchState?.error && (
+            <div className="mt-4 border-l-2 border-ember bg-ember/5 px-4 py-3">
+              <p className="text-sm text-coal">{searchState.error}</p>
+            </div>
           )}
+
+          {searchState && (
+            <div className="mt-6 space-y-6">
+              {/* Answer Section */}
+              {searchState.answer && (
+                <div>
+                  <p className="text-xs tracking-widest text-sandstone uppercase mb-3">Answer</p>
+                  <div className="border-l-2 border-coal bg-fossil/50 px-4 py-3">
+                    <p className="text-sm font-semibold leading-relaxed">{searchState.answer.answer}</p>
+                    {searchState.answer.confidence && (
+                      <p className="mt-2 text-xs text-sandstone uppercase tracking-widest">
+                        Confidence: {searchState.answer.confidence}
+                      </p>
+                    )}
+                  </div>
+
+                  {searchState.answer.sources && searchState.answer.sources.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {searchState.answer.sources.map((source, idx) => (
+                        <div key={idx} className="border border-line bg-paper p-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                            <p className="text-xs text-sandstone">
+                              {formatDate(source.meetingDate)}
+                                {source.isDecision && <Badge tone="won" className="ml-2">Decision</Badge>}
+                              </p>
+                              <blockquote className="mt-1 text-sm text-shale italic">
+                                "{source.excerpt}"
+                              </blockquote>
+                            </div>
+                            {source.documentId && (
+                              <Link
+                                to="/admin/minutes/$meetingId"
+                                params={{ meetingId: source.documentId }}
+                                className="text-xs font-semibold text-ember hover:underline shrink-0"
+                              >
+                                View
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Matched Meetings */}
+              {searchState.matchedMeetings.length > 0 && (
+                <div>
+                  <p className="text-xs tracking-widest text-sandstone uppercase mb-3">
+                    {searchState.matchedMeetings.length} matching{" "}
+                    {searchState.matchedMeetings.length === 1 ? "meeting" : "meetings"}
+                  </p>
+                  <ul className="divide-y divide-line border-y border-line">
+                    {searchState.matchedMeetings.map(({ meeting, excerpt }) => {
+                      const series = detectSeries(meeting.title);
+                      const badge = SERIES_BADGES[series];
+                      return (
+                        <li key={meeting.id} className="flex items-start justify-between gap-4 py-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold" title={meeting.title}>
+                                {formatDate(meeting.date)}
+                              </p>
+                              <Badge tone="new">{badge}</Badge>
+                            </div>
+                            <p className="text-xs text-sandstone mt-1">{formatTime(meeting.time)} MT</p>
+                            {excerpt && (
+                              <p className="mt-2 text-sm text-pretty text-shale border-l-2 border-line pl-3">
+                                {excerpt}
+                              </p>
+                            )}
+                          </div>
+                          <Link
+                            to="/admin/minutes/$meetingId"
+                            params={{ meetingId: meeting.id }}
+                            className="inline-flex min-h-11 items-center border border-line px-3 text-sm font-semibold text-shale hover:border-coal hover:text-coal shrink-0"
+                          >
+                            View
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              {!searchState.answer && searchState.matchedMeetings.length === 0 && (
+                <p className="text-sm text-muted text-center py-4">No results found.</p>
+              )}
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-muted">
+            Searches all meetings for answers and matches. Short keywords skip AI to save cost.
+          </p>
         </div>
       </Section>
 
-      <Section kicker={searchResults !== null ? "Search results" : "Recent meetings"}>
+      <Section kicker="Recent meetings">
         <ul className="divide-y divide-line border-y border-line">
-          {displayedMeetings.map((meeting) => {
-            const result = searchResults?.find((r) => r.meeting.id === meeting.id);
+          {meetings.map((meeting) => {
+            const series = detectSeries(meeting.title);
+            const badge = SERIES_BADGES[series];
             return (
               <li key={meeting.id} className="flex items-start justify-between gap-4 py-3">
-                <div className="flex-1">
-                  <p className="font-semibold">{meeting.title}</p>
-                  <p className="text-sm text-muted">
-                    {formatDate(meeting.date)} at {formatTime(meeting.time)} MT
-                  </p>
-                  {result?.excerpt && (
-                    <p className="mt-2 text-sm text-pretty text-shale border-l-2 border-line pl-3">
-                      {result.excerpt.split("**").map((part, idx) => 
-                        idx % 2 === 1 ? (
-                          <mark key={idx} className="bg-ember/20 text-coal font-semibold px-1">
-                            {part}
-                          </mark>
-                        ) : (
-                          <span key={idx}>{part}</span>
-                        )
-                      )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold" title={meeting.title}>
+                      {formatDate(meeting.date)}
                     </p>
-                  )}
+                    <Badge tone="new">{badge}</Badge>
+                  </div>
+                  <p className="text-xs text-sandstone mt-1">{formatTime(meeting.time)} MT</p>
                 </div>
                 <Link
                   to="/admin/minutes/$meetingId"
                   params={{ meetingId: meeting.id }}
-                  className="inline-flex min-h-11 items-center border border-line px-3 text-sm font-semibold text-shale hover:border-coal hover:text-coal shrink-0"
+                  className="inline-flex min-h-11 items-center border border-line px-3 text-sm font-semibold text-shale hover:border-coal hover:text-coal"
                 >
                   View minutes
                 </Link>
@@ -504,11 +350,6 @@ function MinutesIndexPage() {
             );
           })}
         </ul>
-        {displayedMeetings.length === 0 && searchResults !== null && (
-          <div className="border border-line bg-paper p-8 text-center">
-            <p className="text-sm text-muted">No meetings match your search.</p>
-          </div>
-        )}
       </Section>
     </div>
   );
