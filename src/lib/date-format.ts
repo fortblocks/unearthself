@@ -25,13 +25,33 @@ export function getOrdinalSuffix(day: number): string {
 
 /**
  * Format a date string (YYYY-MM-DD) to full written format in America/Edmonton timezone
- * Example: "2026-08-23" -> "Sunday August 23rd, 2026"
+ * Example: "2026-08-23" -> "Tuesday August 23rd, 2026"
+ * 
+ * IMPORTANT: Uses the date AS-IS from the filename, in Edmonton timezone.
+ * The date "2026-08-25" in a filename means August 25th in Edmonton, regardless of UTC offset.
  */
 export function formatMeetingDate(dateStr: string): string {
   try {
-    const date = new Date(dateStr + "T12:00:00"); // Use noon to avoid timezone issues
+    // Parse YYYY-MM-DD format
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return dateStr;
+    }
     
-    // Check if date is valid
+    const [_, yearStr, monthStr, dayStr] = match;
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr);
+    const day = parseInt(dayStr);
+    
+    // Validate date parts
+    if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return dateStr;
+    }
+    
+    // Create date at noon in Edmonton timezone to avoid day shifts
+    // This ensures the date stays the same regardless of UTC offset
+    const date = new Date(`${yearStr}-${monthStr}-${dayStr}T12:00:00-06:00`); // MDT/MST is UTC-6 or UTC-7
+    
     if (isNaN(date.getTime())) {
       return dateStr;
     }
@@ -41,26 +61,14 @@ export function formatMeetingDate(dateStr: string): string {
       timeZone: "America/Edmonton",
     });
     
-    const month = date.toLocaleDateString("en-US", {
+    const monthName = date.toLocaleDateString("en-US", {
       month: "long",
-      timeZone: "America/Edmonton",
-    });
-    
-    const day = parseInt(
-      date.toLocaleDateString("en-US", {
-        day: "numeric",
-        timeZone: "America/Edmonton",
-      })
-    );
-    
-    const year = date.toLocaleDateString("en-US", {
-      year: "numeric",
       timeZone: "America/Edmonton",
     });
     
     const ordinal = getOrdinalSuffix(day);
     
-    return `${weekday} ${month} ${day}${ordinal}, ${year}`;
+    return `${weekday} ${monthName} ${day}${ordinal}, ${year}`;
   } catch {
     return dateStr;
   }

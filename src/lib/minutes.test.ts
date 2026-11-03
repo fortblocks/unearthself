@@ -190,6 +190,41 @@ describe("parseDateFromFilename", () => {
     assert.strictEqual(result.time, "17:00");
   });
 
+  it("should parse exact filename from Drive: 2026/08/25 11:36 MDT", () => {
+    const filename = "Badlander's Development Meeting - 2026/08/25 11:36 MDT - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-08-25");
+    assert.strictEqual(result.time, "11:36");
+  });
+
+  it("should parse filename with PDT timezone", () => {
+    const filename = "Badlander's Development Meeting - 2026/08/25 11:36 PDT - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-08-25");
+    assert.strictEqual(result.time, "11:36");
+  });
+
+  it("should parse filename with GMT-7 timezone", () => {
+    const filename = "Badlander's Development Meeting - 2026/08/25 11:36 GMT-7 - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-08-25");
+    assert.strictEqual(result.time, "11:36");
+  });
+
+  it("should handle apostrophe in Badlander's correctly", () => {
+    const filename = "Badlander's Development Meeting - 2026/08/25 11:36 MDT - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result, "Should parse despite apostrophe");
+    assert.strictEqual(result.date, "2026-08-25");
+  });
+
   it("should parse morning meeting time", () => {
     const filename = "Badlander's Development Meeting - 2026/11/01 09:30 MDT - Notes by Gemini";
     const result = parseDateFromFilename(filename);

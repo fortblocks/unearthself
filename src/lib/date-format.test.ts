@@ -49,6 +49,21 @@ describe("formatMeetingDate", () => {
     assert.ok(result.includes("2026"));
   });
 
+  it("should format August 25th as Tuesday (bug fix)", () => {
+    const result = formatMeetingDate("2026-08-25");
+    assert.ok(result.includes("Tuesday"), `Expected Tuesday, got: ${result}`);
+    assert.ok(result.includes("August"));
+    assert.ok(result.includes("25th"));
+    assert.ok(result.includes("2026"));
+  });
+
+  it("should format October 29th as Thursday (not Sunday)", () => {
+    const result = formatMeetingDate("2026-10-29");
+    assert.ok(result.includes("Thursday"), `Expected Thursday, got: ${result}`);
+    assert.ok(result.includes("October"));
+    assert.ok(result.includes("29th"));
+  });
+
   it("should format dates with 1st suffix", () => {
     const result = formatMeetingDate("2026-10-01");
     assert.ok(result.includes("1st"));
@@ -75,7 +90,7 @@ describe("formatMeetingDate", () => {
     assert.ok(formatMeetingDate("2026-10-22").includes("22nd"));
   });
 
-  it("should include weekday", () => {
+  it("should include correct weekday", () => {
     const result = formatMeetingDate("2026-08-23");
     // Should include a weekday name
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
