@@ -19,8 +19,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 
-// xAI model for structured extraction (grok-4.7 is current as of Nov 2026)
-export const XAI_MODEL = "grok-4.7";
+// xAI model for structured extraction
+// Using grok-3: faster base model without reasoning overhead
+// grok-4.7 likely has extended reasoning latency (caused 60s+ timeouts on 18KB docs)
+// xAI deprecated grok-beta/grok-2-1212 and recommends grok-3 as replacement
+export const XAI_MODEL = "grok-3";
 
 export type ActionItem = {
   owner: string | null;
@@ -154,12 +157,19 @@ export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
       // Check if we need to chunk the text
       const chunks = chunkText(data.fullText);
       
-      // Process chunks in parallel for speed (with individual timeouts)
-      const chunkPromises = chunks.map((chunk, i) => 
-        processChunkWithTimeout(chunk, i, chunks.length, data.meetingId, apiKey)
-      );
+      // Process chunks with concurrency limit to avoid xAI rate limits
+      // Max 3 concurrent chunk calls to prevent 429 errors
+      const chunkResults: Array<StructuredMinutes | { error: string }> = [];
+      const MAX_CONCURRENT = 3;
       
-      const chunkResults = await Promise.all(chunkPromises);
+      for (let i = 0; i < chunks.length; i += MAX_CONCURRENT) {
+        const batch = chunks.slice(i, i + MAX_CONCURRENT);
+        const batchPromises = batch.map((chunk, batchIndex) =>
+          processChunkWithTimeout(chunk, i + batchIndex, chunks.length, data.meetingId, apiKey)
+        );
+        const batchResults = await Promise.all(batchPromises);
+        chunkResults.push(...batchResults);
+      }
       
       // Check if any chunk failed
       const failed = chunkResults.find(r => "error" in r);
@@ -272,7 +282,7 @@ ${chunk}`;
           },
         },
       }),
-      signal: AbortSignal.timeout(50000), // 50-second timeout per chunk
+      signal: AbortSignal.timeout(100000), // 100-second timeout per chunk (below 120s function limit)
     });
 
     if (!response.ok) {
@@ -314,7 +324,7 @@ ${chunk}`;
   } catch (error: any) {
     console.error(`Chunk ${index + 1} error:`, error);
     if (error.name === "TimeoutError" || error.name === "AbortError") {
-      return { error: `Chunk ${index + 1} timed out after 50 seconds` };
+      return { error: `Chunk ${index + 1} timed out after 100 seconds` };
     }
     return { error: `Chunk ${index + 1} failed: ${error.message}` };
   }

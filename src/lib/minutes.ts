@@ -497,7 +497,7 @@ If you found nothing relevant, return:
           ],
           temperature: 0.1,
         }),
-        signal: AbortSignal.timeout(50000), // 50-second timeout for xAI call
+        signal: AbortSignal.timeout(100000), // 100-second timeout for xAI call
       });
       
       if (!response.ok) {

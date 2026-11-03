@@ -96,13 +96,14 @@ function MeetingDetailPage() {
 
     setIsGenerating(true);
 
-    // Call async generation with 55-second client-side timeout
+    // Call async generation with 110-second client-side timeout
+    // (slightly below server maxDuration of 120s)
     const timeoutId = setTimeout(() => {
       setStructured({
-        error: "Structured view generation timed out. The transcript is very long. Full transcript is available below.",
+        error: "Structured view generation timed out. The xAI API took too long. Full transcript is available below.",
       });
       setIsGenerating(false);
-    }, 55000);
+    }, 110000);
 
     generateStructuredMinutesAsync({
       data: {
