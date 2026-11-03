@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listMeetings, askMinutes, getMeetingMinutes, type Meeting, type AskResult } from "@/lib/minutes";
+import { answerQuestion, testFolderAccess, type AnswerResult } from "@/lib/minutes-archive";
 import { PARTNERS } from "@/data/desk";
-import { Search, Loader2, Filter } from "lucide-react";
+import { Search, Loader2, Filter, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/admin/minutes/")({
   component: MinutesIndexPage,
@@ -57,6 +58,9 @@ function MinutesIndexPage() {
     matchType: "title" | "date" | "content";
   }> | null>(null);
   const [searching, setSearching] = useState(false);
+  const [archiveAnswer, setArchiveAnswer] = useState<AnswerResult | null>(null);
+  const [archiveAsking, setArchiveAsking] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const handleAsk = async () => {
     if (!question.trim()) return;
@@ -88,6 +92,32 @@ function MinutesIndexPage() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void handleAsk();
+    }
+  };
+
+  const handleArchiveAsk = async () => {
+    if (!question.trim()) return;
+
+    setArchiveAsking(true);
+    setArchiveError(null);
+    setArchiveAnswer(null);
+
+    try {
+      const result = await answerQuestion({ data: { question: question.trim() } });
+
+      if ("error" in result) {
+        if (result.error === "XAI_API_KEY not configured") {
+          setArchiveError("Archive search requires XAI_API_KEY environment variable.");
+        } else {
+          setArchiveError(result.error);
+        }
+      } else {
+        setArchiveAnswer(result);
+      }
+    } catch (error) {
+      setArchiveError("Failed to search archive. Please try again.");
+    } finally {
+      setArchiveAsking(false);
     }
   };
 
@@ -195,7 +225,112 @@ function MinutesIndexPage() {
 
   return (
     <div className="grid gap-10">
-      <Section kicker="Ask about meetings">
+      <Section kicker="Search full archive (answer-first)">
+        <div className="border border-line bg-paper p-5">
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Ask a question... (e.g., 'what colour paint were we using?')"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleArchiveAsk();
+                }
+              }}
+              disabled={archiveAsking}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleArchiveAsk}
+              disabled={archiveAsking || !question.trim()}
+              className="min-w-32"
+            >
+              {archiveAsking ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  <span className="ml-2">Searching</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" />
+                  <span className="ml-2">Ask Archive</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {archiveError && (
+            <div className="mt-4 border-l-2 border-ember bg-ember/5 px-4 py-3">
+              <p className="text-sm text-coal">{archiveError}</p>
+            </div>
+          )}
+
+          {archiveAnswer && (
+            <div className="mt-4 space-y-4">
+              <div className="border-l-2 border-coal bg-fossil/50 px-4 py-3">
+                <p className="text-sm font-semibold leading-relaxed">{archiveAnswer.answer}</p>
+                {archiveAnswer.confidence && (
+                  <p className="mt-2 text-xs text-sandstone uppercase tracking-widest">
+                    Confidence: {archiveAnswer.confidence}
+                  </p>
+                )}
+              </div>
+
+              {archiveAnswer.sources && archiveAnswer.sources.length > 0 && (
+                <div>
+                  <p className="text-xs tracking-widest text-sandstone uppercase mb-3">
+                    Supporting evidence
+                  </p>
+                  <div className="space-y-3">
+                    {archiveAnswer.sources.map((source, idx) => (
+                      <div key={idx} className="border border-line bg-paper p-4">
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div>
+                            <p className="font-semibold">{source.documentTitle}</p>
+                            <p className="text-xs text-sandstone mt-1">
+                              {formatDate(source.meetingDate)}
+                              {source.isDecision && (
+                                <Badge tone="won" className="ml-2">Decision</Badge>
+                              )}
+                            </p>
+                          </div>
+                          {source.documentId && (
+                            <Link
+                              to="/admin/minutes/$meetingId"
+                              params={{ meetingId: source.documentId }}
+                              className="text-xs font-semibold text-ember hover:underline"
+                            >
+                              View meeting
+                            </Link>
+                          )}
+                        </div>
+                        <blockquote className="border-l-2 border-line pl-3 text-sm text-pretty text-shale italic">
+                          "{source.excerpt}"
+                        </blockquote>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {archiveAnswer.notFound && (
+                <p className="text-xs text-muted">
+                  No decisions or discussions found in the meeting archive about this topic.
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-muted">
+            Searches the complete archive of all meeting notes. Returns direct answers based on decisions
+            and action items, with citations. If no decision found, will say so clearly.
+          </p>
+        </div>
+      </Section>
+
+      <Section kicker="Ask about meetings (current list)">
         <div className="border border-line bg-paper p-5">
           <div className="flex gap-2">
             <Input
