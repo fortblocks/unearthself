@@ -495,8 +495,19 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     }
   }
   
-  // Take top N passages and join with separator
-  return merged
+  // Rank passages by number of distinct query terms they contain
+  const rankedPassages = merged.map(({ start, end }) => {
+    const passageText = text.slice(start, end).toLowerCase();
+    const distinctTerms = new Set(
+      queryWords.filter(word => passageText.includes(word))
+    );
+    return { start, end, score: distinctTerms.size };
+  });
+  
+  // Sort by score (most distinct query terms first), then take top N
+  rankedPassages.sort((a, b) => b.score - a.score);
+  
+  return rankedPassages
     .slice(0, maxPassages)
     .map(({ start, end }) => text.slice(start, end))
     .join('\n\n[...]\n\n');
@@ -785,32 +796,42 @@ export async function searchAndAnswer(
         decisionsText = decisionsText.slice(0, MAX_DECISIONS_CHARS) + "\n...[truncated]";
       }
 
-      // Calculate remaining space for passages
+      // Calculate fair budget per document (minimum 4KB per doc)
       const remainingChars = MAX_CONTEXT_CHARS - decisionsText.length - 100; // 100 char buffer
-      const passagesPerDoc = Math.floor(remainingChars / sortedDocs.length);
+      const MIN_CHARS_PER_DOC = 4000;
+      const budgetPerDoc = Math.max(MIN_CHARS_PER_DOC, Math.floor(remainingChars / sortedDocs.length));
       
-      console.log(`[answerQuestion] Building passages: remainingChars=${remainingChars}, sortedDocs=${sortedDocs.length}, passagesPerDoc=${passagesPerDoc}`);
+      console.log(`[answerQuestion] Building passages: remainingChars=${remainingChars}, sortedDocs=${sortedDocs.length}, budgetPerDoc=${budgetPerDoc}`);
       
-      // Build passages text, ensuring each passage fits
+      // Extract query terms for passage ranking
+      const queryTerms = question.toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !stopWords.has(w));
+      
+      // Build passages text with fair budgeting - skip docs that won't fit instead of stopping
       let passagesText = '';
       let passagesAdded = 0;
+      let passagesSkipped = 0;
+      
       for (const d of sortedDocs) {
-        const contextChars = Math.min(2000, passagesPerDoc);
-        const passages = extractRelevantPassages(d.fullText, question, 5, contextChars);
+        // Extract best passages for this doc using budget
+        const passages = extractRelevantPassages(d.fullText, question, 5, budgetPerDoc);
         const entry = `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
         
-        console.log(`[answerQuestion] Doc ${passagesAdded + 1}/${sortedDocs.length}: fullText.length=${d.fullText?.length || 0}, passages.length=${passages.length}, entry.length=${entry.length}`);
+        console.log(`[answerQuestion] Doc ${passagesAdded + passagesSkipped + 1}/${sortedDocs.length}: fullText.length=${d.fullText?.length || 0}, passages.length=${passages.length}, entry.length=${entry.length}`);
         
-        // Stop if we would exceed the limit
+        // Skip this doc if it won't fit, but continue trying others
         if (passagesText.length + entry.length > remainingChars) {
-          console.log(`[answerQuestion] Would exceed limit, stopping at ${passagesAdded} docs`);
-          break;
+          console.log(`[answerQuestion] Skipping doc ${d.id.slice(0,8)} - would exceed limit`);
+          passagesSkipped++;
+          continue;
         }
+        
         passagesText += entry;
         passagesAdded++;
       }
 
-      console.log(`[answerQuestion] Added ${passagesAdded} passage entries, total length: ${passagesText.length}`);
+      console.log(`[answerQuestion] Added ${passagesAdded} passage entries (skipped ${passagesSkipped}), total length: ${passagesText.length}`);
 
       const fullContextText = decisionsText + '\n\n' + passagesText;
       console.log(`[answerQuestion] Context size: ${fullContextText.length} chars (decisions: ${decisionsText.length}, passages: ${passagesText.length})`);
