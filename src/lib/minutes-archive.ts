@@ -626,6 +626,22 @@ export async function searchAndAnswer(
       
       const allDocIds = new Set(allMeetings.map(m => m.id));
       
+      // DEBUG: Check if Drive can find "Basecamp" at all
+      try {
+        const basecampQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and fullText contains 'Basecamp'`;
+        const basecampResponse = await drive.files.list({
+          q: basecampQuery,
+          fields: "files(id, name)",
+          pageSize: 10,
+        });
+        const basecampFiles = basecampResponse.data.files || [];
+        console.log(`[answerQuestion] DEBUG: Drive found ${basecampFiles.length} docs with "Basecamp": ${basecampFiles.map(f => `${f.name} (${f.id?.slice(0,8)}...)`).join(', ')}`);
+        const basecampInOurSet = basecampFiles.filter(f => f.id && allDocIds.has(f.id));
+        console.log(`[answerQuestion] DEBUG: ${basecampInOurSet.length} of those are in our meeting doc set: ${basecampInOurSet.map(f => `${f.name} (${f.id?.slice(0,8)}...)`).join(', ')}`);
+      } catch (error) {
+        console.error(`[answerQuestion] DEBUG: Basecamp search failed:`, error);
+      }
+      
       // Broaden search with synonyms and key terms
       const searchStart = Date.now();
       const queryLower = question.toLowerCase();
@@ -733,6 +749,14 @@ export async function searchAndAnswer(
       documents.push(...exportResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
       console.log(`[answerQuestion] Exported ${documents.length} docs: ${Date.now() - exportStart}ms`);
       
+      // Check for "Basecamp" mentions in exported docs
+      const basecampDocs = documents.filter(d => d.fullText.toLowerCase().includes('basecamp'));
+      if (basecampDocs.length > 0) {
+        console.log(`[answerQuestion] Found "Basecamp" in ${basecampDocs.length} docs: ${basecampDocs.map(d => `${d.title} (${d.id.slice(0,8)}...)`).join(', ')}`);
+      } else {
+        console.log(`[answerQuestion] NO docs contain "Basecamp" in exported set`);
+      }
+      
       if (documents.length === 0) {
         return {
           answer: "No meeting records are available yet.",
@@ -745,6 +769,7 @@ export async function searchAndAnswer(
       // Pick top docs by relevance score
       const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0));
       console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+      console.log(`[answerQuestion] Top docs: ${sortedDocs.map(d => `${d.title} (${d.id.slice(0,8)}...)`).join(', ')}`);
 
       // Build context with decisions and relevant passages, cap at 150KB
       const MAX_CONTEXT_CHARS = 150000;
