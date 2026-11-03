@@ -517,7 +517,35 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
     }
   });
 
+// DEPRECATED: Use answerQuestion from minutes-archive.ts instead
+// This function is kept for backwards compatibility but is no longer used
 export const askMinutes = createServerFn({ method: "POST" })
+  .validator((d: { question: string }) => d)
+  .handler(async ({ data }): Promise<AskResult | { error: string }> => {
+    console.warn('[askMinutes] DEPRECATED: Use answerQuestion from minutes-archive.ts');
+    // Redirect to the active implementation
+    const { answerQuestion } = await import("./minutes-archive");
+    const result = await answerQuestion({ data });
+    
+    // Convert AnswerResult to AskResult format
+    if ("error" in result) {
+      return result;
+    }
+    
+    return {
+      answer: result.answer,
+      citations: result.sources.map(s => ({
+        meetingId: s.documentId,
+        meetingDate: s.meetingDate,
+        meetingTime: "",
+        speaker: null,
+        excerpt: s.excerpt,
+      })),
+    };
+  });
+
+// Original implementation kept below for reference but not used
+const askMinutesOriginal = createServerFn({ method: "POST" })
   .validator((d: { question: string }) => d)
   .handler(async ({ data }): Promise<AskResult | { error: string }> => {
     const startTime = Date.now();
