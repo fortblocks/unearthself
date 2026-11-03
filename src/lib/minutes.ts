@@ -172,6 +172,8 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
     let pageToken: string | undefined;
     
     // Paginate through all files
+    // Note: Query searches only direct children of FOLDER_ID, not subfolders or shortcuts
+    // Files in other locations (e.g., different owner's Meet Recordings) won't appear
     do {
       const response = await drive.files.list({
         q: `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`,
@@ -182,6 +184,13 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
       });
       
       const files = response.data.files || [];
+      
+      // Log pagination info for debugging
+      if (files.length > 0) {
+        const firstFile = files[0];
+        const lastFile = files[files.length - 1];
+        console.log(`Fetched ${files.length} files, created ${firstFile.createdTime} to ${lastFile.createdTime}`);
+      }
       
       for (const file of files) {
         if (!file.id || !file.name) continue;
@@ -204,6 +213,14 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
             minute: "2-digit",
             hour12: false,
           });
+        }
+        
+        // Log files that fail to parse (might indicate new naming format)
+        if (!parsedDateTime && file.createdTime) {
+          const createdDate = new Date(file.createdTime);
+          if (createdDate >= new Date('2026-10-01')) {
+            console.log(`Recent file with non-standard name: "${file.name}" (created ${file.createdTime})`);
+          }
         }
         
         meetings.push({
@@ -420,17 +437,17 @@ If you found nothing relevant, return:
       
       if (!response.ok) {
         const errorText = await response.text();
-        let errorDetail = "Failed to get answer from xAI";
+        let errorDetail = `HTTP ${response.status}: Failed to get answer from xAI`;
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.error?.message) {
-            errorDetail = errorJson.error.message;
+            errorDetail = `HTTP ${response.status}: ${errorJson.error.message}`;
           }
         } catch {
-          errorDetail = errorText.substring(0, 200);
+          errorDetail = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
         }
         console.error("xAI API error:", errorText);
-        return { error: `xAI API error: ${errorDetail}` };
+        return { error: errorDetail };
       }
       
       const result = await response.json();
