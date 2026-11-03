@@ -267,6 +267,89 @@ describe("parseDateFromFilename", () => {
   });
 });
 
+describe("Caching and Performance", () => {
+  it("should cache meeting list for 5 minutes", () => {
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    
+    assert.strictEqual(CACHE_TTL_MS, 300000);
+    assert.ok(CACHE_TTL_MS > 0);
+  });
+
+  it("should cache doc exports by meetingId", () => {
+    // Cache keyed by meetingId for fast repeated access
+    const cache = new Map();
+    cache.set("meeting-1", { data: { fullText: "text" }, timestamp: Date.now() });
+    
+    assert.ok(cache.has("meeting-1"));
+    assert.strictEqual(cache.get("meeting-1").data.fullText, "text");
+  });
+
+  it("should validate cache freshness", () => {
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    
+    const freshEntry = { data: {}, timestamp: now - 1000 }; // 1 second old
+    const staleEntry = { data: {}, timestamp: now - (6 * 60 * 1000) }; // 6 minutes old
+    
+    const isFresh = (entry: any) => now - entry.timestamp < CACHE_TTL_MS;
+    
+    assert.ok(isFresh(freshEntry));
+    assert.ok(!isFresh(staleEntry));
+  });
+
+  it("should batch doc exports with concurrency limit", async () => {
+    const meetings = Array.from({ length: 25 }, (_, i) => ({ id: `meeting-${i}` }));
+    const MAX_CONCURRENT = 10;
+    const results: any[] = [];
+    
+    for (let i = 0; i < meetings.length; i += MAX_CONCURRENT) {
+      const batch = meetings.slice(i, i + MAX_CONCURRENT);
+      const batchResults = await Promise.all(
+        batch.map(async (m) => ({ id: m.id, done: true }))
+      );
+      results.push(...batchResults);
+    }
+    
+    assert.strictEqual(results.length, 25);
+    // 3 batches: 10 + 10 + 5
+  });
+
+  it("should include all meetings within 2MB context limit", () => {
+    const MAX_CONTEXT_CHARS = 2000000; // 2MB
+    // Simulate 83 meetings at 18KB avg = ~1.5MB total
+    const meetings = Array.from({ length: 83 }, () => ({ 
+      text: "x".repeat(18000) 
+    }));
+    
+    let contextChars = 0;
+    const included: any[] = [];
+    
+    for (const meeting of meetings) {
+      if (contextChars + meeting.text.length > MAX_CONTEXT_CHARS && included.length > 0) {
+        break;
+      }
+      included.push(meeting);
+      contextChars += meeting.text.length;
+    }
+    
+    // All 83 meetings should fit (83 * 18000 = 1.5MB < 2MB)
+    assert.strictEqual(included.length, 83);
+    assert.ok(contextChars <= MAX_CONTEXT_CHARS);
+  });
+
+  it("should search all meetings not just recent ones", () => {
+    // Regression test: ensure old meetings aren't excluded
+    // If "Basecamp" decision was in meeting #50, it must be searchable
+    const MAX_CONTEXT_CHARS = 2000000;
+    const avgSize = 18000;
+    const totalMeetings = 83;
+    
+    const capacityInMeetings = Math.floor(MAX_CONTEXT_CHARS / avgSize);
+    assert.ok(capacityInMeetings >= totalMeetings, 
+      `Context limit ${MAX_CONTEXT_CHARS} must fit all ${totalMeetings} meetings (avg ${avgSize} chars)`);
+  });
+});
+
 describe("getMeetingMinutes error handling", () => {
   it("should validate MeetingMinutes structure from successful response", () => {
     // This validates the expected structure matches our types

@@ -37,6 +37,25 @@ export type AskResult = {
 const PARENT_FOLDER_ID = "1C5aG-ilfEtzjJowXEFZCzyNLE4OulL54";
 const MAX_FOLDER_DEPTH = 3;
 
+// In-memory caches for speed (5 minute TTL)
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+// Cache for folder listing (all meetings)
+let meetingListCache: CacheEntry<Meeting[]> | null = null;
+
+// Cache for individual doc exports (keyed by meetingId)
+const docExportCache = new Map<string, CacheEntry<MeetingMinutes>>();
+
+function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < CACHE_TTL_MS;
+}
+
 function extractDateTimeFromTitle(title: string): { date: string; time: string } | null {
   // Title format: "Badlander's Development Meeting – Notes by Gemini"
   // We'll use the file's createdTime instead, but we need to parse the Gemini notes for meeting date/time
@@ -245,6 +264,12 @@ async function collectDocsRecursively(
 }
 
 export const listMeetings = createServerFn({ method: "GET" }).handler(async (): Promise<Meeting[]> => {
+  // Check cache first
+  if (isCacheValid(meetingListCache)) {
+    console.log(`Using cached meeting list (${meetingListCache!.data.length} meetings)`);
+    return meetingListCache!.data;
+  }
+
   const drive = await getGoogleDriveClient();
   if (!drive) {
     return [];
@@ -307,6 +332,12 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
       return b.time.localeCompare(a.time);
     });
     
+    // Cache the result
+    meetingListCache = {
+      data: meetings,
+      timestamp: Date.now(),
+    };
+    
     return meetings;
   } catch (error: any) {
     console.error("Error listing meetings:", error);
@@ -321,6 +352,13 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
 export const getMeetingMinutes = createServerFn({ method: "GET" })
   .validator((d: { meetingId: string }) => d)
   .handler(async ({ data }): Promise<MeetingMinutes | null> => {
+    // Check cache first (keyed by meetingId)
+    const cached = docExportCache.get(data.meetingId) || null;
+    if (isCacheValid(cached)) {
+      console.log(`Using cached doc export for ${data.meetingId}`);
+      return cached!.data;
+    }
+
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return null;
@@ -377,11 +415,19 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
       
       const actions = extractActionsFromGeminiNotes(fullText);
       
-      return {
+      const result: MeetingMinutes = {
         meeting,
         fullText,
         actions,
       };
+
+      // Cache the result
+      docExportCache.set(data.meetingId, {
+        data: result,
+        timestamp: Date.now(),
+      });
+
+      return result;
     } catch (error: any) {
       console.error("Error getting meeting minutes:", error);
       // Only return null for not-found errors
@@ -407,18 +453,26 @@ export const askMinutes = createServerFn({ method: "POST" })
     }
     
     try {
-      // First, get all meetings with their full text
+      // First, get all meetings (cached)
       const meetings = await listMeetings();
-      const meetingTexts = await Promise.all(
-        meetings.map(async (meeting) => {
+      
+      // Fetch meeting texts with concurrency limit (max 10 at a time)
+      const MAX_CONCURRENT_EXPORTS = 10;
+      const meetingTexts: Array<{ meeting: Meeting; text: string } | null> = [];
+      
+      for (let i = 0; i < meetings.length; i += MAX_CONCURRENT_EXPORTS) {
+        const batch = meetings.slice(i, i + MAX_CONCURRENT_EXPORTS);
+        const batchPromises = batch.map(async (meeting) => {
           try {
             const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
             return minutes ? { meeting, text: minutes.fullText } : null;
           } catch {
             return null;
           }
-        })
-      );
+        });
+        const batchResults = await Promise.all(batchPromises);
+        meetingTexts.push(...batchResults);
+      }
       
       const validMeetings = meetingTexts.filter((m): m is { meeting: Meeting; text: string } => m !== null);
       
@@ -429,12 +483,30 @@ export const askMinutes = createServerFn({ method: "POST" })
         };
       }
       
+      // Calculate total context size (grok-4.20 supports 1M tokens ~= 4MB text)
+      // With ~83 meetings at 18KB avg = ~1.5MB total, we can fit all meetings
+      const MAX_CONTEXT_CHARS = 2000000; // 2MB - well under model limit
+      let contextChars = 0;
+      const includedMeetings: typeof validMeetings = [];
+      
+      for (const meeting of validMeetings) {
+        const meetingSize = meeting.text.length + 200; // +200 for headers
+        if (contextChars + meetingSize > MAX_CONTEXT_CHARS && includedMeetings.length > 0) {
+          console.log(`Context size limit reached: ${contextChars} chars, ${includedMeetings.length}/${validMeetings.length} meetings`);
+          break;
+        }
+        includedMeetings.push(meeting);
+        contextChars += meetingSize;
+      }
+
+      console.log(`Searching ${includedMeetings.length}/${validMeetings.length} meetings (${contextChars} chars)`);
+
       // Use xAI to answer the question with citations (with timeout)
       const prompt = `You are a meeting assistant helping answer questions about Badlander's Development Meetings. 
 
-Here are all the meeting transcripts:
+Here are the meeting transcripts (${includedMeetings.length} meetings):
 
-${validMeetings.map((m, idx) => `
+${includedMeetings.map((m, idx) => `
 === MEETING ${idx + 1} ===
 Date: ${m.meeting.date}
 Time: ${m.meeting.time} (America/Edmonton)
