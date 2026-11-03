@@ -720,18 +720,28 @@ export async function searchAndAnswer(
       const remainingChars = MAX_CONTEXT_CHARS - decisionsText.length - 100; // 100 char buffer
       const passagesPerDoc = Math.floor(remainingChars / sortedDocs.length);
       
+      console.log(`[answerQuestion] Building passages: remainingChars=${remainingChars}, sortedDocs=${sortedDocs.length}, passagesPerDoc=${passagesPerDoc}`);
+      
       // Build passages text, ensuring each passage fits
       let passagesText = '';
+      let passagesAdded = 0;
       for (const d of sortedDocs) {
-        const passages = extractRelevantPassages(d.fullText, question, 5, Math.min(2000, passagesPerDoc));
+        const contextChars = Math.min(2000, passagesPerDoc);
+        const passages = extractRelevantPassages(d.fullText, question, 5, contextChars);
         const entry = `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
+        
+        console.log(`[answerQuestion] Doc ${passagesAdded + 1}/${sortedDocs.length}: fullText.length=${d.fullText?.length || 0}, passages.length=${passages.length}, entry.length=${entry.length}`);
         
         // Stop if we would exceed the limit
         if (passagesText.length + entry.length > remainingChars) {
+          console.log(`[answerQuestion] Would exceed limit, stopping at ${passagesAdded} docs`);
           break;
         }
         passagesText += entry;
+        passagesAdded++;
       }
+
+      console.log(`[answerQuestion] Added ${passagesAdded} passage entries, total length: ${passagesText.length}`);
 
       const fullContextText = decisionsText + '\n\n' + passagesText;
       console.log(`[answerQuestion] Context size: ${fullContextText.length} chars (decisions: ${decisionsText.length}, passages: ${passagesText.length})`);
@@ -747,41 +757,46 @@ ${passagesText}
 Question: ${question}
 
 Instructions:
-1. Answer the question DIRECTLY and CONCISELY
-2. If there's a decision recorded, start with the answer, then cite: "from the [Meeting Title] on [Date]"
-3. Include a short verbatim excerpt to support your answer
-4. If NO relevant decision or discussion found, respond EXACTLY: "I don't have a record of a decision about that"
-5. NEVER guess or make up information
-6. Prefer decisions/actions over general discussion
+1. Answer the question DIRECTLY based on the evidence in the meeting records
+2. Label each claim in your answer:
+   - RECORDED: Direct quote or explicit statement exists (include verbatim excerpt)
+   - INFERRED: Conclusion drawn from patterns across multiple mentions (explain the pattern)
+   - NOT FOUND: Information not available in the records
+3. If there's NO explicit decision but related mentions exist, synthesize an answer like:
+   "No explicit decision is recorded. [Topic] was first discussed on [date] in [meeting] by [speaker] ('[quote]'), and has been mentioned in [N] meetings since ([dates]), so the inferred [answer] is [X]."
+4. Include dates, speakers, and verbatim quotes to support your answer
+5. NEVER guess or fabricate information not in the records
+6. Check alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp", "headquarters" vs "HQ")
 
 Format as JSON:
 {
-  "answer": "Direct concise answer here, from the Meeting Title on Date",
+  "answer": "Answer with claims labeled as RECORDED/INFERRED/NOT FOUND, including dates, speakers, and quotes",
   "confidence": "high" | "medium" | "low",
   "sources": [
     {
       "documentTitle": "Meeting Title",
       "meetingDate": "YYYY-MM-DD",
-      "excerpt": "verbatim quote supporting the answer",
-      "isDecision": true
+      "excerpt": "verbatim quote",
+      "claimType": "recorded" | "inferred",
+      "isDecision": true | false
     }
   ],
   "notFound": false
 }
 
-If nothing found after thorough search:
+Only use notFound: true when absolutely NO related information exists:
 {
-  "answer": "I don't have a clear record of a decision about that in the available meeting notes",
+  "answer": "I have no record of any discussion about [topic] in the available meeting notes",
   "confidence": "low",
   "sources": [],
   "notFound": true
 }
 
 IMPORTANT: 
-- If you find ANY related information, include it even if it's not a perfect match
-- Use "notFound: true" ONLY when absolutely no relevant information exists
-- Set confidence to "low" or "medium" when uncertain, NEVER "high" for notFound
-- Check for alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp")`;
+- Prefer building inferred answers from evidence over returning "not found"
+- Use "notFound: true" ONLY when absolutely no relevant mentions exist
+- Always include verbatim quotes and dates to support claims
+- Set confidence based on evidence quality: high (explicit decision), medium (inferred from multiple mentions), low (single mention or uncertain)`;
 
       const xaiStart = Date.now();
       console.log(`[answerQuestion] Starting xAI request (context: ${fullContextText.length} chars)...`);
@@ -797,7 +812,7 @@ IMPORTANT:
             {
               role: "system",
               content:
-                "You answer questions using meeting decisions and discussions. Search thoroughly for related information. If you find anything relevant, include it even if it's not an exact match. Never use high confidence with notFound. Only return notFound when absolutely no relevant information exists.",
+                "You answer questions using meeting decisions and discussions. Always synthesize an answer from the available evidence, labeling claims as RECORDED (explicit statement with quote) or INFERRED (conclusion from patterns). Only return notFound when absolutely no related mentions exist. Check alternative spellings and phrasings.",
             },
             { role: "user", content: prompt },
           ],
