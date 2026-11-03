@@ -33,8 +33,9 @@ export type AskResult = {
   }>;
 };
 
-const FOLDER_ID = "1xehL5chPhYNNqtXm5jTIu7bOVV77fpXL";
-const MEET_RECORDINGS_FOLDER = "Meet Recordings";
+// Parent "Google Meet" folder containing all meeting subfolders
+const PARENT_FOLDER_ID = "1C5aG-ilfEtzjJowXEFZCzyNLE4OulL54";
+const MAX_FOLDER_DEPTH = 3;
 
 function extractDateTimeFromTitle(title: string): { date: string; time: string } | null {
   // Title format: "Badlander's Development Meeting – Notes by Gemini"
@@ -161,6 +162,88 @@ async function getGoogleDriveClient() {
   }
 }
 
+/**
+ * Recursively collect all Google Docs from a folder and its subfolders
+ * @param drive Google Drive client
+ * @param folderId Starting folder ID
+ * @param depth Current recursion depth (0 = starting folder)
+ * @param maxDepth Maximum recursion depth
+ * @param seenFileIds Set of file IDs already collected (for deduplication)
+ */
+async function collectDocsRecursively(
+  drive: any,
+  folderId: string,
+  depth: number,
+  maxDepth: number,
+  seenFileIds: Set<string>
+): Promise<Array<{ id: string; name: string; createdTime: string; modifiedTime: string }>> {
+  if (depth > maxDepth) {
+    return [];
+  }
+
+  const results: Array<{ id: string; name: string; createdTime: string; modifiedTime: string }> = [];
+  
+  try {
+    // First, collect all Google Docs in this folder
+    let docsPageToken: string | undefined;
+    do {
+      const docsResponse = await drive.files.list({
+        q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`,
+        fields: "nextPageToken, files(id, name, createdTime, modifiedTime)",
+        pageSize: 100,
+        pageToken: docsPageToken,
+      });
+
+      const docs = docsResponse.data.files || [];
+      for (const doc of docs) {
+        if (doc.id && doc.name && !seenFileIds.has(doc.id)) {
+          seenFileIds.add(doc.id);
+          results.push({
+            id: doc.id,
+            name: doc.name,
+            createdTime: doc.createdTime || "",
+            modifiedTime: doc.modifiedTime || "",
+          });
+        }
+      }
+
+      docsPageToken = docsResponse.data.nextPageToken || undefined;
+    } while (docsPageToken);
+
+    // Then, collect all subfolders and recurse
+    const subfolders: string[] = [];
+    let foldersPageToken: string | undefined;
+    do {
+      const foldersResponse = await drive.files.list({
+        q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: "nextPageToken, files(id, name)",
+        pageSize: 100,
+        pageToken: foldersPageToken,
+      });
+
+      const folders = foldersResponse.data.files || [];
+      for (const folder of folders) {
+        if (folder.id) {
+          subfolders.push(folder.id);
+        }
+      }
+
+      foldersPageToken = foldersResponse.data.nextPageToken || undefined;
+    } while (foldersPageToken);
+
+    // Recurse into each subfolder
+    for (const subfolderId of subfolders) {
+      const subResults = await collectDocsRecursively(drive, subfolderId, depth + 1, maxDepth, seenFileIds);
+      results.push(...subResults);
+    }
+  } catch (error: any) {
+    console.error(`Error collecting docs from folder ${folderId} at depth ${depth}:`, error.message);
+    // Continue with partial results rather than failing completely
+  }
+
+  return results;
+}
+
 export const listMeetings = createServerFn({ method: "GET" }).handler(async (): Promise<Meeting[]> => {
   const drive = await getGoogleDriveClient();
   if (!drive) {
@@ -168,73 +251,54 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
   }
   
   try {
-    const meetings: Meeting[] = [];
-    let pageToken: string | undefined;
+    // Recursively collect all Google Docs from parent folder and subfolders
+    const seenFileIds = new Set<string>();
+    const files = await collectDocsRecursively(drive, PARENT_FOLDER_ID, 0, MAX_FOLDER_DEPTH, seenFileIds);
     
-    // Paginate through all files
-    // Note: Query searches only direct children of FOLDER_ID, not subfolders or shortcuts
-    // Files in other locations (e.g., different owner's Meet Recordings) won't appear
-    do {
-      const response = await drive.files.list({
-        q: `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`,
-        fields: "nextPageToken, files(id, name, createdTime, modifiedTime)",
-        orderBy: "createdTime desc",
-        pageSize: 100,
-        pageToken,
-      });
+    console.log(`Collected ${files.length} unique meeting docs from recursive folder search`);
+    
+    const meetings: Meeting[] = [];
+    
+    for (const file of files) {
+      if (!file.id || !file.name) continue;
       
-      const files = response.data.files || [];
+      // Parse date from filename first (fast, no API call)
+      const parsedDateTime = parseDateFromFilename(file.name);
       
-      // Log pagination info for debugging
-      if (files.length > 0) {
-        const firstFile = files[0];
-        const lastFile = files[files.length - 1];
-        console.log(`Fetched ${files.length} files, created ${firstFile.createdTime} to ${lastFile.createdTime}`);
-      }
+      // Fallback to createdTime in America/Edmonton timezone
+      let fallbackDate = "";
+      let fallbackTime = "00:00";
       
-      for (const file of files) {
-        if (!file.id || !file.name) continue;
-        
-        // Parse date from filename first (fast, no API call)
-        const parsedDateTime = parseDateFromFilename(file.name);
-        
-        // Fallback to createdTime in America/Edmonton timezone
-        let fallbackDate = "";
-        let fallbackTime = "00:00";
-        
-        if (file.createdTime) {
-          const createdDate = new Date(file.createdTime);
-          fallbackDate = createdDate.toLocaleDateString("en-CA", {
-            timeZone: "America/Edmonton",
-          }); // YYYY-MM-DD format
-          fallbackTime = createdDate.toLocaleTimeString("en-US", {
-            timeZone: "America/Edmonton",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          });
-        }
-        
-        // Log files that fail to parse (might indicate new naming format)
-        if (!parsedDateTime && file.createdTime) {
-          const createdDate = new Date(file.createdTime);
-          if (createdDate >= new Date('2026-10-01')) {
-            console.log(`Recent file with non-standard name: "${file.name}" (created ${file.createdTime})`);
-          }
-        }
-        
-        meetings.push({
-          id: file.id,
-          title: file.name,
-          date: parsedDateTime?.date || fallbackDate,
-          time: parsedDateTime?.time || fallbackTime,
-          createdTime: file.createdTime || "",
-          modifiedTime: file.modifiedTime || "",
+      if (file.createdTime) {
+        const createdDate = new Date(file.createdTime);
+        fallbackDate = createdDate.toLocaleDateString("en-CA", {
+          timeZone: "America/Edmonton",
+        }); // YYYY-MM-DD format
+        fallbackTime = createdDate.toLocaleTimeString("en-US", {
+          timeZone: "America/Edmonton",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
         });
       }
       
-      pageToken = response.data.nextPageToken || undefined;
-    } while (pageToken);
+      // Log files that fail to parse (might indicate new naming format)
+      if (!parsedDateTime && file.createdTime) {
+        const createdDate = new Date(file.createdTime);
+        if (createdDate >= new Date('2026-10-01')) {
+          console.log(`Recent file with non-standard name: "${file.name}" (created ${file.createdTime})`);
+        }
+      }
+      
+      meetings.push({
+        id: file.id,
+        title: file.name,
+        date: parsedDateTime?.date || fallbackDate,
+        time: parsedDateTime?.time || fallbackTime,
+        createdTime: file.createdTime || "",
+        modifiedTime: file.modifiedTime || "",
+      });
+    }
     
     // Sort by date desc
     meetings.sort((a, b) => {
