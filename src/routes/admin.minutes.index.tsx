@@ -109,10 +109,10 @@ function MinutesIndexPage() {
       let answerResult: AnswerResult | null = null;
       let searchError: string | null = null;
 
-      // Add 15-second client timeout
-      const CLIENT_TIMEOUT = 15000;
+      // Add 30-second client timeout (server has 120s limit)
+      const CLIENT_TIMEOUT = 30000;
       const timeoutPromise = new Promise<null>((_, reject) => 
-        setTimeout(() => reject(new Error('Client timeout after 15 seconds')), CLIENT_TIMEOUT)
+        setTimeout(() => reject(new Error('Client timeout after 30 seconds')), CLIENT_TIMEOUT)
       );
 
       // Run AI answer (unless simple query) and keyword search in parallel with timeout
@@ -126,7 +126,7 @@ function MinutesIndexPage() {
               }),
           searchMeetings(q, meetings),
         ]),
-        timeoutPromise.then(() => [{ error: 'Search timed out. Try a more specific question.' } as const, [] as Array<{ meeting: Meeting; excerpt?: string }>] as const),
+        timeoutPromise.then(() => [{ error: 'Search timed out after 30 seconds. Try a more specific question or keyword.' } as const, [] as Array<{ meeting: Meeting; excerpt?: string }>] as const),
       ]);
 
       // Process AI result
@@ -349,7 +349,7 @@ function MinutesIndexPage() {
                 </div>
               )}
 
-              {!searchState.answer && searchState.matchedMeetings.length === 0 && (
+              {!searchState.answer && searchState.matchedMeetings.length === 0 && !searchState.error && (
                 <p className="text-sm text-muted text-center py-4">No results found.</p>
               )}
             </div>
