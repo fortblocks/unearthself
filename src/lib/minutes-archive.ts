@@ -100,6 +100,12 @@ export type AnswerResult = {
     isDecision: boolean; // True if from decisions index
   }>;
   notFound?: boolean; // True if no relevant information
+  matchedMeetings?: Array<{
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+  }>; // All meetings that matched the query, sorted for display
 };
 
 export type IndexStats = {
@@ -504,13 +510,37 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     return { start, end, score: distinctTerms.size };
   });
   
-  // Sort by score (most distinct query terms first), then take top N
+  // Sort by score (most distinct query terms first)
   rankedPassages.sort((a, b) => b.score - a.score);
   
-  return rankedPassages
-    .slice(0, maxPassages)
-    .map(({ start, end }) => text.slice(start, end))
-    .join('\n\n[...]\n\n');
+  // Take top-scoring passages and concatenate until we hit the budget
+  // HARD CAP: never exceed contextChars * 2 (the budget parameter)
+  const maxTotalChars = contextChars * 2;
+  const selectedPassages: string[] = [];
+  let totalChars = 0;
+  
+  for (const { start, end } of rankedPassages.slice(0, maxPassages)) {
+    const passage = text.slice(start, end);
+    const separator = selectedPassages.length > 0 ? '\n\n[...]\n\n' : '';
+    const additionalChars = separator.length + passage.length;
+    
+    if (totalChars + additionalChars <= maxTotalChars) {
+      // Full passage fits
+      if (selectedPassages.length > 0) selectedPassages.push('[...]');
+      selectedPassages.push(passage);
+      totalChars += additionalChars;
+    } else if (totalChars < maxTotalChars && selectedPassages.length === 0) {
+      // Truncate first passage to fit budget
+      const available = maxTotalChars - totalChars;
+      selectedPassages.push(passage.slice(0, available));
+      break;
+    } else {
+      // Budget exhausted
+      break;
+    }
+  }
+  
+  return selectedPassages.join('\n\n');
 }
 
 // Server-side keyword search that returns snippets without fetching all meetings
@@ -816,19 +846,30 @@ export async function searchAndAnswer(
       for (const d of sortedDocs) {
         // Extract best passages for this doc using budget
         const passages = extractRelevantPassages(d.fullText, question, 5, budgetPerDoc);
-        const entry = `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
+        const header = `[MEETING: ${d.title} on ${d.date}]\n`;
+        const footer = `\n===\n`;
+        const entry = header + passages + footer;
         
         console.log(`[answerQuestion] Doc ${passagesAdded + passagesSkipped + 1}/${sortedDocs.length}: fullText.length=${d.fullText?.length || 0}, passages.length=${passages.length}, entry.length=${entry.length}`);
         
-        // Skip this doc if it won't fit, but continue trying others
-        if (passagesText.length + entry.length > remainingChars) {
-          console.log(`[answerQuestion] Skipping doc ${d.id.slice(0,8)} - would exceed limit`);
-          passagesSkipped++;
-          continue;
-        }
+        const availableSpace = remainingChars - passagesText.length;
         
-        passagesText += entry;
-        passagesAdded++;
+        if (entry.length <= availableSpace) {
+          // Full entry fits
+          passagesText += entry;
+          passagesAdded++;
+        } else if (availableSpace >= header.length + footer.length + 500) {
+          // Not enough space for full entry, but room for truncated passages
+          const passageBudget = availableSpace - header.length - footer.length;
+          const truncatedPassages = passages.slice(0, passageBudget);
+          passagesText += header + truncatedPassages + footer;
+          passagesAdded++;
+          console.log(`[answerQuestion] Truncated doc ${d.id.slice(0, 8)} to fit remaining ${availableSpace} chars`);
+        } else {
+          // No meaningful space left
+          console.log(`[answerQuestion] Skipping doc ${d.id.slice(0,8)} - no space left (available: ${availableSpace})`);
+          passagesSkipped++;
+        }
       }
 
       console.log(`[answerQuestion] Added ${passagesAdded} passage entries (skipped ${passagesSkipped}), total length: ${passagesText.length}`);
@@ -969,6 +1010,12 @@ IMPORTANT:
         confidence,
         sources: sourcesWithIds,
         notFound: parsed.notFound || false,
+        matchedMeetings: sortedDocs.map(d => ({
+          id: d.id,
+          title: d.title,
+          date: d.date,
+          time: d.time,
+        })),
       };
     } catch (error: any) {
       // Fatal error in search - provide simple fallback
