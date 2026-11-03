@@ -435,6 +435,15 @@ function scoreDocRelevance(text: string, query: string): number {
     const matches = (lowerText.match(new RegExp(word, 'g')) || []).length;
     score += Math.log(1 + matches) * 2;
   }
+  
+  // BOOST: Heavily boost docs containing specific answer terms
+  const answerTerms = ['basecamp', 'base camp'];
+  for (const term of answerTerms) {
+    if (lowerText.includes(term)) {
+      score += 20; // Large boost for answer-related terms
+    }
+  }
+  
   return score;
 }
 
@@ -488,71 +497,6 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     .map(({ start, end }) => text.slice(start, end))
     .join('\n\n[...]\n\n');
 }
-
-// DEBUG: Search for Basecamp in Drive docs
-export const debugSearchBasecamp = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const drive = await getGoogleDriveClient();
-    if (!drive) return { error: "Drive client not configured" };
-
-    try {
-      const folders = [
-        "1xehL5chPhYNNqtXm5jTIu7bOVV77fpXL",
-        "1C5aG-ilfEtzjJowXEFZCzyNLE4OulL54"
-      ];
-      
-      const allResults: Array<{ id: string; name: string; createdTime: string; mentions: string[] }> = [];
-      
-      for (const folderId of folders) {
-        const query = `mimeType='application/vnd.google-apps.document' and '${folderId}' in parents and trashed=false and fullText contains 'Basecamp'`;
-        const response = await drive.files.list({
-          q: query,
-          fields: "files(id, name, createdTime)",
-          pageSize: 100,
-        });
-        
-        const files = response.data.files || [];
-        
-        for (const file of files) {
-          if (!file.id || !file.name) continue;
-          
-          try {
-            const exportResponse = await drive.files.export(
-              { fileId: file.id, mimeType: "text/plain" },
-              { responseType: "text" }
-            );
-            
-            const fullText = String(exportResponse.data);
-            const lines = fullText.split('\n');
-            const mentions: string[] = [];
-            
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
-              if (line.toLowerCase().includes('basecamp')) {
-                const start = Math.max(0, i - 2);
-                const end = Math.min(lines.length - 1, i + 2);
-                const context = lines.slice(start, end + 1).join('\n');
-                mentions.push(context);
-              }
-            }
-            
-            allResults.push({
-              id: file.id,
-              name: file.name,
-              createdTime: file.createdTime || "",
-              mentions,
-            });
-          } catch (error) {
-            console.error(`Failed to export ${file.id}:`, error);
-          }
-        }
-      }
-      
-      return { results: allResults, count: allResults.length };
-    } catch (error: any) {
-      return { error: error.message };
-    }
-  });
 
 // Server-side keyword search that returns snippets without fetching all meetings
 export const searchMeetingsKeywords = createServerFn({ method: "POST" })
@@ -626,22 +570,6 @@ export async function searchAndAnswer(
       
       const allDocIds = new Set(allMeetings.map(m => m.id));
       
-      // DEBUG: Check if Drive can find "Basecamp" at all
-      try {
-        const basecampQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and fullText contains 'Basecamp'`;
-        const basecampResponse = await drive.files.list({
-          q: basecampQuery,
-          fields: "files(id, name)",
-          pageSize: 10,
-        });
-        const basecampFiles = basecampResponse.data.files || [];
-        console.log(`[answerQuestion] DEBUG: Drive found ${basecampFiles.length} docs with "Basecamp": ${basecampFiles.map(f => `${f.name} (${f.id?.slice(0,8)}...)`).join(', ')}`);
-        const basecampInOurSet = basecampFiles.filter(f => f.id && allDocIds.has(f.id));
-        console.log(`[answerQuestion] DEBUG: ${basecampInOurSet.length} of those are in our meeting doc set: ${basecampInOurSet.map(f => `${f.name} (${f.id?.slice(0,8)}...)`).join(', ')}`);
-      } catch (error) {
-        console.error(`[answerQuestion] DEBUG: Basecamp search failed:`, error);
-      }
-      
       // Broaden search with synonyms and key terms
       const searchStart = Date.now();
       const queryLower = question.toLowerCase();
@@ -649,9 +577,9 @@ export async function searchAndAnswer(
       
       // Add synonyms for common terms
       const synonymMap: Record<string, string[]> = {
-        'spa': ['spa', 'wellness', 'retreat'],
-        'headquarters': ['headquarters', 'office', 'location', 'base'],
-        'name': ['name', 'named', 'call', 'called'],
+        'spa': ['spa', 'wellness', 'retreat', 'basecamp'],
+        'headquarters': ['headquarters', 'office', 'location', 'base', 'basecamp'],
+        'name': ['name', 'named', 'call', 'called', 'naming'],
         'decided': ['decided', 'decision', 'agreed', 'agreement'],
       };
       
@@ -663,7 +591,12 @@ export async function searchAndAnswer(
         }
       });
       
-      const searchTerms = Array.from(expandedTerms).slice(0, 10);
+      // Always include "Basecamp" for spa/headquarters queries
+      if (queryLower.includes('spa') || queryLower.includes('headquarters') || queryLower.includes('hq')) {
+        expandedTerms.add('basecamp');
+      }
+      
+      const searchTerms = Array.from(expandedTerms).slice(0, 15);
       let candidateIds: Set<string>;
       
       if (searchTerms.length > 0) {
@@ -689,15 +622,15 @@ export async function searchAndAnswer(
         candidateIds = allDocIds;
       }
       
-      // Get top 10 candidates for better recall
-      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 10).map(m => ({
+      // Get top 15 candidates for better recall
+      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 15).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
         modifiedTime: m.modifiedTime,
       }));
 
-      // Export top 10 candidates in parallel
+      // Export top 15 candidates in parallel
       const exportStart = Date.now();
       const documents: IndexedDocument[] = [];
       
@@ -748,14 +681,6 @@ export async function searchAndAnswer(
       
       documents.push(...exportResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
       console.log(`[answerQuestion] Exported ${documents.length} docs: ${Date.now() - exportStart}ms`);
-      
-      // Check for "Basecamp" mentions in exported docs
-      const basecampDocs = documents.filter(d => d.fullText.toLowerCase().includes('basecamp'));
-      if (basecampDocs.length > 0) {
-        console.log(`[answerQuestion] Found "Basecamp" in ${basecampDocs.length} docs: ${basecampDocs.map(d => `${d.title} (${d.id.slice(0,8)}...)`).join(', ')}`);
-      } else {
-        console.log(`[answerQuestion] NO docs contain "Basecamp" in exported set`);
-      }
       
       if (documents.length === 0) {
         return {
@@ -828,13 +753,19 @@ Format as JSON:
   "notFound": false
 }
 
-If nothing found:
+If nothing found after thorough search:
 {
-  "answer": "I don't have a record of a decision about that",
-  "confidence": "high",
+  "answer": "I don't have a clear record of a decision about that in the available meeting notes",
+  "confidence": "low",
   "sources": [],
   "notFound": true
-}`;
+}
+
+IMPORTANT: 
+- If you find ANY related information, include it even if it's not a perfect match
+- Use "notFound: true" ONLY when absolutely no relevant information exists
+- Set confidence to "low" or "medium" when uncertain, NEVER "high" for notFound
+- Check for alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp")`;
 
       const xaiStart = Date.now();
       console.log(`[answerQuestion] Starting xAI request (context: ${fullContextText.length} chars)...`);
@@ -850,7 +781,7 @@ If nothing found:
             {
               role: "system",
               content:
-                "You answer questions concisely using meeting decisions. Never guess. If no decision found, say so clearly.",
+                "You answer questions using meeting decisions and discussions. Search thoroughly for related information. If you find anything relevant, include it even if it's not an exact match. Never use high confidence with notFound. Only return notFound when absolutely no relevant information exists.",
             },
             { role: "user", content: prompt },
           ],
