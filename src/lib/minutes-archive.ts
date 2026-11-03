@@ -489,6 +489,71 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     .join('\n\n[...]\n\n');
 }
 
+// DEBUG: Search for Basecamp in Drive docs
+export const debugSearchBasecamp = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const drive = await getGoogleDriveClient();
+    if (!drive) return { error: "Drive client not configured" };
+
+    try {
+      const folders = [
+        "1xehL5chPhYNNqtXm5jTIu7bOVV77fpXL",
+        "1C5aG-ilfEtzjJowXEFZCzyNLE4OulL54"
+      ];
+      
+      const allResults: Array<{ id: string; name: string; createdTime: string; mentions: string[] }> = [];
+      
+      for (const folderId of folders) {
+        const query = `mimeType='application/vnd.google-apps.document' and '${folderId}' in parents and trashed=false and fullText contains 'Basecamp'`;
+        const response = await drive.files.list({
+          q: query,
+          fields: "files(id, name, createdTime)",
+          pageSize: 100,
+        });
+        
+        const files = response.data.files || [];
+        
+        for (const file of files) {
+          if (!file.id || !file.name) continue;
+          
+          try {
+            const exportResponse = await drive.files.export(
+              { fileId: file.id, mimeType: "text/plain" },
+              { responseType: "text" }
+            );
+            
+            const fullText = String(exportResponse.data);
+            const lines = fullText.split('\n');
+            const mentions: string[] = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              if (line.toLowerCase().includes('basecamp')) {
+                const start = Math.max(0, i - 2);
+                const end = Math.min(lines.length - 1, i + 2);
+                const context = lines.slice(start, end + 1).join('\n');
+                mentions.push(context);
+              }
+            }
+            
+            allResults.push({
+              id: file.id,
+              name: file.name,
+              createdTime: file.createdTime || "",
+              mentions,
+            });
+          } catch (error) {
+            console.error(`Failed to export ${file.id}:`, error);
+          }
+        }
+      }
+      
+      return { results: allResults, count: allResults.length };
+    } catch (error: any) {
+      return { error: error.message };
+    }
+  });
+
 // Server-side keyword search that returns snippets without fetching all meetings
 export const searchMeetingsKeywords = createServerFn({ method: "POST" })
   .validator((d: { query: string }) => d)
