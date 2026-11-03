@@ -604,6 +604,13 @@ If you found nothing relevant, return:
         }
         
         const parsed = JSON.parse(jsonStr);
+        
+        // Log when model found nothing (for debugging)
+        if (parsed.answer && parsed.answer.toLowerCase().includes("found nothing")) {
+          console.log(`Model found no results for query: "${data.question}"`);
+          console.log(`Searched ${includedMeetings.length} meetings, total context: ${contextChars} chars`);
+        }
+        
         return parsed as AskResult;
       } catch (error) {
         console.error("Failed to parse xAI response:", error, content);
@@ -615,6 +622,6 @@ If you found nothing relevant, return:
       }
     } catch (error: any) {
       console.error("Error in askMinutes:", error);
-      return { error: "Failed to process question" };
+      return { error: `Failed to process question: ${error.message || error}` };
     }
   });
