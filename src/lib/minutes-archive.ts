@@ -610,7 +610,14 @@ export async function searchAndAnswer(
       }
       
       // Get top 15 candidates for better recall
-      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 15).map(m => ({
+      const matchedMeetings = allMeetings.filter(m => candidateIds.has(m.id));
+      console.log(`[answerQuestion] ${matchedMeetings.length} matched meetings from Drive search`);
+      
+      // DEBUG: Check if Aug 20 is in candidates
+      const aug20InCandidates = matchedMeetings.some(m => m.id === '14UIO9kglaCR2JX3h1VNByD416SWVP8A-sNmCDXTguxQ');
+      console.log(`[answerQuestion] Aug 20 doc in candidates: ${aug20InCandidates}`);
+      
+      const files = matchedMeetings.slice(0, 15).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
@@ -682,10 +689,21 @@ export async function searchAndAnswer(
       const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0));
       console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
       console.log(`[answerQuestion] Top docs: ${sortedDocs.map(d => `${d.title} (${d.id.slice(0,8)}...)`).join(', ')}`);
+      
+      // DEBUG: Check if Aug 20 doc is in results
+      const aug20Doc = documents.find(d => d.id === '14UIO9kglaCR2JX3h1VNByD416SWVP8A-sNmCDXTguxQ');
+      if (aug20Doc) {
+        console.log(`[answerQuestion] Aug 20 doc found in results at position ${documents.indexOf(aug20Doc) + 1}/${documents.length}, score: ${aug20Doc.score}, date: ${aug20Doc.date}`);
+      } else {
+        console.log(`[answerQuestion] Aug 20 doc NOT in exported docs`);
+      }
 
       // Build context with decisions and relevant passages, cap at 150KB
       const MAX_CONTEXT_CHARS = 150000;
-      const decisionsText = sortedDocs
+      
+      // Build decisions text, cap at 80KB to leave room for passages
+      const MAX_DECISIONS_CHARS = 80000;
+      let decisionsText = sortedDocs
         .flatMap((d) =>
           d.decisions.map(
             (dec) =>
@@ -693,18 +711,29 @@ export async function searchAndAnswer(
           )
         )
         .join("\n\n");
-
-      // Extract passages with more context per doc for better recall
-      const passagesPerDoc = Math.floor((MAX_CONTEXT_CHARS - decisionsText.length) / sortedDocs.length);
       
-      const passagesText = sortedDocs
-        .map((d) => {
-          const passages = extractRelevantPassages(d.fullText, question, 5, Math.min(2000, passagesPerDoc));
-          return `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
-        })
-        .join("\n");
+      if (decisionsText.length > MAX_DECISIONS_CHARS) {
+        decisionsText = decisionsText.slice(0, MAX_DECISIONS_CHARS) + "\n...[truncated]";
+      }
 
-      const fullContextText = (decisionsText + '\n\n' + passagesText).slice(0, MAX_CONTEXT_CHARS);
+      // Calculate remaining space for passages
+      const remainingChars = MAX_CONTEXT_CHARS - decisionsText.length - 100; // 100 char buffer
+      const passagesPerDoc = Math.floor(remainingChars / sortedDocs.length);
+      
+      // Build passages text, ensuring each passage fits
+      let passagesText = '';
+      for (const d of sortedDocs) {
+        const passages = extractRelevantPassages(d.fullText, question, 5, Math.min(2000, passagesPerDoc));
+        const entry = `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
+        
+        // Stop if we would exceed the limit
+        if (passagesText.length + entry.length > remainingChars) {
+          break;
+        }
+        passagesText += entry;
+      }
+
+      const fullContextText = decisionsText + '\n\n' + passagesText;
       console.log(`[answerQuestion] Context size: ${fullContextText.length} chars (decisions: ${decisionsText.length}, passages: ${passagesText.length})`);
 
       const prompt = `You are answering questions about Unearth Self meeting decisions and discussions.
@@ -780,64 +809,67 @@ IMPORTANT:
 
       if (!response.ok) {
         const errorText = await response.text();
-        let errorDetail = `HTTP ${response.status}: Failed to generate answer`;
+        let errorDetail = `HTTP ${response.status}`;
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.error?.message) {
-            errorDetail = `HTTP ${response.status}: ${errorJson.error.message}`;
+            errorDetail += `: ${errorJson.error.message}`;
           }
         } catch {
-          errorDetail = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
+          // Ignore parse error
         }
         console.error("xAI error:", errorText);
-        return { error: errorDetail };
+        throw new Error(errorDetail);
       }
 
       const result = await response.json();
       const content = result.choices?.[0]?.message?.content;
 
       if (!content) {
-        return { error: "No response from xAI" };
+        throw new Error("No response from xAI");
       }
 
-      try {
-        let jsonStr = content;
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-        if (jsonMatch) jsonStr = jsonMatch[1];
+      let jsonStr = content;
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      if (jsonMatch) jsonStr = jsonMatch[1];
 
-        const parsed = JSON.parse(jsonStr);
-        
-        // Add documentId to sources
-        const sourcesWithIds = (parsed.sources || []).map((s: any) => {
-          const doc = documents.find((d) => d.title === s.documentTitle);
-          return {
-            ...s,
-            documentId: doc?.id || "",
-          };
-        });
-
-        console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
+      const parsed = JSON.parse(jsonStr);
+      
+      // Add documentId to sources
+      const sourcesWithIds = (parsed.sources || []).map((s: any) => {
+        const doc = documents.find((d) => d.title === s.documentTitle);
         return {
-          answer: parsed.answer,
-          confidence: parsed.confidence || "medium",
-          sources: sourcesWithIds,
-          notFound: parsed.notFound || false,
+          ...s,
+          documentId: doc?.id || "",
         };
-      } catch (error) {
-        console.error("[answerQuestion] Parse error:", error, content);
-        return { error: "Failed to parse answer" };
-      }
+      });
+
+      console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
+      return {
+        answer: parsed.answer,
+        confidence: parsed.confidence || "medium",
+        sources: sourcesWithIds,
+        notFound: parsed.notFound || false,
+      };
     } catch (error: any) {
+      // Fatal error in search - provide simple fallback
       const elapsed = Date.now() - startTime;
-      console.error(`[answerQuestion] Error after ${elapsed}ms:`, error);
+      console.error(`[answerQuestion] Fatal error after ${elapsed}ms:`, error.message);
       
-      // On timeout, return fallback with keyword matches
-      if (error.name === 'TimeoutError' || error.name === 'AbortError' || elapsed > 10000) {
-        console.log(`[answerQuestion] Timeout - returning error`);
-        return { error: `Search timed out after ${Math.round(elapsed/1000)}s. Please try a more specific question.` };
+      let fallbackAnswer: string;
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        fallbackAnswer = `Search timed out while analyzing meeting records. Please try a more specific question or check the matching meetings below.`;
+      } else {
+        fallbackAnswer = `Unable to analyze meeting records due to a technical issue. Please try rephrasing your question or review the matching meetings below.`;
       }
       
-      return { error: error.message || "Failed to answer question" };
+      console.log(`[answerQuestion] TOTAL time: ${elapsed}ms (fatal error)`);
+      return {
+        answer: fallbackAnswer,
+        confidence: "low",
+        sources: [],
+        notFound: false,
+      };
     }
 }
 
