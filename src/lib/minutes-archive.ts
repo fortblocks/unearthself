@@ -509,68 +509,74 @@ export const answerQuestion = createServerFn({ method: "POST" })
         candidateIds = allDocIds;
       }
       
-      // Get file metadata for candidates
-      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 20).map(m => ({
+      // Export only top 6 candidates with concurrency 6 (using Drive relevance order)
+      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 6).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
         modifiedTime: m.modifiedTime,
       }));
 
-      // Export and score candidates (max 20 docs instead of 83)
+      // Module-level cache for doc exports (keyed by fileId+modifiedTime)
+      const docCache = new Map<string, string>();
+      
       const exportStart = Date.now();
       const documents: IndexedDocument[] = [];
-      const MAX_CONCURRENT = 5;
       
-      for (let i = 0; i < files.length; i += MAX_CONCURRENT) {
-        const batch = files.slice(i, i + MAX_CONCURRENT);
-        const batchResults = await Promise.all(
-          batch.map(async (file) => {
-            if (!file.id || !file.name) return null;
-            if (data.series && detectSeries(file.name) !== data.series) return null;
+      // Export all 6 docs concurrently
+      const exportResults = await Promise.all(
+        files.map(async (file) => {
+          if (!file.id || !file.name) return null;
+          if (data.series && detectSeries(file.name) !== data.series) return null;
+          
+          try {
+            const cacheKey = `${file.id}-${file.modifiedTime}`;
+            let fullText = docCache.get(cacheKey);
             
-            try {
+            if (!fullText) {
               const exportResponse = await drive.files.export(
                 { fileId: file.id, mimeType: "text/plain" },
                 { responseType: "text" }
               );
-              const fullText = String(exportResponse.data);
-              const parsedDateTime = parseDateTime(fullText);
-              const createdDate = new Date(file.createdTime || "");
-              const extractedDecisions = extractDecisions(fullText);
-              
-              return {
-                id: file.id,
-                title: file.name,
-                series: detectSeries(file.name),
-                date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-                time: parsedDateTime?.time || "00:00",
-                createdTime: file.createdTime || "",
-                modifiedTime: file.modifiedTime || "",
-                fullText,
-                decisions: extractedDecisions.map((d, idx) => ({
-                  id: `${file.id}-d${idx}`,
-                  documentId: file.id || "",
-                  documentTitle: file.name || "",
-                  meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-                  series: detectSeries(file.name || ""),
-                  decisionText: d.text,
-                  context: d.context,
-                  decisionType: d.type,
-                  indexedAt: new Date().toISOString(),
-                })),
-                indexedAt: new Date().toISOString(),
-                score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
-              };
-            } catch (error) {
-              console.error(`Failed to process ${file.id}:`, error);
-              return null;
+              fullText = String(exportResponse.data);
+              docCache.set(cacheKey, fullText);
             }
-          })
-        );
-        documents.push(...batchResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
-      }
+            
+            const parsedDateTime = parseDateTime(fullText);
+            const createdDate = new Date(file.createdTime || "");
+            const extractedDecisions = extractDecisions(fullText);
+            
+            return {
+              id: file.id,
+              title: file.name,
+              series: detectSeries(file.name),
+              date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+              time: parsedDateTime?.time || "00:00",
+              createdTime: file.createdTime || "",
+              modifiedTime: file.modifiedTime || "",
+              fullText,
+              decisions: extractedDecisions.map((d, idx) => ({
+                id: `${file.id}-d${idx}`,
+                documentId: file.id || "",
+                documentTitle: file.name || "",
+                meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+                series: detectSeries(file.name || ""),
+                decisionText: d.text,
+                context: d.context,
+                decisionType: d.type,
+                indexedAt: new Date().toISOString(),
+              })),
+              indexedAt: new Date().toISOString(),
+              score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
+            };
+          } catch (error) {
+            console.error(`Failed to process ${file.id}:`, error);
+            return null;
+          }
+        })
+      );
       
+      documents.push(...exportResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
       console.log(`[answerQuestion] Exported ${documents.length} docs: ${Date.now() - exportStart}ms`);
       
       if (documents.length === 0) {
@@ -582,11 +588,35 @@ export const answerQuestion = createServerFn({ method: "POST" })
         };
       }
 
-      // Pick top 8 most relevant documents by score
-      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
-      console.log(`[answerQuestion] Top 8 scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+      // Sort by score and pick top 6
+      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 6);
+      console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
 
-      // Build compact context from top docs only
+      // Extract matching passages + 2K context from each doc (cap at 60K total)
+      const extractQueryWords = data.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const extractRelevantPassages = (text: string, maxChars: number): string => {
+        const lowerText = text.toLowerCase();
+        const passages: string[] = [];
+        let totalChars = 0;
+        
+        for (const word of extractQueryWords) {
+          const index = lowerText.indexOf(word);
+          if (index === -1) continue;
+          
+          // Extract 1K chars before and after (2K context window)
+          const start = Math.max(0, index - 1000);
+          const end = Math.min(text.length, index + word.length + 1000);
+          const passage = text.slice(start, end);
+          
+          if (totalChars + passage.length > maxChars) break;
+          passages.push((start > 0 ? "..." : "") + passage + (end < text.length ? "..." : ""));
+          totalChars += passage.length;
+        }
+        
+        return passages.length > 0 ? passages.join("\n\n") : text.slice(0, maxChars);
+      };
+
+      // Build compact context: decisions + relevant passages only
       const decisionsText = sortedDocs
         .flatMap((d) =>
           d.decisions.map(
@@ -596,17 +626,23 @@ export const answerQuestion = createServerFn({ method: "POST" })
         )
         .join("\n\n");
 
-      const fullContextText = sortedDocs
-        .map((d) => `[MEETING: ${d.title} on ${d.date}]\n${d.fullText}\n===\n`)
+      const passagesText = sortedDocs
+        .map((d) => {
+          const passages = extractRelevantPassages(d.fullText, 8000); // ~8K per doc
+          return `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
+        })
         .join("\n");
+
+      // Cap total at 60K chars
+      const maxContextChars = 60000;
+      const decisionsChars = Math.min(decisionsText.length, 20000);
+      const passagesChars = Math.min(passagesText.length, maxContextChars - decisionsChars);
+      const finalContext = decisionsText.slice(0, decisionsChars) + "\n\n" + passagesText.slice(0, passagesChars);
 
       const prompt = `You are answering questions about Unearth Self meeting decisions and discussions.
 
-PRIORITIZE DECISIONS AND ACTION ITEMS:
-${decisionsText}
-
-SECONDARY CONTEXT (Top ${sortedDocs.length} relevant meetings):
-${fullContextText.slice(0, 200000)} 
+CONTEXT (Decisions + Relevant Passages from Top ${sortedDocs.length} Meetings):
+${finalContext} 
 
 Question: ${data.question}
 
@@ -642,7 +678,7 @@ If nothing found:
 }`;
 
       const xaiStart = Date.now();
-      console.log(`[answerQuestion] Starting xAI request (context: ${decisionsText.length + fullContextText.length} chars)...`);
+      console.log(`[answerQuestion] Starting xAI request (context: ${finalContext.length} chars, decisions: ${decisionsChars}, passages: ${passagesChars})...`);
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -703,6 +739,7 @@ If nothing found:
           };
         });
 
+        console.log(`[answerQuestion] Answer: "${parsed.answer}"`);
         console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
         return {
           answer: parsed.answer,
