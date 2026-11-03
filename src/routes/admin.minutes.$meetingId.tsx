@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Section } from "@/components/desk/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
-import { generateStructuredMinutes, type StructuredMinutes } from "@/lib/structured-minutes";
+import { generateStructuredMinutesAsync, type StructuredMinutes } from "@/lib/structured-minutes";
 import { formatMeetingDate } from "@/lib/date-format";
 import { detectSeries, SERIES_BADGES } from "@/lib/minutes-archive";
-import { ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/minutes/$meetingId")({
   component: MeetingDetailPage,
@@ -21,21 +21,24 @@ export const Route = createFileRoute("/admin/minutes/$meetingId")({
     };
   },
   loader: async ({ params }) => {
-    const minutes = await getMeetingMinutes({ data: { meetingId: params.meetingId } });
-    
-    // Generate structured minutes if we have the data
-    let structured: StructuredMinutes | { error: string } | null = null;
-    if (minutes) {
-      structured = await generateStructuredMinutes({
-        data: {
-          meetingId: minutes.meeting.id,
-          modifiedTime: minutes.meeting.modifiedTime,
-          fullText: minutes.fullText,
-        },
-      });
+    try {
+      // Only fetch meeting data and transcript - render immediately
+      // Structured view is generated client-side after mount to avoid timeout
+      const minutes = await getMeetingMinutes({ data: { meetingId: params.meetingId } });
+      
+      return { minutes, error: null };
+    } catch (error: any) {
+      console.error("Loader error for meeting:", params.meetingId, error);
+      
+      // Return error state for our component to handle, not null
+      // Only show "Meeting not found" for real 404s
+      const is404 = error?.code === 404 || error?.message?.includes("404") || error?.message?.includes("not found");
+      
+      return { 
+        minutes: null, 
+        error: is404 ? null : (error.message || "Failed to load meeting")
+      };
     }
-    
-    return { minutes, structured };
   },
 });
 
@@ -82,8 +85,73 @@ function groupActionsByOwner(actions: MeetingAction[]): Record<string, MeetingAc
 function MeetingDetailPage() {
   const loaderData = Route.useLoaderData();
   // @ts-ignore - TanStack Router loader data typing
-  const { minutes, structured } = loaderData || {};
+  const { minutes, error: loaderError } = loaderData || {};
   const [showTranscript, setShowTranscript] = useState(false);
+  const [structured, setStructured] = useState<StructuredMinutes | { error: string } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Generate structured view on mount (client-side with timeout protection)
+  useEffect(() => {
+    if (!minutes) return;
+
+    setIsGenerating(true);
+
+    // Call async generation with 110-second client-side timeout
+    // (slightly below server maxDuration of 120s)
+    const timeoutId = setTimeout(() => {
+      setStructured({
+        error: "Structured view generation timed out. The xAI API took too long. Full transcript is available below.",
+      });
+      setIsGenerating(false);
+    }, 110000);
+
+    generateStructuredMinutesAsync({
+      data: {
+        meetingId: minutes.meeting.id,
+        modifiedTime: minutes.meeting.modifiedTime,
+        fullText: minutes.fullText,
+      },
+    })
+      .then((result) => {
+        clearTimeout(timeoutId);
+        setStructured(result);
+      })
+      .catch((error: any) => {
+        clearTimeout(timeoutId);
+        console.error("Structured generation failed:", error);
+        setStructured({
+          error: `Could not generate structured view: ${error.message || "unknown error"}. Full transcript is available below.`,
+        });
+      })
+      .finally(() => {
+        setIsGenerating(false);
+      });
+
+    return () => clearTimeout(timeoutId);
+  }, [minutes?.meeting.id]);
+
+  // Show error component (NOT "Meeting not found" unless it's a real 404)
+  if (loaderError) {
+    return (
+      <div className="grid gap-10">
+        <div className="border-l-2 border-ember bg-ember/5 px-4 py-3">
+          <p className="text-sm font-semibold text-coal mb-2">
+            Error loading meeting
+          </p>
+          <p className="text-xs text-shale">
+            {loaderError}
+          </p>
+          <Link
+            to="/admin/minutes"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-ember hover:underline"
+          >
+            <ChevronLeft className="size-4" />
+            Back to minutes
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!minutes) {
     return (
@@ -132,6 +200,18 @@ function MeetingDetailPage() {
           {formatTime(meeting.time)} MT
         </p>
       </div>
+
+      {/* Show loading state while generating */}
+      {isGenerating && !structured && (
+        <div className="border-l-2 border-coal bg-paper px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="size-4 animate-spin text-sandstone" />
+            <p className="text-sm text-sandstone">
+              Generating structured view...
+            </p>
+          </div>
+        </div>
+      )}
 
       {hasStructured ? (
         <>

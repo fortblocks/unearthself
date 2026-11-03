@@ -19,8 +19,15 @@
 
 import { createServerFn } from "@tanstack/react-start";
 
-// xAI model for structured extraction (grok-4.7 is current as of Nov 2026)
-export const XAI_MODEL = "grok-4.7";
+// xAI model for structured extraction
+// Current models: https://docs.x.ai/docs/models
+// Using grok-4.20-0309-non-reasoning: non-reasoning variant for speed
+// - No reasoning overhead (fast inference, <10s typical)
+// - 1M context window
+// - Supports json_schema structured outputs
+// - $1.25 input / $2.50 output per million tokens
+// Previous grok-4.7 had 60s+ timeouts on 18KB docs (likely reasoning-enabled)
+export const XAI_MODEL = "grok-4.20-0309-non-reasoning";
 
 export type ActionItem = {
   owner: string | null;
@@ -132,9 +139,10 @@ function mergeStructuredResults(results: StructuredMinutes[]): StructuredMinutes
 }
 
 /**
- * Generate structured minutes from raw meeting text
+ * Generate structured minutes from raw meeting text (async, client-called)
+ * Uses AbortSignal timeout and parallel chunk processing for long transcripts
  */
-export const generateStructuredMinutes = createServerFn({ method: "GET" })
+export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
   .validator((d: { meetingId: string; modifiedTime: string; fullText: string }) => d)
   .handler(async ({ data }): Promise<StructuredMinutes | { error: string }> => {
     const apiKey = process.env.XAI_API_KEY;
@@ -152,136 +160,30 @@ export const generateStructuredMinutes = createServerFn({ method: "GET" })
     try {
       // Check if we need to chunk the text
       const chunks = chunkText(data.fullText);
-      const chunkResults: StructuredMinutes[] = [];
-
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const chunkLabel = chunks.length > 1 ? ` (part ${i + 1}/${chunks.length})` : "";
-
-        // Generate structured minutes with xAI using structured outputs
-        const prompt = `Parse this meeting transcript${chunkLabel} into structured minutes. Extract only what is explicitly stated - never invent information.${chunks.length > 1 ? "\n\nThis is part of a larger document; extract from this section only." : ""}
-
-Meeting transcript:
-${chunk}`;
-
-        const response = await fetch("https://api.x.ai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: XAI_MODEL,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You extract structured information from meeting notes. Never invent details. Only include what is explicitly stated.",
-              },
-              { role: "user", content: prompt },
-            ],
-            temperature: 0.1,
-            max_tokens: 2000,
-            response_format: {
-              type: "json_schema",
-              json_schema: {
-                name: "meeting_minutes",
-                strict: true,
-                schema: {
-                  type: "object",
-                  properties: {
-                    attendees: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Names explicitly mentioned as attendees",
-                    },
-                    keyDecisions: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          decision: { type: "string" },
-                          source: { type: "string" },
-                        },
-                        required: ["decision", "source"],
-                        additionalProperties: false,
-                      },
-                    },
-                    actionItems: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          owner: { type: ["string", "null"] },
-                          item: { type: "string" },
-                          dueDate: { type: ["string", "null"] },
-                        },
-                        required: ["owner", "item", "dueDate"],
-                        additionalProperties: false,
-                      },
-                    },
-                    openQuestions: {
-                      type: "array",
-                      items: { type: "string" },
-                    },
-                    summary: {
-                      type: "string",
-                      description: "2-3 sentence summary of the meeting",
-                    },
-                  },
-                  required: ["attendees", "keyDecisions", "actionItems", "openQuestions", "summary"],
-                  additionalProperties: false,
-                },
-              },
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorDetail = `HTTP ${response.status}: Failed to generate structured minutes`;
-          try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson.error?.message) {
-              errorDetail = `HTTP ${response.status}: ${errorJson.error.message}`;
-            }
-          } catch {
-            errorDetail = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
-          }
-          console.error("xAI error:", errorText);
-          return { error: errorDetail };
-        }
-
-        const result = await response.json();
-        const content = result.choices?.[0]?.message?.content;
-
-        if (!content) {
-          return { error: "No response from xAI" };
-        }
-
-        // Parse JSON response (structured output guarantees valid JSON)
-        try {
-          const parsed = JSON.parse(content);
-
-          const chunkResult: StructuredMinutes = {
-            meetingId: data.meetingId,
-            attendees: parsed.attendees || [],
-            keyDecisions: parsed.keyDecisions || [],
-            actionItems: parsed.actionItems || [],
-            openQuestions: parsed.openQuestions || [],
-            summary: parsed.summary || "",
-            generatedAt: new Date().toISOString(),
-          };
-
-          chunkResults.push(chunkResult);
-        } catch (error) {
-          console.error("Parse error:", error, content);
-          return { error: "Failed to parse structured minutes" };
-        }
+      
+      // Process chunks with concurrency limit to avoid xAI rate limits
+      // Max 3 concurrent chunk calls to prevent 429 errors
+      const chunkResults: Array<StructuredMinutes | { error: string }> = [];
+      const MAX_CONCURRENT = 3;
+      
+      for (let i = 0; i < chunks.length; i += MAX_CONCURRENT) {
+        const batch = chunks.slice(i, i + MAX_CONCURRENT);
+        const batchPromises = batch.map((chunk, batchIndex) =>
+          processChunkWithTimeout(chunk, i + batchIndex, chunks.length, data.meetingId, apiKey)
+        );
+        const batchResults = await Promise.all(batchPromises);
+        chunkResults.push(...batchResults);
+      }
+      
+      // Check if any chunk failed
+      const failed = chunkResults.find(r => "error" in r);
+      if (failed && "error" in failed) {
+        return failed;
       }
 
       // Merge results from all chunks
-      const merged = mergeStructuredResults(chunkResults);
+      const validResults = chunkResults.filter((r): r is StructuredMinutes => !("error" in r));
+      const merged = mergeStructuredResults(validResults);
 
       // Cache final result
       cache.set(cacheKey, merged);
@@ -292,6 +194,145 @@ ${chunk}`;
       return { error: error.message || "Failed to generate structured minutes" };
     }
   });
+
+/**
+ * Process a single chunk with timeout protection
+ */
+async function processChunkWithTimeout(
+  chunk: string,
+  index: number,
+  totalChunks: number,
+  meetingId: string,
+  apiKey: string
+): Promise<StructuredMinutes | { error: string }> {
+  const chunkLabel = totalChunks > 1 ? ` (part ${index + 1}/${totalChunks})` : "";
+  
+  try {
+    // Generate structured minutes with xAI using structured outputs
+    const prompt = `Parse this meeting transcript${chunkLabel} into structured minutes. Extract only what is explicitly stated - never invent information.${totalChunks > 1 ? "\n\nThis is part of a larger document; extract from this section only." : ""}
+
+Meeting transcript:
+${chunk}`;
+
+    // Use AbortSignal.timeout for fetch timeout (50 seconds per chunk)
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: XAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You extract structured information from meeting notes. Never invent details. Only include what is explicitly stated.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 2000,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "meeting_minutes",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                attendees: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Names explicitly mentioned as attendees",
+                },
+                keyDecisions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      decision: { type: "string" },
+                      source: { type: "string" },
+                    },
+                    required: ["decision", "source"],
+                    additionalProperties: false,
+                  },
+                },
+                actionItems: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      owner: { type: ["string", "null"] },
+                      item: { type: "string" },
+                      dueDate: { type: ["string", "null"] },
+                    },
+                    required: ["owner", "item", "dueDate"],
+                    additionalProperties: false,
+                  },
+                },
+                openQuestions: {
+                  type: "array",
+                  items: { type: "string" },
+                },
+                summary: {
+                  type: "string",
+                  description: "2-3 sentence summary of the meeting",
+                },
+              },
+              required: ["attendees", "keyDecisions", "actionItems", "openQuestions", "summary"],
+              additionalProperties: false,
+            },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(100000), // 100-second timeout per chunk (below 120s function limit)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorDetail = `HTTP ${response.status}: Failed to generate structured minutes`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          errorDetail = `HTTP ${response.status}: ${errorJson.error.message}`;
+        }
+      } catch {
+        errorDetail = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
+      }
+      console.error("xAI error:", errorText);
+      return { error: errorDetail };
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return { error: "No response from xAI" };
+    }
+
+    // Parse JSON response (structured output guarantees valid JSON)
+    const parsed = JSON.parse(content);
+
+    const chunkResult: StructuredMinutes = {
+      meetingId,
+      attendees: parsed.attendees || [],
+      keyDecisions: parsed.keyDecisions || [],
+      actionItems: parsed.actionItems || [],
+      openQuestions: parsed.openQuestions || [],
+      summary: parsed.summary || "",
+      generatedAt: new Date().toISOString(),
+    };
+
+    return chunkResult;
+  } catch (error: any) {
+    console.error(`Chunk ${index + 1} error:`, error);
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      return { error: `Chunk ${index + 1} timed out after 100 seconds` };
+    }
+    return { error: `Chunk ${index + 1} failed: ${error.message}` };
+  }
+}
 
 /**
  * Clear cache for a specific document (useful when document is updated)

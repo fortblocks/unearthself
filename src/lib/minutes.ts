@@ -429,7 +429,7 @@ export const askMinutes = createServerFn({ method: "POST" })
         };
       }
       
-      // Use xAI to answer the question with citations
+      // Use xAI to answer the question with citations (with timeout)
       const prompt = `You are a meeting assistant helping answer questions about Badlander's Development Meetings. 
 
 Here are all the meeting transcripts:
@@ -497,6 +497,7 @@ If you found nothing relevant, return:
           ],
           temperature: 0.1,
         }),
+        signal: AbortSignal.timeout(100000), // 100-second timeout for xAI call
       });
       
       if (!response.ok) {
