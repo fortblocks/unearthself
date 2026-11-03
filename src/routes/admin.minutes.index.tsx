@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listMeetings, getMeetingMinutes, type Meeting } from "@/lib/minutes";
 import { answerQuestion, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
+import { formatMeetingDate } from "@/lib/date-format";
 import { Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/minutes/")({
@@ -358,7 +359,7 @@ function MinutesIndexPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold" title={meeting.title}>
-                      {formatDate(meeting.date)}
+                      {formatMeetingDate(meeting.date)}
                     </p>
                     <Badge tone="new">{badge}</Badge>
                   </div>

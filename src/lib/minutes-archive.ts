@@ -584,17 +584,17 @@ If nothing found:
 
       if (!response.ok) {
         const errorText = await response.text();
-        let errorDetail = "Failed to generate answer";
+        let errorDetail = `HTTP ${response.status}: Failed to generate answer`;
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.error?.message) {
-            errorDetail = errorJson.error.message;
+            errorDetail = `HTTP ${response.status}: ${errorJson.error.message}`;
           }
         } catch {
-          errorDetail = errorText.substring(0, 200);
+          errorDetail = `HTTP ${response.status}: ${errorText.substring(0, 200)}`;
         }
         console.error("xAI error:", errorText);
-        return { error: `xAI API error: ${errorDetail}` };
+        return { error: errorDetail };
       }
 
       const result = await response.json();

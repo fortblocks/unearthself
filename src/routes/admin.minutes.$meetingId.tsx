@@ -5,10 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
 import { generateStructuredMinutes, type StructuredMinutes } from "@/lib/structured-minutes";
+import { formatMeetingDate } from "@/lib/date-format";
+import { detectSeries, SERIES_BADGES } from "@/lib/minutes-archive";
 import { ChevronLeft, ChevronDown, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/admin/minutes/$meetingId")({
   component: MeetingDetailPage,
+  head: ({ loaderData }) => {
+    // @ts-ignore - loaderData type inference issue
+    if (!loaderData || !loaderData.minutes) return {};
+    // @ts-ignore
+    const pageTitle = formatMeetingDate(loaderData.minutes.meeting.date);
+    return {
+      meta: [{ title: `${pageTitle} — Minutes — Unearth Self Desk` }],
+    };
+  },
   loader: async ({ params }) => {
     const minutes = await getMeetingMinutes({ data: { meetingId: params.meetingId } });
     
@@ -69,7 +80,9 @@ function groupActionsByOwner(actions: MeetingAction[]): Record<string, MeetingAc
 }
 
 function MeetingDetailPage() {
-  const { minutes, structured } = Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
+  // @ts-ignore - TanStack Router loader data typing
+  const { minutes, structured } = loaderData || {};
   const [showTranscript, setShowTranscript] = useState(false);
 
   if (!minutes) {
@@ -93,6 +106,8 @@ function MeetingDetailPage() {
   }
 
   const { meeting, fullText } = minutes;
+  const series = detectSeries(meeting.title);
+  const badge = SERIES_BADGES[series];
 
   // Show structured minutes if available, otherwise fallback to transcript
   const hasStructured = structured && !("error" in structured);
@@ -107,11 +122,14 @@ function MeetingDetailPage() {
           <ChevronLeft className="size-4" />
           Back to minutes
         </Link>
-        <h2 className="font-display text-3xl font-black uppercase leading-tight text-balance">
-          {meeting.title}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-3xl font-black uppercase leading-tight text-balance">
+            {formatMeetingDate(meeting.date)}
+          </h2>
+          <Badge tone="new">{badge}</Badge>
+        </div>
         <p className="mt-2 text-sm text-sandstone">
-          {formatDate(meeting.date)} at {formatTime(meeting.time)} MT
+          {formatTime(meeting.time)} MT
         </p>
       </div>
 
@@ -130,7 +148,7 @@ function MeetingDetailPage() {
             <Section kicker="Attendees">
               <div className="border border-line bg-paper p-5">
                 <div className="flex flex-wrap gap-2">
-                  {structured.attendees.map((name, idx) => (
+                  {structured.attendees.map((name: string, idx: number) => (
                     <Badge key={idx} tone="new">{name}</Badge>
                   ))}
                 </div>
@@ -141,7 +159,7 @@ function MeetingDetailPage() {
           {structured.keyDecisions.length > 0 && (
             <Section kicker="Key decisions">
               <div className="space-y-3">
-                {structured.keyDecisions.map((decision, idx) => (
+                {structured.keyDecisions.map((decision: { decision: string; source?: string }, idx: number) => (
                   <div key={idx} className="border border-line bg-paper p-5">
                     <div className="flex items-start gap-3">
                       <div className="size-2 rounded-full bg-ember shrink-0 mt-2" />
@@ -163,7 +181,7 @@ function MeetingDetailPage() {
           {structured.actionItems.length > 0 && (
             <Section kicker="Action items">
               <ul className="divide-y divide-line border-y border-line">
-                {structured.actionItems.map((action, idx) => (
+                {structured.actionItems.map((action: { owner: string | null; item: string; dueDate: string | null }, idx: number) => (
                   <li key={idx} className="flex items-start justify-between gap-4 py-3">
                     <div className="flex items-start gap-3 flex-1">
                       <div className="size-2 rounded-full bg-coal shrink-0 mt-2" />
@@ -192,7 +210,7 @@ function MeetingDetailPage() {
             <Section kicker="Open questions">
               <div className="border border-line bg-paper p-5">
                 <ul className="space-y-2">
-                  {structured.openQuestions.map((question, idx) => (
+                  {structured.openQuestions.map((question: string, idx: number) => (
                     <li key={idx} className="flex items-start gap-2">
                       <span className="text-ember">?</span>
                       <p className="text-sm text-pretty">{question}</p>
