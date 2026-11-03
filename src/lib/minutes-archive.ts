@@ -471,6 +471,9 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
   // Sort by position and merge overlapping regions
   passages.sort((a, b) => a.start - b.start);
   
+  // Cap each passage at 8000 chars to prevent returning entire documents
+  const MAX_PASSAGE_SIZE = 8000;
+  
   const merged: Array<{ start: number; end: number }> = [];
   for (const p of passages) {
     const start = Math.max(0, p.start - contextChars);
@@ -479,7 +482,16 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     if (merged.length === 0 || start > merged[merged.length - 1].end) {
       merged.push({ start, end });
     } else {
-      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, end);
+      // Merge with previous, but cap the size
+      const newEnd = Math.max(merged[merged.length - 1].end, end);
+      const mergedSize = newEnd - merged[merged.length - 1].start;
+      
+      if (mergedSize <= MAX_PASSAGE_SIZE) {
+        merged[merged.length - 1].end = newEnd;
+      } else {
+        // Start a new passage instead of creating a giant merged one
+        merged.push({ start, end });
+      }
     }
   }
   
@@ -609,7 +621,7 @@ export async function searchAndAnswer(
         candidateIds = allDocIds;
       }
       
-      // Get top 15 candidates for better recall
+      // Get candidates - more for temporal queries
       const matchedMeetings = allMeetings.filter(m => candidateIds.has(m.id));
       console.log(`[answerQuestion] ${matchedMeetings.length} matched meetings from Drive search`);
       
@@ -617,7 +629,18 @@ export async function searchAndAnswer(
       const aug20InCandidates = matchedMeetings.some(m => m.id === '14UIO9kglaCR2JX3h1VNByD416SWVP8A-sNmCDXTguxQ');
       console.log(`[answerQuestion] Aug 20 doc in candidates: ${aug20InCandidates}`);
       
-      const files = matchedMeetings.slice(0, 15).map(m => ({
+      // Detect if query is about "first" mentions - if so, prioritize oldest meetings
+      const isTemporalQuery = /\b(first|earliest|initial|originally|when.*first|when.*start|beginning)\b/i.test(question);
+      
+      let selectedMeetings = matchedMeetings;
+      if (isTemporalQuery) {
+        // For "first" queries, sort by date ascending to prioritize oldest
+        selectedMeetings.sort((a, b) => a.date.localeCompare(b.date));
+        console.log(`[answerQuestion] Temporal query detected, sorted by date ascending`);
+      }
+      
+      // Take top 20 candidates (increased from 15 to catch older meetings)
+      const files = selectedMeetings.slice(0, 20).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
@@ -685,9 +708,18 @@ export async function searchAndAnswer(
         };
       }
 
-      // Pick top docs by relevance score
-      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0));
-      console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+      // Sort docs - by date for temporal queries, by relevance otherwise
+      let sortedDocs = documents;
+      if (isTemporalQuery) {
+        // For "first" queries, sort by date ascending
+        sortedDocs.sort((a, b) => a.date.localeCompare(b.date));
+        console.log(`[answerQuestion] Sorted ${sortedDocs.length} docs by date ascending for temporal query`);
+        console.log(`[answerQuestion] Date range: ${sortedDocs[0]?.date} to ${sortedDocs[sortedDocs.length - 1]?.date}`);
+      } else {
+        // Sort by relevance score
+        sortedDocs.sort((a, b) => (b.score || 0) - (a.score || 0));
+        console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+      }
       console.log(`[answerQuestion] Top docs: ${sortedDocs.map(d => `${d.title} (${d.id.slice(0,8)}...)`).join(', ')}`);
       
       // DEBUG: Check if Aug 20 doc is in results
@@ -764,9 +796,10 @@ Instructions:
    - NOT FOUND: Information not available in the records
 3. If there's NO explicit decision but related mentions exist, synthesize an answer like:
    "No explicit decision is recorded. [Topic] was first discussed on [date] in [meeting] by [speaker] ('[quote]'), and has been mentioned in [N] meetings since ([dates]), so the inferred [answer] is [X]."
-4. Include dates, speakers, and verbatim quotes to support your answer
-5. NEVER guess or fabricate information not in the records
-6. Check alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp", "headquarters" vs "HQ")
+4. ALWAYS cite the EXACT date from the meeting header [MEETING: ... on YYYY-MM-DD] - never approximate or infer dates
+5. Include speakers and verbatim quotes to support your answer
+6. NEVER guess or fabricate information not in the records
+7. Check alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp", "headquarters" vs "HQ")
 
 Format as JSON:
 {
