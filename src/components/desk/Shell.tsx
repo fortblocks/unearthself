@@ -49,7 +49,9 @@ const PAGE: Record<string, { kicker: string; title: string }> = {
 };
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const rawPathname = useRouterState({ select: (s) => s.location.pathname });
+  // Normalize pathname: strip trailing slash except for root
+  const pathname = rawPathname === "/" ? "/" : rawPathname.replace(/\/$/, "");
   const lookingAs = useDesk((s) => s.lookingAs);
   const setLookingAs = useDesk((s) => s.setLookingAs);
   const riskAll = useDesk((s) => s.risk);

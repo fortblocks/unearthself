@@ -8,8 +8,13 @@
  * - Open questions
  * - Short summary
  * 
+ * Handles full documents (no truncation):
+ * - Sends entire text to model
+ * - If exceeds context window (~128K tokens), chunks and merges
+ * - Preserves all content for extraction
+ * 
  * Caching: In-memory per documentId + modifiedTime
- * Cost: ~$0.01-0.03 per meeting (modest model, limited tokens)
+ * Cost: ~$0.03-0.10 per meeting (depends on length)
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -40,6 +45,89 @@ function getCacheKey(documentId: string, modifiedTime: string): string {
   return `${documentId}:${modifiedTime}`;
 }
 
+// Rough estimate: 1 token ≈ 4 characters
+// Max context: 128K tokens ≈ 512K chars
+// Leave room for prompt and output: use 400K chars per chunk
+const MAX_CHUNK_SIZE = 400000;
+
+function chunkText(text: string, maxSize: number = MAX_CHUNK_SIZE): string[] {
+  if (text.length <= maxSize) {
+    return [text];
+  }
+
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < text.length) {
+    let end = start + maxSize;
+    
+    // Try to break at paragraph boundary
+    if (end < text.length) {
+      const lastNewline = text.lastIndexOf("\n\n", end);
+      if (lastNewline > start + maxSize * 0.8) {
+        end = lastNewline;
+      }
+    }
+
+    chunks.push(text.slice(start, end));
+    start = end;
+  }
+
+  return chunks;
+}
+
+function mergeStructuredResults(results: StructuredMinutes[]): StructuredMinutes {
+  if (results.length === 0) {
+    return {
+      meetingId: "",
+      attendees: [],
+      keyDecisions: [],
+      actionItems: [],
+      openQuestions: [],
+      summary: "",
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  if (results.length === 1) {
+    return results[0];
+  }
+
+  // Merge attendees (dedupe)
+  const allAttendees = new Set<string>();
+  results.forEach((r) => r.attendees.forEach((a) => allAttendees.add(a)));
+
+  // Merge decisions
+  const allDecisions = results.flatMap((r) => r.keyDecisions);
+
+  // Merge action items (dedupe by text)
+  const actionMap = new Map<string, ActionItem>();
+  results.forEach((r) =>
+    r.actionItems.forEach((item) => {
+      if (!actionMap.has(item.item)) {
+        actionMap.set(item.item, item);
+      }
+    })
+  );
+
+  // Merge questions (dedupe)
+  const questionSet = new Set<string>();
+  results.forEach((r) => r.openQuestions.forEach((q) => questionSet.add(q)));
+
+  // Use first summary or combine
+  const summary = results[0].summary || results.map((r) => r.summary).filter(Boolean).join(" ");
+
+  return {
+    meetingId: results[0].meetingId,
+    attendees: Array.from(allAttendees),
+    keyDecisions: allDecisions,
+    actionItems: Array.from(actionMap.values()),
+    openQuestions: Array.from(questionSet),
+    summary,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 /**
  * Generate structured minutes from raw meeting text
  */
@@ -59,11 +147,19 @@ export const generateStructuredMinutes = createServerFn({ method: "GET" })
     }
 
     try {
-      // Generate structured minutes with xAI
-      const prompt = `Parse this meeting transcript into structured minutes. Extract only what is explicitly stated - never invent information.
+      // Check if we need to chunk the text
+      const chunks = chunkText(data.fullText);
+      const chunkResults: StructuredMinutes[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const chunkLabel = chunks.length > 1 ? ` (part ${i + 1}/${chunks.length})` : "";
+
+        // Generate structured minutes with xAI
+        const prompt = `Parse this meeting transcript${chunkLabel} into structured minutes. Extract only what is explicitly stated - never invent information.
 
 Meeting transcript:
-${data.fullText.slice(0, 8000)} 
+${chunk} 
 
 Return JSON with these sections (omit any section that has no content):
 
@@ -92,67 +188,73 @@ Rules:
 - Decisions and actions should reference the source where practical
 - Keep summary concise (2-3 sentences max)
 - If a section is empty, omit it entirely
-- Action item due dates only if explicitly stated (e.g. "by Friday", "next week")`;
+- Action item due dates only if explicitly stated (e.g. "by Friday", "next week")${chunks.length > 1 ? "\n- This is part of a larger document; extract from this section only" : ""}`;
 
-      const response = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "grok-beta",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You extract structured information from meeting notes. Never invent details. Only include what is explicitly stated.",
-            },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.1,
-          max_tokens: 2000, // Keep costs low
-        }),
-      });
+        const response = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "grok-beta",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You extract structured information from meeting notes. Never invent details. Only include what is explicitly stated.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.1,
+            max_tokens: 2000,
+          }),
+        });
 
-      if (!response.ok) {
-        console.error("xAI error:", await response.text());
-        return { error: "Failed to generate structured minutes" };
+        if (!response.ok) {
+          console.error("xAI error:", await response.text());
+          return { error: "Failed to generate structured minutes" };
+        }
+
+        const result = await response.json();
+        const content = result.choices?.[0]?.message?.content;
+
+        if (!content) {
+          return { error: "No response from xAI" };
+        }
+
+        // Parse JSON response
+        try {
+          let jsonStr = content;
+          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+          if (jsonMatch) jsonStr = jsonMatch[1];
+
+          const parsed = JSON.parse(jsonStr);
+
+          const chunkResult: StructuredMinutes = {
+            meetingId: data.meetingId,
+            attendees: parsed.attendees || [],
+            keyDecisions: parsed.keyDecisions || [],
+            actionItems: parsed.actionItems || [],
+            openQuestions: parsed.openQuestions || [],
+            summary: parsed.summary || "",
+            generatedAt: new Date().toISOString(),
+          };
+
+          chunkResults.push(chunkResult);
+        } catch (error) {
+          console.error("Parse error:", error, content);
+          return { error: "Failed to parse structured minutes" };
+        }
       }
 
-      const result = await response.json();
-      const content = result.choices?.[0]?.message?.content;
+      // Merge results from all chunks
+      const merged = mergeStructuredResults(chunkResults);
 
-      if (!content) {
-        return { error: "No response from xAI" };
-      }
+      // Cache final result
+      cache.set(cacheKey, merged);
 
-      // Parse JSON response
-      try {
-        let jsonStr = content;
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-        if (jsonMatch) jsonStr = jsonMatch[1];
-
-        const parsed = JSON.parse(jsonStr);
-
-        const structured: StructuredMinutes = {
-          meetingId: data.meetingId,
-          attendees: parsed.attendees || [],
-          keyDecisions: parsed.keyDecisions || [],
-          actionItems: parsed.actionItems || [],
-          openQuestions: parsed.openQuestions || [],
-          summary: parsed.summary || "",
-          generatedAt: new Date().toISOString(),
-        };
-
-        // Cache result
-        cache.set(cacheKey, structured);
-
-        return structured;
-      } catch (error) {
-        console.error("Parse error:", error, content);
-        return { error: "Failed to parse structured minutes" };
-      }
+      return merged;
     } catch (error: any) {
       console.error("Generation error:", error);
       return { error: error.message || "Failed to generate structured minutes" };

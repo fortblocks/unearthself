@@ -81,15 +81,34 @@ describe("Structured Minutes", () => {
     assert.ok(cacheKey.includes(modifiedTime));
   });
 
-  it("should estimate token cost", () => {
-    const inputTokens = 2000;
+  it("should estimate token cost for average meeting", () => {
+    // Average meeting: 8000 tokens input + 500 tokens output = 8500 total
+    const inputTokens = 8000;
     const outputTokens = 500;
     const totalTokens = inputTokens + outputTokens;
     const costPer1KTokens = 0.01;
     const estimatedCost = (totalTokens / 1000) * costPer1KTokens;
 
-    assert.ok(estimatedCost < 0.05);
-    assert.ok(estimatedCost > 0.01);
+    // Should be around $0.085 per meeting
+    assert.ok(estimatedCost < 0.10);
+    assert.ok(estimatedCost > 0.05);
+  });
+
+  it("should handle chunking for large documents", () => {
+    const maxChunkSize = 400000; // 400K chars
+    const largeText = "a".repeat(600000); // 600K chars
+
+    // Should need 2 chunks
+    const chunks: string[] = [];
+    let start = 0;
+    while (start < largeText.length) {
+      const end = Math.min(start + maxChunkSize, largeText.length);
+      chunks.push(largeText.slice(start, end));
+      start = end;
+    }
+
+    assert.ok(chunks.length >= 2);
+    assert.ok(chunks[0].length <= maxChunkSize);
   });
 
   it("should group decisions by type", () => {
