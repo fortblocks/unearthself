@@ -608,7 +608,7 @@ export async function searchAndAnswer(
       
       // Build Drive search with stop word filtering
       const searchStart = Date.now();
-      const stopWords = new Set(['what', 'when', 'where', 'who', 'how', 'why', 'was', 'were', 'is', 'are', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now', 'name', 'named', 'call', 'called', 'agreed', 'decided']);
+      const stopWords = new Set(['what', 'when', 'where', 'who', 'how', 'why', 'was', 'were', 'is', 'are', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now']);
       
       const queryWords = question.toLowerCase()
         .split(/\s+/)
@@ -866,7 +866,9 @@ IMPORTANT:
 - Prefer building inferred answers from evidence over returning "not found"
 - Use "notFound: true" ONLY when absolutely no relevant mentions exist
 - Always include verbatim quotes and dates to support claims
-- Set confidence based on evidence quality: high (explicit decision), medium (inferred from multiple mentions), low (single mention or uncertain)`;
+- Set confidence based on evidence quality: high (explicit decision with clear quote), medium (inferred from multiple mentions), low (single mention, uncertain, or not found)
+- NEVER use "high" confidence with "notFound: true"
+- NEVER cite sources that claim nothing exists - only cite actual mentions with verbatim excerpts`;
 
       const xaiStart = Date.now();
       console.log(`[answerQuestion] Starting xAI request (context: ${fullContextText.length} chars)...`);
@@ -920,19 +922,29 @@ IMPORTANT:
 
       const parsed = JSON.parse(jsonStr);
       
-      // Add documentId to sources
-      const sourcesWithIds = (parsed.sources || []).map((s: any) => {
-        const doc = documents.find((d) => d.title === s.documentTitle);
-        return {
-          ...s,
-          documentId: doc?.id || "",
-        };
-      });
+      // Add documentId to sources and filter out invented sources
+      const sourcesWithIds = (parsed.sources || [])
+        .map((s: any) => {
+          const doc = documents.find((d) => d.title === s.documentTitle);
+          return {
+            ...s,
+            documentId: doc?.id || "",
+          };
+        })
+        // Filter out sources without valid document IDs (invented by model)
+        .filter((s: any) => s.documentId && s.documentId.length > 0);
+      
+      // Enforce: never allow HIGH confidence on "not found" answers
+      let confidence = parsed.confidence || "medium";
+      if ((parsed.notFound || sourcesWithIds.length === 0) && confidence === "high") {
+        console.log(`[answerQuestion] Downgrading confidence from HIGH to LOW (notFound or no sources)`);
+        confidence = "low";
+      }
 
       console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
       return {
         answer: parsed.answer,
-        confidence: parsed.confidence || "medium",
+        confidence,
         sources: sourcesWithIds,
         notFound: parsed.notFound || false,
       };
