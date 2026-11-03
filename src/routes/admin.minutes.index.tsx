@@ -109,12 +109,24 @@ function MinutesIndexPage() {
       let answerResult: AnswerResult | null = null;
       let searchError: string | null = null;
 
-      // Run AI answer (unless simple query) and keyword search in parallel
-      const [aiResult, keywordResults] = await Promise.all([
-        skipAI
-          ? Promise.resolve(null)
-          : answerQuestion({ data: { question: q } }).catch(() => null),
-        searchMeetings(q, meetings),
+      // Add 15-second client timeout
+      const CLIENT_TIMEOUT = 15000;
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Client timeout after 15 seconds')), CLIENT_TIMEOUT)
+      );
+
+      // Run AI answer (unless simple query) and keyword search in parallel with timeout
+      const [aiResult, keywordResults] = await Promise.race([
+        Promise.all([
+          skipAI
+            ? Promise.resolve(null)
+            : answerQuestion({ data: { question: q } }).catch((e) => {
+                console.error('Search error:', e);
+                return { error: e.message || 'Search failed' };
+              }),
+          searchMeetings(q, meetings),
+        ]),
+        timeoutPromise.then(() => [{ error: 'Search timed out. Try a more specific question.' } as const, [] as Array<{ meeting: Meeting; excerpt?: string }>] as const),
       ]);
 
       // Process AI result
