@@ -1,12 +1,10 @@
-import { answerQuestion } from "./src/lib/minutes-archive";
+import { searchAndAnswer } from "./src/lib/minutes-archive";
 
 async function test() {
   console.log("Testing search for spa headquarters naming decision...\n");
   
   const startTime = Date.now();
-  const result = await answerQuestion({ 
-    data: { question: "what was decided name for spa headquarters" } 
-  });
+  const result = await searchAndAnswer("what was decided name for spa headquarters");
   const duration = Date.now() - startTime;
   
   console.log(`Duration: ${duration}ms`);

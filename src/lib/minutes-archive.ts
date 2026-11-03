@@ -525,11 +525,13 @@ export const searchMeetingsKeywords = createServerFn({ method: "POST" })
     }
   });
 
-export const answerQuestion = createServerFn({ method: "POST" })
-  .validator((d: { question: string; series?: MeetingSeries }) => d)
-  .handler(async ({ data }): Promise<AnswerResult | { error: string }> => {
-    const startTime = Date.now();
-    console.log(`[answerQuestion] Starting query: "${data.question}"`);
+// Core search logic that can be tested independently
+export async function searchAndAnswer(
+  question: string,
+  series?: MeetingSeries
+): Promise<AnswerResult | { error: string }> {
+  const startTime = Date.now();
+  console.log(`[answerQuestion] Starting query: "${question}"`);
     
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
@@ -561,7 +563,7 @@ export const answerQuestion = createServerFn({ method: "POST" })
       
       // Broaden search with synonyms and key terms
       const searchStart = Date.now();
-      const queryLower = data.question.toLowerCase();
+      const queryLower = question.toLowerCase();
       const baseWords = queryLower.split(/\s+/).filter(w => w.length > 3);
       
       // Add synonyms for common terms
@@ -621,7 +623,7 @@ export const answerQuestion = createServerFn({ method: "POST" })
       const exportResults = await Promise.all(
         files.map(async (file) => {
           if (!file.id || !file.name) return null;
-          if (data.series && detectSeries(file.name) !== data.series) return null;
+          if (series && detectSeries(file.name) !== series) return null;
           
           try {
             const exportResponse = await drive.files.export(
@@ -654,7 +656,7 @@ export const answerQuestion = createServerFn({ method: "POST" })
                 indexedAt: new Date().toISOString(),
               })),
               indexedAt: new Date().toISOString(),
-              score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
+              score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), question),
             };
           } catch (error) {
             console.error(`Failed to process ${file.id}:`, error);
@@ -695,7 +697,7 @@ export const answerQuestion = createServerFn({ method: "POST" })
       
       const passagesText = sortedDocs
         .map((d) => {
-          const passages = extractRelevantPassages(d.fullText, data.question, 5, Math.min(2000, passagesPerDoc));
+          const passages = extractRelevantPassages(d.fullText, question, 5, Math.min(2000, passagesPerDoc));
           return `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
         })
         .join("\n");
@@ -709,9 +711,9 @@ PRIORITIZE DECISIONS AND ACTION ITEMS:
 ${decisionsText}
 
 RELEVANT PASSAGES (Top ${sortedDocs.length} meetings):
-${passagesText} 
+${passagesText}
 
-Question: ${data.question}
+Question: ${question}
 
 Instructions:
 1. Answer the question DIRECTLY and CONCISELY
@@ -829,6 +831,13 @@ If nothing found:
       
       return { error: error.message || "Failed to answer question" };
     }
+}
+
+// Server function wrapper
+export const answerQuestion = createServerFn({ method: "POST" })
+  .validator((d: { question: string; series?: MeetingSeries }) => d)
+  .handler(async ({ data }) => {
+    return searchAndAnswer(data.question, data.series);
   });
 
 /**
