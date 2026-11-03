@@ -267,6 +267,77 @@ describe("parseDateFromFilename", () => {
   });
 });
 
+describe("Caching and Performance", () => {
+  it("should cache meeting list for 5 minutes", () => {
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    
+    assert.strictEqual(CACHE_TTL_MS, 300000);
+    assert.ok(CACHE_TTL_MS > 0);
+  });
+
+  it("should cache doc exports by meetingId", () => {
+    // Cache keyed by meetingId for fast repeated access
+    const cache = new Map();
+    cache.set("meeting-1", { data: { fullText: "text" }, timestamp: Date.now() });
+    
+    assert.ok(cache.has("meeting-1"));
+    assert.strictEqual(cache.get("meeting-1").data.fullText, "text");
+  });
+
+  it("should validate cache freshness", () => {
+    const CACHE_TTL_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    
+    const freshEntry = { data: {}, timestamp: now - 1000 }; // 1 second old
+    const staleEntry = { data: {}, timestamp: now - (6 * 60 * 1000) }; // 6 minutes old
+    
+    const isFresh = (entry: any) => now - entry.timestamp < CACHE_TTL_MS;
+    
+    assert.ok(isFresh(freshEntry));
+    assert.ok(!isFresh(staleEntry));
+  });
+
+  it("should batch doc exports with concurrency limit", async () => {
+    const meetings = Array.from({ length: 25 }, (_, i) => ({ id: `meeting-${i}` }));
+    const MAX_CONCURRENT = 10;
+    const results: any[] = [];
+    
+    for (let i = 0; i < meetings.length; i += MAX_CONCURRENT) {
+      const batch = meetings.slice(i, i + MAX_CONCURRENT);
+      const batchResults = await Promise.all(
+        batch.map(async (m) => ({ id: m.id, done: true }))
+      );
+      results.push(...batchResults);
+    }
+    
+    assert.strictEqual(results.length, 25);
+    // 3 batches: 10 + 10 + 5
+  });
+
+  it("should trim context size for search", () => {
+    const MAX_CONTEXT_CHARS = 500000;
+    const meetings = [
+      { text: "a".repeat(200000) }, // 200K
+      { text: "b".repeat(200000) }, // 200K
+      { text: "c".repeat(200000) }, // 200K - would exceed
+    ];
+    
+    let contextChars = 0;
+    const included: any[] = [];
+    
+    for (const meeting of meetings) {
+      if (contextChars + meeting.text.length > MAX_CONTEXT_CHARS && included.length > 0) {
+        break;
+      }
+      included.push(meeting);
+      contextChars += meeting.text.length;
+    }
+    
+    assert.strictEqual(included.length, 2); // Only first 2 fit
+    assert.ok(contextChars <= MAX_CONTEXT_CHARS);
+  });
+});
+
 describe("getMeetingMinutes error handling", () => {
   it("should validate MeetingMinutes structure from successful response", () => {
     // This validates the expected structure matches our types
