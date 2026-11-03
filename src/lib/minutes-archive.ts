@@ -457,31 +457,65 @@ export const answerQuestion = createServerFn({ method: "POST" })
     console.log(`[answerQuestion] Drive client init: ${Date.now() - driveStart}ms`);
 
     try {
-      // Use Drive full-text search to preselect candidate docs (FAST: ~200-500ms)
-      const searchStart = Date.now();
-      const queryWords = data.question.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
-      const searchQuery = queryWords.length > 0 
-        ? `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false and (${queryWords.map(w => `fullText contains '${w}'`).join(' or ')})`
-        : `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`;
+      // Get all meetings using the same recursive search as listMeetings
+      // This ensures we cover subfolders (meetings after Aug 25)
+      const { listMeetings } = await import("./minutes");
+      const allMeetings = await listMeetings();
+      console.log(`[answerQuestion] Retrieved ${allMeetings.length} total meetings from listMeetings`);
       
-      const searchResponse = await drive.files.list({
-        q: searchQuery,
-        fields: "files(id, name, createdTime, modifiedTime)",
-        pageSize: 20, // Top 20 candidates from Drive search
-        orderBy: "modifiedTime desc",
-      });
-      
-      console.log(`[answerQuestion] Drive search: ${Date.now() - searchStart}ms (${searchResponse.data.files?.length || 0} candidates)`);
-      
-      const files = searchResponse.data.files || [];
-      if (files.length === 0) {
+      if (allMeetings.length === 0) {
         return {
-          answer: "No meeting records found matching your question.",
+          answer: "No meeting records are available yet.",
           confidence: "high",
           sources: [],
           notFound: true,
         };
       }
+      
+      // Extract all doc IDs for filtering
+      const allDocIds = new Set(allMeetings.map(m => m.id));
+      
+      // Use Drive full-text search across ALL docs (no parent filter to avoid missing subfolders)
+      // Then filter results to our known doc set
+      const searchStart = Date.now();
+      const queryWords = data.question.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
+      
+      let candidateIds: Set<string>;
+      
+      if (queryWords.length > 0) {
+        // Try Drive full-text search first (fast when it works)
+        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${queryWords.map(w => `fullText contains '${w}'`).join(' or ')})`;
+        
+        const searchResponse = await drive.files.list({
+          q: searchQuery,
+          fields: "files(id)",
+          pageSize: 100, // Get more candidates since we're searching all Drive
+        });
+        
+        const driveResults = searchResponse.data.files || [];
+        console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results)`);
+        
+        // Filter to our known doc set
+        candidateIds = new Set(driveResults.map(f => f.id).filter(id => id && allDocIds.has(id)) as string[]);
+        console.log(`[answerQuestion] Filtered to ${candidateIds.size} candidates in our doc set`);
+        
+        // Fallback: if Drive returns 0 results, use keyword scoring over all meetings
+        if (candidateIds.size === 0) {
+          console.log(`[answerQuestion] Drive returned 0 results, falling back to keyword scoring over all ${allMeetings.length} meetings`);
+          candidateIds = allDocIds;
+        }
+      } else {
+        // No useful keywords, search all
+        candidateIds = allDocIds;
+      }
+      
+      // Get file metadata for candidates
+      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 20).map(m => ({
+        id: m.id,
+        name: m.title,
+        createdTime: m.createdTime,
+        modifiedTime: m.modifiedTime,
+      }));
 
       // Export and score candidates (max 20 docs instead of 83)
       const exportStart = Date.now();
