@@ -436,14 +436,6 @@ function scoreDocRelevance(text: string, query: string): number {
     score += Math.log(1 + matches) * 2;
   }
   
-  // BOOST: Heavily boost docs containing specific answer terms
-  const answerTerms = ['basecamp', 'base camp'];
-  for (const term of answerTerms) {
-    if (lowerText.includes(term)) {
-      score += 20; // Large boost for answer-related terms
-    }
-  }
-  
   return score;
 }
 
@@ -577,8 +569,8 @@ export async function searchAndAnswer(
       
       // Add synonyms for common terms
       const synonymMap: Record<string, string[]> = {
-        'spa': ['spa', 'wellness', 'retreat', 'basecamp'],
-        'headquarters': ['headquarters', 'office', 'location', 'base', 'basecamp'],
+        'spa': ['spa', 'wellness', 'retreat'],
+        'headquarters': ['headquarters', 'office', 'location', 'base'],
         'name': ['name', 'named', 'call', 'called', 'naming'],
         'decided': ['decided', 'decision', 'agreed', 'agreement'],
       };
@@ -590,11 +582,6 @@ export async function searchAndAnswer(
           synonymMap[word].forEach(syn => expandedTerms.add(syn));
         }
       });
-      
-      // Always include "Basecamp" for spa/headquarters queries
-      if (queryLower.includes('spa') || queryLower.includes('headquarters') || queryLower.includes('hq')) {
-        expandedTerms.add('basecamp');
-      }
       
       const searchTerms = Array.from(expandedTerms).slice(0, 15);
       let candidateIds: Set<string>;
