@@ -11,31 +11,6 @@ import { listMeetings, getMeetingMinutes, type MeetingAction } from "@/lib/minut
 export const Route = createFileRoute("/admin/")({
   component: TodayPage,
   head: () => ({ meta: [{ title: "Today — Unearth Self Desk" }] }),
-  loader: async () => {
-    try {
-      const meetings = await listMeetings();
-      const allActions: Array<MeetingAction & { meetingId: string; meetingDate: string }> = [];
-      
-      for (const meeting of meetings) {
-        const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
-        if (minutes) {
-          minutes.actions.forEach((action) => {
-            if (!action.completed) {
-              allActions.push({
-                ...action,
-                meetingId: meeting.id,
-                meetingDate: meeting.date,
-              });
-            }
-          });
-        }
-      }
-      
-      return { minutesActions: allActions };
-    } catch {
-      return { minutesActions: [] };
-    }
-  },
 });
 
 function occupiedToday(checkIn: string, checkOut: string) {
@@ -43,7 +18,6 @@ function occupiedToday(checkIn: string, checkOut: string) {
 }
 
 function TodayPage() {
-  const { minutesActions } = Route.useLoaderData();
   const lookingAs = useDesk((s) => s.lookingAs);
   const stays = useDesk((s) => s.stays);
   const slots = useDesk((s) => s.slots);
@@ -58,12 +32,6 @@ function TodayPage() {
   const mineLeads = open.filter((l) => l.owner === lookingAs);
   const mineRisk = risk.filter((r) => r.owner === lookingAs);
   const norahFirst = lookingAs === "norah";
-  
-  // Filter actions for current partner (match by first name)
-  const partnerFirstName = partnerFirst(lookingAs);
-  const mineMinutesActions = minutesActions.filter((action) => 
-    action.owner && action.owner.toLowerCase().includes(lookingAs.toLowerCase())
-  );
 
   const keys = (
     <Section kicker="Arrivals and keys">
@@ -144,34 +112,16 @@ function TodayPage() {
         <Stat label="Open risk" value={String(risk.length)} hint="Waivers, weather, cover" />
       </section>
 
-      {mineLeads.length + mineRisk.length + mineMinutesActions.length > 0 ? (
+      {mineLeads.length + mineRisk.length > 0 ? (
         <Section 
           kicker={`On ${partnerFirst(lookingAs)}`}
           action={
-            mineMinutesActions.length > 0 ? (
-              <Link to="/admin/minutes" className="text-sm font-semibold text-ember">
-                All minutes
-              </Link>
-            ) : undefined
+            <Link to="/admin/minutes" className="text-sm font-semibold text-ember">
+              All minutes
+            </Link>
           }
         >
           <ul className="divide-y divide-line border-y border-line">
-            {mineMinutesActions.map((action, idx) => (
-              <li key={`action-${idx}`} className="flex items-start justify-between gap-4 py-3">
-                <div>
-                  <p className="font-semibold">Meeting action</p>
-                  <p className="text-sm text-pretty text-muted">{action.text}</p>
-                  <p className="text-xs text-sandstone mt-1">From {action.meetingDate}</p>
-                </div>
-                <Link
-                  to="/admin/minutes/$meetingId"
-                  params={{ meetingId: action.meetingId }}
-                  className="text-xs font-semibold text-ember hover:underline shrink-0"
-                >
-                  View
-                </Link>
-              </li>
-            ))}
             {mineLeads.map((l) => (
               <li key={l.id} className="flex items-start justify-between gap-4 py-3">
                 <div>
