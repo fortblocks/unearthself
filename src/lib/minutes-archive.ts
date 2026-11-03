@@ -8,6 +8,9 @@
  *    "You decided on red for that room, from the February 19th meeting"
  * 4. If no decision found, say so plainly - never guess
  * 
+ */
+
+import { XAI_MODEL } from "./structured-minutes.ts";
  * Architecture:
  * 1. Backfill: Extract decisions/actions from all docs, embed separately
  * 2. Incremental: Re-index only changed documents
@@ -568,7 +571,7 @@ If nothing found:
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "grok-beta",
+          model: XAI_MODEL,
           messages: [
             {
               role: "system",
@@ -582,8 +585,18 @@ If nothing found:
       });
 
       if (!response.ok) {
-        console.error("xAI error:", await response.text());
-        return { error: "Failed to generate answer" };
+        const errorText = await response.text();
+        let errorDetail = "Failed to generate answer";
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorDetail = errorJson.error.message;
+          }
+        } catch {
+          errorDetail = errorText.substring(0, 200);
+        }
+        console.error("xAI error:", errorText);
+        return { error: `xAI API error: ${errorDetail}` };
       }
 
       const result = await response.json();

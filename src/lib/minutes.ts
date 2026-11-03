@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { XAI_MODEL } from "./structured-minutes.ts";
 
 export type Meeting = {
   id: string;
@@ -41,35 +42,23 @@ function extractDateTimeFromTitle(title: string): { date: string; time: string }
   return null;
 }
 
-function parseGeminiNotesForDateTime(text: string): { date: string; time: string } | null {
-  // Look for patterns like "Meeting started at 10:30 AM on June 23, 2026"
-  // or similar patterns in the Gemini notes
-  const patterns = [
-    /(?:started|held|occurred)\s+(?:at|on)\s+(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s+(?:on\s+)?(\w+\s+\d{1,2},?\s+\d{4})/i,
-    /(\w+\s+\d{1,2},?\s+\d{4})\s+at\s+(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      try {
-        // Parse the date and time
-        const dateStr = match[2] || match[1];
-        const timeStr = match[1]?.includes(":") ? match[1] : match[2];
-        
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          return {
-            date: date.toISOString().split("T")[0],
-            time: timeStr || "00:00",
-          };
-        }
-      } catch {
-        // Continue to next pattern
-      }
-    }
+/**
+ * Parse date/time from Gemini file name
+ * Format: "Badlander's Development Meeting - 2026/10/29 17:00 MDT - Notes by Gemini"
+ */
+export function parseDateFromFilename(filename: string): { date: string; time: string } | null {
+  // Pattern: YYYY/MM/DD HH:MM
+  const pattern = /(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/;
+  const match = filename.match(pattern);
+  
+  if (match) {
+    const [_, year, month, day, hour, minute] = match;
+    return {
+      date: `${year}-${month}-${day}`,
+      time: `${hour}:${minute}`,
+    };
   }
-
+  
   return null;
 }
 
@@ -179,39 +168,43 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
   }
   
   try {
-    // Search for files with "Badlander's Development Meeting" in the title within the folder
-    const response = await drive.files.list({
-      q: `'${FOLDER_ID}' in parents and name contains 'Badlander' and mimeType='application/vnd.google-apps.document' and trashed=false`,
-      fields: "files(id, name, createdTime, modifiedTime)",
-      orderBy: "createdTime desc",
-      pageSize: 100,
-    });
-    
-    const files = response.data.files || [];
     const meetings: Meeting[] = [];
+    let pageToken: string | undefined;
     
-    for (const file of files) {
-      if (!file.id || !file.name) continue;
+    // Paginate through all files
+    do {
+      const response = await drive.files.list({
+        q: `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`,
+        fields: "nextPageToken, files(id, name, createdTime, modifiedTime)",
+        orderBy: "createdTime desc",
+        pageSize: 100,
+        pageToken,
+      });
       
-      // Try to get the document text to parse meeting date/time
-      try {
-        const exportResponse = await drive.files.export({
-          fileId: file.id,
-          mimeType: "text/plain",
-        }, { responseType: "text" });
+      const files = response.data.files || [];
+      
+      for (const file of files) {
+        if (!file.id || !file.name) continue;
         
-        const text = String(exportResponse.data);
-        const parsedDateTime = parseGeminiNotesForDateTime(text);
+        // Parse date from filename first (fast, no API call)
+        const parsedDateTime = parseDateFromFilename(file.name);
         
-        // Fallback to file creation time if we can't parse from content
-        const createdDate = new Date(file.createdTime || "");
-        const fallbackDate = createdDate.toISOString().split("T")[0];
-        const fallbackTime = createdDate.toLocaleTimeString("en-US", {
-          timeZone: "America/Edmonton",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
+        // Fallback to createdTime in America/Edmonton timezone
+        let fallbackDate = "";
+        let fallbackTime = "00:00";
+        
+        if (file.createdTime) {
+          const createdDate = new Date(file.createdTime);
+          fallbackDate = createdDate.toLocaleDateString("en-CA", {
+            timeZone: "America/Edmonton",
+          }); // YYYY-MM-DD format
+          fallbackTime = createdDate.toLocaleTimeString("en-US", {
+            timeZone: "America/Edmonton",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+        }
         
         meetings.push({
           id: file.id,
@@ -221,25 +214,10 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
           createdTime: file.createdTime || "",
           modifiedTime: file.modifiedTime || "",
         });
-      } catch (error) {
-        console.error(`Failed to export file ${file.id}:`, error);
-        // Add with fallback times
-        const createdDate = new Date(file.createdTime || "");
-        meetings.push({
-          id: file.id,
-          title: file.name || "",
-          date: createdDate.toISOString().split("T")[0],
-          time: createdDate.toLocaleTimeString("en-US", {
-            timeZone: "America/Edmonton",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          }),
-          createdTime: file.createdTime || "",
-          modifiedTime: file.modifiedTime || "",
-        });
       }
-    }
+      
+      pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
     
     // Sort by date desc
     meetings.sort((a, b) => {
@@ -413,7 +391,7 @@ If you found nothing relevant, return:
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "grok-beta",
+          model: XAI_MODEL,
           messages: [
             {
               role: "system",
@@ -429,8 +407,18 @@ If you found nothing relevant, return:
       });
       
       if (!response.ok) {
-        console.error("xAI API error:", await response.text());
-        return { error: "Failed to get answer from xAI" };
+        const errorText = await response.text();
+        let errorDetail = "Failed to get answer from xAI";
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorDetail = errorJson.error.message;
+          }
+        } catch {
+          errorDetail = errorText.substring(0, 200);
+        }
+        console.error("xAI API error:", errorText);
+        return { error: `xAI API error: ${errorDetail}` };
       }
       
       const result = await response.json();

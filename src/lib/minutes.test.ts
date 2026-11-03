@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import type { Meeting, MeetingMinutes, MeetingAction } from "./minutes";
+import type { Meeting, MeetingMinutes, MeetingAction } from "./minutes.ts";
+import { parseDateFromFilename } from "./minutes.ts";
 
 describe("Minutes data structures", () => {
   it("should have valid Meeting structure", () => {
@@ -176,5 +177,57 @@ Action Items:
       assert.ok(meeting.date);
       assert.ok(meeting.time);
     });
+  });
+});
+
+describe("parseDateFromFilename", () => {
+  it("should parse standard Gemini filename format", () => {
+    const filename = "Badlander's Development Meeting - 2026/10/29 17:00 MDT - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-10-29");
+    assert.strictEqual(result.time, "17:00");
+  });
+
+  it("should parse morning meeting time", () => {
+    const filename = "Badlander's Development Meeting - 2026/11/01 09:30 MDT - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-11-01");
+    assert.strictEqual(result.time, "09:30");
+  });
+
+  it("should parse different month", () => {
+    const filename = "Badlander's Development Meeting - 2026/01/15 14:45 MST - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-01-15");
+    assert.strictEqual(result.time, "14:45");
+  });
+
+  it("should return null for filename without date pattern", () => {
+    const filename = "Badlander's Development Meeting - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.strictEqual(result, null);
+  });
+
+  it("should return null for malformed date", () => {
+    const filename = "Meeting - 2026-10-29 17:00 - Notes";
+    const result = parseDateFromFilename(filename);
+    
+    assert.strictEqual(result, null);
+  });
+
+  it("should parse date with different timezone suffix", () => {
+    const filename = "Partner Meeting - 2026/12/25 16:00 PST - Notes by Gemini";
+    const result = parseDateFromFilename(filename);
+    
+    assert.ok(result);
+    assert.strictEqual(result.date, "2026-12-25");
+    assert.strictEqual(result.time, "16:00");
   });
 });
