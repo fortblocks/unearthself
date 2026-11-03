@@ -15,6 +15,31 @@ export const Route = createFileRoute("/admin/minutes/")({
     const meetings = await listMeetings();
     return { meetings };
   },
+  pendingComponent: () => (
+    <div className="grid gap-10">
+      <Section kicker="Badlander's Development Meetings">
+        <div className="border border-line bg-paper p-8 text-center">
+          <Loader2 className="mx-auto size-8 animate-spin text-sandstone" />
+          <p className="mt-4 text-sm text-muted">Loading meetings…</p>
+        </div>
+      </Section>
+    </div>
+  ),
+  errorComponent: ({ error, reset }) => (
+    <div className="grid gap-10">
+      <Section kicker="Badlander's Development Meetings">
+        <div className="border border-line bg-paper p-8 text-center">
+          <p className="text-lg font-semibold text-ember">Couldn't load meetings</p>
+          <p className="mt-2 text-sm text-muted max-w-prose mx-auto">
+            {error instanceof Error ? error.message : "An error occurred while loading meetings"}
+          </p>
+          <Button onClick={() => reset()} className="mt-4">
+            Try again
+          </Button>
+        </div>
+      </Section>
+    </div>
+  ),
 });
 
 function formatDate(dateStr: string): string {

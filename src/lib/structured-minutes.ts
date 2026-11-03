@@ -19,6 +19,9 @@
 
 import { createServerFn } from "@tanstack/react-start";
 
+// xAI model for structured extraction
+export const XAI_MODEL = "grok-2-1212";
+
 export type ActionItem = {
   owner: string | null;
   item: string;
@@ -155,40 +158,11 @@ export const generateStructuredMinutes = createServerFn({ method: "GET" })
         const chunk = chunks[i];
         const chunkLabel = chunks.length > 1 ? ` (part ${i + 1}/${chunks.length})` : "";
 
-        // Generate structured minutes with xAI
-        const prompt = `Parse this meeting transcript${chunkLabel} into structured minutes. Extract only what is explicitly stated - never invent information.
+        // Generate structured minutes with xAI using structured outputs
+        const prompt = `Parse this meeting transcript${chunkLabel} into structured minutes. Extract only what is explicitly stated - never invent information.${chunks.length > 1 ? "\n\nThis is part of a larger document; extract from this section only." : ""}
 
 Meeting transcript:
-${chunk} 
-
-Return JSON with these sections (omit any section that has no content):
-
-{
-  "attendees": ["Name1", "Name2"], // Only names explicitly mentioned as attendees
-  "keyDecisions": [
-    {
-      "decision": "Brief statement of what was decided",
-      "source": "Verbatim quote or citation from the notes"
-    }
-  ],
-  "actionItems": [
-    {
-      "owner": "Name or null", // Only if owner is stated
-      "item": "What needs to be done",
-      "dueDate": "YYYY-MM-DD or null" // Only if due date explicitly mentioned
-    }
-  ],
-  "openQuestions": ["Question that needs resolution"],
-  "summary": "2-3 sentence summary of the meeting"
-}
-
-Rules:
-- Only include sections that have content
-- Never make up or assume information
-- Decisions and actions should reference the source where practical
-- Keep summary concise (2-3 sentences max)
-- If a section is empty, omit it entirely
-- Action item due dates only if explicitly stated (e.g. "by Friday", "next week")${chunks.length > 1 ? "\n- This is part of a larger document; extract from this section only" : ""}`;
+${chunk}`;
 
         const response = await fetch("https://api.x.ai/v1/chat/completions", {
           method: "POST",
@@ -197,7 +171,7 @@ Rules:
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "grok-beta",
+            model: XAI_MODEL,
             messages: [
               {
                 role: "system",
@@ -208,12 +182,74 @@ Rules:
             ],
             temperature: 0.1,
             max_tokens: 2000,
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "meeting_minutes",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    attendees: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Names explicitly mentioned as attendees",
+                    },
+                    keyDecisions: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          decision: { type: "string" },
+                          source: { type: "string" },
+                        },
+                        required: ["decision", "source"],
+                        additionalProperties: false,
+                      },
+                    },
+                    actionItems: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          owner: { type: ["string", "null"] },
+                          item: { type: "string" },
+                          dueDate: { type: ["string", "null"] },
+                        },
+                        required: ["owner", "item", "dueDate"],
+                        additionalProperties: false,
+                      },
+                    },
+                    openQuestions: {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                    summary: {
+                      type: "string",
+                      description: "2-3 sentence summary of the meeting",
+                    },
+                  },
+                  required: ["attendees", "keyDecisions", "actionItems", "openQuestions", "summary"],
+                  additionalProperties: false,
+                },
+              },
+            },
           }),
         });
 
         if (!response.ok) {
-          console.error("xAI error:", await response.text());
-          return { error: "Failed to generate structured minutes" };
+          const errorText = await response.text();
+          let errorDetail = "Failed to generate structured minutes";
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error?.message) {
+              errorDetail = errorJson.error.message;
+            }
+          } catch {
+            errorDetail = errorText.substring(0, 200);
+          }
+          console.error("xAI error:", errorText);
+          return { error: `xAI API error: ${errorDetail}` };
         }
 
         const result = await response.json();
@@ -223,13 +259,9 @@ Rules:
           return { error: "No response from xAI" };
         }
 
-        // Parse JSON response
+        // Parse JSON response (structured output guarantees valid JSON)
         try {
-          let jsonStr = content;
-          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-          if (jsonMatch) jsonStr = jsonMatch[1];
-
-          const parsed = JSON.parse(jsonStr);
+          const parsed = JSON.parse(content);
 
           const chunkResult: StructuredMinutes = {
             meetingId: data.meetingId,

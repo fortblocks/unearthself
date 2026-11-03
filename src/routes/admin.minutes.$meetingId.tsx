@@ -207,8 +207,14 @@ function MeetingDetailPage() {
         <>
           {structured && "error" in structured && (
             <div className="border-l-2 border-ember bg-ember/5 px-4 py-3">
-              <p className="text-sm text-coal">
-                Could not generate structured view. Showing transcript below.
+              <p className="text-sm font-semibold text-coal mb-2">
+                Could not generate structured view
+              </p>
+              <p className="text-xs text-shale">
+                {structured.error}
+              </p>
+              <p className="text-xs text-sandstone mt-2">
+                Showing full transcript below.
               </p>
             </div>
           )}

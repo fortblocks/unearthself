@@ -48,6 +48,7 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
+import { XAI_MODEL } from "./structured-minutes.ts";
 
 export type MeetingSeries = "badlanders" | "business_dev" | "partner_marketing" | "other";
 
@@ -568,7 +569,7 @@ If nothing found:
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "grok-beta",
+          model: XAI_MODEL,
           messages: [
             {
               role: "system",
@@ -582,8 +583,18 @@ If nothing found:
       });
 
       if (!response.ok) {
-        console.error("xAI error:", await response.text());
-        return { error: "Failed to generate answer" };
+        const errorText = await response.text();
+        let errorDetail = "Failed to generate answer";
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorDetail = errorJson.error.message;
+          }
+        } catch {
+          errorDetail = errorText.substring(0, 200);
+        }
+        console.error("xAI error:", errorText);
+        return { error: `xAI API error: ${errorDetail}` };
       }
 
       const result = await response.json();
