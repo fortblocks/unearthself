@@ -438,6 +438,57 @@ function scoreDocRelevance(text: string, query: string): number {
   return score;
 }
 
+// Extract relevant passages around query terms with surrounding context
+function extractRelevantPassages(text: string, query: string, maxPassages: number = 3, contextChars: number = 1000): string {
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const stopWords = new Set(['what', 'was', 'is', 'the', 'a', 'an', 'for', 'to', 'of', 'in', 'on', 'at', 'from', 'with', 'about']);
+  const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+  
+  if (queryWords.length === 0) {
+    // No specific keywords, return start of doc
+    return text.slice(0, contextChars * 2);
+  }
+  
+  const passages: Array<{ start: number; score: number }> = [];
+  
+  // Find all positions where query words appear
+  for (const word of queryWords) {
+    const regex = new RegExp(word, 'gi');
+    let match;
+    while ((match = regex.exec(lowerText)) !== null) {
+      const pos = match.index;
+      passages.push({ start: pos, score: 1 });
+    }
+  }
+  
+  if (passages.length === 0) {
+    // No matches, return start of doc
+    return text.slice(0, contextChars * 2);
+  }
+  
+  // Sort by position and merge overlapping regions
+  passages.sort((a, b) => a.start - b.start);
+  
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const p of passages) {
+    const start = Math.max(0, p.start - contextChars);
+    const end = Math.min(text.length, p.start + contextChars);
+    
+    if (merged.length === 0 || start > merged[merged.length - 1].end) {
+      merged.push({ start, end });
+    } else {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, end);
+    }
+  }
+  
+  // Take top N passages and join with separator
+  return merged
+    .slice(0, maxPassages)
+    .map(({ start, end }) => text.slice(start, end))
+    .join('\n\n[...]\n\n');
+}
+
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator((d: { question: string; series?: MeetingSeries }) => d)
   .handler(async ({ data }): Promise<AnswerResult | { error: string }> => {
@@ -509,68 +560,64 @@ export const answerQuestion = createServerFn({ method: "POST" })
         candidateIds = allDocIds;
       }
       
-      // Get file metadata for candidates
-      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 20).map(m => ({
+      // Get file metadata for candidates - limit to top 6 for speed
+      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 6).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
         modifiedTime: m.modifiedTime,
       }));
 
-      // Export and score candidates (max 20 docs instead of 83)
+      // Export top 6 candidates in parallel (concurrency 6)
       const exportStart = Date.now();
       const documents: IndexedDocument[] = [];
-      const MAX_CONCURRENT = 5;
       
-      for (let i = 0; i < files.length; i += MAX_CONCURRENT) {
-        const batch = files.slice(i, i + MAX_CONCURRENT);
-        const batchResults = await Promise.all(
-          batch.map(async (file) => {
-            if (!file.id || !file.name) return null;
-            if (data.series && detectSeries(file.name) !== data.series) return null;
+      const exportResults = await Promise.all(
+        files.map(async (file) => {
+          if (!file.id || !file.name) return null;
+          if (data.series && detectSeries(file.name) !== data.series) return null;
+          
+          try {
+            const exportResponse = await drive.files.export(
+              { fileId: file.id, mimeType: "text/plain" },
+              { responseType: "text" }
+            );
+            const fullText = String(exportResponse.data);
+            const parsedDateTime = parseDateTime(fullText);
+            const createdDate = new Date(file.createdTime || "");
+            const extractedDecisions = extractDecisions(fullText);
             
-            try {
-              const exportResponse = await drive.files.export(
-                { fileId: file.id, mimeType: "text/plain" },
-                { responseType: "text" }
-              );
-              const fullText = String(exportResponse.data);
-              const parsedDateTime = parseDateTime(fullText);
-              const createdDate = new Date(file.createdTime || "");
-              const extractedDecisions = extractDecisions(fullText);
-              
-              return {
-                id: file.id,
-                title: file.name,
-                series: detectSeries(file.name),
-                date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-                time: parsedDateTime?.time || "00:00",
-                createdTime: file.createdTime || "",
-                modifiedTime: file.modifiedTime || "",
-                fullText,
-                decisions: extractedDecisions.map((d, idx) => ({
-                  id: `${file.id}-d${idx}`,
-                  documentId: file.id || "",
-                  documentTitle: file.name || "",
-                  meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-                  series: detectSeries(file.name || ""),
-                  decisionText: d.text,
-                  context: d.context,
-                  decisionType: d.type,
-                  indexedAt: new Date().toISOString(),
-                })),
+            return {
+              id: file.id,
+              title: file.name,
+              series: detectSeries(file.name),
+              date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+              time: parsedDateTime?.time || "00:00",
+              createdTime: file.createdTime || "",
+              modifiedTime: file.modifiedTime || "",
+              fullText,
+              decisions: extractedDecisions.map((d, idx) => ({
+                id: `${file.id}-d${idx}`,
+                documentId: file.id || "",
+                documentTitle: file.name || "",
+                meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+                series: detectSeries(file.name || ""),
+                decisionText: d.text,
+                context: d.context,
+                decisionType: d.type,
                 indexedAt: new Date().toISOString(),
-                score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
-              };
-            } catch (error) {
-              console.error(`Failed to process ${file.id}:`, error);
-              return null;
-            }
-          })
-        );
-        documents.push(...batchResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
-      }
+              })),
+              indexedAt: new Date().toISOString(),
+              score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
+            };
+          } catch (error) {
+            console.error(`Failed to process ${file.id}:`, error);
+            return null;
+          }
+        })
+      );
       
+      documents.push(...exportResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
       console.log(`[answerQuestion] Exported ${documents.length} docs: ${Date.now() - exportStart}ms`);
       
       if (documents.length === 0) {
@@ -582,11 +629,11 @@ export const answerQuestion = createServerFn({ method: "POST" })
         };
       }
 
-      // Pick top 8 most relevant documents by score
-      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
-      console.log(`[answerQuestion] Top 8 scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+      // Pick top 6 most relevant documents by score
+      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0));
+      console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
 
-      // Build compact context from top docs only
+      // Build compact context from top docs with passage extraction
       const decisionsText = sortedDocs
         .flatMap((d) =>
           d.decisions.map(
@@ -596,17 +643,27 @@ export const answerQuestion = createServerFn({ method: "POST" })
         )
         .join("\n\n");
 
-      const fullContextText = sortedDocs
-        .map((d) => `[MEETING: ${d.title} on ${d.date}]\n${d.fullText}\n===\n`)
+      // Extract relevant passages instead of full text, cap at 60KB total
+      const MAX_CONTEXT_CHARS = 60000;
+      const passagesPerDoc = Math.floor(MAX_CONTEXT_CHARS / sortedDocs.length / 2);
+      
+      const passagesText = sortedDocs
+        .map((d) => {
+          const passages = extractRelevantPassages(d.fullText, data.question, 3, Math.min(1000, passagesPerDoc));
+          return `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
+        })
         .join("\n");
+
+      const fullContextText = (decisionsText + '\n\n' + passagesText).slice(0, MAX_CONTEXT_CHARS);
+      console.log(`[answerQuestion] Context size: ${fullContextText.length} chars (decisions: ${decisionsText.length}, passages: ${passagesText.length})`);
 
       const prompt = `You are answering questions about Unearth Self meeting decisions and discussions.
 
 PRIORITIZE DECISIONS AND ACTION ITEMS:
 ${decisionsText}
 
-SECONDARY CONTEXT (Top ${sortedDocs.length} relevant meetings):
-${fullContextText.slice(0, 200000)} 
+RELEVANT PASSAGES (Top ${sortedDocs.length} meetings):
+${passagesText} 
 
 Question: ${data.question}
 
@@ -642,7 +699,7 @@ If nothing found:
 }`;
 
       const xaiStart = Date.now();
-      console.log(`[answerQuestion] Starting xAI request (context: ${decisionsText.length + fullContextText.length} chars)...`);
+      console.log(`[answerQuestion] Starting xAI request (context: ${fullContextText.length} chars)...`);
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -661,7 +718,7 @@ If nothing found:
           ],
           temperature: 0.1,
         }),
-        signal: AbortSignal.timeout(8000), // 8-second timeout
+        signal: AbortSignal.timeout(10000), // 10-second timeout for xAI
       });
       console.log(`[answerQuestion] xAI response: ${Date.now() - xaiStart}ms (status: ${response.status})`);
 
