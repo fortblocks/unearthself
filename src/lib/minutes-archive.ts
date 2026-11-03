@@ -899,6 +899,14 @@ Instructions:
 6. Never invent prior conversations - search has no memory of earlier chats
 7. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
 
+CRITICAL - Exact Name Matching:
+- Multi-word proper names must match EXACTLY (case/space/hyphen insensitive is okay)
+- "Boot Camp" is NOT the same as "Base Camp" - they are distinct names
+- "Badlands Boot Camp" is NOT the same as "Badlands Base Camp"
+- A generic noun (e.g., "headquarters", "location", "name") appearing alone is NOT evidence of a specific proper name
+- You may ONLY cite a date as mentioning name X if the passage literally contains X (or a trivial variant like "Basecamp" vs "Base Camp")
+- When asked about "when was X first mentioned", check passages character-by-character for X before citing that date
+
 Example answer shape:
 "Looking back over your records, the first time I can hear of an official name for headquarters was on June 22, and the name I picked up was Base Camp. Christopher Mair described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
 
@@ -986,7 +994,7 @@ IMPORTANT:
       const parsed = JSON.parse(jsonStr);
       
       // Add documentId to sources and filter out invented sources
-      const sourcesWithIds = (parsed.sources || [])
+      let sourcesWithIds = (parsed.sources || [])
         .map((s: any) => {
           const doc = documents.find((d) => d.title === s.documentTitle);
           return {
@@ -996,6 +1004,35 @@ IMPORTANT:
         })
         // Filter out sources without valid document IDs (invented by model)
         .filter((s: any) => s.documentId && s.documentId.length > 0);
+      
+      // Post-validation: Extract multi-word proper names from question and verify sources
+      // This catches cases where model cites a date for "Base Camp" but passage only has "Boot Camp"
+      const properNamePattern = /(?:["']([^"']{2,}?)["']|(?:name|called|named|mention(?:ed)?|discuss(?:ed)?|agreed?(?:\s+on)?)\s+(?:was\s+)?(?:the\s+)?["']?([A-Z][A-Za-z\s-]{2,}?)["']?(?:\s|,|\.|\?|$))/gi;
+      const properNames: string[] = [];
+      let match;
+      while ((match = properNamePattern.exec(question)) !== null) {
+        const name = (match[1] || match[2] || '').trim();
+        if (name.length >= 3 && /[A-Z]/.test(name)) {
+          properNames.push(name);
+        }
+      }
+      
+      if (properNames.length > 0) {
+        // Normalize for comparison (case-insensitive, collapse spaces/hyphens)
+        const normalize = (s: string) => s.toLowerCase().replace(/[\s-]+/g, ' ').trim();
+        const normalizedNames = properNames.map(normalize);
+        
+        // Filter sources: keep only if excerpt contains at least one of the proper names
+        const validatedSources = sourcesWithIds.filter((s: any) => {
+          const normalizedExcerpt = normalize(s.excerpt || '');
+          return normalizedNames.some(name => normalizedExcerpt.includes(name));
+        });
+        
+        if (validatedSources.length < sourcesWithIds.length) {
+          console.log(`[answerQuestion] Post-validation: dropped ${sourcesWithIds.length - validatedSources.length} sources that don't contain proper names: [${properNames.join(', ')}]`);
+          sourcesWithIds = validatedSources;
+        }
+      }
       
       // Enforce: never allow HIGH confidence on "not found" answers
       let confidence = parsed.confidence || "medium";
