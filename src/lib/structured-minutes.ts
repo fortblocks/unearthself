@@ -20,10 +20,14 @@
 import { createServerFn } from "@tanstack/react-start";
 
 // xAI model for structured extraction
-// Using grok-3: faster base model without reasoning overhead
-// grok-4.7 likely has extended reasoning latency (caused 60s+ timeouts on 18KB docs)
-// xAI deprecated grok-beta/grok-2-1212 and recommends grok-3 as replacement
-export const XAI_MODEL = "grok-3";
+// Current models: https://docs.x.ai/docs/models
+// Using grok-4.20-0309-non-reasoning: non-reasoning variant for speed
+// - No reasoning overhead (fast inference, <10s typical)
+// - 1M context window
+// - Supports json_schema structured outputs
+// - $1.25 input / $2.50 output per million tokens
+// Previous grok-4.7 had 60s+ timeouts on 18KB docs (likely reasoning-enabled)
+export const XAI_MODEL = "grok-4.20-0309-non-reasoning";
 
 export type ActionItem = {
   owner: string | null;
