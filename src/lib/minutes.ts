@@ -264,16 +264,26 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
       }, { responseType: "text" });
       
       const fullText = String(exportResponse.data);
-      const parsedDateTime = parseGeminiNotesForDateTime(fullText);
       
-      const createdDate = new Date(file.createdTime || "");
-      const fallbackDate = createdDate.toISOString().split("T")[0];
-      const fallbackTime = createdDate.toLocaleTimeString("en-US", {
-        timeZone: "America/Edmonton",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+      // Parse date from filename first
+      const parsedDateTime = parseDateFromFilename(file.name);
+      
+      // Fallback to createdTime in America/Edmonton timezone
+      let fallbackDate = "";
+      let fallbackTime = "00:00";
+      
+      if (file.createdTime) {
+        const createdDate = new Date(file.createdTime);
+        fallbackDate = createdDate.toLocaleDateString("en-CA", {
+          timeZone: "America/Edmonton",
+        }); // YYYY-MM-DD format
+        fallbackTime = createdDate.toLocaleTimeString("en-US", {
+          timeZone: "America/Edmonton",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+      }
       
       const meeting: Meeting = {
         id: file.id,
@@ -293,10 +303,12 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
       };
     } catch (error: any) {
       console.error("Error getting meeting minutes:", error);
-      if (error?.code === 403 || error?.code === 404) {
+      // Only return null for not-found errors
+      if (error?.code === 404) {
         return null;
       }
-      return null;
+      // For other errors, throw to show the real error message
+      throw new Error(`Failed to get meeting minutes: ${error.message || error}`);
     }
   });
 

@@ -7,12 +7,15 @@ export const Route = createFileRoute("/journal/$slug")({
     if (!post) throw notFound();
     return post;
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData.title} - Journal - Unearth Self` },
-      { name: "description", content: loaderData.dek },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    if (!loaderData) return {};
+    return {
+      meta: [
+        { title: `${loaderData.title} - Journal - Unearth Self` },
+        { name: "description", content: loaderData.dek },
+      ],
+    };
+  },
   component: JournalArticle,
 });
 
