@@ -898,6 +898,7 @@ Instructions:
 5. Use EXACT dates from meeting headers [MEETING: ... on YYYY-MM-DD]
 6. Never invent prior conversations - search has no memory of earlier chats
 7. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
+8. IMPORTANT: A generic noun (e.g., "headquarters", "location", "facility") is NOT evidence of a specific proper name
 
 Example answer shape:
 "Looking back over your records, the first time I can hear of an official name for headquarters was on June 22, and the name I picked up was Base Camp. Christopher Mair described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
@@ -986,7 +987,7 @@ IMPORTANT:
       const parsed = JSON.parse(jsonStr);
       
       // Add documentId to sources and filter out invented sources
-      const sourcesWithIds = (parsed.sources || [])
+      let sourcesWithIds = (parsed.sources || [])
         .map((s: any) => {
           const doc = documents.find((d) => d.title === s.documentTitle);
           return {
@@ -996,6 +997,47 @@ IMPORTANT:
         })
         // Filter out sources without valid document IDs (invented by model)
         .filter((s: any) => s.documentId && s.documentId.length > 0);
+      
+      // ANSWER-SIDE VALIDATION: Extract proper names from answer and validate sources
+      // Proper names are multi-word capitalized phrases (e.g., "Badlands Base Camp")
+      const extractProperNames = (text: string): string[] => {
+        const names: string[] = [];
+        // Match sequences of 2+ capitalized words (allows spaces, hyphens, apostrophes)
+        const pattern = /\b([A-Z][a-z]+(?:[\s\-'][A-Z][a-z]+)+)\b/g;
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          const name = match[1].trim();
+          if (name.length >= 5) { // Minimum 5 chars to avoid false positives
+            names.push(name);
+          }
+        }
+        return Array.from(new Set(names)); // Remove duplicates
+      };
+      
+      const properNamesInAnswer = extractProperNames(parsed.answer || '');
+      
+      if (properNamesInAnswer.length > 0) {
+        console.log(`[answerQuestion] Proper names found in answer: [${properNamesInAnswer.join(', ')}]`);
+        
+        // Normalize for comparison (case-insensitive, collapse spaces/hyphens)
+        const normalize = (s: string) => s.toLowerCase().replace(/[\s\-]+/g, '').trim();
+        const normalizedNames = properNamesInAnswer.map(normalize);
+        
+        // Validate: keep sources only if excerpt contains at least one proper name
+        const validatedSources = sourcesWithIds.filter((s: any) => {
+          const normalizedExcerpt = normalize(s.excerpt || '');
+          const containsName = normalizedNames.some(name => normalizedExcerpt.includes(name));
+          if (!containsName) {
+            console.log(`[answerQuestion] Dropping source ${s.meetingDate} - excerpt doesn't contain any proper names`);
+          }
+          return containsName;
+        });
+        
+        if (validatedSources.length < sourcesWithIds.length) {
+          console.log(`[answerQuestion] Post-validation: dropped ${sourcesWithIds.length - validatedSources.length} sources that don't contain proper names`);
+          sourcesWithIds = validatedSources;
+        }
+      }
       
       // Enforce: never allow HIGH confidence on "not found" answers
       let confidence = parsed.confidence || "medium";
