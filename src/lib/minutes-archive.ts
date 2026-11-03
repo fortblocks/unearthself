@@ -8,9 +8,6 @@
  *    "You decided on red for that room, from the February 19th meeting"
  * 4. If no decision found, say so plainly - never guess
  * 
- */
-
-import { XAI_MODEL } from "./structured-minutes.ts";
  * Architecture:
  * 1. Backfill: Extract decisions/actions from all docs, embed separately
  * 2. Incremental: Re-index only changed documents
@@ -51,6 +48,7 @@ import { XAI_MODEL } from "./structured-minutes.ts";
  */
 
 import { createServerFn } from "@tanstack/react-start";
+import { XAI_MODEL } from "./structured-minutes.ts";
 
 export type MeetingSeries = "badlanders" | "business_dev" | "partner_marketing" | "other";
 
