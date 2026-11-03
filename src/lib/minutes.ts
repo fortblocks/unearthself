@@ -352,24 +352,32 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
 export const getMeetingMinutes = createServerFn({ method: "GET" })
   .validator((d: { meetingId: string }) => d)
   .handler(async ({ data }): Promise<MeetingMinutes | null> => {
+    const startTime = Date.now();
+    
     // Check cache first (keyed by meetingId)
+    const cacheCheckStart = Date.now();
     const cached = docExportCache.get(data.meetingId) || null;
     if (isCacheValid(cached)) {
-      console.log(`Using cached doc export for ${data.meetingId}`);
+      console.log(`[getMeetingMinutes] Cache HIT for ${data.meetingId} (${Date.now() - startTime}ms)`);
       return cached!.data;
     }
+    console.log(`[getMeetingMinutes] Cache MISS for ${data.meetingId} (check: ${Date.now() - cacheCheckStart}ms)`);
 
+    const driveStart = Date.now();
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return null;
     }
+    console.log(`[getMeetingMinutes] Drive client init: ${Date.now() - driveStart}ms`);
     
     try {
       // Get file metadata
+      const metaStart = Date.now();
       const metaResponse = await drive.files.get({
         fileId: data.meetingId,
         fields: "id, name, createdTime, modifiedTime",
       });
+      console.log(`[getMeetingMinutes] Metadata fetch: ${Date.now() - metaStart}ms`);
       
       const file = metaResponse.data;
       if (!file.id || !file.name) {
@@ -377,12 +385,15 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
       }
       
       // Export as plain text
+      const exportStart = Date.now();
       const exportResponse = await drive.files.export({
         fileId: data.meetingId,
         mimeType: "text/plain",
       }, { responseType: "text" });
+      console.log(`[getMeetingMinutes] Doc export: ${Date.now() - exportStart}ms`);
       
       const fullText = String(exportResponse.data);
+      console.log(`[getMeetingMinutes] Text size: ${fullText.length} chars`);
       
       // Parse date from filename first
       const parsedDateTime = parseDateFromFilename(file.name);
@@ -427,6 +438,7 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
         timestamp: Date.now(),
       });
 
+      console.log(`[getMeetingMinutes] TOTAL time: ${Date.now() - startTime}ms`);
       return result;
     } catch (error: any) {
       console.error("Error getting meeting minutes:", error);
@@ -442,25 +454,35 @@ export const getMeetingMinutes = createServerFn({ method: "GET" })
 export const askMinutes = createServerFn({ method: "POST" })
   .validator((d: { question: string }) => d)
   .handler(async ({ data }): Promise<AskResult | { error: string }> => {
+    const startTime = Date.now();
+    console.log(`[askMinutes] Starting query: "${data.question}"`);
+    
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { error: "XAI_API_KEY not configured" };
     }
     
+    const driveStart = Date.now();
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return { error: "Google Drive not configured" };
     }
+    console.log(`[askMinutes] Drive client init: ${Date.now() - driveStart}ms`);
     
     try {
       // First, get all meetings (cached)
+      const listStart = Date.now();
       const meetings = await listMeetings();
+      console.log(`[askMinutes] listMeetings: ${Date.now() - listStart}ms (${meetings.length} meetings)`);
       
       // Fetch meeting texts with concurrency limit (max 10 at a time)
+      const exportStart = Date.now();
       const MAX_CONCURRENT_EXPORTS = 10;
       const meetingTexts: Array<{ meeting: Meeting; text: string } | null> = [];
       
+      let batchNum = 0;
       for (let i = 0; i < meetings.length; i += MAX_CONCURRENT_EXPORTS) {
+        const batchStart = Date.now();
         const batch = meetings.slice(i, i + MAX_CONCURRENT_EXPORTS);
         const batchPromises = batch.map(async (meeting) => {
           try {
@@ -472,9 +494,12 @@ export const askMinutes = createServerFn({ method: "POST" })
         });
         const batchResults = await Promise.all(batchPromises);
         meetingTexts.push(...batchResults);
+        console.log(`[askMinutes] Batch ${++batchNum} (${batch.length} docs): ${Date.now() - batchStart}ms`);
       }
+      console.log(`[askMinutes] All exports: ${Date.now() - exportStart}ms total`);
       
       const validMeetings = meetingTexts.filter((m): m is { meeting: Meeting; text: string } => m !== null);
+      console.log(`[askMinutes] Valid meetings: ${validMeetings.length}`);
       
       if (validMeetings.length === 0) {
         return {
@@ -485,6 +510,7 @@ export const askMinutes = createServerFn({ method: "POST" })
       
       // Calculate total context size (grok-4.20 supports 1M tokens ~= 4MB text)
       // With ~83 meetings at 18KB avg = ~1.5MB total, we can fit all meetings
+      const contextStart = Date.now();
       const MAX_CONTEXT_CHARS = 2000000; // 2MB - well under model limit
       let contextChars = 0;
       const includedMeetings: typeof validMeetings = [];
@@ -492,14 +518,14 @@ export const askMinutes = createServerFn({ method: "POST" })
       for (const meeting of validMeetings) {
         const meetingSize = meeting.text.length + 200; // +200 for headers
         if (contextChars + meetingSize > MAX_CONTEXT_CHARS && includedMeetings.length > 0) {
-          console.log(`Context size limit reached: ${contextChars} chars, ${includedMeetings.length}/${validMeetings.length} meetings`);
+          console.log(`[askMinutes] Context size limit reached: ${contextChars} chars, ${includedMeetings.length}/${validMeetings.length} meetings`);
           break;
         }
         includedMeetings.push(meeting);
         contextChars += meetingSize;
       }
 
-      console.log(`Searching ${includedMeetings.length}/${validMeetings.length} meetings (${contextChars} chars)`);
+      console.log(`[askMinutes] Context built: ${Date.now() - contextStart}ms (${includedMeetings.length}/${validMeetings.length} meetings, ${contextChars} chars)`);
 
       // Use xAI to answer the question with citations (with timeout)
       const prompt = `You are a meeting assistant helping answer questions about Badlander's Development Meetings. 
@@ -549,6 +575,8 @@ If you found nothing relevant, return:
   "citations": []
 }`;
       
+      const xaiStart = Date.now();
+      console.log(`[askMinutes] Starting xAI request...`);
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -571,6 +599,7 @@ If you found nothing relevant, return:
         }),
         signal: AbortSignal.timeout(100000), // 100-second timeout for xAI call
       });
+      console.log(`[askMinutes] xAI response received: ${Date.now() - xaiStart}ms (status: ${response.status})`);
       
       if (!response.ok) {
         const errorText = await response.text();
