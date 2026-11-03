@@ -489,6 +489,42 @@ function extractRelevantPassages(text: string, query: string, maxPassages: numbe
     .join('\n\n[...]\n\n');
 }
 
+// Server-side keyword search that returns snippets without fetching all meetings
+export const searchMeetingsKeywords = createServerFn({ method: "POST" })
+  .validator((d: { query: string }) => d)
+  .handler(async ({ data }): Promise<Array<{ meeting: { id: string; title: string; date: string; time: string }; excerpt?: string }>> => {
+    const drive = await getGoogleDriveClient();
+    if (!drive) return [];
+
+    try {
+      const { listMeetings } = await import("./minutes");
+      const allMeetings = await listMeetings();
+      const lowerQ = data.query.toLowerCase();
+      
+      // Quick metadata search first
+      const metadataMatches = allMeetings.filter(m => 
+        m.title.toLowerCase().includes(lowerQ) || m.date.includes(lowerQ)
+      ).map(m => ({ meeting: { id: m.id, title: m.title, date: m.date, time: m.time } }));
+      
+      if (metadataMatches.length > 0) return metadataMatches.slice(0, 10);
+      
+      // Use Drive full-text search with the query
+      const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and fullText contains '${lowerQ.replace(/'/g, "\\'")}'`;
+      const searchResponse = await drive.files.list({
+        q: searchQuery,
+        fields: "files(id)",
+        pageSize: 20,
+      });
+      
+      const matchedIds = new Set((searchResponse.data.files || []).map(f => f.id).filter(Boolean) as string[]);
+      const matched = allMeetings.filter(m => matchedIds.has(m.id)).slice(0, 10);
+      
+      return matched.map(m => ({ meeting: { id: m.id, title: m.title, date: m.date, time: m.time } }));
+    } catch {
+      return [];
+    }
+  });
+
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator((d: { question: string; series?: MeetingSeries }) => d)
   .handler(async ({ data }): Promise<AnswerResult | { error: string }> => {
@@ -508,8 +544,6 @@ export const answerQuestion = createServerFn({ method: "POST" })
     console.log(`[answerQuestion] Drive client init: ${Date.now() - driveStart}ms`);
 
     try {
-      // Get all meetings using the same recursive search as listMeetings
-      // This ensures we cover subfolders (meetings after Aug 25)
       const { listMeetings } = await import("./minutes");
       const allMeetings = await listMeetings();
       console.log(`[answerQuestion] Retrieved ${allMeetings.length} total meetings from listMeetings`);
@@ -523,52 +557,64 @@ export const answerQuestion = createServerFn({ method: "POST" })
         };
       }
       
-      // Extract all doc IDs for filtering
       const allDocIds = new Set(allMeetings.map(m => m.id));
       
-      // Use Drive full-text search across ALL docs (no parent filter to avoid missing subfolders)
-      // Then filter results to our known doc set
+      // Broaden search with synonyms and key terms
       const searchStart = Date.now();
-      const queryWords = data.question.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
+      const queryLower = data.question.toLowerCase();
+      const baseWords = queryLower.split(/\s+/).filter(w => w.length > 3);
       
+      // Add synonyms for common terms
+      const synonymMap: Record<string, string[]> = {
+        'spa': ['spa', 'wellness', 'retreat'],
+        'headquarters': ['headquarters', 'office', 'location', 'base'],
+        'name': ['name', 'named', 'call', 'called'],
+        'decided': ['decided', 'decision', 'agreed', 'agreement'],
+      };
+      
+      const expandedTerms = new Set<string>();
+      baseWords.forEach(word => {
+        expandedTerms.add(word);
+        if (synonymMap[word]) {
+          synonymMap[word].forEach(syn => expandedTerms.add(syn));
+        }
+      });
+      
+      const searchTerms = Array.from(expandedTerms).slice(0, 10);
       let candidateIds: Set<string>;
       
-      if (queryWords.length > 0) {
-        // Try Drive full-text search first (fast when it works)
-        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${queryWords.map(w => `fullText contains '${w}'`).join(' or ')})`;
+      if (searchTerms.length > 0) {
+        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${searchTerms.map(w => `fullText contains '${w}'`).join(' or ')})`;
         
         const searchResponse = await drive.files.list({
           q: searchQuery,
           fields: "files(id)",
-          pageSize: 100, // Get more candidates since we're searching all Drive
+          pageSize: 100,
         });
         
         const driveResults = searchResponse.data.files || [];
         console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results)`);
         
-        // Filter to our known doc set
         candidateIds = new Set(driveResults.map(f => f.id).filter(id => id && allDocIds.has(id)) as string[]);
         console.log(`[answerQuestion] Filtered to ${candidateIds.size} candidates in our doc set`);
         
-        // Fallback: if Drive returns 0 results, use keyword scoring over all meetings
         if (candidateIds.size === 0) {
-          console.log(`[answerQuestion] Drive returned 0 results, falling back to keyword scoring over all ${allMeetings.length} meetings`);
+          console.log(`[answerQuestion] Drive returned 0 results, falling back to all meetings`);
           candidateIds = allDocIds;
         }
       } else {
-        // No useful keywords, search all
         candidateIds = allDocIds;
       }
       
-      // Get file metadata for candidates - limit to top 6 for speed
-      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 6).map(m => ({
+      // Get top 10 candidates for better recall
+      const files = allMeetings.filter(m => candidateIds.has(m.id)).slice(0, 10).map(m => ({
         id: m.id,
         name: m.title,
         createdTime: m.createdTime,
         modifiedTime: m.modifiedTime,
       }));
 
-      // Export top 6 candidates in parallel (concurrency 6)
+      // Export top 10 candidates in parallel
       const exportStart = Date.now();
       const documents: IndexedDocument[] = [];
       
@@ -629,11 +675,12 @@ export const answerQuestion = createServerFn({ method: "POST" })
         };
       }
 
-      // Pick top 6 most relevant documents by score
+      // Pick top docs by relevance score
       const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0));
       console.log(`[answerQuestion] Top ${sortedDocs.length} scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
 
-      // Build compact context from top docs with passage extraction
+      // Build context with decisions and relevant passages, cap at 150KB
+      const MAX_CONTEXT_CHARS = 150000;
       const decisionsText = sortedDocs
         .flatMap((d) =>
           d.decisions.map(
@@ -643,13 +690,12 @@ export const answerQuestion = createServerFn({ method: "POST" })
         )
         .join("\n\n");
 
-      // Extract relevant passages instead of full text, cap at 60KB total
-      const MAX_CONTEXT_CHARS = 60000;
-      const passagesPerDoc = Math.floor(MAX_CONTEXT_CHARS / sortedDocs.length / 2);
+      // Extract passages with more context per doc for better recall
+      const passagesPerDoc = Math.floor((MAX_CONTEXT_CHARS - decisionsText.length) / sortedDocs.length);
       
       const passagesText = sortedDocs
         .map((d) => {
-          const passages = extractRelevantPassages(d.fullText, data.question, 3, Math.min(1000, passagesPerDoc));
+          const passages = extractRelevantPassages(d.fullText, data.question, 5, Math.min(2000, passagesPerDoc));
           return `[MEETING: ${d.title} on ${d.date}]\n${passages}\n===\n`;
         })
         .join("\n");

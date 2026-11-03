@@ -4,8 +4,8 @@ import { Section } from "@/components/desk/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listMeetings, getMeetingMinutes, type Meeting } from "@/lib/minutes";
-import { answerQuestion, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
+import { listMeetings, type Meeting } from "@/lib/minutes";
+import { answerQuestion, searchMeetingsKeywords, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
 import { formatMeetingDate } from "@/lib/date-format";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -111,41 +111,67 @@ function MinutesIndexPage() {
 
       // Add 30-second client timeout (server has 120s limit)
       const CLIENT_TIMEOUT = 30000;
-      const timeoutPromise = new Promise<null>((_, reject) => 
-        setTimeout(() => reject(new Error('Client timeout after 30 seconds')), CLIENT_TIMEOUT)
-      );
+      
+      let aiResult: AnswerResult | { error: string } | null = null;
+      let keywordResults: Array<{ meeting: { id: string; title: string; date: string; time: string }; excerpt?: string }> = [];
 
-      // Run AI answer (unless simple query) and keyword search in parallel with timeout
-      const [aiResult, keywordResults] = await Promise.race([
-        Promise.all([
-          skipAI
-            ? Promise.resolve(null)
-            : answerQuestion({ data: { question: q } }).catch((e) => {
-                console.error('Search error:', e);
-                return { error: e.message || 'Search failed' };
-              }),
-          searchMeetings(q, meetings),
-        ]),
-        timeoutPromise.then(() => [{ error: 'Search timed out after 30 seconds. Try a more specific question or keyword.' } as const, [] as Array<{ meeting: Meeting; excerpt?: string }>] as const),
-      ]);
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), CLIENT_TIMEOUT)
+        );
 
-      // Process AI result
+        // Run AI answer (unless simple query) and server-side keyword search in parallel
+        const results = await Promise.race([
+          Promise.all([
+            skipAI
+              ? Promise.resolve(null)
+              : answerQuestion({ data: { question: q } }).catch((e) => {
+                  console.error('AI search error:', e);
+                  return { error: e.message || 'Search failed' };
+                }),
+            searchMeetingsKeywords({ data: { query: q } }).catch((e) => {
+              console.error('Keyword search error:', e);
+              return [];
+            }),
+          ]),
+          timeoutPromise,
+        ]);
+        
+        aiResult = results[0];
+        keywordResults = results[1];
+      } catch (err: any) {
+        if (err?.message === 'timeout') {
+          aiResult = { error: 'Search timed out after 30 seconds. Try a more specific question.' };
+          keywordResults = [];
+        } else {
+          throw err;
+        }
+      }
+
+      // Process AI result - only set error if we have no results at all
       if (aiResult && !("error" in aiResult)) {
         answerResult = aiResult;
-      } else if (aiResult && "error" in aiResult && aiResult.error !== "XAI_API_KEY not configured") {
-        searchError = aiResult.error;
+      } else if (aiResult && "error" in aiResult) {
+        // Only show error if we also have no keyword results
+        if (keywordResults.length === 0 && aiResult.error !== "XAI_API_KEY not configured") {
+          searchError = aiResult.error;
+        }
       }
 
       setSearchState({
         answer: answerResult,
-        matchedMeetings: keywordResults,
+        matchedMeetings: keywordResults.map(r => ({ 
+          meeting: r.meeting as Meeting, 
+          excerpt: r.excerpt 
+        })),
         error: searchError,
       });
     } catch (error) {
+      console.error('Search exception:', error);
       setSearchState({
         answer: null,
         matchedMeetings: [],
-        error: "Search failed",
+        error: error instanceof Error ? error.message : "Search failed",
       });
     } finally {
       setSearching(false);
@@ -158,55 +184,6 @@ function MinutesIndexPage() {
       void handleSearch();
     }
   };
-
-  // Keyword search over meetings
-  async function searchMeetings(
-    q: string,
-    allMeetings: Meeting[]
-  ): Promise<Array<{ meeting: Meeting; excerpt?: string }>> {
-    const results: Array<{ meeting: Meeting; excerpt?: string }> = [];
-    const lowerQ = q.toLowerCase();
-
-    for (const meeting of allMeetings) {
-      // Check title
-      if (meeting.title.toLowerCase().includes(lowerQ)) {
-        results.push({ meeting });
-        continue;
-      }
-
-      // Check date
-      const formattedDate = formatDate(meeting.date).toLowerCase();
-      if (formattedDate.includes(lowerQ) || meeting.date.includes(lowerQ)) {
-        results.push({ meeting });
-        continue;
-      }
-
-      // Check content
-      try {
-        const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
-        if (minutes) {
-          const lowerText = minutes.fullText.toLowerCase();
-          const queryIndex = lowerText.indexOf(lowerQ);
-
-          if (queryIndex !== -1) {
-            // Extract excerpt
-            const start = Math.max(0, queryIndex - 80);
-            const end = Math.min(minutes.fullText.length, queryIndex + q.length + 80);
-            let excerpt = minutes.fullText.slice(start, end);
-
-            if (start > 0) excerpt = "..." + excerpt;
-            if (end < minutes.fullText.length) excerpt = excerpt + "...";
-
-            results.push({ meeting, excerpt });
-          }
-        }
-      } catch {
-        // Skip this meeting if we can't fetch it
-      }
-    }
-
-    return results;
-  }
 
   if (meetings.length === 0) {
     return (
