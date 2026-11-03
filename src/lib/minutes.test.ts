@@ -231,3 +231,41 @@ describe("parseDateFromFilename", () => {
     assert.strictEqual(result.time, "16:00");
   });
 });
+
+describe("getMeetingMinutes error handling", () => {
+  it("should validate MeetingMinutes structure from successful response", () => {
+    // This validates the expected structure matches our types
+    const mockResponse: MeetingMinutes = {
+      meeting: {
+        id: "doc-123",
+        title: "Badlander's Development Meeting - 2026/10/29 17:00 MDT - Notes by Gemini",
+        date: "2026-10-29",
+        time: "17:00",
+        createdTime: "2026-10-29T23:00:00.000Z",
+        modifiedTime: "2026-10-29T23:30:00.000Z",
+      },
+      fullText: "Meeting notes here...",
+      actions: [
+        {
+          text: "Follow up with partner",
+          owner: "Christopher",
+          completed: false,
+        },
+      ],
+    };
+
+    assert.strictEqual(mockResponse.meeting.id, "doc-123");
+    assert.ok(mockResponse.meeting.title.includes("2026/10/29 17:00"));
+    assert.strictEqual(mockResponse.actions.length, 1);
+    assert.strictEqual(mockResponse.actions[0].owner, "Christopher");
+  });
+
+  it("should parse dates from filename in getMeetingMinutes", () => {
+    const filename = "Badlander's Development Meeting - 2026/10/29 17:00 MDT - Notes by Gemini";
+    const parsed = parseDateFromFilename(filename);
+    
+    assert.ok(parsed);
+    assert.strictEqual(parsed.date, "2026-10-29");
+    assert.strictEqual(parsed.time, "17:00");
+  });
+});

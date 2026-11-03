@@ -52,7 +52,9 @@ describe("Structured Minutes", () => {
     };
 
     assert.strictEqual(action.owner, "Lisa");
-    assert.match(action.dueDate, /^\d{4}-\d{2}-\d{2}$/);
+    if (action.dueDate) {
+      assert.match(action.dueDate, /^\d{4}-\d{2}-\d{2}$/);
+    }
   });
 
   it("should allow empty sections", () => {

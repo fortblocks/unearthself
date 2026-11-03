@@ -64,7 +64,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const partner = PARTNERS.find((p) => p.id === lookingAs);
   const openRisk = riskAll.filter((r) => r.open).length;
   const overdue = moneyAll.filter((m) => m.status === "overdue").length;
-  const page = PAGE[pathname] ?? PAGE["/admin"];
+  
+  // Use longest-prefix matching for page lookup
+  const page = (() => {
+    // Try exact match first
+    if (PAGE[pathname]) return PAGE[pathname];
+    
+    // Find longest matching prefix
+    const paths = Object.keys(PAGE).sort((a, b) => b.length - a.length);
+    const match = paths.find(p => pathname.startsWith(p));
+    return match ? PAGE[match] : PAGE["/admin"];
+  })();
 
   const counts: Record<string, number> = {
     "/admin/risk": openRisk,
