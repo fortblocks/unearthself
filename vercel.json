@@ -2,5 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "app/routes/**/*.tsx": {
+      "maxDuration": 60
+    },
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
+  }
 }

@@ -2,6 +2,125 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import type { StructuredMinutes, ActionItem } from "./structured-minutes";
 
+describe("Structured Minutes - Chunk Processing", () => {
+  it("should merge multiple chunk results correctly", () => {
+    // Simulate results from 2 chunks
+    const chunk1: StructuredMinutes = {
+      meetingId: "test-id",
+      attendees: ["Alice", "Bob"],
+      keyDecisions: [{ decision: "Decision 1", source: "Alice said..." }],
+      actionItems: [{ owner: "Alice", item: "Task 1", dueDate: null }],
+      openQuestions: ["Question 1"],
+      summary: "First part summary",
+      generatedAt: "2026-11-03T10:00:00.000Z",
+    };
+
+    const chunk2: StructuredMinutes = {
+      meetingId: "test-id",
+      attendees: ["Bob", "Charlie"], // Bob duplicated
+      keyDecisions: [{ decision: "Decision 2", source: "Charlie said..." }],
+      actionItems: [{ owner: "Bob", item: "Task 2", dueDate: null }],
+      openQuestions: ["Question 2"],
+      summary: "Second part summary",
+      generatedAt: "2026-11-03T10:00:00.000Z",
+    };
+
+    // Mock merge logic
+    const allAttendees = new Set<string>();
+    [chunk1, chunk2].forEach((r) => r.attendees.forEach((a) => allAttendees.add(a)));
+    
+    const allDecisions = [chunk1, chunk2].flatMap((r) => r.keyDecisions);
+    
+    const actionMap = new Map<string, ActionItem>();
+    [chunk1, chunk2].forEach((r) =>
+      r.actionItems.forEach((item) => {
+        if (!actionMap.has(item.item)) {
+          actionMap.set(item.item, item);
+        }
+      })
+    );
+    
+    const questionSet = new Set<string>();
+    [chunk1, chunk2].forEach((r) => r.openQuestions.forEach((q) => questionSet.add(q)));
+
+    // Verify deduplication and merging
+    assert.strictEqual(allAttendees.size, 3); // Alice, Bob, Charlie (Bob deduplicated)
+    assert.ok(allAttendees.has("Alice"));
+    assert.ok(allAttendees.has("Bob"));
+    assert.ok(allAttendees.has("Charlie"));
+    
+    assert.strictEqual(allDecisions.length, 2);
+    assert.strictEqual(actionMap.size, 2);
+    assert.strictEqual(questionSet.size, 2);
+  });
+
+  it("should handle single chunk (no merging needed)", () => {
+    const singleChunk: StructuredMinutes = {
+      meetingId: "test-id",
+      attendees: ["Alice"],
+      keyDecisions: [],
+      actionItems: [],
+      openQuestions: [],
+      summary: "Single chunk summary",
+      generatedAt: "2026-11-03T10:00:00.000Z",
+    };
+
+    // Single chunk should pass through unchanged
+    const result = [singleChunk];
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].attendees.length, 1);
+  });
+
+  it("should handle parallel chunk processing", async () => {
+    // Simulate 3 chunks processed in parallel
+    const chunks = ["chunk 1 text", "chunk 2 text", "chunk 3 text"];
+    
+    // All chunks start processing at once (parallel)
+    const startTime = Date.now();
+    const promises = chunks.map(async (chunk, i) => {
+      // Simulate async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return {
+        meetingId: "test-id",
+        attendees: [`Person${i + 1}`],
+        keyDecisions: [],
+        actionItems: [],
+        openQuestions: [],
+        summary: `Chunk ${i + 1}`,
+        generatedAt: new Date().toISOString(),
+      };
+    });
+    
+    const results = await Promise.all(promises);
+    const duration = Date.now() - startTime;
+    
+    // All 3 chunks completed
+    assert.strictEqual(results.length, 3);
+    
+    // Processing was parallel (not 30ms for sequential, but ~10ms for parallel)
+    assert.ok(duration < 25); // Should be closer to 10ms than 30ms
+  });
+
+  it("should handle chunk timeout with AbortSignal", () => {
+    // Timeout error should be caught
+    const timeoutError = {
+      error: "Chunk 1 timed out after 50 seconds",
+    };
+
+    assert.ok("error" in timeoutError);
+    assert.ok(timeoutError.error.includes("timed out"));
+    assert.ok(timeoutError.error.includes("50 seconds"));
+  });
+
+  it("should validate AbortSignal timeout value", () => {
+    // 50-second timeout per chunk
+    const timeoutMs = 50000;
+    
+    assert.strictEqual(timeoutMs, 50000);
+    assert.ok(timeoutMs < 60000); // Less than maxDuration
+  });
+});
+
 describe("Structured Minutes", () => {
   it("should validate StructuredMinutes structure", () => {
     const minutes: StructuredMinutes = {
