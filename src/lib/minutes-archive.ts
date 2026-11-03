@@ -847,21 +847,23 @@ ${passagesText}
 Question: ${question}
 
 Instructions:
-1. Answer the question DIRECTLY based on the evidence in the meeting records
-2. Label each claim in your answer:
-   - RECORDED: Direct quote or explicit statement exists (include verbatim excerpt)
-   - INFERRED: Conclusion drawn from patterns across multiple mentions (explain the pattern)
-   - NOT FOUND: Information not available in the records
-3. If there's NO explicit decision but related mentions exist, synthesize an answer like:
-   "No explicit decision is recorded. [Topic] was first discussed on [date] in [meeting] by [speaker] ('[quote]'), and has been mentioned in [N] meetings since ([dates]), so the inferred [answer] is [X]."
-4. ALWAYS cite the EXACT date from the meeting header [MEETING: ... on YYYY-MM-DD] - never approximate or infer dates
-5. Include speakers and verbatim quotes to support your answer
-6. NEVER guess or fabricate information not in the records
-7. Check alternative spellings and phrasings (e.g., "Basecamp" vs "Base Camp", "headquarters" vs "HQ")
+1. Write the answer in a CONVERSATIONAL tone, like talking on a call
+2. Frame findings as coming from the records: "Looking back over your records...", "The first time I can hear of..."
+3. State dates and names plainly with short sentences - NO bracketed labels like [RECORDED] or [INFERRED]
+4. Distinguish recorded vs inferred in plain words:
+   - For recorded facts: "Christopher Mair described..." or "the team agreed to..."
+   - For inferred conclusions: "nobody formally voted on it, but it's been the name in use since..." 
+   - For not found: "I don't see any record of..."
+5. Use EXACT dates from meeting headers [MEETING: ... on YYYY-MM-DD]
+6. Never invent prior conversations - search has no memory of earlier chats
+7. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
+
+Example answer shape:
+"Looking back over your records, the first time I can hear of an official name for headquarters was on June 22, and the name I picked up was Base Camp. Christopher Mair described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
 
 Format as JSON:
 {
-  "answer": "Answer with claims labeled as RECORDED/INFERRED/NOT FOUND, including dates, speakers, and quotes",
+  "answer": "Conversational answer with plain language, short sentences, dates and names stated directly",
   "confidence": "high" | "medium" | "low",
   "sources": [
     {
@@ -877,17 +879,16 @@ Format as JSON:
 
 Only use notFound: true when absolutely NO related information exists:
 {
-  "answer": "I have no record of any discussion about [topic] in the available meeting notes",
+  "answer": "I don't see any record of discussions about [topic] in your meeting notes.",
   "confidence": "low",
   "sources": [],
   "notFound": true
 }
 
 IMPORTANT: 
-- Prefer building inferred answers from evidence over returning "not found"
-- Use "notFound: true" ONLY when absolutely no relevant mentions exist
-- Always include verbatim quotes and dates to support claims
-- Set confidence based on evidence quality: high (explicit decision with clear quote), medium (inferred from multiple mentions), low (single mention, uncertain, or not found)
+- Conversational tone throughout - sound like talking to someone on a call
+- Short sentences, plain language, no technical formatting in the prose
+- Recorded/inferred distinction in natural words, not brackets
 - NEVER use "high" confidence with "notFound: true"
 - NEVER cite sources that claim nothing exists - only cite actual mentions with verbatim excerpts`;
 
@@ -905,7 +906,7 @@ IMPORTANT:
             {
               role: "system",
               content:
-                "You answer questions using meeting decisions and discussions. Always synthesize an answer from the available evidence, labeling claims as RECORDED (explicit statement with quote) or INFERRED (conclusion from patterns). Only return notFound when absolutely no related mentions exist. Check alternative spellings and phrasings.",
+                "You answer questions about meeting records in a conversational tone, like talking to someone on a call. Frame findings as coming from the records. Use short sentences and plain language. Distinguish what was explicitly recorded from what you're inferring, but use natural words, not bracketed labels. Never invent prior conversations.",
             },
             { role: "user", content: prompt },
           ],
