@@ -574,41 +574,80 @@ export async function searchAndAnswer(
       
       const allDocIds = new Set(allMeetings.map(m => m.id));
       
-      // Broaden search with synonyms and key terms
-      const searchStart = Date.now();
-      const queryLower = question.toLowerCase();
-      const baseWords = queryLower.split(/\s+/).filter(w => w.length > 3);
+      // Collect all folder IDs that listMeetings walks for Drive query scoping
+      const PARENT_FOLDER_ID = "1C5aG-ilfEtzjJowXEFZCzyNLE4OulL54";
+      const meetingFolderIds = new Set<string>([PARENT_FOLDER_ID]);
       
-      // Add synonyms for common terms
-      const synonymMap: Record<string, string[]> = {
-        'spa': ['spa', 'wellness', 'retreat'],
-        'headquarters': ['headquarters', 'office', 'location', 'base'],
-        'name': ['name', 'named', 'call', 'called', 'naming'],
-        'decided': ['decided', 'decision', 'agreed', 'agreement'],
-      };
-      
-      const expandedTerms = new Set<string>();
-      baseWords.forEach(word => {
-        expandedTerms.add(word);
-        if (synonymMap[word]) {
-          synonymMap[word].forEach(syn => expandedTerms.add(syn));
+      async function collectFolderIds(folderId: string, depth: number, maxDepth: number): Promise<void> {
+        if (depth > maxDepth) return;
+        try {
+          let pageToken: string | undefined;
+          do {
+            const response = await drive.files.list({
+              q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+              fields: "nextPageToken, files(id)",
+              pageSize: 100,
+              pageToken,
+            });
+            const folders = response.data.files || [];
+            for (const folder of folders) {
+              if (folder.id) {
+                meetingFolderIds.add(folder.id);
+                await collectFolderIds(folder.id, depth + 1, maxDepth);
+              }
+            }
+            pageToken = response.data.nextPageToken || undefined;
+          } while (pageToken);
+        } catch (error: any) {
+          console.error(`Error collecting folders from ${folderId}:`, error.message);
         }
-      });
+      }
       
-      const searchTerms = Array.from(expandedTerms).slice(0, 15);
+      await collectFolderIds(PARENT_FOLDER_ID, 0, 3);
+      console.log(`[answerQuestion] Collected ${meetingFolderIds.size} folder IDs for Drive scoping`);
+      
+      // Build Drive search with stop word filtering
+      const searchStart = Date.now();
+      const stopWords = new Set(['what', 'when', 'where', 'who', 'how', 'why', 'was', 'were', 'is', 'are', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now', 'name', 'named', 'call', 'called', 'agreed', 'decided']);
+      
+      const queryWords = question.toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !stopWords.has(w));
+      
       let candidateIds: Set<string>;
       
-      if (searchTerms.length > 0) {
-        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${searchTerms.map(w => `fullText contains '${w}'`).join(' or ')})`;
+      if (queryWords.length > 0) {
+        // Build folder scoping part of query
+        const folderScope = Array.from(meetingFolderIds).map(id => `'${id}' in parents`).join(' or ');
         
-        const searchResponse = await drive.files.list({
-          q: searchQuery,
-          fields: "files(id)",
-          pageSize: 100,
+        // Build fullText search with generic spacing variants
+        const searchTerms: string[] = [];
+        queryWords.forEach(word => {
+          searchTerms.push(`fullText contains '${word}'`);
+          // Add spacing variant if word contains common separators
+          if (word.includes('-') || word.includes('_')) {
+            const spaced = word.replace(/[-_]/g, ' ');
+            searchTerms.push(`fullText contains '${spaced}'`);
+          }
         });
         
-        const driveResults = searchResponse.data.files || [];
-        console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results)`);
+        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${folderScope}) and (${searchTerms.join(' or ')})`;
+        
+        // Page through all results
+        const driveResults: any[] = [];
+        let pageToken: string | undefined;
+        do {
+          const searchResponse = await drive.files.list({
+            q: searchQuery,
+            fields: "nextPageToken, files(id)",
+            pageSize: 100,
+            pageToken,
+          });
+          driveResults.push(...(searchResponse.data.files || []));
+          pageToken = searchResponse.data.nextPageToken || undefined;
+        } while (pageToken);
+        
+        console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results from ${meetingFolderIds.size} folders)`);
         
         candidateIds = new Set(driveResults.map(f => f.id).filter(id => id && allDocIds.has(id)) as string[]);
         console.log(`[answerQuestion] Filtered to ${candidateIds.size} candidates in our doc set`);
@@ -621,25 +660,23 @@ export async function searchAndAnswer(
         candidateIds = allDocIds;
       }
       
-      // Get candidates - more for temporal queries
+      // Get candidates
       const matchedMeetings = allMeetings.filter(m => candidateIds.has(m.id));
       console.log(`[answerQuestion] ${matchedMeetings.length} matched meetings from Drive search`);
       
-      // DEBUG: Check if Aug 20 is in candidates
-      const aug20InCandidates = matchedMeetings.some(m => m.id === '14UIO9kglaCR2JX3h1VNByD416SWVP8A-sNmCDXTguxQ');
-      console.log(`[answerQuestion] Aug 20 doc in candidates: ${aug20InCandidates}`);
-      
-      // Detect if query is about "first" mentions - if so, prioritize oldest meetings
+      // Detect if query is about "first" mentions OR name/decision - prioritize oldest meetings
       const isTemporalQuery = /\b(first|earliest|initial|originally|when.*first|when.*start|beginning)\b/i.test(question);
+      const isNameDecisionQuery = /\b(name|named|call|called|naming|decided|decision|agreed|agreement)\b/i.test(question);
+      const sortByDateAscending = isTemporalQuery || isNameDecisionQuery;
       
       let selectedMeetings = matchedMeetings;
-      if (isTemporalQuery) {
-        // For "first" queries, sort by date ascending to prioritize oldest
+      if (sortByDateAscending) {
+        // For temporal or name/decision queries, sort by date ascending to prioritize oldest
         selectedMeetings.sort((a, b) => a.date.localeCompare(b.date));
-        console.log(`[answerQuestion] Temporal query detected, sorted by date ascending`);
+        console.log(`[answerQuestion] ${isTemporalQuery ? 'Temporal' : 'Name/decision'} query detected, sorted by date ascending`);
       }
       
-      // Take top 20 candidates (increased from 15 to catch older meetings)
+      // Take top 20 candidates (increased to catch older meetings)
       const files = selectedMeetings.slice(0, 20).map(m => ({
         id: m.id,
         name: m.title,
