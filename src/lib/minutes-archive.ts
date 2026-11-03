@@ -86,6 +86,7 @@ export type IndexedDocument = {
   decisions: IndexedDecision[]; // Extracted decisions
   fullTextEmbedding?: number[]; // Lower weight
   indexedAt: string;
+  score?: number; // Relevance score for search ranking
 };
 
 export type AnswerResult = {
@@ -420,84 +421,124 @@ export const incrementalIndex = createServerFn({ method: "POST" }).handler(async
  * Q: "what colour paint were we using for that room?"
  * A: "You decided on red for that room, from the Badlander's Development Meeting on February 19th"
  */
+// Simple keyword scoring for relevance
+function scoreDocRelevance(text: string, query: string): number {
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const stopWords = new Set(['what', 'was', 'is', 'the', 'a', 'an', 'for', 'to', 'of', 'in', 'on', 'at', 'from', 'with', 'about']);
+  const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+  
+  if (queryWords.length === 0) return 0;
+  
+  let score = 0;
+  for (const word of queryWords) {
+    const matches = (lowerText.match(new RegExp(word, 'g')) || []).length;
+    score += Math.log(1 + matches) * 2;
+  }
+  return score;
+}
+
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator((d: { question: string; series?: MeetingSeries }) => d)
   .handler(async ({ data }): Promise<AnswerResult | { error: string }> => {
+    const startTime = Date.now();
+    console.log(`[answerQuestion] Starting query: "${data.question}"`);
+    
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { error: "XAI_API_KEY not configured" };
     }
 
+    const driveStart = Date.now();
     const drive = await getGoogleDriveClient();
     if (!drive) {
       return { error: "Drive client not configured" };
     }
+    console.log(`[answerQuestion] Drive client init: ${Date.now() - driveStart}ms`);
 
     try {
-      // TODO: In production, search indexed decisions + documents from storage
-      // For now, fetch and search in-memory (expensive, but functional)
+      // Use Drive full-text search to preselect candidate docs (FAST: ~200-500ms)
+      const searchStart = Date.now();
+      const queryWords = data.question.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 5);
+      const searchQuery = queryWords.length > 0 
+        ? `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false and (${queryWords.map(w => `fullText contains '${w}'`).join(' or ')})`
+        : `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`;
+      
+      const searchResponse = await drive.files.list({
+        q: searchQuery,
+        fields: "files(id, name, createdTime, modifiedTime)",
+        pageSize: 20, // Top 20 candidates from Drive search
+        orderBy: "modifiedTime desc",
+      });
+      
+      console.log(`[answerQuestion] Drive search: ${Date.now() - searchStart}ms (${searchResponse.data.files?.length || 0} candidates)`);
+      
+      const files = searchResponse.data.files || [];
+      if (files.length === 0) {
+        return {
+          answer: "No meeting records found matching your question.",
+          confidence: "high",
+          sources: [],
+          notFound: true,
+        };
+      }
 
-      // 1. Fetch all documents
+      // Export and score candidates (max 20 docs instead of 83)
+      const exportStart = Date.now();
       const documents: IndexedDocument[] = [];
-      let pageToken: string | undefined;
-
-      do {
-        const response = await drive.files.list({
-          q: `'${FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`,
-          fields: "nextPageToken, files(id, name, createdTime, modifiedTime)",
-          pageSize: PAGE_SIZE,
-          pageToken,
-        });
-
-        const files = response.data.files || [];
-
-        for (const file of files) {
-          if (!file.id || !file.name) continue;
-          
-          // Filter by series if specified
-          if (data.series && detectSeries(file.name) !== data.series) continue;
-
-          try {
-            const exportResponse = await drive.files.export(
-              { fileId: file.id, mimeType: "text/plain" },
-              { responseType: "text" }
-            );
-
-            const fullText = String(exportResponse.data);
-            const parsedDateTime = parseDateTime(fullText);
-            const createdDate = new Date(file.createdTime || "");
-            const extractedDecisions = extractDecisions(fullText);
-
-            documents.push({
-              id: file.id,
-              title: file.name,
-              series: detectSeries(file.name),
-              date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-              time: parsedDateTime?.time || "00:00",
-              createdTime: file.createdTime || "",
-              modifiedTime: file.modifiedTime || "",
-              fullText,
-              decisions: extractedDecisions.map((d, idx) => ({
-                id: `${file.id}-d${idx}`,
-                documentId: file.id || "",
-                documentTitle: file.name || "",
-                meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
-                series: detectSeries(file.name || ""),
-                decisionText: d.text,
-                context: d.context,
-                decisionType: d.type,
+      const MAX_CONCURRENT = 5;
+      
+      for (let i = 0; i < files.length; i += MAX_CONCURRENT) {
+        const batch = files.slice(i, i + MAX_CONCURRENT);
+        const batchResults = await Promise.all(
+          batch.map(async (file) => {
+            if (!file.id || !file.name) return null;
+            if (data.series && detectSeries(file.name) !== data.series) return null;
+            
+            try {
+              const exportResponse = await drive.files.export(
+                { fileId: file.id, mimeType: "text/plain" },
+                { responseType: "text" }
+              );
+              const fullText = String(exportResponse.data);
+              const parsedDateTime = parseDateTime(fullText);
+              const createdDate = new Date(file.createdTime || "");
+              const extractedDecisions = extractDecisions(fullText);
+              
+              return {
+                id: file.id,
+                title: file.name,
+                series: detectSeries(file.name),
+                date: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+                time: parsedDateTime?.time || "00:00",
+                createdTime: file.createdTime || "",
+                modifiedTime: file.modifiedTime || "",
+                fullText,
+                decisions: extractedDecisions.map((d, idx) => ({
+                  id: `${file.id}-d${idx}`,
+                  documentId: file.id || "",
+                  documentTitle: file.name || "",
+                  meetingDate: parsedDateTime?.date || createdDate.toISOString().split("T")[0],
+                  series: detectSeries(file.name || ""),
+                  decisionText: d.text,
+                  context: d.context,
+                  decisionType: d.type,
+                  indexedAt: new Date().toISOString(),
+                })),
                 indexedAt: new Date().toISOString(),
-              })),
-              indexedAt: new Date().toISOString(),
-            });
-          } catch (error) {
-            console.error(`Failed to process ${file.id}:`, error);
-          }
-        }
-
-        pageToken = response.data.nextPageToken || undefined;
-      } while (pageToken);
-
+                score: scoreDocRelevance(fullText + extractedDecisions.map(d => d.text).join(' '), data.question),
+              };
+            } catch (error) {
+              console.error(`Failed to process ${file.id}:`, error);
+              return null;
+            }
+          })
+        );
+        documents.push(...batchResults.filter((d): d is IndexedDocument & { score: number } => d !== null));
+      }
+      
+      console.log(`[answerQuestion] Exported ${documents.length} docs: ${Date.now() - exportStart}ms`);
+      
       if (documents.length === 0) {
         return {
           answer: "No meeting records are available yet.",
@@ -507,8 +548,12 @@ export const answerQuestion = createServerFn({ method: "POST" })
         };
       }
 
-      // 2. Use xAI to answer question based on decisions + full text
-      const decisionsText = documents
+      // Pick top 8 most relevant documents by score
+      const sortedDocs = documents.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
+      console.log(`[answerQuestion] Top 8 scores: ${sortedDocs.map(d => (d.score || 0).toFixed(1)).join(', ')}`);
+
+      // Build compact context from top docs only
+      const decisionsText = sortedDocs
         .flatMap((d) =>
           d.decisions.map(
             (dec) =>
@@ -517,7 +562,7 @@ export const answerQuestion = createServerFn({ method: "POST" })
         )
         .join("\n\n");
 
-      const fullContextText = documents
+      const fullContextText = sortedDocs
         .map((d) => `[MEETING: ${d.title} on ${d.date}]\n${d.fullText}\n===\n`)
         .join("\n");
 
@@ -526,8 +571,8 @@ export const answerQuestion = createServerFn({ method: "POST" })
 PRIORITIZE DECISIONS AND ACTION ITEMS:
 ${decisionsText}
 
-SECONDARY CONTEXT (Full meeting transcripts):
-${fullContextText.slice(0, 50000)} 
+SECONDARY CONTEXT (Top ${sortedDocs.length} relevant meetings):
+${fullContextText.slice(0, 200000)} 
 
 Question: ${data.question}
 
@@ -562,6 +607,8 @@ If nothing found:
   "notFound": true
 }`;
 
+      const xaiStart = Date.now();
+      console.log(`[answerQuestion] Starting xAI request (context: ${decisionsText.length + fullContextText.length} chars)...`);
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -580,7 +627,9 @@ If nothing found:
           ],
           temperature: 0.1,
         }),
+        signal: AbortSignal.timeout(8000), // 8-second timeout
       });
+      console.log(`[answerQuestion] xAI response: ${Date.now() - xaiStart}ms (status: ${response.status})`);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -620,6 +669,7 @@ If nothing found:
           };
         });
 
+        console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
         return {
           answer: parsed.answer,
           confidence: parsed.confidence || "medium",
@@ -627,11 +677,19 @@ If nothing found:
           notFound: parsed.notFound || false,
         };
       } catch (error) {
-        console.error("Parse error:", error, content);
+        console.error("[answerQuestion] Parse error:", error, content);
         return { error: "Failed to parse answer" };
       }
     } catch (error: any) {
-      console.error("Answer error:", error);
+      const elapsed = Date.now() - startTime;
+      console.error(`[answerQuestion] Error after ${elapsed}ms:`, error);
+      
+      // On timeout, return fallback with keyword matches
+      if (error.name === 'TimeoutError' || error.name === 'AbortError' || elapsed > 10000) {
+        console.log(`[answerQuestion] Timeout - returning error`);
+        return { error: `Search timed out after ${Math.round(elapsed/1000)}s. Please try a more specific question.` };
+      }
+      
       return { error: error.message || "Failed to answer question" };
     }
   });

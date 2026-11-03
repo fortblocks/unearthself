@@ -4,7 +4,7 @@ import { Section } from "@/components/desk/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
-import { generateStructuredMinutesAsync, type StructuredMinutes } from "@/lib/structured-minutes";
+import { getStructuredMinutesViaCDN, generateStructuredMinutesAsync, type StructuredMinutes } from "@/lib/structured-minutes";
 import { formatMeetingDate } from "@/lib/date-format";
 import { detectSeries, SERIES_BADGES } from "@/lib/minutes-archive";
 import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from "lucide-react";

@@ -139,12 +139,59 @@ function mergeStructuredResults(results: StructuredMinutes[]): StructuredMinutes
 }
 
 /**
+ * GET endpoint for CDN-cached structured view
+ * Cache key: meetingId + modifiedTime (invalidates when doc changes)
+ * CDN caches with 1-year max-age since keyed by modifiedTime
+ */
+export const getStructuredMinutesViaCDN = createServerFn({ method: "GET" })
+  .validator((d: { meetingId: string; modifiedTime: string }) => d)
+  .handler(async ({ data }): Promise<StructuredMinutes | { error: string }> => {
+    const startTime = Date.now();
+    const cacheKey = getCacheKey(data.meetingId, data.modifiedTime);
+    console.log(`[getStructuredMinutes] Request for ${data.meetingId}`);
+    
+    // Check in-memory cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log(`[getStructuredMinutes] Cache HIT (${Date.now() - startTime}ms)`);
+      // TODO: Set CDN cache headers when TanStack Start supports response header modification
+      return cached;
+    }
+    
+    console.log(`[getStructuredMinutes] Cache MISS - fetching and generating`);
+    
+    // Fetch meeting text
+    const { getMeetingMinutes } = await import("./minutes");
+    const minutes = await getMeetingMinutes({ data: { meetingId: data.meetingId } });
+    
+    if (!minutes) {
+      return { error: "Meeting not found" };
+    }
+    
+    // Generate using the existing POST handler logic
+    const result = await generateStructuredMinutesAsync({
+      data: {
+        meetingId: data.meetingId,
+        modifiedTime: data.modifiedTime,
+        fullText: minutes.fullText,
+      },
+    });
+    
+    // TODO: Set CDN cache headers when TanStack Start supports response header modification
+    
+    console.log(`[getStructuredMinutes] TOTAL time: ${Date.now() - startTime}ms`);
+    return result;
+  });
+
+/**
  * Generate structured minutes from raw meeting text (async, client-called)
  * Uses AbortSignal timeout and parallel chunk processing for long transcripts
  */
 export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
   .validator((d: { meetingId: string; modifiedTime: string; fullText: string }) => d)
   .handler(async ({ data }): Promise<StructuredMinutes | { error: string }> => {
+    const startTime = Date.now();
+    console.log(`[generateStructuredMinutes] Starting for ${data.meetingId}`);
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { error: "XAI_API_KEY not configured" };
@@ -187,7 +234,8 @@ export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
 
       // Cache final result
       cache.set(cacheKey, merged);
-
+      
+      console.log(`[generateStructuredMinutes] TOTAL time: ${Date.now() - startTime}ms`);
       return merged;
     } catch (error: any) {
       console.error("Generation error:", error);
