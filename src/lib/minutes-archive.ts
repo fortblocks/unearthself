@@ -51,6 +51,13 @@ import { createServerFn } from "@tanstack/react-start";
 
 export type MeetingSeries = "badlanders" | "business_dev" | "partner_marketing" | "other";
 
+export const SERIES_BADGES: Record<MeetingSeries, string> = {
+  badlanders: "BDM",
+  business_dev: "BD",
+  partner_marketing: "PM",
+  other: "Other",
+};
+
 export type DecisionType = "decision" | "action_item" | "agreement" | "commitment";
 
 export type IndexedDecision = {
@@ -107,7 +114,7 @@ const PAGE_SIZE = 100; // Google Drive API page size
 /**
  * Detect meeting series from title
  */
-function detectSeries(title: string): MeetingSeries {
+export function detectSeries(title: string): MeetingSeries {
   const lower = title.toLowerCase();
   if (lower.includes("badlander")) return "badlanders";
   if (lower.includes("business development") || lower.includes("bizdev")) return "business_dev";
