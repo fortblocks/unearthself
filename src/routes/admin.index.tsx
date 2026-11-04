@@ -1,16 +1,33 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { Section } from "@/components/desk/Section";
 import { Stat } from "@/components/desk/Stat";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { APEX_ROS, SUITES, TODAY } from "@/data/desk";
 import { buildBrief } from "@/lib/brief";
 import { cad, clock } from "@/lib/format";
 import { openPipeline, partnerFirst, useDesk, weightedPipeline } from "@/lib/desk-store";
 import { listMeetings, getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
+import {
+  extractAllActions,
+  getActionCompletions,
+  markActionComplete,
+  isRedisConfigured,
+} from "@/lib/action-tracking";
+import { formatDateOrdinal } from "@/lib/minutes-archive";
 
 export const Route = createFileRoute("/admin/")({
   component: TodayPage,
   head: () => ({ meta: [{ title: "Today — Unearth Self Desk" }] }),
+  loader: async () => {
+    const [allActions, completions, redisConfigured] = await Promise.all([
+      extractAllActions(),
+      getActionCompletions(),
+      isRedisConfigured(),
+    ]);
+    return { allActions, completions, redisConfigured };
+  },
 });
 
 function occupiedToday(checkIn: string, checkOut: string) {
@@ -32,6 +49,43 @@ function TodayPage() {
   const mineLeads = open.filter((l) => l.owner === lookingAs);
   const mineRisk = risk.filter((r) => r.owner === lookingAs);
   const norahFirst = lookingAs === "norah";
+  
+  // Load action tracking data
+  const { allActions, completions, redisConfigured } = Route.useLoaderData();
+  const [localCompletions, setLocalCompletions] = useState(completions);
+  const [markingComplete, setMarkingComplete] = useState<string | null>(null);
+  
+  // Normalize lookingAs to match PartnerName format (capitalize first letter)
+  const normalizedPartner = (lookingAs.charAt(0).toUpperCase() + lookingAs.slice(1)) as "Lisa" | "Tess" | "Norah" | "Christopher";
+  
+  // Filter for this partner's open actions
+  const completedActionIds = new Set(
+    localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
+  );
+  const myOpenActions = allActions.filter(
+    (a) => a.owner === normalizedPartner && !completedActionIds.has(a.id)
+  );
+  
+  // Handle mark complete
+  const handleMarkComplete = async (actionId: string) => {
+    if (!redisConfigured) return;
+    setMarkingComplete(actionId);
+    try {
+      const result = await markActionComplete({ data: { actionId, completedBy: normalizedPartner } });
+      if (result.ok) {
+        // Add to local completions
+        setLocalCompletions([...localCompletions, {
+          actionId,
+          completedBy: normalizedPartner,
+          completedAt: new Date().toISOString(),
+        }]);
+      }
+    } catch (error) {
+      console.error("Failed to mark action complete:", error);
+    } finally {
+      setMarkingComplete(null);
+    }
+  };
 
   const keys = (
     <Section kicker="Arrivals and keys">
@@ -111,6 +165,38 @@ function TodayPage() {
         <Stat label="Open pipeline" value={String(open.length)} hint={cad(weightedPipeline(leads)) + " weighted"} />
         <Stat label="Open risk" value={String(risk.length)} hint="Waivers, weather, cover" />
       </section>
+
+      {myOpenActions.length > 0 && (
+        <Section
+          kicker="Your actions"
+          action={
+            <Link to="/admin/minutes" className="text-sm font-semibold text-ember">
+              All actions
+            </Link>
+          }
+        >
+          <ul className="divide-y divide-line border-y border-line">
+            {myOpenActions.slice(0, 5).map((action) => (
+              <li key={action.id} className="flex items-start justify-between gap-4 py-3">
+                <div className="flex-1">
+                  <p className="font-semibold">{action.text}</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {formatDateOrdinal(action.meetingDate)} · {action.meetingTitle}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={!redisConfigured || markingComplete === action.id}
+                  onClick={() => handleMarkComplete(action.id)}
+                  className="text-sm px-3 py-1"
+                >
+                  {markingComplete === action.id ? "..." : "Mark complete"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {mineLeads.length + mineRisk.length > 0 ? (
         <Section 
