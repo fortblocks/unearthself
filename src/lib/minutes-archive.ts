@@ -86,6 +86,63 @@ export function escapeDriveQuery(s: string): string {
   return withoutPossessive.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+/**
+ * Convert ISO date (YYYY-MM-DD) to ordinal format (9th October [2025])
+ * Add year only if not current year
+ */
+export function formatDateOrdinal(isoDate: string): string {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return isoDate; // Return as-is if not ISO format
+  
+  const [_, yearStr, monthStr, dayStr] = match;
+  const year = parseInt(yearStr);
+  const month = parseInt(monthStr);
+  const day = parseInt(dayStr);
+  
+  // Get ordinal suffix (1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, 22nd, 23rd, 31st)
+  const getOrdinalSuffix = (d: number): string => {
+    if (d >= 11 && d <= 13) return 'th';
+    const lastDigit = d % 10;
+    if (lastDigit === 1) return 'st';
+    if (lastDigit === 2) return 'nd';
+    if (lastDigit === 3) return 'rd';
+    return 'th';
+  };
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const ordinal = `${day}${getOrdinalSuffix(day)}`;
+  const monthName = monthNames[month - 1];
+  
+  // Add year only if not current year (2026)
+  const currentYear = 2026;
+  const yearSuffix = year !== currentYear ? ` ${year}` : '';
+  
+  return `${ordinal} ${monthName}${yearSuffix}`;
+}
+
+/**
+ * Shorten full names to first name only for known partners
+ * E.g., "Lisa Hamilton" → "Lisa", "Christopher Mair" → "Christopher"
+ * Extract last names from context, don't hard-code
+ */
+export function shortenPartnerNames(text: string): string {
+  // Known partner first names (extracted from transcript contexts)
+  const partnerFirstNames = new Set(['Lisa', 'Tess', 'Norah', 'Christopher', 'Chris']);
+  
+  // Pattern: Known Firstname + Capitalized Lastname
+  // Only shorten if the first name is a known partner
+  return text.replace(/\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g, (match, first, last) => {
+    // Only shorten if first name is a known partner
+    if (partnerFirstNames.has(first)) {
+      return first;
+    }
+    // Keep full name for other capitalized pairs (e.g., "Base Camp")
+    return match;
+  });
+}
+
 export type IndexedDocument = {
   id: string;
   title: string;
@@ -919,13 +976,14 @@ Instructions:
 2. Frame findings as coming from the records: "Looking back over your records...", "The first time I can hear of..."
 3. State dates and names plainly with short sentences - NO bracketed labels like [RECORDED] or [INFERRED]
 4. Distinguish recorded vs inferred in plain words:
-   - For recorded facts: "Christopher Mair described..." or "the team agreed to..."
+   - For recorded facts: "Christopher described..." or "the team agreed to..."
    - For inferred conclusions: "nobody formally voted on it, but it's been the name in use since..." 
    - For not found: "I don't see any record of..."
-5. Use EXACT dates from meeting headers [MEETING: ... on YYYY-MM-DD]
-6. Never invent prior conversations - search has no memory of earlier chats
-7. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
-8. IMPORTANT: A generic noun (e.g., "headquarters", "location", "facility") is NOT evidence of a specific proper name
+5. Use EXACT dates from meeting headers [MEETING: ... on YYYY-MM-DD], but present them as ordinal dates: "9th October", "1st March", "22nd June"
+6. Refer to partners by FIRST NAME ONLY: Lisa, Tess, Norah, Christopher (not "Lisa Hamilton", just "Lisa")
+7. Never invent prior conversations - search has no memory of earlier chats
+8. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
+9. IMPORTANT: A generic noun (e.g., "headquarters", "location", "facility") is NOT evidence of a specific proper name
 
 Example answer shape:
 "Looking back over your records, the first time I can hear of an official name for headquarters was on June 22, and the name I picked up was Base Camp. Christopher Mair described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
@@ -1114,11 +1172,27 @@ IMPORTANT:
         confidence = "low";
       }
 
+      // POST-PROCESS: Convert ISO dates to ordinal format and shorten partner names
+      let processedAnswer = parsed.answer;
+      let processedSources = sourcesWithIds;
+      
+      // Convert all ISO dates (YYYY-MM-DD) to ordinal format
+      processedAnswer = processedAnswer.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
+      
+      // Shorten full names to first names only
+      processedAnswer = shortenPartnerNames(processedAnswer);
+      
+      // Process source excerpts too
+      processedSources = sourcesWithIds.map((s: any) => ({
+        ...s,
+        excerpt: shortenPartnerNames(s.excerpt || ''),
+      }));
+      
       console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
       return {
-        answer: parsed.answer,
+        answer: processedAnswer,
         confidence,
-        sources: sourcesWithIds,
+        sources: processedSources,
         notFound: parsed.notFound || false,
         matchedMeetings: sortedDocs.map(d => ({
           id: d.id,
@@ -1140,8 +1214,11 @@ IMPORTANT:
       }
       
       console.log(`[answerQuestion] TOTAL time: ${elapsed}ms (fatal error)`);
+      // Post-process fallback answer too
+      const processedFallback = fallbackAnswer.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
+      
       return {
-        answer: fallbackAnswer,
+        answer: shortenPartnerNames(processedFallback),
         confidence: "low",
         sources: [],
         notFound: false,
