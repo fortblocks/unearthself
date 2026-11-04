@@ -138,9 +138,15 @@ export function shortenPartnerNames(text: string): string {
     if (partnerFirstNames.has(first)) {
       return first;
     }
-    // Keep full name for other capitalized pairs (e.g., "Base Camp")
+    // Keep full name for other capitalized pairs
     return match;
   });
+}
+
+export function normalizeBasecamp(text: string): string {
+  // Brand rule: "Basecamp" is always one word
+  // Normalize all variants: "Base Camp", "Base camp", "base camp", "Base-Camp" → "Basecamp"
+  return text.replace(/\b[Bb]ase[\s\-][Cc]amp\b/g, 'Basecamp');
 }
 
 export type IndexedDocument = {
@@ -981,12 +987,13 @@ Instructions:
    - For not found: "I don't see any record of..."
 5. Use EXACT dates from meeting headers [MEETING: ... on YYYY-MM-DD], but present them as ordinal dates: "9th October", "1st March", "22nd June"
 6. Refer to partners by FIRST NAME ONLY: Lisa, Tess, Norah, Christopher (not "Lisa Hamilton", just "Lisa")
-7. Never invent prior conversations - search has no memory of earlier chats
-8. Check alternative spellings (e.g., "Basecamp" vs "Base Camp")
-9. IMPORTANT: A generic noun (e.g., "headquarters", "location", "facility") is NOT evidence of a specific proper name
+7. Always write "Basecamp" as ONE WORD (not "Base Camp", "Base camp", or "Base-Camp")
+8. Never invent prior conversations - search has no memory of earlier chats
+9. Check alternative spellings when searching source material
+10. IMPORTANT: A generic noun (e.g., "headquarters", "location", "facility") is NOT evidence of a specific proper name
 
 Example answer shape:
-"Looking back over your records, the first time I can hear of an official name for headquarters was on June 22, and the name I picked up was Base Camp. Christopher Mair described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
+"Looking back over your records, the first time I can hear of an official name for headquarters was on 22nd June, and the name I picked up was Basecamp. Christopher described it as a workstream under Boot Camp. Nobody formally voted on it, but it's been the name in use since then."
 
 Format as JSON:
 {
@@ -1119,7 +1126,7 @@ IMPORTANT:
       // ANSWER-SIDE VALIDATION: Extract proper names from answer and validate sources
       // Wrap in try-catch to prevent validation errors from breaking the entire response
       try {
-        // Proper names are multi-word capitalized phrases (e.g., "Badlands Base Camp")
+        // Proper names are multi-word capitalized phrases (e.g., "Badlands Basecamp")
         const extractProperNames = (text: string): string[] => {
           const names: string[] = [];
           // Match sequences of 2+ capitalized words (allows spaces, hyphens, apostrophes)
@@ -1172,7 +1179,7 @@ IMPORTANT:
         confidence = "low";
       }
 
-      // POST-PROCESS: Convert ISO dates to ordinal format and shorten partner names
+      // POST-PROCESS: Convert ISO dates to ordinal format, shorten partner names, normalize Basecamp
       let processedAnswer = parsed.answer;
       let processedSources = sourcesWithIds;
       
@@ -1182,10 +1189,13 @@ IMPORTANT:
       // Shorten full names to first names only
       processedAnswer = shortenPartnerNames(processedAnswer);
       
+      // Normalize "Base Camp" to "Basecamp" (brand rule: always one word)
+      processedAnswer = normalizeBasecamp(processedAnswer);
+      
       // Process source excerpts too
       processedSources = sourcesWithIds.map((s: any) => ({
         ...s,
-        excerpt: shortenPartnerNames(s.excerpt || ''),
+        excerpt: normalizeBasecamp(shortenPartnerNames(s.excerpt || '')),
       }));
       
       console.log(`[answerQuestion] TOTAL time: ${Date.now() - startTime}ms`);
@@ -1218,7 +1228,7 @@ IMPORTANT:
       const processedFallback = fallbackAnswer.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
       
       return {
-        answer: shortenPartnerNames(processedFallback),
+        answer: normalizeBasecamp(shortenPartnerNames(processedFallback)),
         confidence: "low",
         sources: [],
         notFound: false,
