@@ -5,16 +5,29 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listMeetings, type Meeting } from "@/lib/minutes";
-import { answerQuestion, searchMeetingsKeywords, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
+import { answerQuestion, searchMeetingsKeywords, detectSeries, SERIES_BADGES, type AnswerResult, formatDateOrdinal } from "@/lib/minutes-archive";
 import { formatMeetingDate } from "@/lib/date-format";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, Circle } from "lucide-react";
+import {
+  extractAllActions,
+  getActionCompletions,
+  markActionComplete,
+  undoActionComplete,
+  isRedisConfigured,
+} from "@/lib/action-tracking";
+import { useDesk } from "@/lib/desk-store";
 
 export const Route = createFileRoute("/admin/minutes/")({
   component: MinutesIndexPage,
   head: () => ({ meta: [{ title: "Minutes — Unearth Self Desk" }] }),
   loader: async () => {
-    const meetings = await listMeetings();
-    return { meetings };
+    const [meetings, allActions, completions, redisConfigured] = await Promise.all([
+      listMeetings(),
+      extractAllActions(),
+      getActionCompletions(),
+      isRedisConfigured(),
+    ]);
+    return { meetings, allActions, completions, redisConfigured };
   },
   pendingComponent: () => (
     <div className="grid gap-10">
@@ -89,10 +102,79 @@ type SearchState = {
 };
 
 function MinutesIndexPage() {
-  const { meetings } = Route.useLoaderData();
+  const { meetings, allActions, completions, redisConfigured } = Route.useLoaderData();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchState, setSearchState] = useState<SearchState | null>(null);
+  const lookingAs = useDesk((s) => s.lookingAs);
+  
+  // Local state for completions (updated optimistically)
+  const [localCompletions, setLocalCompletions] = useState(completions);
+  const [markingComplete, setMarkingComplete] = useState<string | null>(null);
+  const [undoing, setUndoing] = useState<string | null>(null);
+  
+  // Normalize lookingAs to match PartnerName format (capitalize first letter)
+  const normalizedPartner = (lookingAs.charAt(0).toUpperCase() + lookingAs.slice(1)) as "Lisa" | "Tess" | "Norah" | "Christopher";
+  
+  // Group actions by completion status and owner
+  const completedActionIds = new Set(
+    localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
+  );
+  const openActions = allActions.filter((a) => !completedActionIds.has(a.id));
+  const completedActions = allActions.filter((a) => completedActionIds.has(a.id));
+  
+  // Group open actions by owner
+  const openByOwner: Record<string, typeof openActions> = {
+    Lisa: [],
+    Tess: [],
+    Norah: [],
+    Christopher: [],
+  };
+  for (const action of openActions) {
+    if (openByOwner[action.owner]) {
+      openByOwner[action.owner].push(action);
+    }
+  }
+  
+  // Handle mark complete
+  const handleMarkComplete = async (actionId: string) => {
+    if (!redisConfigured) return;
+    setMarkingComplete(actionId);
+    try {
+      const result = await markActionComplete({ data: { actionId, completedBy: normalizedPartner } });
+      if (result.ok) {
+        // Add to local completions
+        setLocalCompletions([...localCompletions, {
+          actionId,
+          completedBy: normalizedPartner,
+          completedAt: new Date().toISOString(),
+        }]);
+      }
+    } catch (error) {
+      console.error("Failed to mark action complete:", error);
+    } finally {
+      setMarkingComplete(null);
+    }
+  };
+  
+  // Handle undo
+  const handleUndo = async (actionId: string) => {
+    if (!redisConfigured) return;
+    setUndoing(actionId);
+    try {
+      const result = await undoActionComplete({ data: { actionId, completedBy: normalizedPartner } });
+      if (result.ok) {
+        // Mark as undone in local completions
+        setLocalCompletions(localCompletions.map(c => 
+          c.actionId === actionId ? { ...c, undone: true } : c
+        ));
+      }
+    } catch (error) {
+      console.error("Failed to undo action:", error);
+    } finally {
+      setUndoing(null);
+    }
+  };
 
   const handleSearch = async () => {
     const q = query.trim();
@@ -214,6 +296,89 @@ function MinutesIndexPage() {
 
   return (
     <div className="grid gap-10">
+      {/* Open Actions by Owner */}
+      {openActions.length > 0 && (
+        <Section kicker="Open actions">
+          <div className="space-y-6">
+            {Object.entries(openByOwner).map(([owner, actions]) => {
+              if (actions.length === 0) return null;
+              return (
+                <div key={owner}>
+                  <p className="text-sm font-semibold text-coal mb-3">{owner}</p>
+                  <ul className="divide-y divide-line border-y border-line">
+                    {actions.map((action) => (
+                      <li key={action.id} className="flex items-start justify-between gap-4 py-3">
+                        <div className="flex-1">
+                          <p className="font-semibold">{action.text}</p>
+                          <p className="mt-1 text-sm text-muted">
+                            {formatDateOrdinal(action.meetingDate)} · {action.meetingTitle}
+                          </p>
+                          <p className="mt-1 text-xs text-sandstone border-l-2 border-line pl-2">
+                            {action.excerpt}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          disabled={!redisConfigured || markingComplete === action.id}
+                          onClick={() => handleMarkComplete(action.id)}
+                          className="text-sm px-3 py-1"
+                        >
+                          <Circle className="size-3 mr-1" />
+                          {markingComplete === action.id ? "..." : "Mark complete"}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* Completed Actions */}
+      {completedActions.length > 0 && (
+        <Section kicker="Completed actions">
+          <ul className="divide-y divide-line border-y border-line">
+            {completedActions.map((action) => {
+              const completion = localCompletions.find((c) => c.actionId === action.id && !c.undone);
+              if (!completion) return null;
+              return (
+                <li key={action.id} className="flex items-start justify-between gap-4 py-3">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="size-4 text-teal mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold line-through text-muted">{action.text}</p>
+                        <p className="mt-1 text-sm text-muted">
+                          {formatDateOrdinal(action.meetingDate)} · {action.meetingTitle}
+                        </p>
+                        <p className="mt-1 text-xs text-sandstone">
+                          Completed by {completion.completedBy} on{" "}
+                          {new Date(completion.completedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    disabled={!redisConfigured || undoing === action.id}
+                    onClick={() => handleUndo(action.id)}
+                    className="text-sm px-3 py-1"
+                  >
+                    {undoing === action.id ? "..." : "Undo"}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
       <Section kicker="Search meetings and decisions">
         <div className="border border-line bg-paper p-5">
           <div className="flex gap-2">
