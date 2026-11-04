@@ -2,21 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Section } from "@/components/desk/Section";
 import { Stat } from "@/components/desk/Stat";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { APEX_ROS, SUITES, TODAY } from "@/data/desk";
 import { buildBrief } from "@/lib/brief";
 import { cad, clock } from "@/lib/format";
 import { openPipeline, partnerFirst, useDesk, weightedPipeline } from "@/lib/desk-store";
 import { listMeetings, getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
-import {
-  extractAllActions,
-  getActionCompletions,
-  markActionComplete,
-  isRedisConfigured,
-  type ActionItem,
-} from "@/lib/action-tracking";
-import { formatDateOrdinal } from "@/lib/minutes-archive";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/admin/")({
   component: TodayPage,
@@ -42,40 +32,6 @@ function TodayPage() {
   const mineLeads = open.filter((l) => l.owner === lookingAs);
   const mineRisk = risk.filter((r) => r.owner === lookingAs);
   const norahFirst = lookingAs === "norah";
-  
-  // Fetch actions and completions
-  const queryClient = useQueryClient();
-  const { data: allActions = [] } = useSuspenseQuery({
-    queryKey: ["actions"],
-    queryFn: () => extractAllActions(),
-  });
-  const { data: completions = [] } = useSuspenseQuery({
-    queryKey: ["action-completions"],
-    queryFn: () => getActionCompletions(),
-  });
-  const { data: redisConfigured = false } = useSuspenseQuery({
-    queryKey: ["redis-configured"],
-    queryFn: () => isRedisConfigured(),
-  });
-  
-  // Filter for this partner's open actions
-  const completedActionIds = new Set(
-    completions.filter((c) => !c.undone).map((c) => c.actionId)
-  );
-  // Normalize lookingAs to match PartnerName format (capitalize first letter)
-  const normalizedPartner = (lookingAs.charAt(0).toUpperCase() + lookingAs.slice(1)) as "Lisa" | "Tess" | "Norah" | "Christopher";
-  const myOpenActions = allActions.filter(
-    (a) => a.owner === normalizedPartner && !completedActionIds.has(a.id)
-  );
-  
-  // Mark complete mutation
-  const markCompleteMutation = useMutation({
-    mutationFn: (actionId: string) =>
-      markActionComplete({ data: { actionId, completedBy: normalizedPartner } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["action-completions"] });
-    },
-  });
 
   const keys = (
     <Section kicker="Arrivals and keys">
@@ -148,38 +104,6 @@ function TodayPage() {
           ))}
         </div>
       </section>
-
-      {myOpenActions.length > 0 && (
-        <Section
-          kicker="Your actions"
-          action={
-            <Link to="/admin/minutes" className="text-sm font-semibold text-ember">
-              All actions
-            </Link>
-          }
-        >
-          <ul className="divide-y divide-line border-y border-line">
-            {myOpenActions.slice(0, 5).map((action) => (
-              <li key={action.id} className="flex items-start justify-between gap-4 py-3">
-                <div className="flex-1">
-                  <p className="font-semibold">{action.text}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {formatDateOrdinal(action.meetingDate)} · {action.meetingTitle}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  disabled={!redisConfigured || markCompleteMutation.isPending}
-                  onClick={() => markCompleteMutation.mutate(action.id)}
-                  className="text-sm px-3 py-1"
-                >
-                  {markCompleteMutation.isPending ? "..." : "Mark complete"}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="In house" value={`${inHouse.length} / 4`} hint="Haven keys tonight" />
