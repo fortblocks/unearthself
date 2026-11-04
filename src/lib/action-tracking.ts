@@ -63,31 +63,50 @@ function hashString(text: string): string {
 }
 
 /**
- * Extract partner name from action line
- * Returns null if no partner is named or if non-partner is named
+ * Extract partner names from action line (can be multiple, comma-separated)
+ * Returns array of partner names, empty if none found or all non-partners
  */
-function extractOwner(line: string): PartnerName | null {
-  // Pattern: "[Lisa Hamilton]" or "Lisa:" or "Lisa will" or "Lisa -"
+function extractOwners(line: string): PartnerName[] {
+  // Skip checkbox markers like [ ] or [x]
+  const cleanedLine = line.replace(/\[\s*[xX]?\s*\]/g, '').trim();
+  
+  // Pattern: "Lisa, Tess" or "Lisa Hamilton, Tess Rodriguez" or "Chris" (means Christopher)
+  // Look for owner list at start of line before the action description
+  // Typical format: "[ ] Lisa, Tess - Do something" or "Lisa - Do something"
+  
   const patterns = [
-    /\[([^\]]+)\]/,  // [Name]
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[:–-]/,  // Name: or Name -
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(will|should|needs? to|must|to)\s+/i,  // Name will
+    // Pattern 1: "Lisa, Tess -" or "Lisa, Tess:" at start (after removing checkbox)
+    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)*)\s*[:–-]/,
+    // Pattern 2: "Lisa will" or "Lisa should" (single owner with verb)
+    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(will|should|needs? to|must|to)\s+/i,
   ];
   
   for (const pattern of patterns) {
-    const match = line.match(pattern);
+    const match = cleanedLine.match(pattern);
     if (match) {
-      const name = match[1].trim();
-      // Extract first name
-      const firstName = name.split(/\s+/)[0];
-      // Check if it matches a partner
-      if (PARTNER_NAMES.includes(firstName as PartnerName)) {
-        return firstName as PartnerName;
+      const ownerText = match[1].trim();
+      // Split by comma for multiple owners
+      const nameParts = ownerText.split(/\s*,\s*/);
+      const owners: PartnerName[] = [];
+      
+      for (const namePart of nameParts) {
+        // Extract first name (handles "Lisa Hamilton" -> "Lisa")
+        const firstName = namePart.trim().split(/\s+/)[0];
+        
+        // Map "Chris" to "Christopher"
+        const mappedName = firstName === "Chris" ? "Christopher" : firstName;
+        
+        // Check if it matches a partner
+        if (PARTNER_NAMES.includes(mappedName as PartnerName)) {
+          owners.push(mappedName as PartnerName);
+        }
       }
+      
+      return owners;
     }
   }
   
-  return null;
+  return [];
 }
 
 /**
@@ -220,22 +239,26 @@ export async function extractExplicitActions(
 ): Promise<ActionItem[]> {
   const actions: ActionItem[] = [];
   const lines = fullText.split("\n");
+  const seenLineHashes = new Set<string>();  // To avoid duplicate actions from tab duplication
   
   let inActionSection = false;
-  const actionSectionPattern = /^#{1,3}\s*(suggested next steps?|action items?|next steps?|follow[- ]?ups?|tasks?)/i;
+  // Real format: plain text "Next steps" or "Suggested next steps" (no markdown headers)
+  const actionSectionPattern = /^(suggested next steps?|action items?|next steps?|follow[- ]?ups?|tasks?)$/i;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
     
-    // Detect action section start
+    // Detect action section start (plain text line, not markdown header)
     if (actionSectionPattern.test(trimmed)) {
       inActionSection = true;
       continue;
     }
     
-    // Exit action section on new header
-    if (/^#{1,3}\s/.test(trimmed) && inActionSection) {
+    // Exit action section on new section heading
+    // Look for other common section names to know when to stop
+    const otherSections = /^(discussion|transcript|agenda|attendees|participants|summary|notes|decisions?|open questions?)$/i;
+    if (otherSections.test(trimmed) && inActionSection) {
       inActionSection = false;
       continue;
     }
@@ -246,19 +269,23 @@ export async function extractExplicitActions(
     // Skip empty or very short lines
     if (trimmed.length < 10) continue;
     
-    // Skip lines that don't look like action items (no bullet/number)
-    if (!/^[-•*\d]/.test(trimmed)) continue;
+    // Skip lines that don't look like action items
+    // Real format: "[ ] Lisa, Tess - Do something" or "- Lisa - Do something"
+    const looksLikeAction = /^[-•*\[\d]/.test(trimmed) || /\[\s*[xX]?\s*\]/.test(trimmed);
+    if (!looksLikeAction) continue;
     
-    // Extract owner
-    const owner = extractOwner(trimmed);
-    if (!owner) continue;  // Skip if no partner is named
-    
-    // Generate stable ID from doc id + line hash
+    // Check for duplicates (tab duplication in docs)
     const lineHash = hashString(trimmed);
-    const actionId = `${meetingId}:${lineHash}`;
+    if (seenLineHashes.has(lineHash)) continue;
+    seenLineHashes.add(lineHash);
     
-    // Rewrite the action into short imperative
-    const rewrittenText = await rewriteAction(meetingId, trimmed, owner);
+    // Extract owners (can be multiple)
+    const owners = extractOwners(trimmed);
+    if (owners.length === 0) continue;  // Skip if no partners named
+    
+    // Rewrite the action into short imperative (share cache across all owners, reuse lineHash from above)
+    // Use first owner for rewrite prompt, but same rewrite applies to all
+    const rewrittenText = await rewriteAction(meetingId, trimmed, owners[0]);
     
     // Apply formatting
     let formattedText = rewrittenText;
@@ -272,15 +299,20 @@ export async function extractExplicitActions(
     formattedExcerpt = shortenPartnerNames(formattedExcerpt);
     formattedExcerpt = normalizeBasecamp(formattedExcerpt);
     
-    actions.push({
-      id: actionId,
-      meetingId,
-      meetingDate,
-      meetingTitle: cleanMeetingTitle(meetingTitle),
-      text: formattedText,
-      owner,
-      excerpt: formattedExcerpt,
-    });
+    // Create one action per owner (for shared actions)
+    for (const owner of owners) {
+      const actionId = `${meetingId}:${lineHash}:${owner}`;
+      
+      actions.push({
+        id: actionId,
+        meetingId,
+        meetingDate,
+        meetingTitle: cleanMeetingTitle(meetingTitle),
+        text: formattedText,
+        owner,
+        excerpt: formattedExcerpt,
+      });
+    }
   }
   
   return actions;
