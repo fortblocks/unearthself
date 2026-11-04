@@ -12,35 +12,79 @@ function hashString(text: string): string {
   return createHash("sha256").update(text).digest("hex").substring(0, 12);
 }
 
+function normalizeLine(line: string): string {
+  let normalized = line;
+  
+  // Remove leading bullet markers: - * •
+  normalized = normalized.replace(/^[-*•]\s*/, '');
+  
+  // Remove checkbox markers: [ ], [x], ☐, ☑
+  normalized = normalized.replace(/\[\s*[xX]?\s*\]/, '').trim();
+  normalized = normalized.replace(/[☐☑]/, '').trim();
+  
+  // Remove backslashes (escape characters from markdown)
+  normalized = normalized.replace(/\\/g, '');
+  
+  // Remove ** markers (bold)
+  normalized = normalized.replace(/\*\*/g, '');
+  
+  return normalized.trim();
+}
+
 function extractOwners(line: string): PartnerName[] {
-  const cleanedLine = line.replace(/\[\s*[xX]?\s*\]/g, '').trim();
+  const normalized = normalizeLine(line);
   
-  const patterns = [
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)*)\s*[:–-]/,
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(will|should|needs? to|must|to)\s+/i,
-  ];
+  // Require leading bracket group: ^\[([^\]]+)\]
+  const bracketMatch = normalized.match(/^\[([^\]]+)\]/);
+  if (!bracketMatch) {
+    return [];
+  }
   
-  for (const pattern of patterns) {
-    const match = cleanedLine.match(pattern);
-    if (match) {
-      const ownerText = match[1].trim();
-      const nameParts = ownerText.split(/\s*,\s*/);
-      const owners: PartnerName[] = [];
-      
-      for (const namePart of nameParts) {
-        const firstName = namePart.trim().split(/\s+/)[0];
-        const mappedName = firstName === "Chris" ? "Christopher" : firstName;
-        
-        if (PARTNER_NAMES.includes(mappedName as PartnerName)) {
-          owners.push(mappedName as PartnerName);
-        }
-      }
-      
-      return owners;
+  const ownerText = bracketMatch[1].trim();
+  
+  // Split by comma for multiple owners: "Tess, Christopher Mair" or "Tess Hamilton, Chris"
+  const nameParts = ownerText.split(/\s*,\s*/);
+  const owners: PartnerName[] = [];
+  
+  for (const namePart of nameParts) {
+    // Take first token of each name: "Lisa Hamilton" -> "Lisa", "Christopher Mair" -> "Christopher"
+    const firstName = namePart.trim().split(/\s+/)[0];
+    
+    // Map "Chris" to "Christopher"
+    const mappedName = firstName === "Chris" ? "Christopher" : firstName;
+    
+    // Keep only partners
+    if (PARTNER_NAMES.includes(mappedName as PartnerName)) {
+      owners.push(mappedName as PartnerName);
     }
   }
   
-  return [];
+  return owners;
+}
+
+function extractTitle(line: string): string {
+  const normalized = normalizeLine(line);
+  
+  // Remove bracket group
+  const withoutBracket = normalized.replace(/^\[([^\]]+)\]\s*/, '');
+  
+  // Get text before first colon
+  const colonIndex = withoutBracket.indexOf(':');
+  if (colonIndex === -1) {
+    return withoutBracket.trim();
+  }
+  
+  const title = withoutBracket.substring(0, colonIndex).trim();
+  
+  // Strip braces: {Perform Moisture Test} -> Perform Moisture Test
+  return title.replace(/[{}]/g, '').trim();
+}
+
+function normalizeHeading(line: string): string {
+  return line
+    .replace(/^#+\s*/, '')  // Remove leading #
+    .replace(/\*\*/g, '')   // Remove **
+    .trim();
 }
 
 function extractActionsNoRewrite(fullText: string, meetingId: string, meetingTitle: string) {
@@ -49,46 +93,57 @@ function extractActionsNoRewrite(fullText: string, meetingId: string, meetingTit
   const seenLineHashes = new Set<string>();
   
   let inActionSection = false;
-  const actionSectionPattern = /^(suggested next steps?|action items?|next steps?|follow[- ]?ups?|tasks?)$/i;
-  const otherSections = /^(discussion|transcript|agenda|attendees|participants|summary|notes|decisions?|open questions?)$/i;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
     
-    if (actionSectionPattern.test(trimmed)) {
+    // Normalize heading to check if it's a section header
+    const normalizedHeading = normalizeHeading(trimmed);
+    
+    // Detect action section start: (Suggested) Next steps
+    if (/^(suggested )?next steps$/i.test(normalizedHeading)) {
       inActionSection = true;
       continue;
     }
     
-    if (otherSections.test(trimmed) && inActionSection) {
-      inActionSection = false;
-      continue;
+    // Exit action section on "Details" heading or any other heading
+    if (inActionSection) {
+      // Check if this is a heading (starts with # or looks like a heading)
+      const isHeading = /^#+\s/.test(trimmed) || /^\*\*[^*]+\*\*$/.test(trimmed);
+      if (isHeading) {
+        inActionSection = false;
+        continue;
+      }
     }
     
-    if (!inActionSection || trimmed.length < 10) continue;
+    // Only process lines within action sections
+    if (!inActionSection) continue;
     
-    const looksLikeAction = /^[-•*\[\d]/.test(trimmed) || /\[\s*[xX]?\s*\]/.test(trimmed);
-    if (!looksLikeAction) continue;
+    // Skip empty lines
+    if (!trimmed) continue;
     
-    const lineHash = hashString(trimmed);
-    if (seenLineHashes.has(lineHash)) continue;
-    seenLineHashes.add(lineHash);
+    // Normalize line: remove leading markers, backslashes, ** markers, and checkboxes
+    const normalized = normalizeLine(trimmed);
+    if (!normalized) continue;
     
+    // Extract owners (requires bracket group)
     const owners = extractOwners(trimmed);
     if (owners.length === 0) continue;
     
-    // Clean up the text (remove checkbox and owner prefix)
-    const cleanText = trimmed
-      .replace(/\[\s*[xX]?\s*\]/g, '')
-      .replace(/^[-•*]?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)*\s*[:–-]\s*/, '')
-      .trim();
+    // Dedupe per doc by normalized line
+    const lineHash = hashString(normalized);
+    if (seenLineHashes.has(lineHash)) continue;
+    seenLineHashes.add(lineHash);
+    
+    // Extract title (text before first colon, braces stripped)
+    const title = extractTitle(trimmed);
     
     for (const owner of owners) {
       actions.push({
         owner,
-        text: cleanText.substring(0, 100),
-        excerpt: trimmed.substring(0, 150),
+        text: title,
+        excerpt: title,
         meetingId,
         meetingTitle: meetingTitle.substring(0, 60),
       });

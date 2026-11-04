@@ -63,50 +63,86 @@ function hashString(text: string): string {
 }
 
 /**
- * Extract partner names from action line (can be multiple, comma-separated)
+ * Normalize line: remove leading markers, backslashes, ** markers, and checkboxes
+ * Real format: - [ ] \[Lisa Hamilton\] Email Proposal: <description>
+ * Becomes: [Lisa Hamilton] Email Proposal: <description>
+ */
+function normalizeLine(line: string): string {
+  let normalized = line;
+  
+  // Remove leading bullet markers: - * •
+  normalized = normalized.replace(/^[-*•]\s*/, '');
+  
+  // Remove checkbox markers: [ ], [x], ☐, ☑
+  normalized = normalized.replace(/\[\s*[xX]?\s*\]/, '').trim();
+  normalized = normalized.replace(/[☐☑]/, '').trim();
+  
+  // Remove backslashes (escape characters from markdown)
+  normalized = normalized.replace(/\\/g, '');
+  
+  // Remove ** markers (bold)
+  normalized = normalized.replace(/\*\*/g, '');
+  
+  return normalized.trim();
+}
+
+/**
+ * Extract partner names from action line
+ * Real format after normalization: [Lisa Hamilton] Email Proposal: <description>
  * Returns array of partner names, empty if none found or all non-partners
  */
 function extractOwners(line: string): PartnerName[] {
-  // Skip checkbox markers like [ ] or [x]
-  const cleanedLine = line.replace(/\[\s*[xX]?\s*\]/g, '').trim();
+  const normalized = normalizeLine(line);
   
-  // Pattern: "Lisa, Tess" or "Lisa Hamilton, Tess Rodriguez" or "Chris" (means Christopher)
-  // Look for owner list at start of line before the action description
-  // Typical format: "[ ] Lisa, Tess - Do something" or "Lisa - Do something"
+  // Require leading bracket group: ^\[([^\]]+)\]
+  const bracketMatch = normalized.match(/^\[([^\]]+)\]/);
+  if (!bracketMatch) {
+    return [];
+  }
   
-  const patterns = [
-    // Pattern 1: "Lisa, Tess -" or "Lisa, Tess:" at start (after removing checkbox)
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)*)\s*[:–-]/,
-    // Pattern 2: "Lisa will" or "Lisa should" (single owner with verb)
-    /^[-•*]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(will|should|needs? to|must|to)\s+/i,
-  ];
+  const ownerText = bracketMatch[1].trim();
   
-  for (const pattern of patterns) {
-    const match = cleanedLine.match(pattern);
-    if (match) {
-      const ownerText = match[1].trim();
-      // Split by comma for multiple owners
-      const nameParts = ownerText.split(/\s*,\s*/);
-      const owners: PartnerName[] = [];
-      
-      for (const namePart of nameParts) {
-        // Extract first name (handles "Lisa Hamilton" -> "Lisa")
-        const firstName = namePart.trim().split(/\s+/)[0];
-        
-        // Map "Chris" to "Christopher"
-        const mappedName = firstName === "Chris" ? "Christopher" : firstName;
-        
-        // Check if it matches a partner
-        if (PARTNER_NAMES.includes(mappedName as PartnerName)) {
-          owners.push(mappedName as PartnerName);
-        }
-      }
-      
-      return owners;
+  // Split by comma for multiple owners: "Tess, Christopher Mair" or "Tess Hamilton, Chris"
+  const nameParts = ownerText.split(/\s*,\s*/);
+  const owners: PartnerName[] = [];
+  
+  for (const namePart of nameParts) {
+    // Take first token of each name: "Lisa Hamilton" -> "Lisa", "Christopher Mair" -> "Christopher"
+    const firstName = namePart.trim().split(/\s+/)[0];
+    
+    // Map "Chris" to "Christopher"
+    const mappedName = firstName === "Chris" ? "Christopher" : firstName;
+    
+    // Keep only partners
+    if (PARTNER_NAMES.includes(mappedName as PartnerName)) {
+      owners.push(mappedName as PartnerName);
     }
   }
   
-  return [];
+  return owners;
+}
+
+/**
+ * Extract title from action line (text before first colon, with braces stripped)
+ * Real format: [Lisa Hamilton] Email Proposal: Send proposal to client by Friday
+ * Returns: "Email Proposal"
+ */
+function extractTitle(line: string): string {
+  const normalized = normalizeLine(line);
+  
+  // Remove bracket group
+  const withoutBracket = normalized.replace(/^\[([^\]]+)\]\s*/, '');
+  
+  // Get text before first colon
+  const colonIndex = withoutBracket.indexOf(':');
+  if (colonIndex === -1) {
+    return withoutBracket.trim();
+  }
+  
+  const title = withoutBracket.substring(0, colonIndex).trim();
+  
+  // Strip braces: {Perform Moisture Test} -> Perform Moisture Test
+  return title.replace(/[{}]/g, '').trim();
 }
 
 /**
@@ -229,6 +265,17 @@ function cleanMeetingTitle(title: string): string {
 }
 
 /**
+ * Normalize heading: strip #, *, and whitespace
+ * Real format: ## **Next steps** -> Next steps
+ */
+function normalizeHeading(line: string): string {
+  return line
+    .replace(/^#+\s*/, '')  // Remove leading #
+    .replace(/\*\*/g, '')   // Remove **
+    .trim();
+}
+
+/**
  * Extract action items from ONLY the explicit action sections
  */
 export async function extractExplicitActions(
@@ -239,53 +286,65 @@ export async function extractExplicitActions(
 ): Promise<ActionItem[]> {
   const actions: ActionItem[] = [];
   const lines = fullText.split("\n");
-  const seenLineHashes = new Set<string>();  // To avoid duplicate actions from tab duplication
+  const seenLineHashes = new Set<string>();  // Dedupe per doc by normalized line
   
   let inActionSection = false;
-  // Real format: plain text "Next steps" or "Suggested next steps" (no markdown headers)
-  const actionSectionPattern = /^(suggested next steps?|action items?|next steps?|follow[- ]?ups?|tasks?)$/i;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
     
-    // Detect action section start (plain text line, not markdown header)
-    if (actionSectionPattern.test(trimmed)) {
+    // Normalize heading to check if it's a section header
+    const normalizedHeading = normalizeHeading(trimmed);
+    
+    // Detect action section start: (Suggested) Next steps
+    if (/^(suggested )?next steps$/i.test(normalizedHeading)) {
       inActionSection = true;
       continue;
     }
     
-    // Exit action section on new section heading
-    // Look for other common section names to know when to stop
-    const otherSections = /^(discussion|transcript|agenda|attendees|participants|summary|notes|decisions?|open questions?)$/i;
-    if (otherSections.test(trimmed) && inActionSection) {
-      inActionSection = false;
-      continue;
+    // Exit action section on "Details" heading or any other heading
+    if (inActionSection) {
+      // Check if this is a heading (starts with # or looks like a heading)
+      const isHeading = /^#+\s/.test(trimmed) || /^\*\*[^*]+\*\*$/.test(trimmed);
+      if (isHeading) {
+        inActionSection = false;
+        continue;
+      }
     }
     
     // Only process lines within action sections
     if (!inActionSection) continue;
     
-    // Skip empty or very short lines
-    if (trimmed.length < 10) continue;
+    // Skip empty lines
+    if (!trimmed) continue;
     
-    // Skip lines that don't look like action items
-    // Real format: "[ ] Lisa, Tess - Do something" or "- Lisa - Do something"
-    const looksLikeAction = /^[-•*\[\d]/.test(trimmed) || /\[\s*[xX]?\s*\]/.test(trimmed);
-    if (!looksLikeAction) continue;
+    // Normalize line: remove leading markers, backslashes, ** markers, and checkboxes
+    const normalized = normalizeLine(trimmed);
+    if (!normalized) continue;
     
-    // Check for duplicates (tab duplication in docs)
-    const lineHash = hashString(trimmed);
-    if (seenLineHashes.has(lineHash)) continue;
-    seenLineHashes.add(lineHash);
-    
-    // Extract owners (can be multiple)
+    // Extract owners (requires bracket group)
     const owners = extractOwners(trimmed);
     if (owners.length === 0) continue;  // Skip if no partners named
     
-    // Rewrite the action into short imperative (share cache across all owners, reuse lineHash from above)
-    // Use first owner for rewrite prompt, but same rewrite applies to all
-    const rewrittenText = await rewriteAction(meetingId, trimmed, owners[0]);
+    // Dedupe per doc by normalized line
+    const lineHash = hashString(normalized);
+    if (seenLineHashes.has(lineHash)) continue;
+    seenLineHashes.add(lineHash);
+    
+    // Extract title (text before first colon, braces stripped)
+    const title = extractTitle(trimmed);
+    
+    // Full text after bracket group for description/context
+    const bracketMatch = normalized.match(/^\[([^\]]+)\]\s*/);
+    const description = bracketMatch 
+      ? normalized.substring(bracketMatch[0].length)
+      : normalized;
+    
+    // Rewrite the action into short imperative (share cache across all owners)
+    // Pass title and description as context
+    const contextText = description || title;
+    const rewrittenText = await rewriteAction(meetingId, contextText, owners[0]);
     
     // Apply formatting
     let formattedText = rewrittenText;
@@ -293,8 +352,8 @@ export async function extractExplicitActions(
     formattedText = shortenPartnerNames(formattedText);
     formattedText = normalizeBasecamp(formattedText);
     
-    // Keep verbatim source as excerpt
-    let formattedExcerpt = trimmed;
+    // Keep title as excerpt (already cleaned)
+    let formattedExcerpt = title;
     formattedExcerpt = formattedExcerpt.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
     formattedExcerpt = shortenPartnerNames(formattedExcerpt);
     formattedExcerpt = normalizeBasecamp(formattedExcerpt);
