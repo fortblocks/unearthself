@@ -81,17 +81,45 @@ function validateSources(answer: string, sources: any[]): any[] {
   return validatedSources;
 }
 
+// Mock answer for Lisa's roles (no multi-word proper names)
+const mockLisaAnswer = {
+  answer: "Looking back over your records, Lisa manages the design team and oversees client relationships. She's responsible for project timelines and team coordination.",
+  confidence: "medium",
+  sources: [
+    {
+      documentTitle: "Meeting started 2026/10/27 12:18 PDT - Notes by Gemini",
+      meetingDate: "2026-10-27",
+      excerpt: "[00:15:32] Christopher Mair: Lisa Hamilton will lead the design initiatives going forward",
+      claimType: "recorded",
+      isDecision: false
+    },
+    {
+      documentTitle: "Meeting started 2026/08/26 11:43 PDT - Notes by Gemini",
+      meetingDate: "2026-08-26",
+      excerpt: "[00:22:15] Tess Hamilton: Lisa has been managing client relationships very effectively",
+      claimType: "recorded",
+      isDecision: false
+    }
+  ],
+  notFound: false
+};
+
 // Test suite
 function runTests() {
   console.log('\n🧪 Testing Answer-Side Validation\n');
-  console.log('Ground Truth:');
+  console.log('Test Cases:');
+  console.log('1. Multi-word proper name (Base Camp vs Boot Camp)');
+  console.log('2. Possessive name with no multi-word proper names (Lisa\'s roles)\n');
+  
+  let allTestsPassed = true;
+  
+  console.log('='.repeat(80));
+  console.log('TEST 1: Base Camp proper name validation');
+  console.log('='.repeat(80));
+  console.log('\nGround Truth:');
   console.log('- June 13: "Badlands Boot Camp" only (NOT Base Camp)');
   console.log('- June 18: "Badlands boot camp headquarters" only (NOT Base Camp)');
   console.log('- June 22: "Badlands Base Camp headquarters" (first Base Camp mention)\n');
-  
-  console.log('='.repeat(80));
-  console.log('TEST 1: Mock bad answer claiming June 13 as first "Badlands Base Camp"');
-  console.log('='.repeat(80));
   
   console.log('\n📥 INPUT (mocked model response):');
   console.log('Answer:', mockBadAnswer.answer);
@@ -174,15 +202,74 @@ function runTests() {
     if (!a.passed) allPassed = false;
   });
   
+  // Test 1 results
+  if (!allPassed) allTestsPassed = false;
+  
+  // TEST 2: Lisa's roles (possessive, no multi-word proper names)
   console.log('\n' + '='.repeat(80));
-  if (allPassed) {
+  console.log('TEST 2: Possessive name with no multi-word proper names');
+  console.log('='.repeat(80));
+  
+  console.log('\n📥 INPUT (mocked model response):');
+  console.log('Answer:', mockLisaAnswer.answer);
+  console.log('\nSources:');
+  mockLisaAnswer.sources.forEach((s, i) => {
+    console.log(`  ${i + 1}. ${s.meetingDate}: "${s.excerpt.substring(0, 80)}..."`);
+  });
+  
+  console.log('\n🔍 VALIDATION:');
+  const lisaValidatedSources = validateSources(mockLisaAnswer.answer, mockLisaAnswer.sources);
+  
+  console.log('\n📤 OUTPUT (after validation):');
+  console.log(`Validated sources: ${lisaValidatedSources.length}/${mockLisaAnswer.sources.length}`);
+  lisaValidatedSources.forEach((s, i) => {
+    console.log(`  ${i + 1}. ${s.meetingDate}: "${s.excerpt.substring(0, 80)}..."`);
+  });
+  
+  // Assertions for Test 2
+  console.log('\n✅ ASSERTIONS:');
+  const lisaAssertions = [];
+  
+  // Should NOT extract multi-word proper names (just "Lisa" which is one word)
+  const lisaExtractedNames = extractProperNames(mockLisaAnswer.answer);
+  const hasNoMultiWord = lisaExtractedNames.length === 0;
+  lisaAssertions.push({
+    name: 'No multi-word proper names extracted from Lisa answer',
+    passed: hasNoMultiWord,
+    expected: '0',
+    actual: lisaExtractedNames.length.toString(),
+    details: `Extracted names: [${lisaExtractedNames.join(', ')}]`
+  });
+  
+  // Should keep all sources (validation skipped when no proper names)
+  const allSourcesKept = lisaValidatedSources.length === mockLisaAnswer.sources.length;
+  lisaAssertions.push({
+    name: 'All sources kept (validation skipped)',
+    passed: allSourcesKept,
+    expected: mockLisaAnswer.sources.length.toString(),
+    actual: lisaValidatedSources.length.toString(),
+    details: 'When no multi-word proper names, validation is skipped'
+  });
+  
+  // Print assertions
+  let test2Passed = true;
+  lisaAssertions.forEach(a => {
+    const icon = a.passed ? '✅' : '❌';
+    console.log(`  ${icon} ${a.name}`);
+    console.log(`     Expected: ${a.expected}, Actual: ${a.actual}`);
+    if (a.details) console.log(`     ${a.details}`);
+    if (!a.passed) test2Passed = false;
+  });
+  
+  if (!test2Passed) allTestsPassed = false;
+  
+  // Final summary
+  console.log('\n' + '='.repeat(80));
+  if (allTestsPassed) {
     console.log('✅ ALL TESTS PASSED');
     console.log('='.repeat(80));
-    console.log('\nThe validation correctly:');
-    console.log('- Extracts "Badlands Base Camp" from the answer');
-    console.log('- Drops June 13 (only has "Boot Camp")');
-    console.log('- Drops June 18 (only has "headquarters", no "Base Camp")');
-    console.log('- Keeps June 22 (has "Badlands Base Camp")');
+    console.log('\nTest 1 (Base Camp): Validation correctly drops wrong proper names');
+    console.log('Test 2 (Lisa\'s roles): Validation skipped when no multi-word proper names');
     console.log('\nReady to merge to main.');
     return 0;
   } else {

@@ -999,44 +999,52 @@ IMPORTANT:
         .filter((s: any) => s.documentId && s.documentId.length > 0);
       
       // ANSWER-SIDE VALIDATION: Extract proper names from answer and validate sources
-      // Proper names are multi-word capitalized phrases (e.g., "Badlands Base Camp")
-      const extractProperNames = (text: string): string[] => {
-        const names: string[] = [];
-        // Match sequences of 2+ capitalized words (allows spaces, hyphens, apostrophes)
-        const pattern = /\b([A-Z][a-z]+(?:[\s\-'][A-Z][a-z]+)+)\b/g;
-        let match;
-        while ((match = pattern.exec(text)) !== null) {
-          const name = match[1].trim();
-          if (name.length >= 5) { // Minimum 5 chars to avoid false positives
-            names.push(name);
+      // Wrap in try-catch to prevent validation errors from breaking the entire response
+      try {
+        // Proper names are multi-word capitalized phrases (e.g., "Badlands Base Camp")
+        const extractProperNames = (text: string): string[] => {
+          const names: string[] = [];
+          // Match sequences of 2+ capitalized words (allows spaces, hyphens, apostrophes)
+          const pattern = /\b([A-Z][a-z]+(?:[\s\-'][A-Z][a-z]+)+)\b/g;
+          let match;
+          while ((match = pattern.exec(text)) !== null) {
+            const name = match[1].trim();
+            if (name.length >= 5) { // Minimum 5 chars to avoid false positives
+              names.push(name);
+            }
           }
-        }
-        return Array.from(new Set(names)); // Remove duplicates
-      };
-      
-      const properNamesInAnswer = extractProperNames(parsed.answer || '');
-      
-      if (properNamesInAnswer.length > 0) {
-        console.log(`[answerQuestion] Proper names found in answer: [${properNamesInAnswer.join(', ')}]`);
+          return Array.from(new Set(names)); // Remove duplicates
+        };
         
-        // Normalize for comparison (case-insensitive, collapse spaces/hyphens)
-        const normalize = (s: string) => s.toLowerCase().replace(/[\s\-]+/g, '').trim();
-        const normalizedNames = properNamesInAnswer.map(normalize);
+        const properNamesInAnswer = extractProperNames(parsed.answer || '');
         
-        // Validate: keep sources only if excerpt contains at least one proper name
-        const validatedSources = sourcesWithIds.filter((s: any) => {
-          const normalizedExcerpt = normalize(s.excerpt || '');
-          const containsName = normalizedNames.some(name => normalizedExcerpt.includes(name));
-          if (!containsName) {
-            console.log(`[answerQuestion] Dropping source ${s.meetingDate} - excerpt doesn't contain any proper names`);
+        if (properNamesInAnswer.length > 0) {
+          console.log(`[answerQuestion] Proper names found in answer: [${properNamesInAnswer.join(', ')}]`);
+          
+          // Normalize for comparison (case-insensitive, collapse spaces/hyphens)
+          const normalize = (s: string) => s.toLowerCase().replace(/[\s\-]+/g, '').trim();
+          const normalizedNames = properNamesInAnswer.map(normalize);
+          
+          // Validate: keep sources only if excerpt contains at least one proper name
+          const validatedSources = sourcesWithIds.filter((s: any) => {
+            const normalizedExcerpt = normalize(s.excerpt || '');
+            const containsName = normalizedNames.some(name => normalizedExcerpt.includes(name));
+            if (!containsName) {
+              console.log(`[answerQuestion] Dropping source ${s.meetingDate} - excerpt doesn't contain any proper names`);
+            }
+            return containsName;
+          });
+          
+          if (validatedSources.length < sourcesWithIds.length) {
+            console.log(`[answerQuestion] Post-validation: dropped ${sourcesWithIds.length - validatedSources.length} sources that don't contain proper names`);
+            sourcesWithIds = validatedSources;
           }
-          return containsName;
-        });
-        
-        if (validatedSources.length < sourcesWithIds.length) {
-          console.log(`[answerQuestion] Post-validation: dropped ${sourcesWithIds.length - validatedSources.length} sources that don't contain proper names`);
-          sourcesWithIds = validatedSources;
+        } else {
+          console.log(`[answerQuestion] No multi-word proper names in answer, skipping validation`);
         }
+      } catch (validationError: any) {
+        // If validation fails, log and continue with unvalidated sources
+        console.error(`[answerQuestion] Validation error (continuing with unvalidated sources):`, validationError.message);
       }
       
       // Enforce: never allow HIGH confidence on "not found" answers
