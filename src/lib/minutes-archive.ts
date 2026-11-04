@@ -74,6 +74,18 @@ export type IndexedDecision = {
   indexedAt: string;
 };
 
+/**
+ * Escape a string for use in Drive API query syntax.
+ * Per Drive API docs, escape backslashes and single quotes.
+ * Also strips possessives (Lisa's → Lisa) to avoid query issues.
+ */
+export function escapeDriveQuery(s: string): string {
+  // Strip possessives first
+  const withoutPossessive = s.replace(/['']s$/i, '');
+  // Escape backslashes and single quotes for Drive query syntax
+  return withoutPossessive.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export type IndexedDocument = {
   id: string;
   title: string;
@@ -651,50 +663,65 @@ export async function searchAndAnswer(
       const searchStart = Date.now();
       const stopWords = new Set(['what', 'when', 'where', 'who', 'how', 'why', 'was', 'were', 'is', 'are', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now']);
       
+      // Helper to escape Drive query strings: escape backslashes and single quotes
+      // Exported for testing
+      const escapeDriveQuery = (s: string): string => {
+        return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      };
+      
       const queryWords = question.toLowerCase()
         .split(/\s+/)
-        .filter(w => w.length >= 3 && !stopWords.has(w));
+        .filter(w => w.length >= 3 && !stopWords.has(w))
+        .map(w => w.replace(/['']s$/i, '')); // Strip possessives (Lisa's → Lisa)
       
       let candidateIds: Set<string>;
       
       if (queryWords.length > 0) {
-        // Build folder scoping part of query
-        const folderScope = Array.from(meetingFolderIds).map(id => `'${id}' in parents`).join(' or ');
-        
-        // Build fullText search with generic spacing variants
-        const searchTerms: string[] = [];
-        queryWords.forEach(word => {
-          searchTerms.push(`fullText contains '${word}'`);
-          // Add spacing variant if word contains common separators
-          if (word.includes('-') || word.includes('_')) {
-            const spaced = word.replace(/[-_]/g, ' ');
-            searchTerms.push(`fullText contains '${spaced}'`);
-          }
-        });
-        
-        const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${folderScope}) and (${searchTerms.join(' or ')})`;
-        
-        // Page through all results
-        const driveResults: any[] = [];
-        let pageToken: string | undefined;
-        do {
-          const searchResponse = await drive.files.list({
-            q: searchQuery,
-            fields: "nextPageToken, files(id)",
-            pageSize: 100,
-            pageToken,
+        try {
+          // Build folder scoping part of query
+          const folderScope = Array.from(meetingFolderIds).map(id => `'${id}' in parents`).join(' or ');
+          
+          // Build fullText search with generic spacing variants
+          const searchTerms: string[] = [];
+          queryWords.forEach(word => {
+            searchTerms.push(`fullText contains '${escapeDriveQuery(word)}'`);
+            // Add spacing variant if word contains common separators
+            if (word.includes('-') || word.includes('_')) {
+              const spaced = word.replace(/[-_]/g, ' ');
+              searchTerms.push(`fullText contains '${escapeDriveQuery(spaced)}'`);
+            }
           });
-          driveResults.push(...(searchResponse.data.files || []));
-          pageToken = searchResponse.data.nextPageToken || undefined;
-        } while (pageToken);
-        
-        console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results from ${meetingFolderIds.size} folders)`);
-        
-        candidateIds = new Set(driveResults.map(f => f.id).filter(id => id && allDocIds.has(id)) as string[]);
-        console.log(`[answerQuestion] Filtered to ${candidateIds.size} candidates in our doc set`);
-        
-        if (candidateIds.size === 0) {
-          console.log(`[answerQuestion] Drive returned 0 results, falling back to all meetings`);
+          
+          const searchQuery = `mimeType='application/vnd.google-apps.document' and trashed=false and (${folderScope}) and (${searchTerms.join(' or ')})`;
+          
+          console.log(`[answerQuestion] Drive query: ${searchQuery.substring(0, 200)}...`);
+          
+          // Page through all results
+          const driveResults: any[] = [];
+          let pageToken: string | undefined;
+          do {
+            const searchResponse = await drive.files.list({
+              q: searchQuery,
+              fields: "nextPageToken, files(id)",
+              pageSize: 100,
+              pageToken,
+            });
+            driveResults.push(...(searchResponse.data.files || []));
+            pageToken = searchResponse.data.nextPageToken || undefined;
+          } while (pageToken);
+          
+          console.log(`[answerQuestion] Drive full-text search: ${Date.now() - searchStart}ms (${driveResults.length} raw results from ${meetingFolderIds.size} folders)`);
+          
+          candidateIds = new Set(driveResults.map(f => f.id).filter(id => id && allDocIds.has(id)) as string[]);
+          console.log(`[answerQuestion] Filtered to ${candidateIds.size} candidates in our doc set`);
+          
+          if (candidateIds.size === 0) {
+            console.log(`[answerQuestion] Drive returned 0 results, falling back to all meetings`);
+            candidateIds = allDocIds;
+          }
+        } catch (driveError: any) {
+          // If Drive search fails, degrade gracefully to all meetings
+          console.error(`[answerQuestion] Drive search error (degrading to all meetings):`, driveError.message);
           candidateIds = allDocIds;
         }
       } else {
@@ -981,10 +1008,27 @@ IMPORTANT:
       }
 
       let jsonStr = content;
+      // Try to extract JSON from markdown code blocks
       const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-      if (jsonMatch) jsonStr = jsonMatch[1];
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      } else {
+        // Try to find raw JSON object in response
+        const rawJsonMatch = content.match(/\{[\s\S]*\}/);
+        if (rawJsonMatch) {
+          jsonStr = rawJsonMatch[0];
+        }
+      }
 
-      const parsed = JSON.parse(jsonStr);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (parseError: any) {
+        // If JSON parsing fails, log the response and provide a graceful fallback
+        console.error(`[answerQuestion] JSON parse error:`, parseError.message);
+        console.error(`[answerQuestion] Response content (first 500 chars):`, content.substring(0, 500));
+        throw new Error(`xAI returned invalid JSON: ${parseError.message}`);
+      }
       
       // Add documentId to sources and filter out invented sources
       let sourcesWithIds = (parsed.sources || [])
