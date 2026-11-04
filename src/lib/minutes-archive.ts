@@ -980,6 +980,7 @@ IMPORTANT:
             { role: "user", content: prompt },
           ],
           temperature: 0.1,
+          response_format: { type: "json_object" }, // Force JSON output, prevent markdown
         }),
         signal: AbortSignal.timeout(10000), // 10-second timeout for xAI
       });
@@ -1024,10 +1025,25 @@ IMPORTANT:
       try {
         parsed = JSON.parse(jsonStr);
       } catch (parseError: any) {
-        // If JSON parsing fails, log the response and provide a graceful fallback
-        console.error(`[answerQuestion] JSON parse error:`, parseError.message);
+        // If JSON parsing fails, use the raw text as answer (graceful degradation)
+        console.error(`[answerQuestion] JSON parse error (using raw text as answer):`, parseError.message);
         console.error(`[answerQuestion] Response content (first 500 chars):`, content.substring(0, 500));
-        throw new Error(`xAI returned invalid JSON: ${parseError.message}`);
+        
+        // Strip markdown headings and format markers
+        const cleanedAnswer = content
+          .replace(/\*\*Answer\*\*/gi, '')
+          .replace(/\*\*Sources\*\*/gi, '')
+          .replace(/\*\*Confidence\*\*/gi, '')
+          .replace(/^#+\s+/gm, '') // Remove markdown headings
+          .trim();
+        
+        // Return a valid response with the cleaned text
+        parsed = {
+          answer: cleanedAnswer || "I found some information but couldn't format it properly. Please try rephrasing your question.",
+          confidence: "low",
+          sources: [],
+          notFound: false
+        };
       }
       
       // Add documentId to sources and filter out invented sources
