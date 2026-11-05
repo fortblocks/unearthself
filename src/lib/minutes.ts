@@ -348,6 +348,38 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
     
     console.log(`Collected ${files.length} unique meeting docs from recursive folder search`);
     
+    // Fallback: search for Badlander meeting notes by name (catches docs in recurring meeting folders)
+    // Recurring Meet folders may not be under configured parent; search finds them if SA has access
+    try {
+      const searchQuery = `name contains 'Badlander' and mimeType='application/vnd.google-apps.document' and trashed=false`;
+      const searchResponse = await drive.files.list({
+        q: searchQuery,
+        fields: "files(id, name, createdTime, modifiedTime)",
+        pageSize: 100,
+      });
+      
+      const searchFiles = searchResponse.data.files || [];
+      let addedFromSearch = 0;
+      for (const file of searchFiles) {
+        if (file.id && file.name && !seenFileIds.has(file.id)) {
+          seenFileIds.add(file.id);
+          files.push({
+            id: file.id,
+            name: file.name,
+            createdTime: file.createdTime || "",
+            modifiedTime: file.modifiedTime || "",
+          });
+          addedFromSearch++;
+        }
+      }
+      
+      if (addedFromSearch > 0) {
+        console.log(`Added ${addedFromSearch} additional meeting docs from name search (total: ${files.length})`);
+      }
+    } catch (searchError: any) {
+      console.error(`Fallback search error (continuing with folder results):`, searchError.message);
+    }
+    
     const meetings: Meeting[] = [];
     
     for (const file of files) {

@@ -283,14 +283,20 @@ function isActionSectionEndHeading(normalizedHeading: string): boolean {
 
 /**
  * True for real Gemini checklist/action lines only.
- * Accepts: "- [ ] [Owner] …", "☐ [Owner] …", "[ ] [Owner] …"
+ * Markdown: "- [ ] \[Owner\] …", "☐ [Owner] …"
+ * Plaintext: "* [Owner] …" (NO checkbox in text/plain exports)
  * Rejects bare transcript speaker lines: "[Lisa Hamilton] spoken words…"
  */
 function isChecklistActionLine(line: string): boolean {
   const trimmed = line.trim();
+  // Unicode checkbox at start (plaintext Quick notes)
   if (/^[☐☑]/.test(trimmed)) return true;
+  // Bullet + checkbox: "- [ ] [Owner]" or "* [ ] [Owner]" (markdown with checkbox)
   if (/^[-*•]\s*\[\s*[xX]?\s*\]/.test(trimmed)) return true;
+  // Checkbox alone at start: "[ ] [Owner]" (markdown without bullet)
   if (/^\[\s*[xX]?\s*\]\s+/.test(trimmed)) return true;
+  // Bullet + bracket (NO checkbox): "* [Owner]" (text/plain export format)
+  if (/^[-*•]\s+\[/.test(trimmed)) return true;
   return false;
 }
 
@@ -413,10 +419,12 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
       
       // Create cache key based on meeting IDs and modified times
       // This automatically invalidates when meetings are added/modified
+      // Version namespace: bump when extraction logic changes
+      const CACHE_VERSION = 'v2-plaintext';
       const meetingFingerprint = meetings
         .map((m) => `${m.id}:${m.modifiedTime || ''}`)
         .join('|');
-      const cacheKey = `actions-cache:${hashString(meetingFingerprint)}`;
+      const cacheKey = `actions-cache:${CACHE_VERSION}:${hashString(meetingFingerprint)}`;
       
       // Try cache first
       if (redis) {
