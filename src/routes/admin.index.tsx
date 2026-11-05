@@ -58,12 +58,19 @@ function TodayPage() {
   // Normalize lookingAs to match PartnerName format (capitalize first letter)
   const normalizedPartner = (lookingAs.charAt(0).toUpperCase() + lookingAs.slice(1)) as "Lisa" | "Tess" | "Norah" | "Christopher";
   
-  // Filter for this partner's open actions
+  // Calculate date 30 days ago
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Filter for this partner's open actions from last 30 days
   const completedActionIds = new Set(
     localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
   );
   const myOpenActions = allActions.filter(
-    (a) => a.owner === normalizedPartner && !completedActionIds.has(a.id)
+    (a) => a.owner === normalizedPartner && 
+           !completedActionIds.has(a.id) &&
+           a.meetingDate >= thirtyDaysAgoStr  // Only last 30 days for Today page
   );
   
   // Handle mark complete
