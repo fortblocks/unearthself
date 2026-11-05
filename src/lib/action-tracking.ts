@@ -399,14 +399,40 @@ export async function extractExplicitActions(
 }
 
 /**
- * Extract all actions from all meetings
+ * Extract all actions from all meetings with Redis caching
+ * Cache key includes meeting IDs + modified times for automatic invalidation
  */
 export const extractAllActions = createServerFn({ method: "GET" }).handler(
   async (): Promise<ActionItem[]> => {
     const { listMeetings, getMeetingMinutes } = await import("./minutes");
+    const redis = await getRedisClient();
     
     try {
+      // Get list of meetings (fast metadata fetch)
       const meetings = await listMeetings();
+      
+      // Create cache key based on meeting IDs and modified times
+      // This automatically invalidates when meetings are added/modified
+      const meetingFingerprint = meetings
+        .map((m) => `${m.id}:${m.modifiedTime || ''}`)
+        .join('|');
+      const cacheKey = `actions-cache:${hashString(meetingFingerprint)}`;
+      
+      // Try cache first
+      if (redis) {
+        try {
+          const cached = await redis.get(cacheKey);
+          if (cached && Array.isArray(cached)) {
+            console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings)`);
+            return cached as ActionItem[];
+          }
+        } catch (error) {
+          console.error("[extractAllActions] Cache read error:", error);
+        }
+      }
+      
+      // Cache miss - fetch and process all meetings
+      console.log(`[extractAllActions] Cache MISS - processing ${meetings.length} meetings`);
       const allActions: ActionItem[] = [];
       
       // Process meetings in batches
@@ -438,6 +464,17 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
       
       // Sort by date descending
       allActions.sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
+      
+      // Cache for 5 minutes (300 seconds)
+      // Short TTL ensures fresh data while preventing slow loads
+      if (redis) {
+        try {
+          await redis.set(cacheKey, allActions, { ex: 300 });
+          console.log(`[extractAllActions] Cached ${allActions.length} actions for 5 minutes`);
+        } catch (error) {
+          console.error("[extractAllActions] Cache write error:", error);
+        }
+      }
       
       return allActions;
     } catch (error) {
