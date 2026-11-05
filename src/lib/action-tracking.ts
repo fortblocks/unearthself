@@ -7,9 +7,8 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { formatDateOrdinal, normalizeBasecamp, shortenPartnerNames } from "./minutes-archive";
+import { XAI_MODEL } from "./structured-minutes";
 import { createHash } from "crypto";
-
-const XAI_MODEL = "grok-beta";
 
 // Known partner first names
 const PARTNER_NAMES = ["Lisa", "Tess", "Norah", "Christopher"] as const;
@@ -146,23 +145,28 @@ function extractTitle(line: string): string {
 }
 
 /**
- * Rewrite action line into short imperative using xAI
- * Cached by doc id + line hash
+ * Rewrite a short action title into a short imperative using xAI.
+ * Only the title (text before the first colon) is rewritten.
+ * On any failure, return the clean title unchanged — never post-bracket prose.
+ * Cached by doc id + title hash.
  */
 async function rewriteAction(
   meetingId: string,
-  sourceLine: string,
+  title: string,
   owner: PartnerName
 ): Promise<string> {
+  const cleanTitle = title.trim();
+  if (!cleanTitle) return cleanTitle;
+
   const redis = await getRedisClient();
-  const lineHash = hashString(sourceLine);
+  const lineHash = hashString(cleanTitle);
   const cacheKey = `action-rewrite:${meetingId}:${lineHash}`;
   
   // Check cache first
   if (redis) {
     try {
       const cached = await redis.get(cacheKey);
-      if (cached && typeof cached === "string") {
+      if (cached && typeof cached === "string" && cached.trim()) {
         return cached;
       }
     } catch (error) {
@@ -173,23 +177,18 @@ async function rewriteAction(
   // Rewrite with xAI
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
-    // Fallback: just clean up the source line
-    return sourceLine
-      .replace(/^\[?[^\]]*\]?\s*[:–-]?\s*/i, '')  // Remove owner prefix
-      .replace(/^[-•*]\s*/, '')  // Remove bullet
-      .trim()
-      .substring(0, 100);  // Cap at 100 chars
+    return cleanTitle;
   }
   
-  const prompt = `Rewrite this action item into a clear, short imperative sentence of 12 words maximum.
+  const prompt = `Rewrite this action title into a clear, short imperative of 12 words maximum.
 
-Source: "${sourceLine}"
+Title: "${cleanTitle}"
 Owner: ${owner}
 
 Rules:
-1. Start with a verb (e.g., "Ask", "Review", "Complete", "Schedule", "Send")
+1. Start with a verb when the title is not already imperative (e.g., "Ask", "Review", "Complete", "Schedule", "Send")
 2. Maximum 12 words
-3. Keep all facts from the source - don't add new information
+3. Keep all facts from the title - don't add new information
 4. Remove the owner's name from the text (it's stored separately)
 5. Be specific and actionable
 
@@ -207,7 +206,7 @@ Return ONLY the rewritten action as plain text, no quotes, no explanation.`;
         messages: [
           {
             role: "system",
-            content: "You rewrite action items into short, clear imperatives. Be concise and specific."
+            content: "You rewrite action titles into short, clear imperatives. Be concise and specific."
           },
           { role: "user", content: prompt },
         ],
@@ -222,7 +221,10 @@ Return ONLY the rewritten action as plain text, no quotes, no explanation.`;
     }
     
     const result = await response.json();
-    const rewritten = result.choices?.[0]?.message?.content?.trim() || sourceLine;
+    const rewritten = result.choices?.[0]?.message?.content?.trim();
+    if (!rewritten) {
+      return cleanTitle;
+    }
     
     // Validate: max 12 words
     const wordCount = rewritten.split(/\s+/).length;
@@ -240,12 +242,7 @@ Return ONLY the rewritten action as plain text, no quotes, no explanation.`;
     return finalRewrite;
   } catch (error) {
     console.error("[rewriteAction] xAI error:", error);
-    // Fallback to cleaned source
-    return sourceLine
-      .replace(/^\[?[^\]]*\]?\s*[:–-]?\s*/i, '')
-      .replace(/^[-•*]\s*/, '')
-      .trim()
-      .substring(0, 100);
+    return cleanTitle;
   }
 }
 
@@ -267,12 +264,34 @@ function cleanMeetingTitle(title: string): string {
 /**
  * Normalize heading: strip #, *, and whitespace
  * Real format: ## **Next steps** -> Next steps
+ * Plaintext: Details -> Details
  */
 function normalizeHeading(line: string): string {
   return line
     .replace(/^#+\s*/, '')  // Remove leading #
     .replace(/\*\*/g, '')   // Remove **
     .trim();
+}
+
+/**
+ * True when a normalized heading ends the Next steps section.
+ * Covers markdown (### **Details**) and bare plaintext (Details).
+ */
+function isActionSectionEndHeading(normalizedHeading: string): boolean {
+  return /^(details|transcript|discussion|summary)$/i.test(normalizedHeading);
+}
+
+/**
+ * True for real Gemini checklist/action lines only.
+ * Accepts: "- [ ] [Owner] …", "☐ [Owner] …", "[ ] [Owner] …"
+ * Rejects bare transcript speaker lines: "[Lisa Hamilton] spoken words…"
+ */
+function isChecklistActionLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (/^[☐☑]/.test(trimmed)) return true;
+  if (/^[-*•]\s*\[\s*[xX]?\s*\]/.test(trimmed)) return true;
+  if (/^\[\s*[xX]?\s*\]\s+/.test(trimmed)) return true;
+  return false;
 }
 
 /**
@@ -303,11 +322,17 @@ export async function extractExplicitActions(
       continue;
     }
     
-    // Exit action section on "Details" heading or any other heading
+    // Exit action section on Details / Transcript / Discussion / Summary
+    // (same normalizeHeading path as Next steps — works for bare plaintext and markdown)
+    if (inActionSection && isActionSectionEndHeading(normalizedHeading)) {
+      inActionSection = false;
+      continue;
+    }
+
+    // Exit on any other markdown heading (## / **Title**) that is not Next steps
     if (inActionSection) {
-      // Check if this is a heading (starts with # or looks like a heading)
-      const isHeading = /^#+\s/.test(trimmed) || /^\*\*[^*]+\*\*$/.test(trimmed);
-      if (isHeading) {
+      const isMarkdownHeading = /^#+\s/.test(trimmed) || /^\*\*[^*]+\*\*$/.test(trimmed);
+      if (isMarkdownHeading && !/^(suggested )?next steps$/i.test(normalizedHeading)) {
         inActionSection = false;
         continue;
       }
@@ -318,6 +343,9 @@ export async function extractExplicitActions(
     
     // Skip empty lines
     if (!trimmed) continue;
+
+    // Only real checklist/action lines — never bare transcript speaker labels
+    if (!isChecklistActionLine(trimmed)) continue;
     
     // Normalize line: remove leading markers, backslashes, ** markers, and checkboxes
     const normalized = normalizeLine(trimmed);
@@ -332,22 +360,15 @@ export async function extractExplicitActions(
     if (seenLineHashes.has(lineHash)) continue;
     seenLineHashes.add(lineHash);
     
-    // Extract title (text before first colon, braces stripped)
+    // Extract title (text before first colon, braces stripped) — this is the UI text source
     const title = extractTitle(trimmed);
+    if (!title) continue;
     
-    // Full text after bracket group for description/context
-    const bracketMatch = normalized.match(/^\[([^\]]+)\]\s*/);
-    const description = bracketMatch 
-      ? normalized.substring(bracketMatch[0].length)
-      : normalized;
-    
-    // Rewrite the action into short imperative (share cache across all owners)
-    // Pass title and description as context
-    const contextText = description || title;
-    const rewrittenText = await rewriteAction(meetingId, contextText, owners[0]);
+    // Rewrite only the short title (never post-bracket prose). On failure, keep the title.
+    const rewrittenText = await rewriteAction(meetingId, title, owners[0]);
     
     // Apply formatting
-    let formattedText = rewrittenText;
+    let formattedText = rewrittenText || title;
     formattedText = formattedText.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
     formattedText = shortenPartnerNames(formattedText);
     formattedText = normalizeBasecamp(formattedText);
