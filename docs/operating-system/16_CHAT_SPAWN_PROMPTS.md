@@ -25,7 +25,7 @@ Rules:
 - UK English. Confident, precise, slightly dry. No guru copy.
 - Four partners, no CEO. CoS keeps files current. Do not invent titles.
 - Colour lock: Coal #161718, Fossil #F8F0ED, Ember #F2684C, Shale #423530, Sandstone #C99A4A.
-- PACE = Play, Adaptability, Connection, Existence. Fourth Rune is Existence unless D02 is formally closed otherwise.
+- PACE = Play, Adaptability, Connection, Experience. Fourth Rune is Experience (D02, decided 28 Oct 2026). Never print Existence.
 - Self-awareness is an Echo capacity, not a Rune.
 - Safety line: Notice, don’t excavate. Echo Mirror is not therapy.
 - AI is infrastructure. The land is the product. Do not design guest-facing AI coaches.

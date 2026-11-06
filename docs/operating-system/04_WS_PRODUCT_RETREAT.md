@@ -3,7 +3,7 @@
 **Code:** RETREAT  
 **Status:** Working MVP — sellable, still being forged  
 **Primary source:** *Unearth Self MVP.pdf* (118 pp, current as of 10 Sep 2026). Architecture pp. 1–19. Day 1 run-of-show from p. 34. Adaptability field quest from pp. 56–110.  
-**Do not treat as current:** p. 21 five-principle schedule (Play / Self-awareness / Adaptability / Connection / Presence). Self-awareness is an Echo capacity. Fourth Rune is Existence unless D02 closes otherwise.
+**Do not treat as current:** p. 21 five-principle schedule (Play / Self-awareness / Adaptability / Connection / Presence). Self-awareness is an Echo capacity. Fourth Rune is Experience (D02, decided by Christopher 28 Oct 2026).
 
 ## Job of this workstream
 
@@ -18,9 +18,9 @@ Turn PACE into a bookable, repeatable 2–5 day expedition that a facilitator ca
 | First evening | Play | P | Basecamp HQ |
 | Second-day morning | Adaptability | P + A | Horseshoe Canyon |
 | Second-day afternoon | Connection | P + A + C | Downtown Drumheller (geofenced) |
-| Final day | Existence | P + A + C + E | Rosedale acreage → fossil shop → Eleven Bridges → Last Chance Saloon (route unconfirmed) |
+| Final day | Experience | P + A + C + E | Rosedale acreage → fossil shop → Eleven Bridges → Last Chance Saloon (route unconfirmed) |
 
-Existence is the evolution of the forged Rune **Presence**. Self-awareness is not a Rune.
+Experience is the evolution of the forged Rune **Presence** (Existence was an interim name). Self-awareness is not a Rune.
 
 ### Working principles
 
@@ -30,7 +30,7 @@ Existence is the evolution of the forged Rune **Presence**. Self-awareness is no
   *What response fits the conditions now?*
 - **Connection** — the capacity to remain in meaningful contact with self and others while listening, contributing and allowing difference to exist.  
   *How do we make contact without disappearing, dominating or assuming?*
-- **Existence** — meeting the here and now as one’s point of contact with life, time, Earth and meaningful action.  
+- **Experience** — meeting the here and now as one’s point of contact with life, time, Earth and meaningful action.  
   *How will I meet this moment, and how do I want my existence to imprint the world?*
 
 ### Experience loop (every Rune)
@@ -75,7 +75,7 @@ Geofenced scavenger with briefed partners. Optional purchase, optional stranger 
 
 Town pack is thinner than Adaptability. Do not invent businesses.
 
-### Final day — Existence
+### Final day — Experience
 
 Rosedale acreage → fossil shop → Eleven Bridges → Last Chance as a possible close. Route, permits, access: D07. Grounding, not religious, not overwhelming.
 
@@ -126,7 +126,7 @@ Local 12-week Transformation Programme is Phase 2, not the November sales object
 - Physical Rune objects and Rune Keeper
 - Facilitator named + backup
 - Pre/post 9-question pulse in the instance
-- Exact Connection and Existence app beats (Adaptability is the only fully written field quest)
+- Exact Connection and Experience app beats (Adaptability is the only fully written field quest)
 
 ## Definition of done for first paid pilot
 
@@ -141,3 +141,4 @@ Local 12-week Transformation Programme is Phase 2, not the November sales object
 
 - 2026-09-08 — PACE + Existence declared current. Presence demoted to predecessor of Existence. Self-awareness locked as Echo capacity.
 - 2026-09-10 — Full MVP PDF ingested. Day 1 and Adaptability field quest pulled into this file. Receive / Reveal / Activate locked. App detail lives in `09`. p. 21 five-principle schedule marked archive.
+- 2026-11-02 — Fourth Rune renamed Existence → Experience per D02 (Christopher, 28 Oct 2026).
