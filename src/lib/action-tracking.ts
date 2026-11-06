@@ -425,155 +425,22 @@ export type ExtractionResult = {
  */
 export const extractAllActions = createServerFn({ method: "GET" }).handler(
   async (): Promise<ExtractionResult> => {
+    // Auth guard - must throw before pipeline execution
     const { requireStaffSession } = await import("./staff-session");
     await requireStaffSession();
     
+    // Use production pipeline with real dependencies injected
+    const { runExtractionPipeline } = await import("./action-extraction-pipeline");
     const { listMeetings, getMeetingMinutes } = await import("./minutes");
-    const redis = await getRedisClient();
     
-    const errors: Array<{ stage: string; code: string }> = [];
-    const extractStart = Date.now();
-    let cacheHit = false;
-    let durationMs: number | undefined;
-    
-    try {
-      // Get list of meetings (fast metadata fetch)
-      let meetings: Awaited<ReturnType<typeof listMeetings>>;
-      try {
-        meetings = await listMeetings();
-      } catch (error: any) {
-        console.error("[extractAllActions] Discovery failed:", error);
-        return {
-          actions: [],
-          diagnostic: {
-            cacheHit: false,
-            meetingsProcessed: 0,
-            meetingsFailed: 0,
-            latestMeetingDate: null,
-            errors: [{ stage: 'discovery', code: 'LIST_FAILED' }],
-          },
-        };
-      }
-      
-      // Find actual latest date, don't assume sort order
-      const latestMeetingDate = meetings.length > 0 
-        ? meetings.reduce((max, m) => m.date > max ? m.date : max, meetings[0].date)
-        : null;
-      
-      // Create cache key based on meeting IDs and modified times
-      // This automatically invalidates when meetings are added/modified
-      // Version namespace: bump when extraction logic changes
-      const CACHE_VERSION = 'v2-plaintext';
-      const meetingFingerprint = meetings
-        .map((m) => `${m.id}:${m.modifiedTime || ''}`)
-        .join('|');
-      const cacheKey = `actions-cache:${CACHE_VERSION}:${hashString(meetingFingerprint)}`;
-      
-      // Try cache first
-      if (redis) {
-        try {
-          const cached = await redis.get(cacheKey);
-          if (cached && Array.isArray(cached)) {
-            cacheHit = true;
-            durationMs = Date.now() - extractStart;
-            console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings, ${durationMs}ms)`);
-            return {
-              actions: cached as ActionItem[],
-              diagnostic: {
-                cacheHit: true,
-                durationMs,
-                meetingsProcessed: meetings.length,
-                meetingsFailed: 0,
-                latestMeetingDate,
-                errors: [],
-              },
-            };
-          }
-        } catch (error: any) {
-          console.error("[extractAllActions] Cache read error:", error);
-          errors.push({ stage: 'cache-read', code: 'REDIS_ERROR' });
-        }
-      }
-      
-      // Cache miss - fetch and process all meetings
-      console.log(`[extractAllActions] Cache MISS - processing ${meetings.length} meetings`);
-      const allActions: ActionItem[] = [];
-      let meetingsFailed = 0;
-      
-      // Process meetings in batches
-      const BATCH_SIZE = 5;  // Smaller batch due to xAI calls
-      for (let i = 0; i < meetings.length; i += BATCH_SIZE) {
-        const batch = meetings.slice(i, i + BATCH_SIZE);
-        const batchPromises = batch.map(async (meeting) => {
-          try {
-            const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
-            if (!minutes) {
-              meetingsFailed++;
-              console.error(`[extractAllActions] Export null for meeting ${meeting.id}`);
-              errors.push({ stage: 'export', code: 'NULL_RESULT' });
-              return [];
-            }
-            
-            return await extractExplicitActions(
-              meeting.id,
-              meeting.date,
-              meeting.title,
-              minutes.fullText
-            );
-          } catch (error: any) {
-            meetingsFailed++;
-            console.error(`[extractAllActions] Failed meeting ${meeting.id}:`, error);
-            errors.push({ stage: 'export', code: 'EXPORT_FAILED' });
-            return [];
-          }
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        for (const actions of batchResults) {
-          allActions.push(...actions);
-        }
-      }
-      
-      // Sort by date descending
-      allActions.sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
-      
-      // Cache for 5 minutes (300 seconds) - only cache actions, not diagnostic
-      // Short TTL ensures fresh data while preventing slow loads
-      if (redis && meetingsFailed === 0) {
-        try {
-          await redis.set(cacheKey, allActions, { ex: 300 });
-          console.log(`[extractAllActions] Cached ${allActions.length} actions for 5 minutes`);
-        } catch (error: any) {
-          console.error("[extractAllActions] Cache write error:", error);
-          errors.push({ stage: 'cache-write', code: 'REDIS_ERROR' });
-        }
-      }
-      
-      durationMs = Date.now() - extractStart;
-      return {
-        actions: allActions,
-        diagnostic: {
-          cacheHit: false,
-          durationMs,
-          meetingsProcessed: meetings.length,
-          meetingsFailed,
-          latestMeetingDate,
-          errors,
-        },
-      };
-    } catch (error: any) {
-      console.error("[extractAllActions] Fatal extraction error:", error);
-      return {
-        actions: [],
-        diagnostic: {
-          cacheHit: false,
-          meetingsProcessed: 0,
-          meetingsFailed: 0,
-          latestMeetingDate: null,
-          errors: [{ stage: 'extraction', code: 'FATAL_ERROR' }],
-        },
-      };
-    }
+    return runExtractionPipeline({
+      listMeetings: async () => await listMeetings(),
+      getMeetingMinutes: async (meetingId: string) => 
+        await getMeetingMinutes({ data: { meetingId } }),
+      extractExplicitActions,
+      getRedisClient,
+      hashString,
+    });
   }
 );
 
