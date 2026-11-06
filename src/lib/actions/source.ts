@@ -1,12 +1,13 @@
 import { extractAllActions, getActionCompletions, isRedisConfigured } from "../action-tracking";
+import { sectionSources } from "../today/registry";
 import { devFixtureRequested } from "./dev-fixture";
 import { loadSampleActions } from "./sample-actions";
 import { ACTIONS_LOAD_TIMEOUT_MS, type ActionsBundle, type ActionsDataSource, type SourceMode } from "./types";
 import { isAbortError, loadWithTimeout } from "./timeout";
 import { bundleFromExtraction, failureBundle, timeoutBundle } from "./view";
 
-/** Live Drive pipeline. Change this to "sample" only for a labelled fixture. */
-export const ACTIONS_SOURCE_MODE: SourceMode = "live";
+/** Live Drive pipeline unless the section registry is switched to the labelled fixture. */
+export const ACTIONS_SOURCE_MODE: SourceMode = sectionSources.actions;
 
 export async function loadLiveActions(signal?: AbortSignal): Promise<ActionsBundle> {
   try {

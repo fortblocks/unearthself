@@ -172,8 +172,9 @@ test("admin loaders do not await action extraction", () => {
   const today = readFileSync(new URL("../../routes/admin.index.tsx", import.meta.url), "utf8");
   assert.equal(minutes.includes("extractAllActions"), false);
   assert.equal(today.includes("extractAllActions"), false);
-  assert.match(minutes, /await listMeetings\(\)/);
   const minutesLoader = minutes.slice(minutes.indexOf("loader:"), minutes.indexOf("pendingComponent"));
   assert.equal(minutesLoader.includes("extractAllActions"), false);
-  assert.match(minutesLoader, /listMeetings/);
+  assert.match(minutesLoader, /fetchMeetingList/);
+  const minutesSource = readFileSync(new URL("../today/sources/minutes.ts", import.meta.url), "utf8");
+  assert.match(minutesSource, /listMeetings/);
 });
