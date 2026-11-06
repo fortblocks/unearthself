@@ -473,6 +473,17 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
       // Sort by date descending
       allActions.sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
       
+      // Safe diagnostics (partner counts only, no action text)
+      const partnerCounts = {
+        Lisa: allActions.filter(a => a.owner === 'Lisa').length,
+        Tess: allActions.filter(a => a.owner === 'Tess').length,
+        Christopher: allActions.filter(a => a.owner === 'Christopher').length,
+        Norah: allActions.filter(a => a.owner === 'Norah').length,
+      };
+      console.log(`[extractAllActions] Processed ${meetings.length} meetings`);
+      console.log(`[extractAllActions] Extracted ${allActions.length} total actions`);
+      console.log(`[extractAllActions] Partner counts:`, JSON.stringify(partnerCounts));
+      
       // Cache for 5 minutes (300 seconds)
       // Short TTL ensures fresh data while preventing slow loads
       if (redis) {

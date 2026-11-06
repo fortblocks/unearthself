@@ -35,8 +35,22 @@ const NAV = [
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
+// Dynamic date for Today page (America/Edmonton timezone)
+function getTodayKicker(): string {
+  const today = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Edmonton'
+  });
+  // Format: "Wednesday 5 November 2026" (remove comma after day)
+  return formatter.format(today).replace(',', '');
+}
+
 const PAGE: Record<string, { kicker: string; title: string }> = {
-  "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
+  "/admin": { kicker: getTodayKicker(), title: "Today" },
   "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
   "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
   "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },

@@ -20,6 +20,16 @@ export const Route = createFileRoute("/admin/")({
       getActionCompletions(),
       isRedisConfigured(),
     ]);
+    
+    // Safe diagnostics: log action counts per partner
+    const partnerTotals = {
+      Lisa: allActions.filter(a => a.owner === 'Lisa').length,
+      Tess: allActions.filter(a => a.owner === 'Tess').length,
+      Christopher: allActions.filter(a => a.owner === 'Christopher').length,
+      Norah: allActions.filter(a => a.owner === 'Norah').length,
+    };
+    console.log('[Today loader] All actions by partner:', JSON.stringify(partnerTotals));
+    
     return { allActions, completions, redisConfigured };
   },
 });
@@ -44,11 +54,20 @@ function TodayPage() {
   const completedActionIds = new Set(
     localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
   );
+  // Count actions before filtering
+  const beforeDate = allActions.filter(a => a.owner === normalizedPartner).length;
+  const afterDate = allActions.filter(a => a.owner === normalizedPartner && a.meetingDate >= thirtyDaysAgoStr).length;
+  
   const myOpenActions = allActions.filter(
     (a) => a.owner === normalizedPartner && 
            !completedActionIds.has(a.id) &&
            a.meetingDate >= thirtyDaysAgoStr  // Only last 30 days for Today page
   );
+  
+  // Safe diagnostics: log filtering stages
+  console.log(`[Today/${normalizedPartner}] Total actions for partner: ${beforeDate}`);
+  console.log(`[Today/${normalizedPartner}] After date filter (>= ${thirtyDaysAgoStr}): ${afterDate}`);
+  console.log(`[Today/${normalizedPartner}] After completions filter: ${myOpenActions.length}`);
   
   // Handle mark complete
   const handleMarkComplete = async (actionId: string) => {

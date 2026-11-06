@@ -430,6 +430,17 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
       return b.time.localeCompare(a.time);
     });
     
+    // Safe diagnostics (no secrets, no full content)
+    const latestDate = meetings.length > 0 ? meetings[0].date : 'none';
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoff = thirtyDaysAgo.toISOString().split('T')[0];
+    const recentCount = meetings.filter(m => m.date >= cutoff).length;
+    
+    console.log(`[listMeetings] Discovered ${meetings.length} total meeting docs`);
+    console.log(`[listMeetings] Latest meeting date: ${latestDate}`);
+    console.log(`[listMeetings] Meetings in last 30 days (>= ${cutoff}): ${recentCount}`);
+    
     // Cache the result
     meetingListCache = {
       data: meetings,
