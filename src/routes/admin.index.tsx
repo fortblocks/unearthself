@@ -8,19 +8,80 @@ import {
   getActionCompletions,
   markActionComplete,
   isRedisConfigured,
+  type ActionItem,
 } from "@/lib/action-tracking";
 import { formatDateOrdinal } from "@/lib/minutes-archive";
+
+type DiagnosticInfo = {
+  timestamp: string;
+  cacheHit: boolean;
+  cacheAge?: number;
+  discoveredMeetings: number;
+  latestMeetingDate: string | null;
+  extractedTotal: number;
+  partnerCounts: Record<string, number>;
+  errors: string[];
+};
 
 export const Route = createFileRoute("/admin/")({
   component: TodayPage,
   head: () => ({ meta: [{ title: "Today — Unearth Self Desk" }] }),
   loader: async () => {
-    const [allActions, completions, redisConfigured] = await Promise.all([
-      extractAllActions(),
-      getActionCompletions(),
-      isRedisConfigured(),
+    const errors: string[] = [];
+    
+    let allActions: ActionItem[] = [];
+    let discoveredMeetings = 0;
+    let latestMeetingDate: string | null = null;
+    let cacheHit = false;
+    let cacheAge: number | undefined;
+    
+    try {
+      // Get meetings list (fast, no export work)
+      const { listMeetings } = await import("@/lib/minutes");
+      const meetings = await listMeetings();
+      discoveredMeetings = meetings.length;
+      latestMeetingDate = meetings.length > 0 ? meetings[0].date : null;
+      
+      // Extract actions (may hit cache)
+      const extractStart = Date.now();
+      allActions = await extractAllActions();
+      const extractDuration = Date.now() - extractStart;
+      
+      // Cache hit heuristic: < 100ms for extraction suggests cache
+      cacheHit = extractDuration < 100 && allActions.length > 0;
+      if (cacheHit) {
+        cacheAge = extractDuration;
+      }
+    } catch (error: any) {
+      errors.push(`Extraction failed: ${error.message}`);
+    }
+    
+    const [completions, redisConfigured] = await Promise.all([
+      getActionCompletions().catch((e: any) => {
+        errors.push(`Completions fetch failed: ${e.message}`);
+        return [];
+      }),
+      isRedisConfigured().catch(() => false),
     ]);
-    return { allActions, completions, redisConfigured };
+    
+    // Diagnostic info (no extra work, just counts)
+    const diagnostic: DiagnosticInfo = {
+      timestamp: new Date().toISOString(),
+      cacheHit,
+      cacheAge,
+      discoveredMeetings,
+      latestMeetingDate,
+      extractedTotal: allActions.length,
+      partnerCounts: {
+        Lisa: allActions.filter(a => a.owner === 'Lisa').length,
+        Tess: allActions.filter(a => a.owner === 'Tess').length,
+        Christopher: allActions.filter(a => a.owner === 'Christopher').length,
+        Norah: allActions.filter(a => a.owner === 'Norah').length,
+      },
+      errors,
+    };
+    
+    return { allActions, completions, redisConfigured, diagnostic };
   },
 });
 
@@ -28,7 +89,7 @@ function TodayPage() {
   const lookingAs = useDesk((s) => s.lookingAs);
   
   // Load action tracking data
-  const { allActions, completions, redisConfigured } = Route.useLoaderData();
+  const { allActions, completions, redisConfigured, diagnostic } = Route.useLoaderData();
   const [localCompletions, setLocalCompletions] = useState(completions);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   
@@ -44,11 +105,23 @@ function TodayPage() {
   const completedActionIds = new Set(
     localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
   );
+  const beforeDate = allActions.filter(a => a.owner === normalizedPartner).length;
+  const afterDate = allActions.filter(a => a.owner === normalizedPartner && a.meetingDate >= thirtyDaysAgoStr).length;
+  
   const myOpenActions = allActions.filter(
     (a) => a.owner === normalizedPartner && 
            !completedActionIds.has(a.id) &&
            a.meetingDate >= thirtyDaysAgoStr  // Only last 30 days for Today page
   );
+  
+  // Per-partner filtering diagnostic
+  const partnerDiagnostic = {
+    partner: normalizedPartner,
+    totalForPartner: beforeDate,
+    afterDateFilter: afterDate,
+    afterCompletions: myOpenActions.length,
+    dateFilterCutoff: thirtyDaysAgoStr,
+  };
   
   // Handle mark complete
   const handleMarkComplete = async (actionId: string) => {
@@ -137,6 +210,42 @@ function TodayPage() {
           </div>
         </Section>
       )}
+      
+      {/* Authenticated-only diagnostic info (hidden, for debugging) */}
+      <details className="mt-10 border border-line bg-paper p-4 text-xs font-mono">
+        <summary className="cursor-pointer font-semibold text-coal">Diagnostic Info</summary>
+        <div className="mt-4 space-y-2">
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Discovery & Extraction</p>
+            <p>Timestamp: {diagnostic.timestamp}</p>
+            <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.cacheAge ? `(${diagnostic.cacheAge}ms)` : ''}</p>
+            <p>Discovered meetings: {diagnostic.discoveredMeetings}</p>
+            <p>Latest meeting date: {diagnostic.latestMeetingDate || 'none'}</p>
+            <p>Total extracted actions: {diagnostic.extractedTotal}</p>
+          </div>
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Partner Counts (All Actions)</p>
+            <p>Lisa: {diagnostic.partnerCounts.Lisa}</p>
+            <p>Tess: {diagnostic.partnerCounts.Tess}</p>
+            <p>Christopher: {diagnostic.partnerCounts.Christopher}</p>
+            <p>Norah: {diagnostic.partnerCounts.Norah}</p>
+          </div>
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Filtering Stages ({partnerDiagnostic.partner})</p>
+            <p>Total for partner: {partnerDiagnostic.totalForPartner}</p>
+            <p>After date filter (≥ {partnerDiagnostic.dateFilterCutoff}): {partnerDiagnostic.afterDateFilter}</p>
+            <p>After completions filter: {partnerDiagnostic.afterCompletions}</p>
+          </div>
+          {diagnostic.errors.length > 0 && (
+            <div className="text-red-600">
+              <p className="font-semibold">Errors</p>
+              {diagnostic.errors.map((err, i) => (
+                <p key={i}>{err}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

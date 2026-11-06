@@ -35,8 +35,38 @@ const NAV = [
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
+// Dynamic date for Today page: "5th November" (ordinal, no year if current, weekday if fits)
+function getTodayKicker(): string {
+  const today = new Date();
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Edmonton'
+  };
+  
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(today);
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+  
+  // Ordinal suffix
+  const suffix = ['th', 'st', 'nd', 'rd'][
+    day % 10 > 3 || Math.floor(day % 100 / 10) === 1 ? 0 : day % 10
+  ];
+  
+  // Add weekday if it fits (< 80 chars total for header)
+  const weekdayFormatter = new Intl.DateTimeFormat('en-US', { 
+    weekday: 'long',
+    timeZone: 'America/Edmonton'
+  });
+  const weekday = weekdayFormatter.format(today);
+  const withWeekday = `${weekday} ${day}${suffix} ${month}`;
+  
+  return withWeekday.length < 80 ? withWeekday : `${day}${suffix} ${month}`;
+}
+
 const PAGE: Record<string, { kicker: string; title: string }> = {
-  "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
+  "/admin": { kicker: getTodayKicker(), title: "Today" },
   "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
   "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
   "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
