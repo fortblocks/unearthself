@@ -330,6 +330,9 @@ async function collectDocsRecursively(
 }
 
 export const listMeetings = createServerFn({ method: "GET" }).handler(async (): Promise<Meeting[]> => {
+  const { requireStaffSession } = await import("./staff-session");
+  await requireStaffSession();
+  
   // Check cache first
   if (isCacheValid(meetingListCache)) {
     console.log(`Using cached meeting list (${meetingListCache!.data.length} meetings)`);
@@ -450,6 +453,9 @@ export const listMeetings = createServerFn({ method: "GET" }).handler(async (): 
 export const getMeetingMinutes = createServerFn({ method: "GET" })
   .validator((d: { meetingId: string }) => d)
   .handler(async ({ data }): Promise<MeetingMinutes | null> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const startTime = Date.now();
     
     // Check cache first (keyed by meetingId)

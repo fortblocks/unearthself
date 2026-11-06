@@ -8,19 +8,59 @@ import {
   getActionCompletions,
   markActionComplete,
   isRedisConfigured,
+  type ActionItem,
 } from "@/lib/action-tracking";
 import { formatDateOrdinal } from "@/lib/minutes-archive";
+
+type DiagnosticInfo = {
+  timestamp: string;
+  cacheHit: boolean;
+  durationMs?: number;
+  discoveredMeetings: number;
+  meetingsFailed: number;
+  latestMeetingDate: string | null;
+  extractedTotal: number;
+  partnerCounts: Record<string, number>;
+  errors: Array<{ stage: string; code: string }>;
+};
 
 export const Route = createFileRoute("/admin/")({
   component: TodayPage,
   head: () => ({ meta: [{ title: "Today — Unearth Self Desk" }] }),
   loader: async () => {
-    const [allActions, completions, redisConfigured] = await Promise.all([
-      extractAllActions(),
-      getActionCompletions(),
-      isRedisConfigured(),
+    // Extract actions with real pipeline diagnostic
+    const extractionResult = await extractAllActions();
+    const allActions = extractionResult.actions;
+    const errors = [...extractionResult.diagnostic.errors];
+    
+    const [completions, redisConfigured] = await Promise.all([
+      getActionCompletions().catch((e: any) => {
+        console.error("[loader] Completions fetch failed:", e);
+        errors.push({ stage: 'completions', code: 'FETCH_FAILED' });
+        return [];
+      }),
+      isRedisConfigured().catch(() => false),
     ]);
-    return { allActions, completions, redisConfigured };
+    
+    // Build diagnostic from real extraction pipeline
+    const diagnostic: DiagnosticInfo = {
+      timestamp: new Date().toISOString(),
+      cacheHit: extractionResult.diagnostic.cacheHit,
+      durationMs: extractionResult.diagnostic.durationMs,
+      discoveredMeetings: extractionResult.diagnostic.meetingsProcessed,
+      meetingsFailed: extractionResult.diagnostic.meetingsFailed,
+      latestMeetingDate: extractionResult.diagnostic.latestMeetingDate,
+      extractedTotal: allActions.length,
+      partnerCounts: {
+        Lisa: allActions.filter(a => a.owner === 'Lisa').length,
+        Tess: allActions.filter(a => a.owner === 'Tess').length,
+        Christopher: allActions.filter(a => a.owner === 'Christopher').length,
+        Norah: allActions.filter(a => a.owner === 'Norah').length,
+      },
+      errors,
+    };
+    
+    return { allActions, completions, redisConfigured, diagnostic };
   },
 });
 
@@ -28,7 +68,7 @@ function TodayPage() {
   const lookingAs = useDesk((s) => s.lookingAs);
   
   // Load action tracking data
-  const { allActions, completions, redisConfigured } = Route.useLoaderData();
+  const { allActions, completions, redisConfigured, diagnostic } = Route.useLoaderData();
   const [localCompletions, setLocalCompletions] = useState(completions);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   
@@ -44,11 +84,23 @@ function TodayPage() {
   const completedActionIds = new Set(
     localCompletions.filter((c) => !c.undone).map((c) => c.actionId)
   );
+  const beforeDate = allActions.filter(a => a.owner === normalizedPartner).length;
+  const afterDate = allActions.filter(a => a.owner === normalizedPartner && a.meetingDate >= thirtyDaysAgoStr).length;
+  
   const myOpenActions = allActions.filter(
     (a) => a.owner === normalizedPartner && 
            !completedActionIds.has(a.id) &&
            a.meetingDate >= thirtyDaysAgoStr  // Only last 30 days for Today page
   );
+  
+  // Per-partner filtering diagnostic
+  const partnerDiagnostic = {
+    partner: normalizedPartner,
+    totalForPartner: beforeDate,
+    afterDateFilter: afterDate,
+    afterCompletions: myOpenActions.length,
+    dateFilterCutoff: thirtyDaysAgoStr,
+  };
   
   // Handle mark complete
   const handleMarkComplete = async (actionId: string) => {
@@ -137,6 +189,43 @@ function TodayPage() {
           </div>
         </Section>
       )}
+      
+      {/* Authenticated-only diagnostic info (hidden, for debugging) */}
+      <details className="mt-10 border border-line bg-paper p-4 text-xs font-mono">
+        <summary className="cursor-pointer font-semibold text-coal">Diagnostic Info</summary>
+        <div className="mt-4 space-y-2">
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Discovery & Extraction</p>
+            <p>Timestamp: {diagnostic.timestamp}</p>
+            <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.durationMs ? `(${diagnostic.durationMs}ms)` : ''}</p>
+            <p>Discovered meetings: {diagnostic.discoveredMeetings === 0 && diagnostic.errors.length === 0 ? '0 (UNKNOWN - check server logs)' : diagnostic.discoveredMeetings}</p>
+            <p>Export failures: {diagnostic.meetingsFailed !== undefined ? diagnostic.meetingsFailed : 'N/A (cache hit - exports not attempted this request)'}</p>
+            <p>Latest meeting date: {diagnostic.latestMeetingDate || 'none'}</p>
+            <p>Total extracted actions: {diagnostic.extractedTotal}</p>
+          </div>
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Partner Counts (All Actions)</p>
+            <p>Lisa: {diagnostic.partnerCounts.Lisa}</p>
+            <p>Tess: {diagnostic.partnerCounts.Tess}</p>
+            <p>Christopher: {diagnostic.partnerCounts.Christopher}</p>
+            <p>Norah: {diagnostic.partnerCounts.Norah}</p>
+          </div>
+          <div className="border-b border-line pb-2">
+            <p className="font-semibold">Filtering Stages ({partnerDiagnostic.partner})</p>
+            <p>Total for partner: {partnerDiagnostic.totalForPartner}</p>
+            <p>After date filter (≥ {partnerDiagnostic.dateFilterCutoff}): {partnerDiagnostic.afterDateFilter}</p>
+            <p>After completions filter: {partnerDiagnostic.afterCompletions}</p>
+          </div>
+          {diagnostic.errors.length > 0 && (
+            <div className="text-red-600">
+              <p className="font-semibold">Errors</p>
+              {diagnostic.errors.map((err, i) => (
+                <p key={i}>{err.stage}: {err.code}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

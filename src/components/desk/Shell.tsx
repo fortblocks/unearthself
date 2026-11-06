@@ -35,8 +35,14 @@ const NAV = [
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
-const PAGE: Record<string, { kicker: string; title: string }> = {
-  "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
+import { formatTodayKicker } from "./formatTodayKicker";
+
+// Dynamic date for Today page: computed at render time
+function getTodayKicker(): string {
+  return formatTodayKicker(new Date());
+}
+
+const PAGE_STATIC: Record<string, { kicker: string; title: string }> = {
   "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
   "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
   "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
@@ -47,6 +53,14 @@ const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin/minutes": { kicker: "Badlander's Development Meetings", title: "Minutes" },
   "/admin/friday": { kicker: "Week of 1–7 September", title: "Friday pack" },
 };
+
+// Get page info, computing Today kicker at render time
+function getPageInfo(pathname: string): { kicker: string; title: string } {
+  if (pathname === "/admin") {
+    return { kicker: getTodayKicker(), title: "Today" };
+  }
+  return PAGE_STATIC[pathname] || PAGE_STATIC["/admin/pipeline"];
+}
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const rawPathname = useRouterState({ select: (s) => s.location.pathname });
@@ -65,15 +79,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const openRisk = riskAll.filter((r) => r.open).length;
   const overdue = moneyAll.filter((m) => m.status === "overdue").length;
   
-  // Use longest-prefix matching for page lookup
+  // Get page info with dynamic Today kicker
   const page = (() => {
     // Try exact match first
-    if (PAGE[pathname]) return PAGE[pathname];
+    if (pathname === "/admin" || PAGE_STATIC[pathname]) {
+      return getPageInfo(pathname);
+    }
     
     // Find longest matching prefix
-    const paths = Object.keys(PAGE).sort((a, b) => b.length - a.length);
+    const paths = Object.keys(PAGE_STATIC).sort((a, b) => b.length - a.length);
     const match = paths.find(p => pathname.startsWith(p));
-    return match ? PAGE[match] : PAGE["/admin"];
+    return match ? PAGE_STATIC[match] : getPageInfo("/admin");
   })();
 
   const counts: Record<string, number> = {

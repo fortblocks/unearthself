@@ -25,7 +25,11 @@ function cookieOpts(maxAge: number, host?: string) {
   return opts;
 }
 
-export const getStaffSession = createServerFn({ method: "GET" }).handler(async () => {
+/**
+ * Verify staff session from cookie JWT
+ * Internal helper for server functions - does not expose as server fn
+ */
+async function verifyStaffSession(): Promise<{ email: string } | null> {
   const { getCookie } = await import("@tanstack/react-start/server");
   const { jwtVerify } = await import("jose");
   const token = getCookie(COOKIE);
@@ -43,6 +47,22 @@ export const getStaffSession = createServerFn({ method: "GET" }).handler(async (
   } catch {
     return null;
   }
+}
+
+/**
+ * Require staff session or throw 401
+ * Use at server function boundary
+ */
+export async function requireStaffSession(): Promise<{ email: string }> {
+  const session = await verifyStaffSession();
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+  return session;
+}
+
+export const getStaffSession = createServerFn({ method: "GET" }).handler(async () => {
+  return verifyStaffSession();
 });
 
 export const staffLogin = createServerFn({ method: "POST" })

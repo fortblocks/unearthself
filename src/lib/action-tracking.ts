@@ -404,99 +404,55 @@ export async function extractExplicitActions(
   return actions;
 }
 
+export type ExtractionDiagnostic = {
+  cacheHit: boolean;
+  durationMs?: number;
+  meetingsProcessed: number;
+  meetingsFailed: number | undefined; // undefined on cache hit (exports not attempted)
+  latestMeetingDate: string | null;
+  errors: Array<{ stage: string; code: string }>;
+};
+
+export type ExtractionResult = {
+  actions: ActionItem[];
+  diagnostic: ExtractionDiagnostic;
+};
+
 /**
  * Extract all actions from all meetings with Redis caching
- * Cache key includes meeting IDs + modified times for automatic invalidation
+ * Returns actions + diagnostic metadata from actual extraction pipeline
+ * Requires staff session
  */
 export const extractAllActions = createServerFn({ method: "GET" }).handler(
-  async (): Promise<ActionItem[]> => {
-    const { listMeetings, getMeetingMinutes } = await import("./minutes");
-    const redis = await getRedisClient();
+  async (): Promise<ExtractionResult> => {
+    // Auth guard - must throw before pipeline execution
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
     
-    try {
-      // Get list of meetings (fast metadata fetch)
-      const meetings = await listMeetings();
-      
-      // Create cache key based on meeting IDs and modified times
-      // This automatically invalidates when meetings are added/modified
-      // Version namespace: bump when extraction logic changes
-      const CACHE_VERSION = 'v2-plaintext';
-      const meetingFingerprint = meetings
-        .map((m) => `${m.id}:${m.modifiedTime || ''}`)
-        .join('|');
-      const cacheKey = `actions-cache:${CACHE_VERSION}:${hashString(meetingFingerprint)}`;
-      
-      // Try cache first
-      if (redis) {
-        try {
-          const cached = await redis.get(cacheKey);
-          if (cached && Array.isArray(cached)) {
-            console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings)`);
-            return cached as ActionItem[];
-          }
-        } catch (error) {
-          console.error("[extractAllActions] Cache read error:", error);
-        }
-      }
-      
-      // Cache miss - fetch and process all meetings
-      console.log(`[extractAllActions] Cache MISS - processing ${meetings.length} meetings`);
-      const allActions: ActionItem[] = [];
-      
-      // Process meetings in batches
-      const BATCH_SIZE = 5;  // Smaller batch due to xAI calls
-      for (let i = 0; i < meetings.length; i += BATCH_SIZE) {
-        const batch = meetings.slice(i, i + BATCH_SIZE);
-        const batchPromises = batch.map(async (meeting) => {
-          try {
-            const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
-            if (!minutes) return [];
-            
-            return await extractExplicitActions(
-              meeting.id,
-              meeting.date,
-              meeting.title,
-              minutes.fullText
-            );
-          } catch (error) {
-            console.error(`[extractAllActions] Failed to process meeting ${meeting.id}:`, error);
-            return [];
-          }
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        for (const actions of batchResults) {
-          allActions.push(...actions);
-        }
-      }
-      
-      // Sort by date descending
-      allActions.sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
-      
-      // Cache for 5 minutes (300 seconds)
-      // Short TTL ensures fresh data while preventing slow loads
-      if (redis) {
-        try {
-          await redis.set(cacheKey, allActions, { ex: 300 });
-          console.log(`[extractAllActions] Cached ${allActions.length} actions for 5 minutes`);
-        } catch (error) {
-          console.error("[extractAllActions] Cache write error:", error);
-        }
-      }
-      
-      return allActions;
-    } catch (error) {
-      console.error("[extractAllActions] Error:", error);
-      return [];
-    }
+    // Use production pipeline with real dependencies injected
+    const { runExtractionPipeline } = await import("./action-extraction-pipeline");
+    const { listMeetings, getMeetingMinutes } = await import("./minutes");
+    
+    return runExtractionPipeline({
+      listMeetings: async () => await listMeetings(),
+      getMeetingMinutes: async (meetingId: string) => 
+        await getMeetingMinutes({ data: { meetingId } }),
+      extractExplicitActions,
+      getRedisClient,
+      hashString,
+    });
   }
 );
 
 /**
  * Get all action completions from Redis
+ * Requires staff session
  */
 export const getActionCompletions = createServerFn({ method: "GET" }).handler(
   async (): Promise<ActionCompletion[]> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return [];
@@ -526,10 +482,14 @@ export const getActionCompletions = createServerFn({ method: "GET" }).handler(
 
 /**
  * Mark an action as complete
+ * Requires staff session
  */
 export const markActionComplete = createServerFn({ method: "POST" })
   .validator((d: { actionId: string; completedBy: PartnerName }) => d)
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string }> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return { ok: false, error: "Redis not configured" };
@@ -552,10 +512,14 @@ export const markActionComplete = createServerFn({ method: "POST" })
 
 /**
  * Undo action completion
+ * Requires staff session
  */
 export const undoActionComplete = createServerFn({ method: "POST" })
   .validator((d: { actionId: string; completedBy: PartnerName }) => d)
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string }> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return { ok: false, error: "Redis not configured" };
