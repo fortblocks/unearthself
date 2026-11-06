@@ -6,9 +6,19 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
-import { formatDateOrdinal, normalizeBasecamp, shortenPartnerNames } from "./minutes-archive";
-import { XAI_MODEL } from "./structured-minutes";
-import { createHash } from "crypto";
+import { formatDateOrdinal, normalizeBasecamp, shortenPartnerNames } from "./minutes-archive.ts";
+import { XAI_MODEL } from "./structured-minutes.ts";
+/**
+ * Hash a string to create stable IDs.
+ * Node's crypto is loaded on call so the browser can import the server fns
+ * in this module without evaluating a node builtin at startup.
+ */
+function hashString(text: string): string {
+  const builtin =
+    typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("crypto") : undefined;
+  const crypto = builtin ?? (Function("return require('crypto')")() as typeof import("crypto"));
+  return crypto.createHash("sha256").update(text).digest("hex").substring(0, 12);
+}
 
 // Known partner first names
 const PARTNER_NAMES = ["Lisa", "Tess", "Norah", "Christopher"] as const;
@@ -52,13 +62,6 @@ async function getRedisClient() {
     console.error("[action-tracking] Failed to create Redis client:", error);
     return null;
   }
-}
-
-/**
- * Hash a string to create stable IDs
- */
-function hashString(text: string): string {
-  return createHash("sha256").update(text).digest("hex").substring(0, 12);
 }
 
 /**
@@ -413,9 +416,17 @@ export type ExtractionDiagnostic = {
   errors: Array<{ stage: string; code: string }>;
 };
 
+/** ok = the action list is complete. unknown = discovery was ambiguous. error = extraction failed. */
+export type ExtractionOutcome = "ok" | "unknown" | "error";
+
 export type ExtractionResult = {
   actions: ActionItem[];
   diagnostic: ExtractionDiagnostic;
+  /**
+   * Set by the extraction pipeline. Missing only on hand-built objects.
+   * Callers must not treat a missing or non-ok outcome as "no actions".
+   */
+  outcome?: ExtractionOutcome;
 };
 
 /**
