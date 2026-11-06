@@ -21,12 +21,13 @@ export const Route = createFileRoute("/admin/minutes/")({
   component: MinutesIndexPage,
   head: () => ({ meta: [{ title: "Minutes — Unearth Self Desk" }] }),
   loader: async () => {
-    const [meetings, allActions, completions, redisConfigured] = await Promise.all([
+    const [meetings, extractionResult, completions, redisConfigured] = await Promise.all([
       listMeetings(),
       extractAllActions(),
       getActionCompletions(),
       isRedisConfigured(),
     ]);
+    const allActions = extractionResult.actions;
     return { meetings, allActions, completions, redisConfigured };
   },
   pendingComponent: () => (

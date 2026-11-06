@@ -17,6 +17,7 @@ type DiagnosticInfo = {
   cacheHit: boolean;
   cacheAge?: number;
   discoveredMeetings: number;
+  meetingsFailed: number;
   latestMeetingDate: string | null;
   extractedTotal: number;
   partnerCounts: Record<string, number>;
@@ -27,50 +28,26 @@ export const Route = createFileRoute("/admin/")({
   component: TodayPage,
   head: () => ({ meta: [{ title: "Today — Unearth Self Desk" }] }),
   loader: async () => {
-    const errors: string[] = [];
-    
-    let allActions: ActionItem[] = [];
-    let discoveredMeetings = 0;
-    let latestMeetingDate: string | null = null;
-    let cacheHit = false;
-    let cacheAge: number | undefined;
-    
-    try {
-      // Get meetings list (fast, no export work)
-      const { listMeetings } = await import("@/lib/minutes");
-      const meetings = await listMeetings();
-      discoveredMeetings = meetings.length;
-      latestMeetingDate = meetings.length > 0 ? meetings[0].date : null;
-      
-      // Extract actions (may hit cache)
-      const extractStart = Date.now();
-      allActions = await extractAllActions();
-      const extractDuration = Date.now() - extractStart;
-      
-      // Cache hit heuristic: < 100ms for extraction suggests cache
-      cacheHit = extractDuration < 100 && allActions.length > 0;
-      if (cacheHit) {
-        cacheAge = extractDuration;
-      }
-    } catch (error: any) {
-      errors.push(`Extraction failed: ${error.message}`);
-    }
+    // Extract actions with real pipeline diagnostic
+    const extractionResult = await extractAllActions();
+    const allActions = extractionResult.actions;
     
     const [completions, redisConfigured] = await Promise.all([
       getActionCompletions().catch((e: any) => {
-        errors.push(`Completions fetch failed: ${e.message}`);
+        extractionResult.diagnostic.errors.push(`Completions: ${e.message}`);
         return [];
       }),
       isRedisConfigured().catch(() => false),
     ]);
     
-    // Diagnostic info (no extra work, just counts)
+    // Build diagnostic from real extraction pipeline
     const diagnostic: DiagnosticInfo = {
       timestamp: new Date().toISOString(),
-      cacheHit,
-      cacheAge,
-      discoveredMeetings,
-      latestMeetingDate,
+      cacheHit: extractionResult.diagnostic.cacheHit,
+      cacheAge: extractionResult.diagnostic.cacheAge,
+      discoveredMeetings: extractionResult.diagnostic.meetingsProcessed,
+      meetingsFailed: extractionResult.diagnostic.meetingsFailed,
+      latestMeetingDate: extractionResult.diagnostic.latestMeetingDate,
       extractedTotal: allActions.length,
       partnerCounts: {
         Lisa: allActions.filter(a => a.owner === 'Lisa').length,
@@ -78,7 +55,7 @@ export const Route = createFileRoute("/admin/")({
         Christopher: allActions.filter(a => a.owner === 'Christopher').length,
         Norah: allActions.filter(a => a.owner === 'Norah').length,
       },
-      errors,
+      errors: extractionResult.diagnostic.errors,
     };
     
     return { allActions, completions, redisConfigured, diagnostic };
@@ -220,6 +197,7 @@ function TodayPage() {
             <p>Timestamp: {diagnostic.timestamp}</p>
             <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.cacheAge ? `(${diagnostic.cacheAge}ms)` : ''}</p>
             <p>Discovered meetings: {diagnostic.discoveredMeetings}</p>
+            <p>Export failures: {diagnostic.meetingsFailed}</p>
             <p>Latest meeting date: {diagnostic.latestMeetingDate || 'none'}</p>
             <p>Total extracted actions: {diagnostic.extractedTotal}</p>
           </div>
