@@ -408,7 +408,7 @@ export type ExtractionDiagnostic = {
   cacheHit: boolean;
   durationMs?: number;
   meetingsProcessed: number;
-  meetingsFailed: number;
+  meetingsFailed: number | undefined; // undefined on cache hit (exports not attempted)
   latestMeetingDate: string | null;
   errors: Array<{ stage: string; code: string }>;
 };

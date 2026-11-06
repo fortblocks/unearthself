@@ -253,7 +253,7 @@ test('Cache hit returns cached actions with metadata', async () => {
   assert.strictEqual(result.actions[0].owner, 'Christopher');
   assert.strictEqual(result.diagnostic.cacheHit, true);
   assert.strictEqual(result.diagnostic.meetingsProcessed, 1); // Still discovered
-  assert.strictEqual(result.diagnostic.meetingsFailed, 0); // Synthesized, not actual
+  assert.strictEqual(result.diagnostic.meetingsFailed, undefined, 'Exports not attempted on cache hit');
   assert.ok(result.diagnostic.durationMs! < 100, 'Cache hit should be fast');
   assert.ok(getMeetingsCalled, 'listMeetings should be called to generate cache key');
 });

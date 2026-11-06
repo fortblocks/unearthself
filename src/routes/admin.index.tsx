@@ -198,8 +198,8 @@ function TodayPage() {
             <p className="font-semibold">Discovery & Extraction</p>
             <p>Timestamp: {diagnostic.timestamp}</p>
             <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.durationMs ? `(${diagnostic.durationMs}ms)` : ''}</p>
-            <p>Discovered meetings: {diagnostic.discoveredMeetings}</p>
-            <p>Export failures: {diagnostic.meetingsFailed}</p>
+            <p>Discovered meetings: {diagnostic.discoveredMeetings === 0 && diagnostic.errors.length === 0 ? '0 (UNKNOWN - check server logs)' : diagnostic.discoveredMeetings}</p>
+            <p>Export failures: {diagnostic.meetingsFailed !== undefined ? diagnostic.meetingsFailed : 'N/A (cache hit - exports not attempted this request)'}</p>
             <p>Latest meeting date: {diagnostic.latestMeetingDate || 'none'}</p>
             <p>Total extracted actions: {diagnostic.extractedTotal}</p>
           </div>

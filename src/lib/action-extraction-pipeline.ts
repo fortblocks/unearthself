@@ -49,10 +49,14 @@ export async function runExtractionPipeline(
   
   try {
     // Get list of meetings (fast metadata fetch)
+    // Note: listMeetings catches all errors internally and returns []
+    // Empty array is ambiguous (valid empty OR discovery failed)
+    // We track discovery attempt but cannot distinguish without structured errors
     let meetings: Awaited<ReturnType<typeof deps.listMeetings>>;
     try {
       meetings = await deps.listMeetings();
     } catch (error: any) {
+      // Only reached if auth fails before listMeetings
       console.error("[extractAllActions] Discovery failed:", error);
       return {
         actions: [],
@@ -64,6 +68,15 @@ export async function runExtractionPipeline(
           errors: [{ stage: 'discovery', code: 'LIST_FAILED' }],
         },
       };
+    }
+    
+    // If meetings is empty, we cannot distinguish:
+    // - Valid empty (no meetings exist)
+    // - Discovery failure (Drive API error, swallowed by listMeetings)
+    // Mark status as unknown when zero meetings and no cache
+    const discoveryStatus = meetings.length === 0 ? 'UNKNOWN' : 'SUCCESS';
+    if (discoveryStatus === 'UNKNOWN') {
+      console.warn("[extractAllActions] Zero meetings discovered - could be empty or discovery failed (check Drive API logs)");
     }
     
     // Find actual latest date, don't assume sort order
@@ -87,17 +100,19 @@ export async function runExtractionPipeline(
           cacheHit = true;
           durationMs = Date.now() - extractStart;
           console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings, ${durationMs}ms)`);
-          return {
-            actions: cached as ActionItem[],
-            diagnostic: {
-              cacheHit: true,
-              durationMs,
-              meetingsProcessed: meetings.length,
-              meetingsFailed: 0,
-              latestMeetingDate,
-              errors: [],
-            },
-          };
+            return {
+              actions: cached as ActionItem[],
+              diagnostic: {
+                cacheHit: true,
+                durationMs,
+                meetingsProcessed: meetings.length,
+                // Cache hit: exports not attempted this request
+                // meetingsFailed would require re-processing, so undefined
+                meetingsFailed: undefined as any, // Not applicable on cache hit
+                latestMeetingDate,
+                errors: [],
+              },
+            };
         }
       } catch (error: any) {
         console.error("[extractAllActions] Cache read error:", error);

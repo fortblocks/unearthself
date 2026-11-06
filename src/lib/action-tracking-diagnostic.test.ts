@@ -77,7 +77,7 @@ test('Cache hit vs miss duration semantics', () => {
     cacheHit: true,
     durationMs: 15,  // Fast fetch from Redis
     meetingsProcessed: 5,
-    meetingsFailed: 0,
+    meetingsFailed: undefined, // Exports not attempted this request
     latestMeetingDate: '2026-10-09',
     errors: [],
   };
@@ -95,6 +95,7 @@ test('Cache hit vs miss duration semantics', () => {
   assert.ok(cacheMiss.durationMs! > 1000, 'Cache miss with exports should be slow');
   assert.strictEqual(cacheHit.cacheHit, true);
   assert.strictEqual(cacheMiss.cacheHit, false);
+  assert.strictEqual(cacheHit.meetingsFailed, undefined, 'Cache hit should not report meetingsFailed');
 });
 
 test('Error codes are safe constants', () => {
