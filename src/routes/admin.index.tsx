@@ -15,13 +15,13 @@ import { formatDateOrdinal } from "@/lib/minutes-archive";
 type DiagnosticInfo = {
   timestamp: string;
   cacheHit: boolean;
-  cacheAge?: number;
+  durationMs?: number;
   discoveredMeetings: number;
   meetingsFailed: number;
   latestMeetingDate: string | null;
   extractedTotal: number;
   partnerCounts: Record<string, number>;
-  errors: string[];
+  errors: Array<{ stage: string; code: string }>;
 };
 
 export const Route = createFileRoute("/admin/")({
@@ -31,10 +31,12 @@ export const Route = createFileRoute("/admin/")({
     // Extract actions with real pipeline diagnostic
     const extractionResult = await extractAllActions();
     const allActions = extractionResult.actions;
+    const errors = [...extractionResult.diagnostic.errors];
     
     const [completions, redisConfigured] = await Promise.all([
       getActionCompletions().catch((e: any) => {
-        extractionResult.diagnostic.errors.push(`Completions: ${e.message}`);
+        console.error("[loader] Completions fetch failed:", e);
+        errors.push({ stage: 'completions', code: 'FETCH_FAILED' });
         return [];
       }),
       isRedisConfigured().catch(() => false),
@@ -44,7 +46,7 @@ export const Route = createFileRoute("/admin/")({
     const diagnostic: DiagnosticInfo = {
       timestamp: new Date().toISOString(),
       cacheHit: extractionResult.diagnostic.cacheHit,
-      cacheAge: extractionResult.diagnostic.cacheAge,
+      durationMs: extractionResult.diagnostic.durationMs,
       discoveredMeetings: extractionResult.diagnostic.meetingsProcessed,
       meetingsFailed: extractionResult.diagnostic.meetingsFailed,
       latestMeetingDate: extractionResult.diagnostic.latestMeetingDate,
@@ -55,7 +57,7 @@ export const Route = createFileRoute("/admin/")({
         Christopher: allActions.filter(a => a.owner === 'Christopher').length,
         Norah: allActions.filter(a => a.owner === 'Norah').length,
       },
-      errors: extractionResult.diagnostic.errors,
+      errors,
     };
     
     return { allActions, completions, redisConfigured, diagnostic };
@@ -195,7 +197,7 @@ function TodayPage() {
           <div className="border-b border-line pb-2">
             <p className="font-semibold">Discovery & Extraction</p>
             <p>Timestamp: {diagnostic.timestamp}</p>
-            <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.cacheAge ? `(${diagnostic.cacheAge}ms)` : ''}</p>
+            <p>Cache hit: {diagnostic.cacheHit ? 'YES' : 'NO'} {diagnostic.durationMs ? `(${diagnostic.durationMs}ms)` : ''}</p>
             <p>Discovered meetings: {diagnostic.discoveredMeetings}</p>
             <p>Export failures: {diagnostic.meetingsFailed}</p>
             <p>Latest meeting date: {diagnostic.latestMeetingDate || 'none'}</p>
@@ -218,7 +220,7 @@ function TodayPage() {
             <div className="text-red-600">
               <p className="font-semibold">Errors</p>
               {diagnostic.errors.map((err, i) => (
-                <p key={i}>{err}</p>
+                <p key={i}>{err.stage}: {err.code}</p>
               ))}
             </div>
           )}

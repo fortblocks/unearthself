@@ -35,38 +35,31 @@ const NAV = [
   { to: "/admin/friday", label: "Friday", icon: BarChart3 },
 ] as const;
 
-// Dynamic date for Today page: "5th November" (ordinal, no year if current, weekday if fits)
+// Dynamic date for Today page: "5th November" (ordinal, no year, weekday if fits)
+// Computed at render time in America/Edmonton timezone
 function getTodayKicker(): string {
-  const today = new Date();
-  const options: Intl.DateTimeFormatOptions = {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     day: 'numeric',
+    weekday: 'long',
     timeZone: 'America/Edmonton'
-  };
+  });
   
-  const formatter = new Intl.DateTimeFormat('en-US', options);
-  const parts = formatter.formatToParts(today);
+  const parts = formatter.formatToParts(now);
   const month = parts.find(p => p.type === 'month')?.value || '';
   const day = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+  const weekday = parts.find(p => p.type === 'weekday')?.value || '';
   
-  // Ordinal suffix
   const suffix = ['th', 'st', 'nd', 'rd'][
     day % 10 > 3 || Math.floor(day % 100 / 10) === 1 ? 0 : day % 10
   ];
   
-  // Add weekday if it fits (< 80 chars total for header)
-  const weekdayFormatter = new Intl.DateTimeFormat('en-US', { 
-    weekday: 'long',
-    timeZone: 'America/Edmonton'
-  });
-  const weekday = weekdayFormatter.format(today);
   const withWeekday = `${weekday} ${day}${suffix} ${month}`;
-  
   return withWeekday.length < 80 ? withWeekday : `${day}${suffix} ${month}`;
 }
 
-const PAGE: Record<string, { kicker: string; title: string }> = {
-  "/admin": { kicker: getTodayKicker(), title: "Today" },
+const PAGE_STATIC: Record<string, { kicker: string; title: string }> = {
   "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
   "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
   "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
@@ -77,6 +70,14 @@ const PAGE: Record<string, { kicker: string; title: string }> = {
   "/admin/minutes": { kicker: "Badlander's Development Meetings", title: "Minutes" },
   "/admin/friday": { kicker: "Week of 1–7 September", title: "Friday pack" },
 };
+
+// Get page info, computing Today kicker at render time
+function getPageInfo(pathname: string): { kicker: string; title: string } {
+  if (pathname === "/admin") {
+    return { kicker: getTodayKicker(), title: "Today" };
+  }
+  return PAGE_STATIC[pathname] || PAGE_STATIC["/admin/pipeline"];
+}
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const rawPathname = useRouterState({ select: (s) => s.location.pathname });
@@ -95,15 +96,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const openRisk = riskAll.filter((r) => r.open).length;
   const overdue = moneyAll.filter((m) => m.status === "overdue").length;
   
-  // Use longest-prefix matching for page lookup
+  // Get page info with dynamic Today kicker
   const page = (() => {
     // Try exact match first
-    if (PAGE[pathname]) return PAGE[pathname];
+    if (pathname === "/admin" || PAGE_STATIC[pathname]) {
+      return getPageInfo(pathname);
+    }
     
     // Find longest matching prefix
-    const paths = Object.keys(PAGE).sort((a, b) => b.length - a.length);
+    const paths = Object.keys(PAGE_STATIC).sort((a, b) => b.length - a.length);
     const match = paths.find(p => pathname.startsWith(p));
-    return match ? PAGE[match] : PAGE["/admin"];
+    return match ? PAGE_STATIC[match] : getPageInfo("/admin");
   })();
 
   const counts: Record<string, number> = {

@@ -406,11 +406,11 @@ export async function extractExplicitActions(
 
 export type ExtractionDiagnostic = {
   cacheHit: boolean;
-  cacheAge?: number;
+  durationMs?: number;
   meetingsProcessed: number;
   meetingsFailed: number;
   latestMeetingDate: string | null;
-  errors: string[];
+  errors: Array<{ stage: string; code: string }>;
 };
 
 export type ExtractionResult = {
@@ -427,15 +427,18 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
     const { listMeetings, getMeetingMinutes } = await import("./minutes");
     const redis = await getRedisClient();
     
-    const errors: string[] = [];
+    const errors: Array<{ stage: string; code: string }> = [];
     const extractStart = Date.now();
     let cacheHit = false;
-    let cacheAge: number | undefined;
+    let durationMs: number | undefined;
     
     try {
       // Get list of meetings (fast metadata fetch)
       const meetings = await listMeetings();
-      const latestMeetingDate = meetings.length > 0 ? meetings[0].date : null;
+      // Find actual latest date, don't assume sort order
+      const latestMeetingDate = meetings.length > 0 
+        ? meetings.reduce((max, m) => m.date > max ? m.date : max, meetings[0].date)
+        : null;
       
       // Create cache key based on meeting IDs and modified times
       // This automatically invalidates when meetings are added/modified
@@ -452,13 +455,13 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
           const cached = await redis.get(cacheKey);
           if (cached && Array.isArray(cached)) {
             cacheHit = true;
-            cacheAge = Date.now() - extractStart;
-            console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings, ${cacheAge}ms)`);
+            durationMs = Date.now() - extractStart;
+            console.log(`[extractAllActions] Cache HIT (${meetings.length} meetings, ${durationMs}ms)`);
             return {
               actions: cached as ActionItem[],
               diagnostic: {
                 cacheHit: true,
-                cacheAge,
+                durationMs,
                 meetingsProcessed: meetings.length,
                 meetingsFailed: 0,
                 latestMeetingDate,
@@ -467,9 +470,8 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
             };
           }
         } catch (error: any) {
-          const errMsg = `Cache read error: ${error.message}`;
-          console.error("[extractAllActions]", errMsg);
-          errors.push(errMsg);
+          console.error("[extractAllActions] Cache read error:", error);
+          errors.push({ stage: 'cache-read', code: 'REDIS_ERROR' });
         }
       }
       
@@ -487,7 +489,8 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
             const minutes = await getMeetingMinutes({ data: { meetingId: meeting.id } });
             if (!minutes) {
               meetingsFailed++;
-              errors.push(`Meeting ${meeting.id.substring(0, 8)}: export returned null`);
+              console.error(`[extractAllActions] Export null for meeting ${meeting.id}`);
+              errors.push({ stage: 'export', code: 'NULL_RESULT' });
               return [];
             }
             
@@ -499,9 +502,8 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
             );
           } catch (error: any) {
             meetingsFailed++;
-            const errMsg = `Meeting ${meeting.id.substring(0, 8)}: ${error.message}`;
-            console.error("[extractAllActions]", errMsg);
-            errors.push(errMsg);
+            console.error(`[extractAllActions] Failed meeting ${meeting.id}:`, error);
+            errors.push({ stage: 'export', code: 'EXPORT_FAILED' });
             return [];
           }
         });
@@ -522,16 +524,17 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
           await redis.set(cacheKey, allActions, { ex: 300 });
           console.log(`[extractAllActions] Cached ${allActions.length} actions for 5 minutes`);
         } catch (error: any) {
-          const errMsg = `Cache write error: ${error.message}`;
-          console.error("[extractAllActions]", errMsg);
-          errors.push(errMsg);
+          console.error("[extractAllActions] Cache write error:", error);
+          errors.push({ stage: 'cache-write', code: 'REDIS_ERROR' });
         }
       }
       
+      durationMs = Date.now() - extractStart;
       return {
         actions: allActions,
         diagnostic: {
           cacheHit: false,
+          durationMs,
           meetingsProcessed: meetings.length,
           meetingsFailed,
           latestMeetingDate,
@@ -539,8 +542,7 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
         },
       };
     } catch (error: any) {
-      const errMsg = `Fatal extraction error: ${error.message}`;
-      console.error("[extractAllActions]", errMsg);
+      console.error("[extractAllActions] Fatal extraction error:", error);
       return {
         actions: [],
         diagnostic: {
@@ -548,7 +550,7 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
           meetingsProcessed: 0,
           meetingsFailed: 0,
           latestMeetingDate: null,
-          errors: [errMsg],
+          errors: [{ stage: 'extraction', code: 'FATAL_ERROR' }],
         },
       };
     }

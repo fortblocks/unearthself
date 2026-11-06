@@ -3,7 +3,7 @@
  * Real plaintext format: * [Owner] Title: Description. (NO checkbox tokens)
  */
 
-import { extractExplicitActions } from './src/lib/action-tracking';
+import { extractExplicitActions } from './src/lib/action-tracking.ts';
 import { readFileSync } from 'fs';
 
 async function testActualSources() {
