@@ -438,7 +438,23 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
     
     try {
       // Get list of meetings (fast metadata fetch)
-      const meetings = await listMeetings();
+      let meetings: Awaited<ReturnType<typeof listMeetings>>;
+      try {
+        meetings = await listMeetings();
+      } catch (error: any) {
+        console.error("[extractAllActions] Discovery failed:", error);
+        return {
+          actions: [],
+          diagnostic: {
+            cacheHit: false,
+            meetingsProcessed: 0,
+            meetingsFailed: 0,
+            latestMeetingDate: null,
+            errors: [{ stage: 'discovery', code: 'LIST_FAILED' }],
+          },
+        };
+      }
+      
       // Find actual latest date, don't assume sort order
       const latestMeetingDate = meetings.length > 0 
         ? meetings.reduce((max, m) => m.date > max ? m.date : max, meetings[0].date)

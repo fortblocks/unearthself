@@ -103,12 +103,14 @@ test('Error codes are safe constants', () => {
     'NULL_RESULT', 
     'EXPORT_FAILED',
     'FATAL_ERROR',
-    'FETCH_FAILED'
+    'FETCH_FAILED',
+    'LIST_FAILED'
   ];
   
   const validStages = [
     'cache-read',
     'cache-write',
+    'discovery',
     'export',
     'extraction',
     'completions'
