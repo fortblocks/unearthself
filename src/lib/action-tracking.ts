@@ -421,9 +421,13 @@ export type ExtractionResult = {
 /**
  * Extract all actions from all meetings with Redis caching
  * Returns actions + diagnostic metadata from actual extraction pipeline
+ * Requires staff session
  */
 export const extractAllActions = createServerFn({ method: "GET" }).handler(
   async (): Promise<ExtractionResult> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const { listMeetings, getMeetingMinutes } = await import("./minutes");
     const redis = await getRedisClient();
     
@@ -559,9 +563,13 @@ export const extractAllActions = createServerFn({ method: "GET" }).handler(
 
 /**
  * Get all action completions from Redis
+ * Requires staff session
  */
 export const getActionCompletions = createServerFn({ method: "GET" }).handler(
   async (): Promise<ActionCompletion[]> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return [];
@@ -591,10 +599,14 @@ export const getActionCompletions = createServerFn({ method: "GET" }).handler(
 
 /**
  * Mark an action as complete
+ * Requires staff session
  */
 export const markActionComplete = createServerFn({ method: "POST" })
   .validator((d: { actionId: string; completedBy: PartnerName }) => d)
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string }> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return { ok: false, error: "Redis not configured" };
@@ -617,10 +629,14 @@ export const markActionComplete = createServerFn({ method: "POST" })
 
 /**
  * Undo action completion
+ * Requires staff session
  */
 export const undoActionComplete = createServerFn({ method: "POST" })
   .validator((d: { actionId: string; completedBy: PartnerName }) => d)
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string }> => {
+    const { requireStaffSession } = await import("./staff-session");
+    await requireStaffSession();
+    
     const redis = await getRedisClient();
     if (!redis) {
       return { ok: false, error: "Redis not configured" };
