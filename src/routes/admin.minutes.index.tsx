@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { devFixtureRequested } from "@/lib/actions/dev-fixture";
 import { resolveActionsSource } from "@/lib/actions/source";
 import { fixtureMeetings } from "@/lib/actions/fixture-data";
-import { listMeetings, type Meeting } from "@/lib/minutes";
+import { type Meeting } from "@/lib/minutes";
+import { fetchMeetingList } from "@/lib/today/sources/minutes";
 import { answerQuestion, searchMeetingsKeywords, detectSeries, SERIES_BADGES, type AnswerResult } from "@/lib/minutes-archive";
 import { formatMeetingDate } from "@/lib/date-format";
 import { Sparkles, Loader2 } from "lucide-react";
@@ -18,8 +19,8 @@ export const Route = createFileRoute("/admin/minutes/")({
   component: MinutesIndexPage,
   head: () => ({ meta: [{ title: "Minutes — Unearth Self Desk" }] }),
   loader: async () => {
-    const meetings = await listMeetings();
-    return { meetings };
+    const result = await fetchMeetingList();
+    return { meetings: result.ok ? result.data : [] };
   },
   pendingComponent: () => (
     <div className="grid gap-10">
