@@ -6,7 +6,7 @@
 
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { runExtractionPipeline, type PipelineDependencies } from './action-extraction-pipeline.ts';
+import { runExtractionPipeline, SHORT_CACHE_SECONDS, type PipelineDependencies } from './action-extraction-pipeline.ts';
 import type { ActionItem } from './action-tracking.ts';
 
 // Test listMeetings error swallowing behavior documented in src/lib/minutes.ts:440-447
@@ -277,12 +277,16 @@ test('Latest meeting date computed from max, not first', async () => {
   assert.strictEqual(result.diagnostic.meetingsProcessed, 3);
 });
 
-test('Cache write skipped on partial failure', async () => {
-  let cacheWritten = false;
+test('Failed extraction is cached briefly and does not look like a clean empty list', async () => {
+  let ttl: number | undefined;
+  let stored: unknown;
+  let writes = 0;
   const mockRedis = {
     get: async () => null,
-    set: async () => {
-      cacheWritten = true;
+    set: async (_key: string, value: unknown, options: { ex: number }) => {
+      writes += 1;
+      stored = value;
+      ttl = options.ex;
     },
   };
   
@@ -298,8 +302,13 @@ test('Cache write skipped on partial failure', async () => {
   
   const result = await runExtractionPipeline(deps);
   
+  assert.strictEqual(result.outcome, 'error');
   assert.strictEqual(result.diagnostic.meetingsFailed, 1);
-  assert.strictEqual(cacheWritten, false, 'Cache should not be written when meetings fail');
+  assert.strictEqual(writes, 1);
+  assert.strictEqual(ttl, 60);
+  assert.ok(stored && typeof stored === 'object' && !Array.isArray(stored));
+  assert.strictEqual((stored as { v: number; outcome: string }).v, 3);
+  assert.strictEqual((stored as { outcome: string }).outcome, 'error');
 });
 
 test('Redis cache error tracked but continues', async () => {
@@ -326,5 +335,97 @@ test('Redis cache error tracked but continues', async () => {
   
   // Should continue despite cache errors
   assert.strictEqual(result.diagnostic.meetingsProcessed, 1);
+  assert.strictEqual(result.outcome, 'ok');
   assert.ok(result.diagnostic.errors.some(e => e.stage === 'cache-read' && e.code === 'REDIS_ERROR'));
+  assert.ok(result.diagnostic.errors.some(e => e.stage === 'cache-write' && e.code === 'REDIS_ERROR'));
+});
+
+test('Empty successful extraction is cached for 60 seconds', async () => {
+  let ttl: number | undefined;
+  let stored: { v?: number; outcome?: string; actions?: unknown[] } | undefined;
+  const deps: PipelineDependencies = {
+    listMeetings: async () => [
+      { id: '1', title: 'M1', date: '2026-10-08', time: '10:00', createdTime: '', modifiedTime: 'v1' },
+    ],
+    getMeetingMinutes: async () => ({ meeting: {}, fullText: 'no actions here', actions: [] }),
+    extractExplicitActions: async () => [],
+    getRedisClient: async () => ({
+      get: async () => null,
+      set: async (_key: string, value: unknown, options: { ex: number }) => {
+        stored = value as { v?: number; outcome?: string; actions?: unknown[] };
+        ttl = options.ex;
+      },
+    }),
+    hashString: (s) => s,
+  };
+
+  const result = await runExtractionPipeline(deps);
+  assert.strictEqual(result.outcome, 'ok');
+  assert.strictEqual(result.actions.length, 0);
+  assert.strictEqual(ttl, SHORT_CACHE_SECONDS);
+  assert.strictEqual(stored?.v, 3);
+  assert.strictEqual(stored?.outcome, 'ok');
+  assert.deepStrictEqual(stored?.actions, []);
+});
+
+test('Zero meetings is unknown, cached briefly, and a hit does not re-export', async () => {
+  const stored = new Map<string, unknown>();
+  let exports = 0;
+  const deps: PipelineDependencies = {
+    listMeetings: async () => [],
+    getMeetingMinutes: async () => {
+      exports += 1;
+      return null;
+    },
+    extractExplicitActions: async () => [],
+    getRedisClient: async () => ({
+      get: async (key: string) => stored.get(key) ?? null,
+      set: async (key: string, value: unknown, options: { ex: number }) => {
+        assert.strictEqual(options.ex, SHORT_CACHE_SECONDS);
+        stored.set(key, value);
+      },
+    }),
+    hashString: (s) => `h-${s.length}`,
+  };
+
+  const first = await runExtractionPipeline(deps);
+  assert.strictEqual(first.outcome, 'unknown');
+  assert.strictEqual(first.actions.length, 0);
+  assert.strictEqual(exports, 0);
+
+  const second = await runExtractionPipeline(deps);
+  assert.strictEqual(second.diagnostic.cacheHit, true);
+  assert.strictEqual(second.outcome, 'unknown');
+  assert.strictEqual(exports, 0);
+});
+
+test('Discovery failure is cached and the next call does not list meetings again', async () => {
+  let lists = 0;
+  const stored = new Map<string, unknown>();
+  const deps: PipelineDependencies = {
+    listMeetings: async () => {
+      lists += 1;
+      throw new Error('Drive API auth failed');
+    },
+    getMeetingMinutes: async () => null,
+    extractExplicitActions: async () => [],
+    getRedisClient: async () => ({
+      get: async (key: string) => stored.get(key) ?? null,
+      set: async (key: string, value: unknown, options: { ex: number }) => {
+        assert.strictEqual(options.ex, 60);
+        stored.set(key, value);
+      },
+    }),
+    hashString: (s) => s,
+  };
+
+  const first = await runExtractionPipeline(deps);
+  assert.strictEqual(first.outcome, 'error');
+  assert.strictEqual(first.diagnostic.errors[0].code, 'LIST_FAILED');
+  assert.strictEqual(lists, 1);
+
+  const second = await runExtractionPipeline(deps);
+  assert.strictEqual(second.diagnostic.cacheHit, true);
+  assert.strictEqual(second.outcome, 'error');
+  assert.strictEqual(lists, 1);
 });
