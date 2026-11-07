@@ -4,7 +4,12 @@ import { Section } from "@/components/desk/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getMeetingMinutes, type MeetingAction } from "@/lib/minutes";
-import { getStructuredMinutesViaCDN, generateStructuredMinutesAsync, type StructuredMinutes } from "@/lib/structured-minutes";
+import {
+  generateStructuredMinutesAsync,
+  minutesDetailMode,
+  plainMeetingSummary,
+  type StructuredMinutes,
+} from "@/lib/structured-minutes";
 import { formatMeetingDate } from "@/lib/date-format";
 import { detectSeries, SERIES_BADGES } from "@/lib/minutes-archive";
 import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
@@ -177,8 +182,10 @@ function MeetingDetailPage() {
   const series = detectSeries(meeting.title);
   const badge = SERIES_BADGES[series];
 
-  // Show structured minutes if available, otherwise fallback to transcript
-  const hasStructured = structured && !("error" in structured);
+  // Raw notes render immediately. Structured sections replace them when ready.
+  const mode = minutesDetailMode(structured);
+  const hasStructured = mode === "structured" && structured && !("error" in structured);
+  const rawSummary = mode === "raw" ? plainMeetingSummary(fullText) : null;
 
   return (
     <div className="grid gap-10">
@@ -213,7 +220,7 @@ function MeetingDetailPage() {
         </div>
       )}
 
-      {hasStructured ? (
+      {hasStructured && structured && !("error" in structured) ? (
         <>
           {/* AI-Generated Structured View */}
           {structured.summary && (
@@ -312,14 +319,27 @@ function MeetingDetailPage() {
                 {structured.error}
               </p>
               <p className="text-xs text-sandstone mt-2">
-                Showing full transcript below.
+                Showing the meeting notes.
               </p>
             </div>
           )}
+          {rawSummary ? (
+            <Section kicker="Summary">
+              <div className="border-l-2 border-coal bg-paper px-5 py-4">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{rawSummary}</p>
+              </div>
+            </Section>
+          ) : null}
+          <Section kicker={rawSummary ? "Transcript" : "Notes"}>
+            <div className="border border-line bg-paper p-6">
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-coal">{fullText}</pre>
+            </div>
+          </Section>
         </>
       )}
 
-      {/* Full Transcript Toggle */}
+      {/* Full transcript stays available after the structured view replaces the raw notes. */}
+      {hasStructured ? (
       <Section kicker="Full transcript">
         <div className="border border-line bg-paper">
           <button
@@ -347,6 +367,7 @@ function MeetingDetailPage() {
           )}
         </div>
       </Section>
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import type { ActionItem, StructuredMinutes } from "./structured-minutes.ts";
-import { XAI_MODEL } from "./structured-minutes.ts";
+import {
+  XAI_MODEL,
+  minutesDetailMode,
+  plainMeetingSummary,
+  readStructuredMinutes,
+  structuredMinutesCacheKey,
+} from "./structured-minutes.ts";
 
 describe("XAI Model Configuration", () => {
   it("should use a documented xAI model", () => {
@@ -266,5 +273,65 @@ describe("Structured Minutes", () => {
 
     assert.strictEqual(actionWithoutDate.dueDate, null);
     assert.strictEqual(typeof actionWithDate.dueDate, "string");
+  });
+});
+
+describe("Structured minutes speed", () => {
+  const sample: StructuredMinutes = {
+    meetingId: "doc-1",
+    attendees: ["Lisa"],
+    keyDecisions: [],
+    actionItems: [],
+    openQuestions: [],
+    summary: "The partners agreed to send the proposal.",
+    generatedAt: "2026-11-07T00:00:00.000Z",
+  };
+
+  it("keys Redis by meeting id and content hash", () => {
+    const notes = "Summary\n\nSend the proposal.\n";
+    const key = structuredMinutesCacheKey("doc-1", notes);
+    assert.equal(key, structuredMinutesCacheKey("doc-1", notes));
+    assert.match(key, /^structured-minutes:v1:doc-1:[a-f0-9]{32}$/);
+    assert.notEqual(key, structuredMinutesCacheKey("doc-2", notes));
+    assert.notEqual(key, structuredMinutesCacheKey("doc-1", `${notes}edited`));
+  });
+
+  it("reads a stored structured view and rejects anything else", () => {
+    assert.deepEqual(readStructuredMinutes(sample), sample);
+    assert.deepEqual(readStructuredMinutes(JSON.stringify(sample)), sample);
+    assert.equal(readStructuredMinutes({ error: "failed" }), null);
+    assert.equal(readStructuredMinutes("not json"), null);
+    assert.equal(readStructuredMinutes(null), null);
+  });
+
+  it("keeps the raw notes on screen until a structured view exists", () => {
+    assert.equal(minutesDetailMode(null), "raw");
+    assert.equal(minutesDetailMode({ error: "timed out" }), "raw");
+    assert.equal(minutesDetailMode(sample), "structured");
+  });
+
+  it("uses the notes' own summary and does not invent one", () => {
+    const notes = `# Summary
+Lisa will send the proposal to Christopher on Friday.
+
+# Transcript
+Long spoken notes.
+`;
+    assert.equal(
+      plainMeetingSummary(notes),
+      "Lisa will send the proposal to Christopher on Friday.",
+    );
+    assert.equal(plainMeetingSummary("Transcript\n\nNo summary heading here."), null);
+  });
+
+  it("renders raw notes while structured generation is still running", () => {
+    const page = readFileSync(new URL("../routes/admin.minutes.$meetingId.tsx", import.meta.url), "utf8");
+    assert.match(page, /minutesDetailMode/);
+    assert.match(page, /plainMeetingSummary/);
+    assert.match(page, /mode === "raw"/);
+    const lib = readFileSync(new URL("./structured-minutes.ts", import.meta.url), "utf8");
+    assert.match(lib, /structuredMinutesCacheKey\(data\.meetingId, data\.fullText\)/);
+    assert.match(lib, /STRUCTURED_CACHE_TTL_SECONDS/);
+    assert.match(lib, /Redis HIT/);
   });
 });

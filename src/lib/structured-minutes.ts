@@ -13,8 +13,9 @@
  * - If exceeds context window (~128K tokens), chunks and merges
  * - Preserves all content for extraction
  * 
- * Caching: In-memory per documentId + modifiedTime
- * Cost: ~$0.03-0.10 per meeting (depends on length)
+ * Caching: Redis keyed by meeting id + content hash (30 days), plus a
+ * per-instance memory cache. A content change misses. Errors are not cached.
+ * Cost: ~$0.03-0.10 per meeting on a cache miss (depends on length)
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -53,6 +54,91 @@ const cache = new Map<string, StructuredMinutes>();
 
 function getCacheKey(documentId: string, modifiedTime: string): string {
   return `${documentId}:${modifiedTime}`;
+}
+
+/** Successful structured views. Content hash changes the key, so this can be long. */
+export const STRUCTURED_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+const SUMMARY_END =
+  /^(details|transcript|discussion|next steps|suggested next steps|action items|attendees|participants)$/i;
+
+function hashText(text: string): string {
+  const builtin =
+    typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("crypto") : undefined;
+  const crypto = builtin ?? (Function("return require('crypto')")() as typeof import("crypto"));
+  return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
+}
+
+/** Redis key. Same notes reuse the structured view; an edit does not. */
+export function structuredMinutesCacheKey(meetingId: string, fullText: string): string {
+  return `structured-minutes:v1:${meetingId}:${hashText(fullText)}`;
+}
+
+function headingLabel(line: string): string {
+  return line.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim();
+}
+
+/**
+ * The notes' own Summary section, verbatim. Null when the export has no Summary heading.
+ */
+export function plainMeetingSummary(fullText: string): string | null {
+  const lines = fullText.split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^summary$/i.test(headingLabel(lines[i]))) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start < 0) return null;
+  const body: string[] = [];
+  for (let i = start; i < lines.length; i++) {
+    const raw = lines[i];
+    const label = headingLabel(raw);
+    const markdownHeading = /^#+\s+\S/.test(raw.trim()) || /^\*\*[^*]+\*\*$/.test(raw.trim());
+    if (label && (markdownHeading || SUMMARY_END.test(label)) && !/^summary$/i.test(label)) break;
+    body.push(raw);
+  }
+  const text = body.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return text || null;
+}
+
+/** Structured sections replace the raw notes only after a real structured result exists. */
+export function minutesDetailMode(
+  structured: StructuredMinutes | { error: string } | null,
+): "structured" | "raw" {
+  if (structured && !("error" in structured)) return "structured";
+  return "raw";
+}
+
+export function readStructuredMinutes(value: unknown): StructuredMinutes | null {
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const row = parsed as Partial<StructuredMinutes>;
+  if (typeof row.meetingId !== "string" || typeof row.summary !== "string") return null;
+  if (!Array.isArray(row.attendees) || !Array.isArray(row.keyDecisions)) return null;
+  if (!Array.isArray(row.actionItems) || !Array.isArray(row.openQuestions)) return null;
+  return row as StructuredMinutes;
+}
+
+async function structuredRedis() {
+  try {
+    const { Redis } = await import("@upstash/redis");
+    const hasKv = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+    const hasUpstash = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!hasKv && !hasUpstash) return null;
+    return Redis.fromEnv();
+  } catch (error) {
+    console.error("[structured-minutes] Redis client failed:", error);
+    return null;
+  }
 }
 
 // Rough estimate: 1 token ≈ 4 characters
@@ -192,16 +278,32 @@ export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<StructuredMinutes | { error: string }> => {
     const startTime = Date.now();
     console.log(`[generateStructuredMinutes] Starting for ${data.meetingId}`);
+    const cacheKey = structuredMinutesCacheKey(data.meetingId, data.fullText);
+    const memoryKey = getCacheKey(data.meetingId, data.modifiedTime);
+    const cached = cache.get(cacheKey) ?? cache.get(memoryKey);
+    if (cached) {
+      console.log(`[generateStructuredMinutes] Memory HIT (${Date.now() - startTime}ms)`);
+      return cached;
+    }
+
+    const redis = await structuredRedis();
+    if (redis) {
+      try {
+        const stored = readStructuredMinutes(await redis.get(cacheKey));
+        if (stored) {
+          cache.set(cacheKey, stored);
+          cache.set(memoryKey, stored);
+          console.log(`[generateStructuredMinutes] Redis HIT (${Date.now() - startTime}ms)`);
+          return stored;
+        }
+      } catch (error) {
+        console.error("[generateStructuredMinutes] Redis read error:", error);
+      }
+    }
+
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return { error: "XAI_API_KEY not configured" };
-    }
-
-    // Check cache first
-    const cacheKey = getCacheKey(data.meetingId, data.modifiedTime);
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return cached;
     }
 
     try {
@@ -232,8 +334,15 @@ export const generateStructuredMinutesAsync = createServerFn({ method: "POST" })
       const validResults = chunkResults.filter((r): r is StructuredMinutes => !("error" in r));
       const merged = mergeStructuredResults(validResults);
 
-      // Cache final result
       cache.set(cacheKey, merged);
+      cache.set(memoryKey, merged);
+      if (redis) {
+        try {
+          await redis.set(cacheKey, merged, { ex: STRUCTURED_CACHE_TTL_SECONDS });
+        } catch (error) {
+          console.error("[generateStructuredMinutes] Redis write error:", error);
+        }
+      }
       
       console.log(`[generateStructuredMinutes] TOTAL time: ${Date.now() - startTime}ms`);
       return merged;
