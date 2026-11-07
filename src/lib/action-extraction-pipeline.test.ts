@@ -6,7 +6,7 @@
 
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { runExtractionPipeline, SHORT_CACHE_SECONDS, type PipelineDependencies } from './action-extraction-pipeline.ts';
+import { ACTIONS_CACHE_VERSION, runExtractionPipeline, SHORT_CACHE_SECONDS, type PipelineDependencies } from './action-extraction-pipeline.ts';
 import type { ActionItem } from './action-tracking.ts';
 
 // Test listMeetings error swallowing behavior documented in src/lib/minutes.ts:440-447
@@ -109,9 +109,11 @@ test('Successful extraction with real cache key generation', async () => {
   assert.strictEqual(result.diagnostic.cacheHit, false);
   assert.ok(result.diagnostic.durationMs !== undefined);
   
-  // Verify cache key format
+  // Verify cache key format. Version must change when cached action fields change.
   assert.ok(cacheKey);
-  assert.ok(cacheKey.includes('actions-cache:v2-plaintext:'));
+  assert.equal(ACTIONS_CACHE_VERSION, 'v3-plaintext-context');
+  assert.ok(cacheKey.includes(`actions-cache:${ACTIONS_CACHE_VERSION}:`));
+  assert.equal(cacheKey.includes('actions-cache:v2-plaintext:'), false);
   assert.ok(cacheKey.includes('hash-')); // Our mock hash
 });
 

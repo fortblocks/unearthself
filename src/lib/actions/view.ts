@@ -187,6 +187,50 @@ export function formatCompletedWhen(iso: string, now = new Date()): string {
   return `${day}${getOrdinalSuffix(day)} ${month}${yearBit}, ${hour}:${minute} ${dayPeriod}`;
 }
 
+export function actionPanelId(actionId: string): string {
+  return `action-context-${actionId.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+}
+
+/** Each action toggles on its own. Collapsed is an empty set. */
+export function toggleExpandedIds(open: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(open);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+export type ExpansionBody = { kind: "sentence"; sentence: string } | { kind: "meeting" };
+
+/**
+ * Expanded body is the stored source sentence, or the meeting citation when
+ * that sentence was never extracted. Never a placeholder.
+ */
+export function expansionBody(action: Pick<ActionItem, "context">): ExpansionBody {
+  const sentence = action.context?.replace(/\s+/g, " ").trim();
+  if (sentence) return { kind: "sentence", sentence };
+  return { kind: "meeting" };
+}
+
+export function actionRowExpansion(
+  action: Pick<ActionItem, "id" | "text" | "context">,
+  openIds: ReadonlySet<string>,
+) {
+  const expanded = openIds.has(action.id);
+  const body = expansionBody(action);
+  return {
+    expanded,
+    title: action.text,
+    panelId: actionPanelId(action.id),
+    control: {
+      type: "button" as const,
+      "aria-expanded": expanded,
+      "aria-controls": actionPanelId(action.id),
+    },
+    sentence: expanded && body.kind === "sentence" ? body.sentence : null,
+    meetingFallback: expanded && body.kind === "meeting",
+  };
+}
+
 export function partnerFromDesk(id: string): ActionOwner | null {
   const match = ACTION_OWNERS.find((name) => name.toLowerCase() === id.toLowerCase());
   return match ?? null;

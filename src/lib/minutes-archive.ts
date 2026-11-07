@@ -672,6 +672,7 @@ export async function searchAndAnswer(
     if (!drive) {
       return { error: "Drive client not configured" };
     }
+    const driveClient = drive;
     console.log(`[answerQuestion] Drive client init: ${Date.now() - driveStart}ms`);
 
     try {
@@ -699,7 +700,7 @@ export async function searchAndAnswer(
         try {
           let pageToken: string | undefined;
           do {
-            const response = await drive.files.list({
+            const response = await driveClient.files.list({
               q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
               fields: "nextPageToken, files(id)",
               pageSize: 100,
@@ -1184,7 +1185,7 @@ IMPORTANT:
       let processedSources = sourcesWithIds;
       
       // Convert all ISO dates (YYYY-MM-DD) to ordinal format
-      processedAnswer = processedAnswer.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
+      processedAnswer = String(processedAnswer).replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
       
       // Shorten full names to first names only
       processedAnswer = shortenPartnerNames(processedAnswer);

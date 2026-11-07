@@ -9,12 +9,16 @@ import { test } from "node:test";
 import { buildFixtureActionsBundle } from "./fixture.ts";
 import { searchRequestsFixture } from "./dev-fixture.ts";
 import { ActionsTimeoutError, loadWithTimeout } from "./timeout.ts";
+import { contextSentenceFromDetail, CONTEXT_WORD_LIMIT } from "./context.ts";
+import { extractExplicitActions } from "../action-tracking.ts";
 import {
+  actionRowExpansion,
   bundleFromExtraction,
   formatCompletedWhen,
   groupOpenActions,
   openListState,
   splitByCompletion,
+  toggleExpandedIds,
 } from "./view.ts";
 import type { ExtractionResult } from "../action-tracking.ts";
 
@@ -165,6 +169,94 @@ test("action load times out instead of hanging", async () => {
     () => loadWithTimeout(() => new Promise(() => {}), 30),
     (error: unknown) => error instanceof ActionsTimeoutError,
   );
+});
+
+test("action rows start collapsed and toggle open in place", () => {
+  const action = {
+    id: "fixture-2026-10-29:abc:Lisa",
+    text: "Send email proposal",
+    context: "Send the updated proposal to the client by Friday.",
+  };
+  const collapsed = actionRowExpansion(action, new Set());
+  assert.equal(collapsed.expanded, false);
+  assert.equal(collapsed.control.type, "button");
+  assert.equal(collapsed.control["aria-expanded"], false);
+  assert.equal(collapsed.control["aria-controls"], collapsed.panelId);
+  assert.equal(collapsed.title, "Send email proposal");
+  assert.equal(collapsed.sentence, null);
+  assert.equal(collapsed.meetingFallback, false);
+
+  const opened = toggleExpandedIds(new Set(), action.id);
+  const expanded = actionRowExpansion(action, opened);
+  assert.equal(expanded.expanded, true);
+  assert.equal(expanded.control["aria-expanded"], true);
+  assert.equal(expanded.sentence, "Send the updated proposal to the client by Friday.");
+  assert.equal(expanded.meetingFallback, false);
+  assert.equal(expanded.title, action.text);
+
+  const closed = toggleExpandedIds(opened, action.id);
+  assert.equal(closed.has(action.id), false);
+  const other = toggleExpandedIds(opened, "other-action");
+  assert.equal(other.has(action.id), true);
+  assert.equal(other.has("other-action"), true);
+});
+
+test("expanded action without a source sentence cites the meeting", () => {
+  const action = {
+    id: "m1:line:Tess",
+    text: "Inform Scott",
+  };
+  const expanded = actionRowExpansion(action, new Set([action.id]));
+  assert.equal(expanded.sentence, null);
+  assert.equal(expanded.meetingFallback, true);
+  assert.equal(expanded.title, "Inform Scott");
+  const blank = actionRowExpansion({ ...action, context: "   " }, new Set([action.id]));
+  assert.equal(blank.sentence, null);
+  assert.equal(blank.meetingFallback, true);
+});
+
+test("context sentence comes from the action detail and is not invented", () => {
+  assert.equal(
+    contextSentenceFromDetail("Send the updated proposal to Lisa Hamilton and Chris by Friday."),
+    "Send the updated proposal to Lisa and Christopher by Friday.",
+  );
+  assert.equal(contextSentenceFromDetail(""), undefined);
+  assert.equal(contextSentenceFromDetail("   "), undefined);
+  const long = Array.from({ length: CONTEXT_WORD_LIMIT + 8 }, (_, i) => `word${i}`).join(" ");
+  const capped = contextSentenceFromDetail(long);
+  assert.ok(capped);
+  assert.equal(capped.split(/\s+/).length, CONTEXT_WORD_LIMIT);
+  assert.match(capped, /^word0\b/);
+  assert.match(capped, /\.$/);
+  assert.equal(capped.includes("word25"), false);
+});
+
+test("extraction stores one source sentence and omits context when the line has no detail", async () => {
+  delete process.env.XAI_API_KEY;
+  const text = `
+Next steps
+
+☐ [Lisa Hamilton] Email Proposal: Send the updated proposal to Lisa Hamilton and Chris by Friday.
+☐ [Tess] Inform Scott about the door move
+
+Details
+`;
+  const actions = await extractExplicitActions("m-1", "2026-10-29", "Development meeting", text);
+  const lisa = actions.find((action) => action.owner === "Lisa");
+  const tess = actions.find((action) => action.owner === "Tess");
+  assert.ok(lisa);
+  assert.equal(lisa.text, "Email Proposal");
+  assert.equal(lisa.context, "Send the updated proposal to Lisa and Christopher by Friday.");
+  assert.ok(tess);
+  assert.equal(tess.text, "Inform Scott about the door move");
+  assert.equal(tess.context, undefined);
+  const collapsed = actionRowExpansion(lisa, new Set());
+  assert.equal(collapsed.sentence, null);
+  const opened = actionRowExpansion(lisa, new Set([lisa.id]));
+  assert.equal(opened.sentence, lisa.context);
+  const tessOpen = actionRowExpansion(tess, new Set([tess.id]));
+  assert.equal(tessOpen.sentence, null);
+  assert.equal(tessOpen.meetingFallback, true);
 });
 
 test("admin loaders do not await action extraction", () => {

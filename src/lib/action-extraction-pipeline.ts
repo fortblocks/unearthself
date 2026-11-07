@@ -12,6 +12,12 @@ export const SHORT_CACHE_SECONDS = 60;
 
 const LIST_FAILED_CACHE_KEY = "actions-cache:v3-status:list-failed";
 
+/**
+ * Bump when ActionItem's cached shape changes.
+ * v3 stores the source `context` sentence. v2 rows have no context and must not be reused.
+ */
+export const ACTIONS_CACHE_VERSION = "v3-plaintext-context";
+
 export type CacheEnvelope = {
   v: 3;
   actions: ActionItem[];
@@ -208,11 +214,10 @@ export async function runExtractionPipeline(
       : null;
     
     // Create cache key based on meeting IDs and modified times
-    const CACHE_VERSION = 'v2-plaintext';
     const meetingFingerprint = meetings
       .map((m) => `${m.id}:${m.modifiedTime || ''}`)
       .join('|');
-    const cacheKey = `actions-cache:${CACHE_VERSION}:${deps.hashString(meetingFingerprint)}`;
+    const cacheKey = `actions-cache:${ACTIONS_CACHE_VERSION}:${deps.hashString(meetingFingerprint)}`;
     
     // Try cache first. A bare array is a previous successful extract.
     // An envelope carries empty, unknown, and failed results (short TTL).

@@ -6,6 +6,7 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
+import { contextSentenceFromDetail } from "./actions/context.ts";
 import { formatDateOrdinal, normalizeBasecamp, shortenPartnerNames } from "./minutes-archive.ts";
 import { XAI_MODEL } from "./structured-minutes.ts";
 /**
@@ -32,6 +33,11 @@ export type ActionItem = {
   text: string; // Short imperative rewrite (12 words max)
   owner: PartnerName; // Assigned partner (first name only)
   excerpt: string; // Verbatim source line
+  /**
+   * One sentence from the action line's own detail (text after the colon).
+   * Absent when the notes do not say anything beyond the title.
+   */
+  context?: string;
 };
 
 export type ActionCompletion = {
@@ -145,6 +151,19 @@ function extractTitle(line: string): string {
   
   // Strip braces: {Perform Moisture Test} -> Perform Moisture Test
   return title.replace(/[{}]/g, '').trim();
+}
+
+/**
+ * Detail after the first colon. This is the only context the notes give
+ * for a checklist line. Empty when the line is title-only.
+ * Real format: [Lisa Hamilton] Email Proposal: Send the updated proposal…
+ */
+function extractDetail(line: string): string {
+  const normalized = normalizeLine(line);
+  const withoutBracket = normalized.replace(/^\[([^\]]+)\]\s*/, "");
+  const colonIndex = withoutBracket.indexOf(":");
+  if (colonIndex === -1) return "";
+  return withoutBracket.slice(colonIndex + 1).trim();
 }
 
 /**
@@ -387,6 +406,9 @@ export async function extractExplicitActions(
     formattedExcerpt = formattedExcerpt.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDateOrdinal(match));
     formattedExcerpt = shortenPartnerNames(formattedExcerpt);
     formattedExcerpt = normalizeBasecamp(formattedExcerpt);
+
+    // Context is the source detail only. No detail means no sentence.
+    const context = contextSentenceFromDetail(extractDetail(trimmed));
     
     // Create one action per owner (for shared actions)
     for (const owner of owners) {
@@ -400,6 +422,7 @@ export async function extractExplicitActions(
         text: formattedText,
         owner,
         excerpt: formattedExcerpt,
+        ...(context ? { context } : {}),
       });
     }
   }
