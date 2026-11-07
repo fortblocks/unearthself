@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, Loader2 } from "lucide-react";
 import { Section } from "@/components/desk/Section";
 import { SampleBadge } from "@/components/desk/SampleBadge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { useDesk } from "@/lib/desk-store";
 import {
   markActionComplete,
@@ -21,12 +22,14 @@ import {
 } from "@/lib/actions/types";
 import { isAbortError } from "@/lib/actions/timeout";
 import {
+  actionRowExpansion,
   bundleMessage,
   formatCompletedWhen,
   groupOpenActions,
   openListState,
   partnerFromDesk,
   splitByCompletion,
+  toggleExpandedIds,
   type OpenListState,
 } from "@/lib/actions/view";
 import { formatDateOrdinal } from "@/lib/minutes-archive";
@@ -152,6 +155,7 @@ export function OpenActionsPanel({
   const state = useActionsState();
   const [filter, setFilter] = useState<ActionFilter>("All");
   const [shownByOwner, setShownByOwner] = useState<Partial<Record<ActionOwner, number>>>({});
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const pageSize = variant === "mine" ? TODAY_ACTIONS_LIMIT : OPEN_ACTIONS_PAGE_SIZE;
   const activeFilter: ActionFilter = variant === "mine" && owner ? owner : filter;
 
@@ -245,21 +249,57 @@ export function OpenActionsPanel({
               <div key={group.owner}>
                 {variant === "board" ? <p className="mb-3 text-sm font-semibold text-coal">{group.owner}</p> : null}
                 <ul className="divide-y divide-line border-y border-line">
-                    {group.visible.map((action) => (
+                    {group.visible.map((action) => {
+                      const row = actionRowExpansion(action, openIds);
+                      const meetingLabel = `${formatDateOrdinal(action.meetingDate)} · ${action.meetingTitle}`;
+                      return (
                       <li key={action.id} className="flex items-start justify-between gap-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold">{action.text}</p>
+                          <button
+                            type={row.control.type}
+                            className="inline-flex max-w-full items-start gap-1.5 text-left font-semibold text-coal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember"
+                            aria-expanded={row.control["aria-expanded"]}
+                            aria-controls={row.control["aria-controls"]}
+                            onClick={() => setOpenIds((prev) => toggleExpandedIds(prev, action.id))}
+                          >
+                            <ChevronRight
+                              aria-hidden="true"
+                              className={cn(
+                                "mt-1 size-3.5 shrink-0 text-sandstone transition-transform",
+                                row.expanded && "rotate-90",
+                              )}
+                            />
+                            <span>{row.title}</span>
+                          </button>
                           <p className="mt-1 text-sm text-muted">
                             <Link
                               to="/admin/minutes/$meetingId"
                               params={{ meetingId: action.meetingId }}
                               className="hover:underline"
                             >
-                              {formatDateOrdinal(action.meetingDate)} · {action.meetingTitle}
+                              {meetingLabel}
                             </Link>
                           </p>
                           {action.excerpt ? (
                             <p className="mt-1 border-l-2 border-line pl-2 text-xs text-sandstone">{action.excerpt}</p>
+                          ) : null}
+                          {row.expanded ? (
+                            <div id={row.panelId} role="region" aria-label={row.title}>
+                              {row.sentence ? (
+                                <p className="mt-2 text-sm leading-relaxed text-shale">{row.sentence}</p>
+                              ) : null}
+                              {row.meetingFallback ? (
+                                <p className="mt-2 text-sm text-muted">
+                                  <Link
+                                    to="/admin/minutes/$meetingId"
+                                    params={{ meetingId: action.meetingId }}
+                                    className="hover:underline"
+                                  >
+                                    {meetingLabel}
+                                  </Link>
+                                </p>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                         <Button
@@ -273,7 +313,8 @@ export function OpenActionsPanel({
                           {state.pendingId === action.id ? "…" : "Mark complete"}
                         </Button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 {variant === "board" && group.remaining > 0 ? (
                   <Button
