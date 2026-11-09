@@ -116,9 +116,7 @@ function TreatmentRow({
         >
           <span className="min-w-0 flex-1">
             <span className="block group-hover:text-sandstone group-focus-visible:text-sandstone">{treatment.name}</span>
-            <span className="mt-1 block text-sm text-fossil/45">
-              {treatment.mins} · {treatment.line}
-            </span>
+            <span className="mt-1 block text-sm text-fossil/45">{treatment.line}</span>
           </span>
           <span className="w-14 shrink-0 text-right text-sm tabular-nums text-sandstone">{cad(treatment.price)}</span>
         </button>
