@@ -6,9 +6,9 @@ export const HERO_SENTENCE = "Basecamp is our wellness centre, in the heart of D
 export const WHAT_IT_IS = "Come in for the heat, the cold, and time on the table.";
 
 export const WHAT_IT_IS_PARAGRAPHS = [
-  "Basecamp is our wellness centre in the heart of Drumheller. You come here for heat and cold, and for treatments on the table — a place to book a session, not a room to stay in.",
-  "The Fire and Ice room is for the shared infrared sauna, the steam, the cold plunge, and the baths. You can book one of those on its own, or take the circuit that moves you between heat and cold. Table treatments happen in their own rooms, one person at a time.",
-  "If you want a suite, that is Haven, and it is separate from Basecamp. You can book here if you live in town, if you are visiting for the day, or if you are staying at Haven or elsewhere nearby.",
+  "You arrive and put the day down for a while. Then you step into the heat, the cold, or a treatment on the table.",
+  "The Fire and Ice room has the shared infrared sauna, the steam, the cold plunge, and the baths. You can book one of those on its own, or move through the circuit from heat to cold. Treatments on the table happen in their own rooms, one person at a time.",
+  "If you are staying at Haven, you can book a session here during your visit. You can also come in if you live in town, or if you are only in Drumheller for the day.",
 ] as const;
 
 export const MENU_NOTE =
