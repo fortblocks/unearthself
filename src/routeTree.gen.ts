@@ -39,8 +39,6 @@ import { Route as AdminMoneyRouteImport } from './routes/admin.money'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminRiskRouteImport } from './routes/admin.risk'
 import { Route as AdminSocialsRouteImport } from './routes/admin.socials'
-import { Route as BasecampIndexRouteImport } from './routes/basecamp.index'
-import { Route as BasecampSlugRouteImport } from './routes/basecamp.$slug'
 import { Route as BookRetreatRouteImport } from './routes/book.retreat'
 import { Route as BookTreatmentRouteImport } from './routes/book.treatment'
 import { Route as D14IndexRouteImport } from './routes/d14.index'
@@ -228,16 +226,6 @@ const AdminSocialsRoute = AdminSocialsRouteImport.update({
   path: '/socials',
   getParentRoute: () => AdminRoute,
 } as any)
-const BasecampIndexRoute = BasecampIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => BasecampRoute,
-} as any)
-const BasecampSlugRoute = BasecampSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => BasecampRoute,
-} as any)
 const BookRetreatRoute = BookRetreatRouteImport.update({
   id: '/book/retreat',
   path: '/book/retreat',
@@ -423,7 +411,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
-  '/basecamp': typeof BasecampRouteWithChildren
+  '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
   '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
@@ -449,7 +437,6 @@ export interface FileRoutesByFullPath {
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
   '/admin/socials': typeof AdminSocialsRoute
-  '/basecamp/$slug': typeof BasecampSlugRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -473,7 +460,6 @@ export interface FileRoutesByFullPath {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/admin/': typeof AdminIndexRoute
-  '/basecamp/': typeof BasecampIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
@@ -492,6 +478,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
   '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
@@ -512,7 +499,6 @@ export interface FileRoutesByTo {
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
   '/admin/socials': typeof AdminSocialsRoute
-  '/basecamp/$slug': typeof BasecampSlugRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -535,7 +521,6 @@ export interface FileRoutesByTo {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/admin': typeof AdminIndexRoute
-  '/basecamp': typeof BasecampIndexRoute
   '/d14': typeof D14IndexRoute
   '/haven': typeof HavenIndexRoute
   '/journal': typeof JournalIndexRoute
@@ -556,7 +541,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
-  '/basecamp': typeof BasecampRouteWithChildren
+  '/basecamp': typeof BasecampRoute
   '/bootcamp': typeof BootcampRoute
   '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
@@ -582,7 +567,6 @@ export interface FileRoutesById {
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/risk': typeof AdminRiskRoute
   '/admin/socials': typeof AdminSocialsRoute
-  '/basecamp/$slug': typeof BasecampSlugRoute
   '/book/retreat': typeof BookRetreatRoute
   '/book/treatment': typeof BookTreatmentRoute
   '/d14/basecamp': typeof D14BasecampRoute
@@ -606,7 +590,6 @@ export interface FileRoutesById {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/admin/': typeof AdminIndexRoute
-  '/basecamp/': typeof BasecampIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
@@ -654,7 +637,6 @@ export interface FileRouteTypes {
     | '/admin/pipeline'
     | '/admin/risk'
     | '/admin/socials'
-    | '/basecamp/$slug'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -678,7 +660,6 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/admin/'
-    | '/basecamp/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
@@ -697,6 +678,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/basecamp'
     | '/bootcamp'
     | '/brand'
     | '/builder'
@@ -717,7 +699,6 @@ export interface FileRouteTypes {
     | '/admin/pipeline'
     | '/admin/risk'
     | '/admin/socials'
-    | '/basecamp/$slug'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -740,7 +721,6 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/admin'
-    | '/basecamp'
     | '/d14'
     | '/haven'
     | '/journal'
@@ -786,7 +766,6 @@ export interface FileRouteTypes {
     | '/admin/pipeline'
     | '/admin/risk'
     | '/admin/socials'
-    | '/basecamp/$slug'
     | '/book/retreat'
     | '/book/treatment'
     | '/d14/basecamp'
@@ -810,7 +789,6 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/admin/'
-    | '/basecamp/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
@@ -831,7 +809,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
-  BasecampRoute: typeof BasecampRouteWithChildren
+  BasecampRoute: typeof BasecampRoute
   BootcampRoute: typeof BootcampRoute
   BrandRoute: typeof BrandRoute
   BuilderRoute: typeof BuilderRoute
@@ -1066,20 +1044,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/socials'
       preLoaderRoute: typeof AdminSocialsRouteImport
       parentRoute: typeof AdminRoute
-    }
-    '/basecamp/': {
-      id: '/basecamp/'
-      path: '/'
-      fullPath: '/basecamp/'
-      preLoaderRoute: typeof BasecampIndexRouteImport
-      parentRoute: typeof BasecampRoute
-    }
-    '/basecamp/$slug': {
-      id: '/basecamp/$slug'
-      path: '/$slug'
-      fullPath: '/basecamp/$slug'
-      preLoaderRoute: typeof BasecampSlugRouteImport
-      parentRoute: typeof BasecampRoute
     }
     '/book/retreat': {
       id: '/book/retreat'
@@ -1378,20 +1342,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface BasecampRouteChildren {
-  BasecampSlugRoute: typeof BasecampSlugRoute
-  BasecampIndexRoute: typeof BasecampIndexRoute
-}
-
-const BasecampRouteChildren: BasecampRouteChildren = {
-  BasecampSlugRoute: BasecampSlugRoute,
-  BasecampIndexRoute: BasecampIndexRoute,
-}
-
-const BasecampRouteWithChildren = BasecampRoute._addFileChildren(
-  BasecampRouteChildren,
-)
-
 interface D14RouteChildren {
   D14BasecampRoute: typeof D14BasecampRoute
   D14SeamRoute: typeof D14SeamRoute
@@ -1497,7 +1447,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
-  BasecampRoute: BasecampRouteWithChildren,
+  BasecampRoute: BasecampRoute,
   BootcampRoute: BootcampRoute,
   BrandRoute: BrandRoute,
   BuilderRoute: BuilderRoute,

@@ -1,6 +1,8 @@
 /** Guest-facing Basecamp copy from Norah, 5 November 2026. */
 export const PLACE_LABEL = "The place";
 
+export const WELLNESS_LABEL = "Basecamp is the wellness centre.";
+
 export const PLACE_HEADLINE = "Check in. Exhale. Come back to yourself.";
 
 export const PLACE_PARAGRAPHS = [

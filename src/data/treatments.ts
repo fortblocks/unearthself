@@ -6,7 +6,7 @@ export type Treatment = {
   group: "heat" | "table" | "light" | "with";
   line: string;
   /**
-   * Full guest-facing description for the treatment page.
+   * Full guest-facing description for the open menu row.
    * Leave unset until that copy exists. Do not fill with internal notes.
    */
   description?: string;

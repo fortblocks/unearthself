@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { MENU_NOTE, PLACE_HEADLINE, PLACE_LABEL, PLACE_PARAGRAPHS } from "./basecampCopy.ts";
+import { MENU_NOTE, PLACE_HEADLINE, PLACE_LABEL, PLACE_PARAGRAPHS, WELLNESS_LABEL } from "./basecampCopy.ts";
 import { TREATMENTS, treatmentById } from "./treatments.ts";
 
 const PLACEHOLDER = /lorem ipsum|coming soon|add what you want|book opens the same panel|\bTODO\b/i;
@@ -51,6 +51,7 @@ test("treatment pages have no invented descriptions or placeholder copy", () => 
 
 test("Norah's Basecamp opening and menu line are the public words", () => {
   assert.equal(PLACE_LABEL, "The place");
+  assert.equal(WELLNESS_LABEL, "Basecamp is the wellness centre.");
   assert.equal(PLACE_HEADLINE, "Check in. Exhale. Come back to yourself.");
   assert.equal(
     MENU_NOTE,
@@ -65,12 +66,14 @@ test("Norah's Basecamp opening and menu line are the public words", () => {
   assert.doesNotMatch(`${PLACE_LABEL}\n${PLACE_HEADLINE}\n${opening}\n${MENU_NOTE}`, PLACEHOLDER);
 
   const book = readFileSync(new URL("../components/basecamp/TreatmentBook.tsx", import.meta.url), "utf8");
-  const detail = readFileSync(new URL("../components/basecamp/TreatmentDetail.tsx", import.meta.url), "utf8");
-  assert.match(book, /Not a gym floor with a candle/);
-  assert.match(book, /Fire and Ice for sauna, steam and plunge/);
-  assert.match(book, /We keep the diaries/);
+  assert.doesNotMatch(book, /Not a gym floor with a candle/);
+  assert.doesNotMatch(book, /Fire and Ice for sauna, steam and plunge/);
+  assert.doesNotMatch(book, /We keep the diaries/);
+  assert.doesNotMatch(book, /the house/i);
   assert.doesNotMatch(book, /Come in from/);
+  assert.doesNotMatch(book, /heat, cold, hands/i);
+  assert.doesNotMatch(book, /\/basecamp\/\$slug/);
+  assert.match(book, /\{WELLNESS_LABEL\}/);
+  assert.match(book, /aria-expanded/);
   assert.doesNotMatch(book, PLACEHOLDER);
-  assert.doesNotMatch(detail, PLACEHOLDER);
-  assert.doesNotMatch(detail, /description coming soon|Read more about/i);
 });
