@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS } from "./basecampCopy.ts";
+import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS, WHAT_IT_IS_PARAGRAPHS } from "./basecampCopy.ts";
 import { TREATMENT_GROUPS, TREATMENTS, treatmentById } from "./treatments.ts";
 
 const PLACEHOLDER = /lorem ipsum|coming soon|add what you want|book opens the same panel|\bTODO\b/i;
@@ -130,12 +130,18 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.equal(HERO_KICKER, "Drumheller — the wellness centre");
   assert.equal(HERO_SENTENCE, "Basecamp is our wellness centre, in the heart of Drumheller.");
   assert.equal(WHAT_IT_IS, "Come in for the heat, the cold, and time on the table.");
+  assert.deepEqual(WHAT_IT_IS_PARAGRAPHS, [
+    "Basecamp is our wellness centre in the heart of Drumheller. You come here for heat and cold, and for treatments on the table — a place to book a session, not a room to stay in.",
+    "The Fire and Ice room is for the shared infrared sauna, the steam, the cold plunge, and the baths. You can book one of those on its own, or take the circuit that moves you between heat and cold. Table treatments happen in their own rooms, one person at a time.",
+    "If you want a suite, that is Haven, and it is separate from Basecamp. You can book here if you live in town, if you are visiting for the day, or if you are staying at Haven or elsewhere nearby.",
+  ]);
   assert.equal(
     MENU_NOTE,
     "Prices in CAD. Select from massage therapy to healing work, weight loss and nervous system quieting.",
   );
-  assert.doesNotMatch(`${HERO_KICKER}\n${HERO_SENTENCE}\n${WHAT_IT_IS}\n${MENU_NOTE}`, PLACEHOLDER);
-  assert.doesNotMatch(`${HERO_SENTENCE}\n${WHAT_IT_IS}`, /Haven|boutique hotel|under one roof|Base Camp|the house/i);
+  const opening = [HERO_KICKER, HERO_SENTENCE, WHAT_IT_IS, ...WHAT_IT_IS_PARAGRAPHS, MENU_NOTE].join("\n");
+  assert.doesNotMatch(opening, PLACEHOLDER);
+  assert.doesNotMatch(opening, /boutique hotel|under one roof|Base Camp|the house|Not a gym floor|Check in\. Exhale/i);
 
   const book = readFileSync(new URL("../components/basecamp/TreatmentBook.tsx", import.meta.url), "utf8");
   assert.match(book, /min-h-\[70vh\]/);
@@ -149,6 +155,9 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.doesNotMatch(book, /\/book\/retreat/);
   assert.match(book, /What it is/);
   assert.match(book, /\{WHAT_IT_IS\}/);
+  assert.match(book, /md:whitespace-nowrap/);
+  assert.match(book, /mb-4 text-lg text-fossil\/80/);
+  assert.match(book, /WHAT_IT_IS_PARAGRAPHS/);
   const whatItIs = book.indexOf("What it is");
   const menu = book.indexOf("The menu");
   assert.ok(whatItIs > 0 && menu > whatItIs);

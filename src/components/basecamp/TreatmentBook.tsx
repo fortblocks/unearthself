@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS } from "@/data/basecampCopy";
+import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS, WHAT_IT_IS_PARAGRAPHS } from "@/data/basecampCopy";
 import { cad, TREATMENT_GROUPS, TREATMENTS, type Treatment } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
@@ -49,7 +49,12 @@ export function TreatmentBook() {
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What it is</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">{WHAT_IT_IS}</h2>
+          <h2 className="font-display mb-6 text-4xl uppercase md:whitespace-nowrap">{WHAT_IT_IS}</h2>
+          {WHAT_IT_IS_PARAGRAPHS.map((paragraph) => (
+            <p key={paragraph} className="mb-4 text-lg text-fossil/80">
+              {paragraph}
+            </p>
+          ))}
         </div>
       </section>
 
