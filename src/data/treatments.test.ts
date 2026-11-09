@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { MENU_NOTE, PLACE_HEADLINE, PLACE_LABEL, PLACE_PARAGRAPHS, WELLNESS_LABEL } from "./basecampCopy.ts";
+import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE } from "./basecampCopy.ts";
 import { TREATMENT_GROUPS, TREATMENTS, treatmentById } from "./treatments.ts";
 
 const PLACEHOLDER = /lorem ipsum|coming soon|add what you want|book opens the same panel|\bTODO\b/i;
@@ -126,31 +126,33 @@ test("treatment copy is the approved guest sentences", () => {
   assert.equal(treatmentById("missing"), undefined);
 });
 
-test("Norah's Basecamp opening and menu line are the public words", () => {
-  assert.equal(PLACE_LABEL, "The place");
-  assert.equal(WELLNESS_LABEL, "Basecamp is the wellness centre.");
-  assert.equal(PLACE_HEADLINE, "Check in. Exhale. Come back to yourself.");
+test("Basecamp hero matches the Bootcamp structure and drops the hotel wording", () => {
+  assert.equal(HERO_KICKER, "Drumheller — the wellness centre");
+  assert.equal(HERO_SENTENCE, "Basecamp is our wellness centre, in the heart of Drumheller.");
   assert.equal(
     MENU_NOTE,
     "Prices in CAD. Select from massage therapy to healing work, weight loss and nervous system quieting.",
   );
-  const opening = PLACE_PARAGRAPHS.join("\n");
-  assert.match(opening, /^Basecamp brings boutique hotel comfort/);
-  assert.match(opening, /as an intriguing journey to wellness/);
-  assert.match(opening, /The Haven’s thoughtfully appointed suites/);
-  assert.doesNotMatch(opening, /Base Camp/);
-  assert.doesNotMatch(opening, /a intriguing/);
-  assert.doesNotMatch(`${PLACE_LABEL}\n${PLACE_HEADLINE}\n${opening}\n${MENU_NOTE}`, PLACEHOLDER);
+  assert.doesNotMatch(`${HERO_KICKER}\n${HERO_SENTENCE}\n${MENU_NOTE}`, PLACEHOLDER);
+  assert.doesNotMatch(HERO_SENTENCE, /Haven|boutique hotel|under one roof|Base Camp/i);
 
   const book = readFileSync(new URL("../components/basecamp/TreatmentBook.tsx", import.meta.url), "utf8");
+  assert.match(book, /min-h-\[70vh\]/);
+  assert.match(book, /max-w-5xl px-6 pb-16 pt-28/);
+  assert.match(book, /mb-5 text-\[clamp\(2\.6rem,7vw,5\.2rem\)\]/);
+  assert.doesNotMatch(book, /max-w-\[16ch\]/);
+  assert.match(book, /Badlands/);
+  assert.match(book, /Request a conversation/);
+  assert.match(book, /setOpen\(true\)/);
+  assert.doesNotMatch(book, /\/book\/retreat/);
   assert.doesNotMatch(book, /Not a gym floor with a candle/);
-  assert.doesNotMatch(book, /Fire and Ice for sauna, steam and plunge/);
-  assert.doesNotMatch(book, /We keep the diaries/);
   assert.doesNotMatch(book, /the house/i);
   assert.doesNotMatch(book, /Come in from/);
-  assert.doesNotMatch(book, /heat, cold, hands/i);
+  assert.doesNotMatch(book, /Check in\. Exhale/);
+  assert.doesNotMatch(book, /boutique hotel|under one roof|The Haven|The place/i);
+  assert.doesNotMatch(book, /Book opens the same panel/);
   assert.doesNotMatch(book, /\/basecamp\/\$slug/);
-  assert.match(book, /\{WELLNESS_LABEL\}/);
+  assert.match(book, /What we do here/);
   assert.match(book, /aria-expanded/);
   assert.doesNotMatch(book, PLACEHOLDER);
 });

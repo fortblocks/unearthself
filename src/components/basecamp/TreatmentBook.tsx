@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { MENU_NOTE, PLACE_HEADLINE, PLACE_LABEL, PLACE_PARAGRAPHS, WELLNESS_LABEL } from "@/data/basecampCopy";
+import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE } from "@/data/basecampCopy";
 import { cad, TREATMENT_GROUPS, TREATMENTS, type Treatment } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
@@ -25,32 +25,24 @@ export function TreatmentBook() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              "linear-gradient(to top, rgba(22,23,24,0.88) 0%, rgba(22,23,24,0.45) 48%, rgba(22,23,24,0.28) 100%), url('/images/basecamp/lounge.jpg')",
+              "linear-gradient(to top, rgba(22,23,24,0.78) 0%, rgba(22,23,24,0.12) 50%), url('/images/basecamp/lounge.jpg')",
           }}
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
-          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">{PLACE_LABEL}</p>
-          <h1 className="font-display mb-8 max-w-[16ch] text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] uppercase">
-            {PLACE_HEADLINE}
+          <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">{HERO_KICKER}</p>
+          <h1 className="font-display mb-5 text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] uppercase">
+            Badlands
+            <br />
+            Basecamp
           </h1>
+          <p className="mb-8 max-w-[40ch] text-lg text-fossil/85">{HERO_SENTENCE}</p>
           <button
             type="button"
             onClick={() => setOpen(true)}
             className="inline-flex rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white"
           >
-            Book
+            Request a conversation
           </button>
-        </div>
-      </section>
-
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-3xl">
-          <p className="mb-6 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{WELLNESS_LABEL}</p>
-          <div className="space-y-4 text-lg text-fossil/80">
-            {PLACE_PARAGRAPHS.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
         </div>
       </section>
 

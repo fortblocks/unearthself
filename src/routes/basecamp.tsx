@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { TreatmentBook } from "@/components/basecamp/TreatmentBook";
-import { PLACE_HEADLINE, PLACE_PARAGRAPHS } from "@/data/basecampCopy";
+import { HERO_SENTENCE } from "@/data/basecampCopy";
 
 export const Route = createFileRoute("/basecamp")({
   component: BasecampPage,
@@ -9,7 +9,7 @@ export const Route = createFileRoute("/basecamp")({
       { title: "Basecamp - Unearth Self" },
       {
         name: "description",
-        content: `${PLACE_HEADLINE} ${PLACE_PARAGRAPHS[0]}`,
+        content: HERO_SENTENCE,
       },
     ],
   }),
