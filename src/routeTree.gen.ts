@@ -18,6 +18,8 @@ import { Route as BrandRouteImport } from './routes/brand'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as D14RouteImport } from './routes/d14'
+import { Route as DrumhellerRouteImport } from './routes/drumheller'
+import { Route as EventsRouteImport } from './routes/events'
 import { Route as FindUsRouteImport } from './routes/find-us'
 import { Route as FoundRouteImport } from './routes/found'
 import { Route as HavenRouteImport } from './routes/haven'
@@ -52,6 +54,9 @@ import { Route as HavenIndexRouteImport } from './routes/haven.index'
 import { Route as HavenSlugRouteImport } from './routes/haven.$slug'
 import { Route as JournalIndexRouteImport } from './routes/journal.index'
 import { Route as JournalSlugRouteImport } from './routes/journal.$slug'
+import { Route as PackagesIndexRouteImport } from './routes/packages.index'
+import { Route as PackagesSlugRouteImport } from './routes/packages.$slug'
+import { Route as PackagesWomensWellnessRouteImport } from './routes/packages.womens-wellness'
 import { Route as QuestIndexRouteImport } from './routes/quest.index'
 import { Route as QuestAdminRouteImport } from './routes/quest.admin'
 import { Route as QuestBoundaryRouteImport } from './routes/quest.boundary'
@@ -119,6 +124,16 @@ const CommunityRoute = CommunityRouteImport.update({
 const D14Route = D14RouteImport.update({
   id: '/d14',
   path: '/d14',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DrumhellerRoute = DrumhellerRouteImport.update({
+  id: '/drumheller',
+  path: '/drumheller',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FindUsRoute = FindUsRouteImport.update({
@@ -291,6 +306,21 @@ const JournalSlugRoute = JournalSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => JournalRoute,
 } as any)
+const PackagesIndexRoute = PackagesIndexRouteImport.update({
+  id: '/packages/',
+  path: '/packages/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackagesSlugRoute = PackagesSlugRouteImport.update({
+  id: '/packages/$slug',
+  path: '/packages/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackagesWomensWellnessRoute = PackagesWomensWellnessRouteImport.update({
+  id: '/packages/womens-wellness',
+  path: '/packages/womens-wellness',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuestIndexRoute = QuestIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -417,6 +447,8 @@ export interface FileRoutesByFullPath {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/drumheller': typeof DrumhellerRoute
+  '/events': typeof EventsRoute
   '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
@@ -447,6 +479,8 @@ export interface FileRoutesByFullPath {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/packages/$slug': typeof PackagesSlugRoute
+  '/packages/womens-wellness': typeof PackagesWomensWellnessRoute
   '/quest/admin': typeof QuestAdminRouteWithChildren
   '/quest/boundary': typeof QuestBoundaryRoute
   '/quest/experiment': typeof QuestExperimentRoute
@@ -463,6 +497,7 @@ export interface FileRoutesByFullPath {
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
+  '/packages/': typeof PackagesIndexRoute
   '/quest/': typeof QuestIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
@@ -483,6 +518,8 @@ export interface FileRoutesByTo {
   '/brand': typeof BrandRoute
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
+  '/drumheller': typeof DrumhellerRoute
+  '/events': typeof EventsRoute
   '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/login': typeof LoginRoute
@@ -509,6 +546,8 @@ export interface FileRoutesByTo {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/packages/$slug': typeof PackagesSlugRoute
+  '/packages/womens-wellness': typeof PackagesWomensWellnessRoute
   '/quest/boundary': typeof QuestBoundaryRoute
   '/quest/experiment': typeof QuestExperimentRoute
   '/quest/mirror': typeof QuestMirrorRoute
@@ -524,6 +563,7 @@ export interface FileRoutesByTo {
   '/d14': typeof D14IndexRoute
   '/haven': typeof HavenIndexRoute
   '/journal': typeof JournalIndexRoute
+  '/packages': typeof PackagesIndexRoute
   '/quest': typeof QuestIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
@@ -547,6 +587,8 @@ export interface FileRoutesById {
   '/builder': typeof BuilderRoute
   '/community': typeof CommunityRoute
   '/d14': typeof D14RouteWithChildren
+  '/drumheller': typeof DrumhellerRoute
+  '/events': typeof EventsRoute
   '/find-us': typeof FindUsRoute
   '/found': typeof FoundRoute
   '/haven': typeof HavenRouteWithChildren
@@ -577,6 +619,8 @@ export interface FileRoutesById {
   '/for/teams': typeof ForTeamsRoute
   '/haven/$slug': typeof HavenSlugRoute
   '/journal/$slug': typeof JournalSlugRoute
+  '/packages/$slug': typeof PackagesSlugRoute
+  '/packages/womens-wellness': typeof PackagesWomensWellnessRoute
   '/quest/admin': typeof QuestAdminRouteWithChildren
   '/quest/boundary': typeof QuestBoundaryRoute
   '/quest/experiment': typeof QuestExperimentRoute
@@ -593,6 +637,7 @@ export interface FileRoutesById {
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
+  '/packages/': typeof PackagesIndexRoute
   '/quest/': typeof QuestIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
@@ -617,6 +662,8 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/drumheller'
+    | '/events'
     | '/find-us'
     | '/found'
     | '/haven'
@@ -647,6 +694,8 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/packages/$slug'
+    | '/packages/womens-wellness'
     | '/quest/admin'
     | '/quest/boundary'
     | '/quest/experiment'
@@ -663,6 +712,7 @@ export interface FileRouteTypes {
     | '/d14/'
     | '/haven/'
     | '/journal/'
+    | '/packages/'
     | '/quest/'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
@@ -683,6 +733,8 @@ export interface FileRouteTypes {
     | '/brand'
     | '/builder'
     | '/community'
+    | '/drumheller'
+    | '/events'
     | '/find-us'
     | '/found'
     | '/login'
@@ -709,6 +761,8 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/packages/$slug'
+    | '/packages/womens-wellness'
     | '/quest/boundary'
     | '/quest/experiment'
     | '/quest/mirror'
@@ -724,6 +778,7 @@ export interface FileRouteTypes {
     | '/d14'
     | '/haven'
     | '/journal'
+    | '/packages'
     | '/quest'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
@@ -746,6 +801,8 @@ export interface FileRouteTypes {
     | '/builder'
     | '/community'
     | '/d14'
+    | '/drumheller'
+    | '/events'
     | '/find-us'
     | '/found'
     | '/haven'
@@ -776,6 +833,8 @@ export interface FileRouteTypes {
     | '/for/teams'
     | '/haven/$slug'
     | '/journal/$slug'
+    | '/packages/$slug'
+    | '/packages/womens-wellness'
     | '/quest/admin'
     | '/quest/boundary'
     | '/quest/experiment'
@@ -792,6 +851,7 @@ export interface FileRouteTypes {
     | '/d14/'
     | '/haven/'
     | '/journal/'
+    | '/packages/'
     | '/quest/'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
@@ -815,6 +875,8 @@ export interface RootRouteChildren {
   BuilderRoute: typeof BuilderRoute
   CommunityRoute: typeof CommunityRoute
   D14Route: typeof D14RouteWithChildren
+  DrumhellerRoute: typeof DrumhellerRoute
+  EventsRoute: typeof EventsRoute
   FindUsRoute: typeof FindUsRoute
   FoundRoute: typeof FoundRoute
   HavenRoute: typeof HavenRouteWithChildren
@@ -831,6 +893,9 @@ export interface RootRouteChildren {
   ForCrewsRoute: typeof ForCrewsRoute
   ForFriendsRoute: typeof ForFriendsRoute
   ForTeamsRoute: typeof ForTeamsRoute
+  PackagesSlugRoute: typeof PackagesSlugRoute
+  PackagesWomensWellnessRoute: typeof PackagesWomensWellnessRoute
+  PackagesIndexRoute: typeof PackagesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -896,6 +961,20 @@ declare module '@tanstack/react-router' {
       path: '/d14'
       fullPath: '/d14'
       preLoaderRoute: typeof D14RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/drumheller': {
+      id: '/drumheller'
+      path: '/drumheller'
+      fullPath: '/drumheller'
+      preLoaderRoute: typeof DrumhellerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/find-us': {
@@ -1135,6 +1214,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/journal/$slug'
       preLoaderRoute: typeof JournalSlugRouteImport
       parentRoute: typeof JournalRoute
+    }
+    '/packages/': {
+      id: '/packages/'
+      path: '/packages'
+      fullPath: '/packages/'
+      preLoaderRoute: typeof PackagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packages/$slug': {
+      id: '/packages/$slug'
+      path: '/packages/$slug'
+      fullPath: '/packages/$slug'
+      preLoaderRoute: typeof PackagesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packages/womens-wellness': {
+      id: '/packages/womens-wellness'
+      path: '/packages/womens-wellness'
+      fullPath: '/packages/womens-wellness'
+      preLoaderRoute: typeof PackagesWomensWellnessRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/quest/': {
       id: '/quest/'
@@ -1453,6 +1553,8 @@ const rootRouteChildren: RootRouteChildren = {
   BuilderRoute: BuilderRoute,
   CommunityRoute: CommunityRoute,
   D14Route: D14RouteWithChildren,
+  DrumhellerRoute: DrumhellerRoute,
+  EventsRoute: EventsRoute,
   FindUsRoute: FindUsRoute,
   FoundRoute: FoundRoute,
   HavenRoute: HavenRouteWithChildren,
@@ -1469,6 +1571,9 @@ const rootRouteChildren: RootRouteChildren = {
   ForCrewsRoute: ForCrewsRoute,
   ForFriendsRoute: ForFriendsRoute,
   ForTeamsRoute: ForTeamsRoute,
+  PackagesSlugRoute: PackagesSlugRoute,
+  PackagesWomensWellnessRoute: PackagesWomensWellnessRoute,
+  PackagesIndexRoute: PackagesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
