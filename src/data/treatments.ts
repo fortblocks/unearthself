@@ -5,6 +5,11 @@ export type Treatment = {
   price: number;
   group: "heat" | "table" | "light" | "with";
   line: string;
+  /**
+   * Full guest-facing description for the treatment page.
+   * Leave unset until that copy exists. Do not fill with internal notes.
+   */
+  description?: string;
 };
 
 export const TREATMENTS: Treatment[] = [
@@ -37,6 +42,10 @@ export const TREATMENT_GROUPS: { id: Treatment["group"]; title: string; line: st
   { id: "table", title: "On the table", line: "Bodywork, wraps, facials. One person, one room." },
   { id: "with", title: "With a practitioner", line: "We hold the room. Their diary is their own." },
 ];
+
+export function treatmentById(id: string) {
+  return TREATMENTS.find((t) => t.id === id);
+}
 
 export function cad(n: number) {
   return `$${n}`;

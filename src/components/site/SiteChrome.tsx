@@ -31,6 +31,7 @@ function Mark() {
 export function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onHaven = pathname.startsWith("/haven");
+  const onBasecamp = pathname.startsWith("/basecamp");
   const onJournal = pathname.startsWith("/journal");
   const onD14 = pathname.startsWith("/d14");
   const onDesk = pathname.startsWith("/admin") || pathname.startsWith("/login");
@@ -53,6 +54,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
               className={`text-[0.8rem] font-semibold uppercase tracking-wide transition-colors ${
                 pathname === l.to ||
                 (l.to === "/haven" && onHaven) ||
+                (l.to === "/basecamp" && onBasecamp) ||
                 (l.to === "/journal" && onJournal)
                   ? "text-ember"
                   : "text-fossil hover:text-ember"
