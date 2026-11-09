@@ -30,12 +30,12 @@ export function TreatmentBook() {
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">{HERO_KICKER}</p>
-          <h1 className="font-display mb-5 text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] uppercase">
+          <h1 className="font-display mb-5 text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] min-h-[1.8em] uppercase">
             Badlands
             <br />
             Basecamp
           </h1>
-          <p className="mb-8 max-w-[40ch] text-lg text-fossil/85">{HERO_SENTENCE}</p>
+          <p className="mb-8 min-h-[5.25rem] max-w-[40ch] text-lg text-fossil/85">{HERO_SENTENCE}</p>
           <button
             type="button"
             onClick={() => setOpen(true)}
