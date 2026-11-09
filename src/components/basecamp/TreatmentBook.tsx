@@ -49,9 +49,18 @@ export function TreatmentBook() {
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What it is</p>
-          <h2 className="font-display mb-6 text-4xl uppercase md:whitespace-nowrap">{WHAT_IT_IS}</h2>
-          {WHAT_IT_IS_PARAGRAPHS.map((paragraph) => (
-            <p key={paragraph} className="mb-4 text-lg text-fossil/80">
+          <h2 className="font-display mb-6 text-[clamp(0.9rem,3.4vw,2.05rem)] leading-none whitespace-nowrap uppercase">
+            {WHAT_IT_IS}
+          </h2>
+          {WHAT_IT_IS_PARAGRAPHS.map((paragraph, index) => (
+            <p
+              key={paragraph}
+              className={
+                index === WHAT_IT_IS_PARAGRAPHS.length - 1
+                  ? "text-lg text-fossil/80"
+                  : "mb-4 text-lg text-fossil/80"
+              }
+            >
               {paragraph}
             </p>
           ))}

@@ -155,8 +155,11 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.doesNotMatch(book, /\/book\/retreat/);
   assert.match(book, /What it is/);
   assert.match(book, /\{WHAT_IT_IS\}/);
-  assert.match(book, /md:whitespace-nowrap/);
+  assert.match(book, /whitespace-nowrap/);
+  assert.doesNotMatch(book, /md:whitespace-nowrap/);
+  assert.match(book, /text-\[clamp\(0\.9rem,3\.4vw,2\.05rem\)\]/);
   assert.match(book, /mb-4 text-lg text-fossil\/80/);
+  assert.match(book, /text-lg text-fossil\/80/);
   assert.match(book, /WHAT_IT_IS_PARAGRAPHS/);
   const whatItIs = book.indexOf("What it is");
   const menu = book.indexOf("The menu");
