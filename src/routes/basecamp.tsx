@@ -1,9 +1,24 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { TreatmentBook } from "@/components/basecamp/TreatmentBook";
+import { HERO_SENTENCE } from "@/data/basecampCopy";
 
 export const Route = createFileRoute("/basecamp")({
-  component: BasecampLayout,
+  component: BasecampPage,
+  head: () => ({
+    meta: [
+      { title: "Basecamp - Unearth Self" },
+      {
+        name: "description",
+        content: HERO_SENTENCE,
+      },
+    ],
+  }),
 });
 
-function BasecampLayout() {
-  return <Outlet />;
+function BasecampPage() {
+  return (
+    <main className="bg-coal text-fossil">
+      <TreatmentBook />
+    </main>
+  );
 }
