@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE } from "./basecampCopy.ts";
+import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS } from "./basecampCopy.ts";
 import { TREATMENT_GROUPS, TREATMENTS, treatmentById } from "./treatments.ts";
 
 const PLACEHOLDER = /lorem ipsum|coming soon|add what you want|book opens the same panel|\bTODO\b/i;
@@ -129,12 +129,13 @@ test("treatment copy is the approved guest sentences", () => {
 test("Basecamp hero matches the Bootcamp structure and drops the hotel wording", () => {
   assert.equal(HERO_KICKER, "Drumheller — the wellness centre");
   assert.equal(HERO_SENTENCE, "Basecamp is our wellness centre, in the heart of Drumheller.");
+  assert.equal(WHAT_IT_IS, "Come in for the heat, the cold, and time on the table.");
   assert.equal(
     MENU_NOTE,
     "Prices in CAD. Select from massage therapy to healing work, weight loss and nervous system quieting.",
   );
-  assert.doesNotMatch(`${HERO_KICKER}\n${HERO_SENTENCE}\n${MENU_NOTE}`, PLACEHOLDER);
-  assert.doesNotMatch(HERO_SENTENCE, /Haven|boutique hotel|under one roof|Base Camp/i);
+  assert.doesNotMatch(`${HERO_KICKER}\n${HERO_SENTENCE}\n${WHAT_IT_IS}\n${MENU_NOTE}`, PLACEHOLDER);
+  assert.doesNotMatch(`${HERO_SENTENCE}\n${WHAT_IT_IS}`, /Haven|boutique hotel|under one roof|Base Camp|the house/i);
 
   const book = readFileSync(new URL("../components/basecamp/TreatmentBook.tsx", import.meta.url), "utf8");
   assert.match(book, /min-h-\[70vh\]/);
@@ -142,9 +143,17 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.match(book, /mb-5 text-\[clamp\(2\.6rem,7vw,5\.2rem\)\]/);
   assert.doesNotMatch(book, /max-w-\[16ch\]/);
   assert.match(book, /Badlands/);
-  assert.match(book, /Request a conversation/);
+  assert.match(book, /Make a booking/);
+  assert.doesNotMatch(book, /Request a conversation/);
   assert.match(book, /setOpen\(true\)/);
   assert.doesNotMatch(book, /\/book\/retreat/);
+  assert.match(book, /What it is/);
+  assert.match(book, /\{WHAT_IT_IS\}/);
+  const whatItIs = book.indexOf("What it is");
+  const menu = book.indexOf("The menu");
+  assert.ok(whatItIs > 0 && menu > whatItIs);
+  assert.match(book, /Add \$\{treatment\.name\}/);
+  assert.doesNotMatch(book, />\s*Book\s*</);
   assert.doesNotMatch(book, /Not a gym floor with a candle/);
   assert.doesNotMatch(book, /the house/i);
   assert.doesNotMatch(book, /Come in from/);
