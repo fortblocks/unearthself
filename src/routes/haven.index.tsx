@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { RateTable } from "@/components/haven/RateTable";
 import { StayRequest } from "@/components/haven/StayRequest";
 import { fromNight, HAVEN_RULES } from "@/data/havenRates";
-import { HAVEN_PHOTOS } from "@/data/havenPhotos";
 import { HAVEN_ADDRESS, HAVEN_PLACE, HAVEN_SHARED, ROOMS } from "@/data/rooms";
 import { cad } from "@/lib/format";
 
@@ -21,7 +20,7 @@ export const Route = createFileRoute("/haven/")({
 });
 
 function HavenPage() {
-  const hero = HAVEN_PHOTOS.exterior[0] ?? ROOMS[0].images[0];
+  const hero = "/images/haven/water-mark/water-mark-01.jpg";
 
   return (
     <main className="bg-coal text-fossil">
