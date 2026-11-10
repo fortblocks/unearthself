@@ -81,27 +81,27 @@ const DESCRIPTIONS: Record<string, string> = {
   reiki:
     "Fifty-five minutes of Reiki on the treatment table. It is a quiet session with a light touch, giving you time to rest while the practitioner works.",
   lymph:
-    "Fifty-five minutes of lymphatic bodywork on the treatment table. The work uses gentle, rhythmic movement over the body, at a pace you can stay comfortable with.",
+    "Fifty-five minutes on the treatment table. This pairs gentle energy work with a light, soft lymphatic massage, and a touch of magnesium is blended into the oil. The pace is quiet, and easy to rest with.",
   stone:
     "Fifty-five minutes of stone therapy on the treatment table, using stones that are warmed or cooled, depending on what you need that day. You get both the pressure of the hands and the temperature of the stones.",
   unearthed:
-    "This is our longer signature treatment: seventy-five minutes on the table that brings together energy work, an exfoliation, time spent on the feet, and a hot or cool stone massage. Choose this if you want more than a single kind of work in one session.",
+    "Seventy-five minutes on the table. The session starts with massage work on the head, face, and neck, so you can settle and rest. Then comes a dry body brushing to gently exfoliate, and the body is worked with a blend of massage and essential oils. It finishes with stones that are warmed or cooled, applied where they are needed.",
   exfoliation:
-    "Forty-five minutes on the treatment table to exfoliate the skin over the whole body. A product is used to lift away dry surface skin, either as a treatment on its own or before something else.",
+    "Forty-five minutes on the treatment table. This is a brisk massage that exfoliates the whole body, lifting away dry and rough skin. It is a good treatment on its own, and it works well before a body wrap.",
   "herbal-wrap":
-    "An hour and a half in a clinician room for an herbal wrap. You are wrapped and left to rest for the session. If you want to add infrared time, a shorter facial, or an exfoliation, those can be booked alongside.",
+    "An hour and a half in a clinician room for a full body herbal wrap. You are wrapped and left to rest for the session. A shorter facial can be booked alongside if you want one.",
   "mud-wrap":
-    "Fifty-five minutes in a clinician room for a mud wrap. The mud is applied and you rest while wrapped, then it is removed before you leave. Infrared time, a shorter facial, or an exfoliation can be added if you want them.",
+    "Fifty-five minutes in a clinician room for a full body mud wrap. The session includes a dry brush exfoliation, then the mud is applied and you rest while wrapped. A shorter facial can be booked alongside if you want one.",
   seaweed:
     "Fifty-five minutes in a clinician room for a seaweed wrap. The seaweed is applied and you rest while wrapped, then it is rinsed away. You can add infrared time, a shorter facial, or an exfoliation to the same visit if you like.",
   "mud-red":
     "A shorter thirty-minute session that pairs mud with red light. You apply the mud yourself and spend the time with the red light panels, then wash it off. It is a simple combined treatment if you do not want a full wrap.",
   facial:
-    "Fifty-five minutes for an advanced facial on the treatment table. This is a full facial that includes glycolic acid, so it goes further than a quick refresh.",
+    "Fifty-five minutes on the treatment table for an advanced facial. It is cleansing and hydrating, and it includes glycolic acid, so it goes further than a quick refresh.",
   brow: "A twenty-minute brow tint to deepen the colour of your brows. It is a short add-on you can book on its own or beside another treatment.",
-  rmt: "Fifty-five minutes of massage with a registered massage therapist. We provide the room; their diary is their own, so this session depends on their availability.",
+  rmt: "Fifty-five minutes of massage with a registered massage therapist, a regulated health professional. The work is clinical, focused on the soft tissues and joints. We provide the room; their diary is their own, so this session depends on their availability.",
   sound:
-    "A fifty-five-minute group sound bath. These run on dates when we have a session booked, rather than every day, so we will let you know what is coming up if you want to join.",
+    "A fifty-five-minute group sound bath. You lie back on a mat, with a blanket and pillow, and sometimes an eye mask, while a practitioner plays instruments such as crystal singing bowls, gongs, and chimes. These run on dates when we have a session booked, rather than every day, so we will let you know what is coming up if you want to join.",
 };
 
 test("treatment copy is the approved guest sentences", () => {

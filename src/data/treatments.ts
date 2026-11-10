@@ -108,7 +108,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "Fifty-five minutes on the treatment table.",
     description:
-      "Fifty-five minutes of lymphatic bodywork on the treatment table. The work uses gentle, rhythmic movement over the body, at a pace you can stay comfortable with.",
+      "Fifty-five minutes on the treatment table. This pairs gentle energy work with a light, soft lymphatic massage, and a touch of magnesium is blended into the oil. The pace is quiet, and easy to rest with.",
   },
   {
     id: "stone",
@@ -128,7 +128,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "Seventy-five minutes. Our longer signature treatment.",
     description:
-      "This is our longer signature treatment: seventy-five minutes on the table that brings together energy work, an exfoliation, time spent on the feet, and a hot or cool stone massage. Choose this if you want more than a single kind of work in one session.",
+      "Seventy-five minutes on the table. The session starts with massage work on the head, face, and neck, so you can settle and rest. Then comes a dry body brushing to gently exfoliate, and the body is worked with a blend of massage and essential oils. It finishes with stones that are warmed or cooled, applied where they are needed.",
   },
   {
     id: "exfoliation",
@@ -138,7 +138,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "Forty-five minutes on the treatment table.",
     description:
-      "Forty-five minutes on the treatment table to exfoliate the skin over the whole body. A product is used to lift away dry surface skin, either as a treatment on its own or before something else.",
+      "Forty-five minutes on the treatment table. This is a brisk massage that exfoliates the whole body, lifting away dry and rough skin. It is a good treatment on its own, and it works well before a body wrap.",
   },
   {
     id: "herbal-wrap",
@@ -148,7 +148,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "An hour and a half in a clinician room.",
     description:
-      "An hour and a half in a clinician room for an herbal wrap. You are wrapped and left to rest for the session. If you want to add infrared time, a shorter facial, or an exfoliation, those can be booked alongside.",
+      "An hour and a half in a clinician room for a full body herbal wrap. You are wrapped and left to rest for the session. A shorter facial can be booked alongside if you want one.",
   },
   {
     id: "mud-wrap",
@@ -158,7 +158,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "Fifty-five minutes in a clinician room.",
     description:
-      "Fifty-five minutes in a clinician room for a mud wrap. The mud is applied and you rest while wrapped, then it is removed before you leave. Infrared time, a shorter facial, or an exfoliation can be added if you want them.",
+      "Fifty-five minutes in a clinician room for a full body mud wrap. The session includes a dry brush exfoliation, then the mud is applied and you rest while wrapped. A shorter facial can be booked alongside if you want one.",
   },
   {
     id: "seaweed",
@@ -188,7 +188,7 @@ export const TREATMENTS: Treatment[] = [
     group: "table",
     line: "Fifty-five minutes on the treatment table.",
     description:
-      "Fifty-five minutes for an advanced facial on the treatment table. This is a full facial that includes glycolic acid, so it goes further than a quick refresh.",
+      "Fifty-five minutes on the treatment table for an advanced facial. It is cleansing and hydrating, and it includes glycolic acid, so it goes further than a quick refresh.",
   },
   {
     id: "brow",
@@ -208,7 +208,7 @@ export const TREATMENTS: Treatment[] = [
     group: "with",
     line: "Fifty-five minutes with a registered massage therapist.",
     description:
-      "Fifty-five minutes of massage with a registered massage therapist. We provide the room; their diary is their own, so this session depends on their availability.",
+      "Fifty-five minutes of massage with a registered massage therapist, a regulated health professional. The work is clinical, focused on the soft tissues and joints. We provide the room; their diary is their own, so this session depends on their availability.",
   },
   {
     id: "sound",
@@ -218,7 +218,7 @@ export const TREATMENTS: Treatment[] = [
     group: "with",
     line: "A fifty-five-minute group session, on dates when we have one.",
     description:
-      "A fifty-five-minute group sound bath. These run on dates when we have a session booked, rather than every day, so we will let you know what is coming up if you want to join.",
+      "A fifty-five-minute group sound bath. You lie back on a mat, with a blanket and pillow, and sometimes an eye mask, while a practitioner plays instruments such as crystal singing bowls, gongs, and chimes. These run on dates when we have a session booked, rather than every day, so we will let you know what is coming up if you want to join.",
   },
 ];
 
