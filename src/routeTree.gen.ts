@@ -70,6 +70,8 @@ import { Route as QuestShuttleRouteImport } from './routes/quest.shuttle'
 import { Route as QuestSpecimenRouteImport } from './routes/quest.specimen'
 import { Route as QuestThirtyRouteImport } from './routes/quest.thirty'
 import { Route as QuestTodayRouteImport } from './routes/quest.today'
+import { Route as ThingsToSeeIndexRouteImport } from './routes/things-to-see.index'
+import { Route as ThingsToSeeSlugRouteImport } from './routes/things-to-see.$slug'
 import { Route as AdminMinutesIndexRouteImport } from './routes/admin.minutes.index'
 import { Route as AdminMinutesMeetingIdRouteImport } from './routes/admin.minutes.$meetingId'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
@@ -386,6 +388,16 @@ const QuestTodayRoute = QuestTodayRouteImport.update({
   path: '/today',
   getParentRoute: () => QuestRoute,
 } as any)
+const ThingsToSeeIndexRoute = ThingsToSeeIndexRouteImport.update({
+  id: '/things-to-see/',
+  path: '/things-to-see/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ThingsToSeeSlugRoute = ThingsToSeeSlugRouteImport.update({
+  id: '/things-to-see/$slug',
+  path: '/things-to-see/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminMinutesIndexRoute = AdminMinutesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -493,12 +505,14 @@ export interface FileRoutesByFullPath {
   '/quest/specimen': typeof QuestSpecimenRoute
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
+  '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
   '/packages/': typeof PackagesIndexRoute
   '/quest/': typeof QuestIndexRoute
+  '/things-to-see/': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -559,12 +573,14 @@ export interface FileRoutesByTo {
   '/quest/specimen': typeof QuestSpecimenRoute
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
+  '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
   '/admin': typeof AdminIndexRoute
   '/d14': typeof D14IndexRoute
   '/haven': typeof HavenIndexRoute
   '/journal': typeof JournalIndexRoute
   '/packages': typeof PackagesIndexRoute
   '/quest': typeof QuestIndexRoute
+  '/things-to-see': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -633,12 +649,14 @@ export interface FileRoutesById {
   '/quest/specimen': typeof QuestSpecimenRoute
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
+  '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
   '/journal/': typeof JournalIndexRoute
   '/packages/': typeof PackagesIndexRoute
   '/quest/': typeof QuestIndexRoute
+  '/things-to-see/': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -708,12 +726,14 @@ export interface FileRouteTypes {
     | '/quest/specimen'
     | '/quest/thirty'
     | '/quest/today'
+    | '/things-to-see/$slug'
     | '/admin/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
     | '/packages/'
     | '/quest/'
+    | '/things-to-see/'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -774,12 +794,14 @@ export interface FileRouteTypes {
     | '/quest/specimen'
     | '/quest/thirty'
     | '/quest/today'
+    | '/things-to-see/$slug'
     | '/admin'
     | '/d14'
     | '/haven'
     | '/journal'
     | '/packages'
     | '/quest'
+    | '/things-to-see'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -847,12 +869,14 @@ export interface FileRouteTypes {
     | '/quest/specimen'
     | '/quest/thirty'
     | '/quest/today'
+    | '/things-to-see/$slug'
     | '/admin/'
     | '/d14/'
     | '/haven/'
     | '/journal/'
     | '/packages/'
     | '/quest/'
+    | '/things-to-see/'
     | '/admin/minutes/$meetingId'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -895,7 +919,9 @@ export interface RootRouteChildren {
   ForTeamsRoute: typeof ForTeamsRoute
   PackagesSlugRoute: typeof PackagesSlugRoute
   PackagesWomensWellnessRoute: typeof PackagesWomensWellnessRoute
+  ThingsToSeeSlugRoute: typeof ThingsToSeeSlugRoute
   PackagesIndexRoute: typeof PackagesIndexRoute
+  ThingsToSeeIndexRoute: typeof ThingsToSeeIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1327,6 +1353,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuestTodayRouteImport
       parentRoute: typeof QuestRoute
     }
+    '/things-to-see/': {
+      id: '/things-to-see/'
+      path: '/things-to-see'
+      fullPath: '/things-to-see/'
+      preLoaderRoute: typeof ThingsToSeeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/things-to-see/$slug': {
+      id: '/things-to-see/$slug'
+      path: '/things-to-see/$slug'
+      fullPath: '/things-to-see/$slug'
+      preLoaderRoute: typeof ThingsToSeeSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/minutes/': {
       id: '/admin/minutes/'
       path: '/'
@@ -1573,7 +1613,9 @@ const rootRouteChildren: RootRouteChildren = {
   ForTeamsRoute: ForTeamsRoute,
   PackagesSlugRoute: PackagesSlugRoute,
   PackagesWomensWellnessRoute: PackagesWomensWellnessRoute,
+  ThingsToSeeSlugRoute: ThingsToSeeSlugRoute,
   PackagesIndexRoute: PackagesIndexRoute,
+  ThingsToSeeIndexRoute: ThingsToSeeIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

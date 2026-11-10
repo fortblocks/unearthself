@@ -90,6 +90,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             <ul className="space-y-2">
               <li><Link to="/events" className="hover:text-fossil">Events</Link></li>
               <li><Link to="/drumheller" className="hover:text-fossil">Drumheller</Link></li>
+              <li><Link to="/things-to-see" className="hover:text-fossil">Things to See</Link></li>
               <li><Link to="/journal" className="hover:text-fossil">Journal</Link></li>
             </ul>
           </div>

@@ -28,6 +28,8 @@
 ├── /trail                Trail Quest page (PWA later)
 ├── /visit
 ├── /journal
+├── /things-to-see        local sights, not the Drumheller long read
+│     └── /things-to-see/{slug}
 ├── /about
 ├── /book/{stay,treatment,retreat}
 ├── /legal/*
