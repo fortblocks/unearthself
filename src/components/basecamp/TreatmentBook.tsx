@@ -12,6 +12,7 @@ import {
   WHAT_IT_IS,
   WHAT_IT_IS_PARAGRAPHS,
 } from "@/data/basecampCopy";
+import { Divider } from "@/components/site/Divider";
 import { cad, TREATMENT_GROUPS, TREATMENTS, type Treatment } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
@@ -74,7 +75,9 @@ export function TreatmentBook() {
         </div>
       </section>
 
-      <section id="menu" className="scroll-mt-24 border-t border-fossil/10 px-6 py-20">
+      <Divider />
+
+      <section id="menu" className="scroll-mt-24 px-6 py-20">
         <div className="mx-auto max-w-5xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{MENU_LABEL}</p>
           <h2 className="font-display mb-4 text-4xl uppercase">{MENU_HEADING}</h2>

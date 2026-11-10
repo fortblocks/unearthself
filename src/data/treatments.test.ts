@@ -119,19 +119,19 @@ test("treatment copy is the approved guest sentences", () => {
     [
       [
         "heat",
-        "This is a natural place to begin, in the Fire and Ice room with the shared infrared sauna, the salt stone steam, the cold plunge and the baths. You can book one on its own or take the circuit from heat to cold.",
+        "Book the shared infrared sauna, salt stone steam, cold plunge or baths in Fire and Ice, or take the circuit.",
       ],
       [
         "light",
-        "Red light is twenty quiet minutes in front of three panels, and it fits easily into a longer visit. You can book it on its own or add it to a treatment.",
+        "Twenty minutes of red light, in front of three panels. On its own, or added to a treatment.",
       ],
       [
         "table",
-        "This is the part of the afternoon where you lie down and let someone else take care of things for a while. Every treatment is for one person in a private room, from Reiki and stone work to wraps, facials and our signature Unearthed Bodyworks.",
+        "One person in a private room: Reiki, stone work, wraps, facials and Unearthed Bodyworks.",
       ],
       [
         "with",
-        "For these sessions we provide the room, and the practitioner keeps their own diary. They include RMT massage and sound baths, which run as group sessions on the dates when one is planned.",
+        "We provide the room, and the practitioner keeps their own diary. Sound baths are planned group sessions.",
       ],
     ],
   );
@@ -160,16 +160,16 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   );
   assert.deepEqual(WHAT_IT_IS_PARAGRAPHS, [
     "You come in from downtown Drumheller with the Badlands still on the horizon, and the first thing to do is nothing at all. You hang up your coat, take a breath, and let the day you arrived with sit a little further back.",
-    "From there, the Fire and Ice room is a good place to start. It holds a shared infrared sauna, a salt stone steam room, a cold plunge and baths, and you can book any one of them or take the Fire and Ice circuit, which moves you through the steam, the plunge and the infrared sauna as a set. The few minutes after the cold plunge, when you are back in the warmth, are some of the best of the afternoon. If you would rather have the heat to yourself, the single infrared sauna is a private option in its own room.",
-    "Later, you might settle onto a treatment table in one of our private rooms, where each treatment is given to one person at a time, whether that is Reiki, stone work, a wrap, a facial or our signature Unearthed Bodyworks. Guests staying at Haven can book Basecamp during their visit, and if you live in town or are only in Drumheller for the day, you are just as welcome to come in and make an afternoon of it.",
+    "From there, the Fire and Ice room holds a shared infrared sauna, a salt stone steam room, a cold plunge and baths. You can book one of them, or take the Fire and Ice circuit. The single infrared sauna is a private option if you want the heat to yourself.",
+    "Later you settle onto a treatment table, one person at a time in a private room. Haven guests can book Basecamp during a stay. If you live in town, or you are only in Drumheller for the day, you are just as welcome.",
   ]);
   assert.doesNotMatch(WHAT_IT_IS_PARAGRAPHS.join("\n"), /—|–/);
   assert.doesNotMatch(HERO_SENTENCE, /off the street|downtown street/);
   assert.equal(MENU_LABEL, "Planning your afternoon");
-  assert.equal(MENU_HEADING, "Here is everything on the menu, so you can decide how your visit unfolds.");
+  assert.equal(MENU_HEADING, "Everything on the menu.");
   assert.equal(
     MENU_NOTE,
-    "All prices are in Canadian dollars. You can keep it to a single sauna or steam, or put together a longer afternoon from heat and cold, red light, a treatment on the table and a session with a practitioner.",
+    "Prices in Canadian dollars, from a single sauna or steam to a full afternoon.",
   );
   const opening = [HERO_KICKER, HERO_SENTENCE, WHAT_IT_IS, ...WHAT_IT_IS_PARAGRAPHS, MENU_NOTE].join("\n");
   assert.doesNotMatch(opening, PLACEHOLDER);
