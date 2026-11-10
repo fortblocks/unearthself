@@ -151,12 +151,12 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.equal(HERO_KICKER, "Right in the middle of Drumheller");
   assert.equal(
     HERO_SENTENCE,
-    "Basecamp is our wellness centre in downtown Drumheller, a refurbished spa where you can come in, warm up slowly, try the cold plunge if you are feeling brave, and finish the afternoon on a treatment table.",
+    "Our refurbished spa in downtown Drumheller, where you warm up slowly and finish the afternoon on a treatment table.",
   );
   assert.equal(STORY_LABEL, "The story of a visit");
   assert.equal(
     WHAT_IT_IS,
-    "Here is what an afternoon at Basecamp can look like, from the first warm room to the last quiet minute on the table.",
+    "An afternoon of heat, cold and quiet.",
   );
   assert.deepEqual(WHAT_IT_IS_PARAGRAPHS, [
     "You come in from downtown Drumheller with the Badlands still on the horizon, and the first thing to do is nothing at all. You hang up your coat, take a breath, and let the day you arrived with sit a little further back.",

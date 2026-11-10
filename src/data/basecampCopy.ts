@@ -1,12 +1,11 @@
 export const HERO_KICKER = "Right in the middle of Drumheller";
 
 export const HERO_SENTENCE =
-  "Basecamp is our wellness centre in downtown Drumheller, a refurbished spa where you can come in, warm up slowly, try the cold plunge if you are feeling brave, and finish the afternoon on a treatment table.";
+  "Our refurbished spa in downtown Drumheller, where you warm up slowly and finish the afternoon on a treatment table.";
 
 export const STORY_LABEL = "The story of a visit";
 
-export const WHAT_IT_IS =
-  "Here is what an afternoon at Basecamp can look like, from the first warm room to the last quiet minute on the table.";
+export const WHAT_IT_IS = "An afternoon of heat, cold and quiet.";
 
 export const WHAT_IT_IS_PARAGRAPHS = [
   "You come in from downtown Drumheller with the Badlands still on the horizon, and the first thing to do is nothing at all. You hang up your coat, take a breath, and let the day you arrived with sit a little further back.",
