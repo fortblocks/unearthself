@@ -201,8 +201,10 @@ function BootcampPage() {
       </div>
       <section className="px-6 py-20">
         <div className="mx-auto max-w-6xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
+          <div className="mx-auto text-center">
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
+            <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
+          </div>
           <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
             A Rune is a mark for a way of moving through the Badlands, a capacity you practise on the
             land and then carry when you leave.

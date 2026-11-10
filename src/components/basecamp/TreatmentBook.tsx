@@ -79,8 +79,10 @@ export function TreatmentBook() {
 
       <section id="menu" className="scroll-mt-24 px-6 py-20">
         <div className="mx-auto max-w-5xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{MENU_LABEL}</p>
-          <h2 className="font-display mb-4 text-4xl uppercase">{MENU_HEADING}</h2>
+          <div className="mx-auto text-center">
+            <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{MENU_LABEL}</p>
+            <h2 className="font-display mb-4 text-4xl uppercase">{MENU_HEADING}</h2>
+          </div>
           <p className="mb-14 max-w-[46ch] text-fossil/70">{MENU_NOTE}</p>
           <div className="grid gap-16">
             {TREATMENT_GROUPS.map((g) => (
