@@ -8,7 +8,7 @@ export const Route = createFileRoute("/journal/")({
       { title: "Journal - Unearth Self" },
       {
         name: "description",
-        content: "Field notes from Drumheller. The town, the land, the work underneath.",
+        content: "Notes from Drumheller on the town, the land, and the work underneath.",
       },
     ],
   }),
@@ -21,10 +21,10 @@ function JournalIndex() {
         <div className="mx-auto max-w-3xl">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">Journal</p>
           <h1 className="font-display mb-6 text-[clamp(2.6rem,7vw,5rem)] leading-[0.9] uppercase">
-            Field notes.
+            Notes from the valley.
           </h1>
           <p className="max-w-[46ch] text-lg text-fossil/80">
-            Notes on the town, the land and the language we are still writing. This is not a blog.
+            These are notes on the town, the land, and the language we are still writing.
           </p>
         </div>
       </section>

@@ -100,7 +100,7 @@ function VenueRentals() {
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-ember uppercase">The whole property</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">Yours, end to end.</h2>
+          <h2 className="font-display mb-6 text-4xl uppercase">The whole property, for your own days.</h2>
           <p className="mb-4 text-lg text-fossil/80">
             A venue rental means leasing the entire property for your own requirements. You get the whole of it: the
             Basecamp suite with its spa facilities, the meeting areas, and all four suites at the Haven.

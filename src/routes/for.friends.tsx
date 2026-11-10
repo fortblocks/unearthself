@@ -20,11 +20,11 @@ function FriendsLander() {
     <AudiencePage
       word="Friends"
       eyebrow="The outdoors, together"
-      lede="For friends who want the outdoors together: not a race, not a spa weekend and not a classroom."
+      lede="For friends who want a few days outdoors together, on the land rather than in a classroom."
       introLabel="For friends"
       introHeading="Days on the land, together."
       intro={[
-        "Badlands Bootcamp works for groups of friends too: six to thirty people who want the outdoors together. It is not a race, a spa weekend or a classroom.",
+        "Badlands Bootcamp works for groups of friends too: six to thirty people who want the outdoors together, for a few days on the land.",
         "Days are spent on the land, nights at Haven or Canalta, and recovery happens next door at Basecamp. It all sits ninety minutes from Calgary, in a town that is small on land that is not.",
       ]}
       heroImage="/images/hero-badlands-dusk.jpg"

@@ -25,7 +25,7 @@ export const Route = createFileRoute("/spring")({
       {
         name: "description",
         content:
-          "Canada’s newest corporate expedition. Badlands Bootcamp in Drumheller. Enquiries open for spring 2027 — the first teams onto the land.",
+          "Canada's newest corporate expedition is Badlands Bootcamp in Drumheller. Enquiries are open for spring 2027, the first teams onto the land.",
       },
     ],
   }),
@@ -58,8 +58,8 @@ function SpringPage() {
             corporate expedition.
           </h1>
           <p className="mb-8 max-w-[42ch] text-lg text-pretty text-fossil/85">
-            Not a hotel ballroom with a hike attached. A 2–5 day Badlands Bootcamp in Drumheller —
-            and we are taking enquiries for the first teams onto the land this spring.
+            Badlands Bootcamp is a 2 to 5 day expedition in Drumheller, and we are taking enquiries
+            for the first teams onto the land this spring.
           </p>
           <a
             href="#enquire"
@@ -82,9 +82,9 @@ function SpringPage() {
             is the first season we will run it for teams.
           </p>
           <p className="text-lg text-pretty text-fossil/80">
-            If you want your people somewhere the job title will not follow — and you want to be on
-            the land before the calendar fills — this is the page. Enquiries now. Dates and a figure
-            come back by email.
+            If you want your people somewhere the job title will not follow, and you want to be on
+            the land before the calendar fills, this is the page. Enquiries are open now. Dates and a
+            figure come back by email.
           </p>
         </div>
       </section>
@@ -112,7 +112,7 @@ function SpringPage() {
               <p className="text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">The expedition</p>
               <h3 className="font-display mt-1 text-3xl uppercase">Badlands Bootcamp</h3>
               <p className="mt-2 text-fossil/70">
-                Play, Adaptability, Connection and Experience, practised on the ground and then carried through weather, route and each other. This is not a deck taken outdoors.
+                Play, Adaptability, Connection and Experience, practised on the ground and then carried through weather, route and each other. The sequence happens on the land, not in a deck taken outside.
               </p>
             </article>
             <article>
@@ -137,8 +137,7 @@ function SpringPage() {
               <p className="text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">After the land</p>
               <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
               <p className="mt-2 text-fossil/70">
-                Heat, cold and hands. A close that is quiet on purpose — so Monday is not a reset to
-                silence.
+                Heat, cold and hands. The close is quiet on purpose, so Monday is not a reset to silence.
               </p>
             </article>
           </div>
@@ -152,14 +151,13 @@ function SpringPage() {
             The person who sends the invite.
           </h2>
           <p className="mb-4 text-pretty text-fossil/75">
-            Calgary and Edmonton leadership groups. Founders, senior teams, crews that collaborate
-            on paper and stall in the room. Close enough to leave in the morning and be on the land
-            by lunch.
+            This is for Calgary and Edmonton leadership groups, founders, senior teams, and crews that
+            collaborate on paper and stall in the room. It is close enough to leave in the morning and
+            be on the land by lunch.
           </p>
           <p className="text-pretty text-fossil/75">
-            If you want a tasting menu, a speaker and a branded notebook, this is the wrong page.
-            This costs real money. It is not a conference rate. It is the first season of something
-            Canada has not had.
+            The offer is the expedition, the land and the recovery afterwards. It costs real money,
+            and it is not a conference rate. It is the first season of something Canada has not had.
           </p>
         </div>
       </section>
@@ -247,7 +245,7 @@ function Enquire() {
           <h2 className="font-display mb-4 text-4xl uppercase">Hold a date for the first teams.</h2>
           <p className="max-w-[42ch] text-pretty text-coal/70">
             Tell us who is coming and which month you can travel. We write back with availability
-            and a figure. No deposit from this page — this is the enquiry, not a checkout.
+            and a figure. There is no deposit from this page. This is the enquiry, not a checkout.
           </p>
         </div>
 

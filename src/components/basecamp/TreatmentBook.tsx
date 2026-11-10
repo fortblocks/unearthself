@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS, WHAT_IT_IS_PARAGRAPHS } from "@/data/basecampCopy";
+import {
+  HERO_KICKER,
+  HERO_SENTENCE,
+  MENU_HEADING,
+  MENU_LABEL,
+  MENU_NOTE,
+  STORY_LABEL,
+  WHAT_IT_IS,
+  WHAT_IT_IS_PARAGRAPHS,
+} from "@/data/basecampCopy";
 import { cad, TREATMENT_GROUPS, TREATMENTS, type Treatment } from "@/data/treatments";
 import { useBooking } from "@/lib/booking/context";
 
@@ -41,17 +50,15 @@ export function TreatmentBook() {
             onClick={() => setOpen(true)}
             className="inline-flex rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white"
           >
-            Make a booking
+            Book your visit
           </button>
         </div>
       </section>
 
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What it is</p>
-          <h2 className="font-display mb-6 text-[clamp(0.9rem,3.4vw,2.05rem)] leading-none whitespace-nowrap uppercase">
-            {WHAT_IT_IS}
-          </h2>
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{STORY_LABEL}</p>
+          <h2 className="font-display mb-6 text-4xl uppercase">{WHAT_IT_IS}</h2>
           {WHAT_IT_IS_PARAGRAPHS.map((paragraph, index) => (
             <p
               key={paragraph}
@@ -69,8 +76,8 @@ export function TreatmentBook() {
 
       <section id="menu" className="scroll-mt-24 border-t border-fossil/10 px-6 py-20">
         <div className="mx-auto max-w-5xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">The menu</p>
-          <h2 className="font-display mb-4 text-4xl uppercase">What we do here.</h2>
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{MENU_LABEL}</p>
+          <h2 className="font-display mb-4 text-4xl uppercase">{MENU_HEADING}</h2>
           <p className="mb-14 max-w-[46ch] text-fossil/70">{MENU_NOTE}</p>
           <div className="grid gap-16">
             {TREATMENT_GROUPS.map((g) => (

@@ -42,7 +42,7 @@ const runes = [
   {
     name: "Experience",
     slug: "experience",
-    line: "Be in the thing that is happening. Not the story you brought from the car.",
+    line: "Be in the thing that is happening, rather than the story you brought from the car.",
   },
 ];
 
@@ -76,7 +76,7 @@ function BootcampPage() {
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Drumheller — the expedition
+            The expedition, in Drumheller
           </p>
           <h1 className="font-display mb-5 text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] min-h-[1.8em] uppercase">
             Badlands
@@ -84,7 +84,7 @@ function BootcampPage() {
             Bootcamp
           </h1>
           <p className="mb-8 min-h-[5.25rem] max-w-[40ch] text-lg text-fossil/85">
-            A group goes out onto the land, works through a sequence together and comes back in. That, simply, is the product.
+            A group goes out onto the land, works through a sequence together, and comes back in. That is the product.
           </p>
           <Link
             to="/book/retreat"
@@ -98,17 +98,17 @@ function BootcampPage() {
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What it is</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">Not a race. Not a spa weekend. Not a classroom.</h2>
+          <h2 className="font-display mb-6 text-4xl uppercase">A few days on the land, for a group.</h2>
           <p className="mb-4 text-lg text-fossil/80">
-            Badlands Bootcamp is a 2–5 day expedition for a group of six to thirty. Teams first —
-            Calgary and Edmonton companies, clubs, families, the people who need to be useful to each
-            other when the plan dies.
+            Badlands Bootcamp is a 2 to 5 day expedition for a group of six to thirty. It is built first
+            for teams: Calgary and Edmonton companies, clubs, families, and the people who need to be
+            useful to each other when the plan dies.
           </p>
           <p className="mb-4 text-lg text-fossil/80">
             Days are on hoodoo country and the Red Deer valley. The sequence is PACE: Play,
             Adaptability, Connection, Experience. Each Rune is revealed, practised on the ground, then
-            carried. Nights are at Haven or Canalta. Recovery is next door at Basecamp — heat, cold,
-            hands.
+            carried. Nights are at Haven or Canalta. Recovery is next door at Basecamp, with heat, cold
+            and hands.
           </p>
           <p className="text-lg text-fossil/80">
             The point is not who is fittest; it is a group that can see its own patterns and choose again. It all happens ninety minutes from Calgary, in a town that is small on land that is not.
@@ -167,16 +167,16 @@ function BootcampPage() {
           <div className="grid gap-6 md:grid-cols-3">
             <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
               <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day one — Play</p>
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day one, Play</p>
               <h3 className="font-display mb-2 text-2xl uppercase">Onto the land</h3>
               <p className="text-fossil/70">
-                Arrive, drop the office, start before anyone has the right answer. Out of the meeting
-                and into the place.
+                You arrive, leave the office behind, and start before anyone has the right answer. The
+                day moves out of the meeting and into the place.
               </p>
             </article>
             <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
               <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day two — Adapt + Connect</p>
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day two, Adapt and Connect</p>
               <h3 className="font-display mb-2 text-2xl uppercase">The plan will not survive</h3>
               <p className="text-fossil/70">
                 A longer day on the ground, shaped by weather, route and each other, and by who you are with when the map and the weather disagree.
@@ -184,7 +184,7 @@ function BootcampPage() {
             </article>
             <article className="relative rounded-[4px] border border-fossil/10 bg-fossil/[0.03] p-6 pt-8">
               <span aria-hidden="true" className="absolute top-0 left-6 h-1 w-10 -translate-y-1/2 rounded-full bg-ember" />
-              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day three — Experience</p>
+              <p className="mb-2 text-[0.7rem] tracking-[0.18em] text-ember uppercase">Day three, Experience</p>
               <h3 className="font-display mb-2 text-2xl uppercase">A quiet close</h3>
               <p className="text-fossil/70">
                 The last day is for being in the thing that happened: naming what you will carry, sharing a meal and driving home before the spell is talked to death.
@@ -204,13 +204,13 @@ function BootcampPage() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
           <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
           <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
-            A Rune is a mark for a way of moving through the Badlands — a capacity you practise on the
-            land, then carry when you leave.
+            A Rune is a mark for a way of moving through the Badlands, a capacity you practise on the
+            land and then carry when you leave.
           </p>
           <p className="mb-12 max-w-[58ch] text-fossil/65">
             PACE is the sequence: Play, Adaptability, Connection, Experience. Each day of Bootcamp
             reveals one, puts you inside it, and asks you to choose again. The four marks below are how
-            that sequence is held — on the wall at Basecamp, in Trail Quest, on the thing you take home.
+            that sequence is held, on the wall at Basecamp, in Trail Quest, and on the thing you take home.
           </p>
           <RuneCards runes={runes} />
         </div>
@@ -256,7 +256,7 @@ function BootcampPage() {
             </div>
             <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Sleep</p>
             <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
-            <p className="mt-2 text-fossil/65">Four suites on the block, with overflow held for groups of 30.</p>
+            <p className="mt-2 text-fossil/65">Four suites on the block, with overflow held when a group reaches 30.</p>
             <p className="mt-1 text-fossil/50">Haven, then Canalta</p>
             <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Haven</span>
           </Link>
@@ -270,7 +270,7 @@ function BootcampPage() {
             </div>
             <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">After the day</p>
             <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
-            <p className="mt-2 text-fossil/65">Heat, cold and hands, in the house next door.</p>
+            <p className="mt-2 text-fossil/65">Heat, cold and hands, next door after the day.</p>
             <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Basecamp</span>
           </Link>
         </div>

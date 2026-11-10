@@ -18,9 +18,9 @@ const field =
 const label = "mb-1.5 block text-[0.68rem] font-semibold tracking-[0.14em] text-shale uppercase";
 
 const FACES: { id: BookFace; title: string; line: string }[] = [
-  { id: "bootcamp", title: "Bootcamp", line: "Hold a date for 6–30 people" },
-  { id: "basecamp", title: "Basecamp", line: "Treatments, heat and cold" },
-  { id: "haven", title: "Haven", line: "Four suites on the block" },
+  { id: "bootcamp", title: "Bootcamp", line: "Hold a date for a group of 6 to 30." },
+  { id: "basecamp", title: "Basecamp", line: "Book a treatment, or time in the heat and the cold." },
+  { id: "haven", title: "Haven", line: "Ask about one of the four suites." },
 ];
 
 export function BookPanel() {

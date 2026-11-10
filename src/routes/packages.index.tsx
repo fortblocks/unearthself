@@ -15,7 +15,7 @@ export const Route = createFileRoute("/packages/")({
 function PackagesIndex() {
   return (
     <main className="overflow-hidden bg-coal text-fossil">
-      <PackagesHero eyebrow="Experiences · Drumheller badlands" word="Packages" lede="Six ways to spend a few days on the land." />
+      <PackagesHero eyebrow="Experiences in the Drumheller badlands" word="Packages" lede="There are six ways to spend a few days on the land." />
       <section className="px-6 py-20 md:py-28">
         <ul className="mx-auto grid max-w-7xl gap-10 sm:grid-cols-2 lg:grid-cols-3">
           {PACKAGES.map((p) => (

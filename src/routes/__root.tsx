@@ -16,7 +16,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Unearthself is the holding philosophy and ecosystem for the Echo System, Human Adaptation Model, Basecamp, Badlands Bootcamp and Haven.",
+          "Unearth Self holds the Echo System, the Human Adaptation Model, Basecamp, Badlands Bootcamp and Haven.",
       },
       { name: "theme-color", content: "#161718" },
     ],

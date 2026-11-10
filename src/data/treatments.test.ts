@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { HERO_KICKER, HERO_SENTENCE, MENU_NOTE, WHAT_IT_IS, WHAT_IT_IS_PARAGRAPHS } from "./basecampCopy.ts";
+import {
+  HERO_KICKER,
+  HERO_SENTENCE,
+  MENU_HEADING,
+  MENU_LABEL,
+  MENU_NOTE,
+  STORY_LABEL,
+  WHAT_IT_IS,
+  WHAT_IT_IS_PARAGRAPHS,
+} from "./basecampCopy.ts";
 import { TREATMENT_GROUPS, TREATMENTS, treatmentById } from "./treatments.ts";
 
 const PLACEHOLDER = /lorem ipsum|coming soon|add what you want|book opens the same panel|\bTODO\b/i;
@@ -108,10 +117,22 @@ test("treatment copy is the approved guest sentences", () => {
   assert.deepEqual(
     TREATMENT_GROUPS.map((group) => [group.id, group.line]),
     [
-      ["heat", "These are the heat and cold sessions in our Fire and Ice room: sauna, steam, plunge, and baths."],
-      ["light", "You can book red light on its own, or add it to a table treatment."],
-      ["table", "These are the one-to-one treatments. Each booking is one person, in one room."],
-      ["with", "For these sessions we provide the room, and the practitioner keeps their own diary."],
+      [
+        "heat",
+        "This is a natural place to begin, in the Fire and Ice room with the shared infrared sauna, the salt stone steam, the cold plunge and the baths. You can book one on its own or take the circuit from heat to cold.",
+      ],
+      [
+        "light",
+        "Red light is twenty quiet minutes in front of three panels, and it fits easily into a longer visit. You can book it on its own or add it to a treatment.",
+      ],
+      [
+        "table",
+        "This is the part of the afternoon where you lie down and let someone else take care of things for a while. Every treatment is for one person in a private room, from Reiki and stone work to wraps, facials and our signature Unearthed Bodyworks.",
+      ],
+      [
+        "with",
+        "For these sessions we provide the room, and the practitioner keeps their own diary. They include RMT massage and sound baths, which run as group sessions on the dates when one is planned.",
+      ],
     ],
   );
   for (const treatment of TREATMENTS) {
@@ -127,18 +148,28 @@ test("treatment copy is the approved guest sentences", () => {
 });
 
 test("Basecamp hero matches the Bootcamp structure and drops the hotel wording", () => {
-  assert.equal(HERO_KICKER, "Drumheller — the wellness centre");
-  assert.equal(HERO_SENTENCE, "Basecamp is our wellness centre, in the heart of Drumheller.");
-  assert.equal(WHAT_IT_IS, "Come in for the heat, the cold, and time on the table.");
+  assert.equal(HERO_KICKER, "Right in the middle of Drumheller");
+  assert.equal(
+    HERO_SENTENCE,
+    "Basecamp is our wellness centre in downtown Drumheller, a refurbished spa where you can come in, warm up slowly, try the cold plunge if you are feeling brave, and finish the afternoon on a treatment table.",
+  );
+  assert.equal(STORY_LABEL, "The story of a visit");
+  assert.equal(
+    WHAT_IT_IS,
+    "Here is what an afternoon at Basecamp can look like, from the first warm room to the last quiet minute on the table.",
+  );
   assert.deepEqual(WHAT_IT_IS_PARAGRAPHS, [
-    "You arrive and put the day down for a while. Then you step into the heat, the cold, or a treatment on the table.",
-    "The Fire and Ice room has the shared infrared sauna, the steam, the cold plunge, and the baths. You can book one of those on its own, or move through the circuit from heat to cold. Treatments on the table happen in their own rooms, one person at a time.",
-    "If you are staying at Haven, you can book a session here during your visit. You can also come in if you live in town, or if you are only in Drumheller for the day.",
+    "You come in from downtown Drumheller with the Badlands still on the horizon, and the first thing to do is nothing at all. You hang up your coat, take a breath, and let the day you arrived with sit a little further back.",
+    "From there, the Fire and Ice room is a good place to start. It holds a shared infrared sauna, a salt stone steam room, a cold plunge and baths, and you can book any one of them or take the Fire and Ice circuit, which moves you through the steam, the plunge and the infrared sauna as a set. The few minutes after the cold plunge, when you are back in the warmth, are some of the best of the afternoon. If you would rather have the heat to yourself, the single infrared sauna is a private option in its own room.",
+    "Later, you might settle onto a treatment table in one of our private rooms, where each treatment is given to one person at a time, whether that is Reiki, stone work, a wrap, a facial or our signature Unearthed Bodyworks. Guests staying at Haven can book Basecamp during their visit, and if you live in town or are only in Drumheller for the day, you are just as welcome to come in and make an afternoon of it.",
   ]);
   assert.doesNotMatch(WHAT_IT_IS_PARAGRAPHS.join("\n"), /—|–/);
+  assert.doesNotMatch(HERO_SENTENCE, /off the street|downtown street/);
+  assert.equal(MENU_LABEL, "Planning your afternoon");
+  assert.equal(MENU_HEADING, "Here is everything on the menu, so you can decide how your visit unfolds.");
   assert.equal(
     MENU_NOTE,
-    "Prices in CAD. Select from massage therapy to healing work, weight loss and nervous system quieting.",
+    "All prices are in Canadian dollars. You can keep it to a single sauna or steam, or put together a longer afternoon from heat and cold, red light, a treatment on the table and a session with a practitioner.",
   );
   const opening = [HERO_KICKER, HERO_SENTENCE, WHAT_IT_IS, ...WHAT_IT_IS_PARAGRAPHS, MENU_NOTE].join("\n");
   assert.doesNotMatch(opening, PLACEHOLDER);
@@ -150,20 +181,18 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.match(book, /mb-5 text-\[clamp\(2\.6rem,7vw,5\.2rem\)\]/);
   assert.doesNotMatch(book, /max-w-\[16ch\]/);
   assert.match(book, /Badlands/);
-  assert.match(book, /Make a booking/);
+  assert.match(book, /Book your visit/);
   assert.doesNotMatch(book, /Request a conversation/);
   assert.match(book, /setOpen\(true\)/);
   assert.doesNotMatch(book, /\/book\/retreat/);
-  assert.match(book, /What it is/);
+  assert.match(book, /\{STORY_LABEL\}/);
   assert.match(book, /\{WHAT_IT_IS\}/);
-  assert.match(book, /whitespace-nowrap/);
-  assert.doesNotMatch(book, /md:whitespace-nowrap/);
-  assert.match(book, /text-\[clamp\(0\.9rem,3\.4vw,2\.05rem\)\]/);
+  assert.doesNotMatch(book, /whitespace-nowrap/);
   assert.match(book, /mb-4 text-lg text-fossil\/80/);
   assert.match(book, /text-lg text-fossil\/80/);
   assert.match(book, /WHAT_IT_IS_PARAGRAPHS/);
-  const whatItIs = book.indexOf("What it is");
-  const menu = book.indexOf("The menu");
+  const whatItIs = book.indexOf("{STORY_LABEL}");
+  const menu = book.indexOf("{MENU_LABEL}");
   assert.ok(whatItIs > 0 && menu > whatItIs);
   assert.match(book, /Add \$\{treatment\.name\}/);
   assert.doesNotMatch(book, />\s*Book\s*</);
@@ -174,7 +203,7 @@ test("Basecamp hero matches the Bootcamp structure and drops the hotel wording",
   assert.doesNotMatch(book, /boutique hotel|under one roof|The Haven|The place/i);
   assert.doesNotMatch(book, /Book opens the same panel/);
   assert.doesNotMatch(book, /\/basecamp\/\$slug/);
-  assert.match(book, /What we do here/);
+  assert.match(book, /\{MENU_HEADING\}/);
   assert.match(book, /aria-expanded/);
   assert.doesNotMatch(book, PLACEHOLDER);
 });

@@ -82,7 +82,7 @@ function FindUs() {
             Find us<span className="text-ember">.</span>
           </h1>
           <p className="max-w-[34ch] text-xl leading-relaxed text-fossil/85 md:text-2xl">
-            A heritage house on 4 Street West in downtown Drumheller, with Basecamp next door.
+            Haven is a heritage house on 4 Street West in downtown Drumheller, with Basecamp next door.
           </p>
           <div aria-hidden="true" className="flex gap-6">
             {RUNES.map((r) => (

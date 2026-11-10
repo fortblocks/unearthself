@@ -226,22 +226,22 @@ export const TREATMENT_GROUPS: { id: Treatment["group"]; title: string; line: st
   {
     id: "heat",
     title: "Heat and cold",
-    line: "These are the heat and cold sessions in our Fire and Ice room: sauna, steam, plunge, and baths.",
+    line: "This is a natural place to begin, in the Fire and Ice room with the shared infrared sauna, the salt stone steam, the cold plunge and the baths. You can book one on its own or take the circuit from heat to cold.",
   },
   {
     id: "light",
     title: "Light",
-    line: "You can book red light on its own, or add it to a table treatment.",
+    line: "Red light is twenty quiet minutes in front of three panels, and it fits easily into a longer visit. You can book it on its own or add it to a treatment.",
   },
   {
     id: "table",
     title: "On the table",
-    line: "These are the one-to-one treatments. Each booking is one person, in one room.",
+    line: "This is the part of the afternoon where you lie down and let someone else take care of things for a while. Every treatment is for one person in a private room, from Reiki and stone work to wraps, facials and our signature Unearthed Bodyworks.",
   },
   {
     id: "with",
     title: "With a practitioner",
-    line: "For these sessions we provide the room, and the practitioner keeps their own diary.",
+    line: "For these sessions we provide the room, and the practitioner keeps their own diary. They include RMT massage and sound baths, which run as group sessions on the dates when one is planned.",
   },
 ];
 

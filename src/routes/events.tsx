@@ -134,8 +134,9 @@ function EventsPage() {
             Events<span className="text-ember">.</span>
           </h1>
           <p className="max-w-[40ch] text-xl leading-relaxed text-fossil/85 md:text-2xl">
-            The badlands keep a calendar. Music in February, theatre on the hillsides in July, fireworks
-            over the river. Come for the event and stay in the valley.
+            The valley keeps a calendar through the year. There is music in February, theatre on the
+            hillsides in July, and fireworks over the river. You can come for the event and stay in the
+            valley.
           </p>
         </div>
       </section>
@@ -180,8 +181,8 @@ function EventsPage() {
 
       <section className="px-6 pb-12">
         <p className="mx-auto max-w-7xl text-lg text-fossil/60">
-          Dates marked TBC follow the usual month; check the official page before you plan. Unearth Self
-          isn't the organizer of these events.
+          Dates marked TBC follow the usual month. Check the official page before you plan. Unearth Self
+          is not the organizer of these events.
         </p>
       </section>
 

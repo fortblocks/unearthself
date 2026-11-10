@@ -123,7 +123,7 @@ export function StayRequest({ presetSlug, tone = "light" }: Props) {
           We’ll reply to confirm availability
           {room ? ` for ${ROOMS.find((r) => r.slug === room)?.name}` : ""}
           {nights ? ` · ${nights} night${nights === 1 ? "" : "s"}` : ""}. Rates and final details come next. Rooms
-          only — treatments stay a separate book.
+          only. Treatments stay a separate booking.
         </p>
       </div>
     );

@@ -32,7 +32,7 @@ function VisitPage() {
             from Calgary.
           </h1>
           <p className="max-w-[40ch] text-lg text-fossil/85">
-            This is not Banff. It is a small town on deep time, which is exactly why we are here.
+            Drumheller is a small town on deep time, which is why the work lives here.
           </p>
         </div>
       </section>
@@ -40,14 +40,14 @@ function VisitPage() {
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Getting here</p>
-          <h2 className="font-display mb-6 text-4xl uppercase">Drive. Do not fly into the canyon.</h2>
+          <h2 className="font-display mb-6 text-4xl uppercase">You drive in. You do not fly into the canyon.</h2>
           <p className="mb-4 text-lg text-fossil/80">
-            Calgary International is the usual airport. Then Highway 9 or the Trans-Canada and north.
-            Allow two hours if you have not driven the last stretch in winter.
+            Calgary International is the usual airport. From there you take Highway 9, or the Trans-Canada
+            and then north. Allow two hours if you have not driven the last stretch in winter.
           </p>
           <p className="text-lg text-fossil/80">
-            Edmonton is longer. There is no useful passenger rail. We do not run a shuttle in year one —
-            say if the group needs one and we will point you at a van.
+            Edmonton is longer. There is no useful passenger rail. We do not run a shuttle in year one.
+            If the group needs one, say so and we will point you at a van.
           </p>
         </div>
       </section>
@@ -56,10 +56,11 @@ function VisitPage() {
         <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2">
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Sleep</p>
-            <h2 className="font-display mb-4 text-3xl uppercase">Haven first. Canalta when you overflow.</h2>
+            <h2 className="font-display mb-4 text-3xl uppercase">Haven first, then Canalta if you overflow.</h2>
             <p className="mb-4 text-fossil/75">
-              Four suites on the same block as Basecamp: Elowen, Hidden Hollow, River Blossom, Water Mark.
-              Kitchens, quiet, the house next door for heat and cold. Direct rates from $165 a night.
+              Four suites sit on the same block as Basecamp: Elowen, Hidden Hollow, River Blossom and Water
+              Mark. They have kitchens, and the place next door has heat and cold. Direct rates start from
+              $165 a night.
             </p>
             <p className="text-fossil/75">
               Groups larger than the four suites go to Canalta. We hold those rooms; you do not book them
@@ -71,7 +72,7 @@ function VisitPage() {
           </div>
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Seasons</p>
-            <h2 className="font-display mb-4 text-3xl uppercase">The land does not close.</h2>
+            <h2 className="font-display mb-4 text-3xl uppercase">The land stays open through the year.</h2>
             <ul className="space-y-4 text-fossil/75">
               <li>
                 <strong className="block text-fossil">Spring / autumn.</strong> Best for teams. Cool mornings,
@@ -93,11 +94,11 @@ function VisitPage() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Pack</p>
           <h2 className="font-display mb-6 text-4xl uppercase">What to bring.</h2>
           <ul className="space-y-3 text-lg text-fossil/80">
-            <li>Boots you can walk in for hours. Not fashion trainers.</li>
-            <li>A layer that cuts wind. The coulees do not care about your forecast app.</li>
-            <li>Water bottle. Head torch if you are here in winter.</li>
-            <li>Swim things if you want the plunge.</li>
-            <li>A notebook if you write things down. We are not issuing branded ones.</li>
+            <li>Bring boots you can walk in for hours, the kind you would actually wear on a trail.</li>
+            <li>Bring a layer that cuts the wind. The coulees do not follow a forecast app.</li>
+            <li>Bring a water bottle, and a head torch if you are here in winter.</li>
+            <li>Bring something to swim in if you want the plunge.</li>
+            <li>Bring a notebook if you write things down. We do not hand out branded ones.</li>
           </ul>
           <p className="mt-8 text-fossil/60">
             Outdoor days are sold only after insurance and a named facilitator are in place. Until then we

@@ -33,14 +33,14 @@ function HavenPage() {
         />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Drumheller — four suites
+            Four suites in Drumheller
           </p>
           <h1 className="font-display mb-5 text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.9] uppercase">
             Haven
           </h1>
           <p className="mb-8 max-w-[42ch] text-lg text-fossil/85">
-            A heritage house on 4 Street West. Four apartments with kitchens and fireplaces. Sleep here
-            whether or not you are on a Bootcamp.
+            Haven is a heritage house on 4 Street West, with four apartments, kitchens and fireplaces.
+            You can sleep here whether or not you are on a Bootcamp.
           </p>
           <a href="#stay" className="inline-flex rounded-[2px] bg-ember px-8 py-3.5 font-semibold text-white">
             Request a stay
@@ -54,7 +54,7 @@ function HavenPage() {
             <p className="mb-3 text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
               The house
             </p>
-            <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3rem)]">A house in town.</h2>
+            <h2 className="font-display mb-5 text-[clamp(2rem,4vw,3rem)]">A stay in town.</h2>
             <p className="max-w-[48ch] text-lg text-shale">{HAVEN_PLACE}</p>
           </div>
           <ul className="grid grid-cols-2 gap-3 text-sm text-shale">

@@ -25,7 +25,7 @@ function CrewsLander() {
       introHeading="Groups who already work as one."
       intro={[
         "Firefighters, police services and coaching staff already know how to work as one. What matters is staying useful to each other when the plan dies.",
-        "Badlands Bootcamp brings six to thirty people onto the land for two to five days, ninety minutes from Calgary. The point is not who is fittest but a group that can see its own patterns and choose again, and passing on sharing is always available, because the rule here is notice, don’t excavate.",
+        "Badlands Bootcamp brings six to thirty people onto the land for two to five days, ninety minutes from Calgary. The point is a group that can see its own patterns and choose again, and passing on sharing is always available. Notice, don't excavate.",
       ]}
       heroImage="/images/exp-canyon.jpg"
       reasons={[

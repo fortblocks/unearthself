@@ -20,9 +20,9 @@ function TeamsLander() {
     <AudiencePage
       word="Teams"
       eyebrow="For the person who sends the invite"
-      lede="Take the team somewhere the job title won’t follow: six to thirty people, two to five days, ninety minutes from Calgary."
+      lede="Take the team somewhere the job title will not follow: six to thirty people, two to five days, ninety minutes from Calgary."
       introLabel="For corporate teams"
-      introHeading="Not a hotel with a hike."
+      introHeading="A few days on the land, for the same company."
       intro={[
         "Badlands Bootcamp for teams is a two-to-five-day expedition for six to thirty people from the same company: founders, senior teams and leadership groups who need more than a change of hotel. It sits close enough that Calgary and Edmonton can leave in the morning and be on the land by lunch.",
         "The days are spent on the land, working through a sequence the group can keep using on Monday, and the recovery afterwards is genuinely quiet. It is not therapy, and it is not a circle that never ends.",

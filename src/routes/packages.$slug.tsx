@@ -21,7 +21,7 @@ function PackagePlaceholder() {
       <PackagesHero eyebrow="Packages" word={pkg.title} lede={pkg.line} image={pkg.image} />
       <section className="px-6 py-20">
         <div className="mx-auto max-w-3xl">
-          <p className="mb-8 text-lg text-fossil/80">Details coming soon.</p>
+          <p className="mb-8 text-lg text-fossil/80">The day-by-day for this package is not written on this page yet.</p>
           <Link to="/packages" className="text-[0.85rem] font-semibold tracking-[0.12em] text-ember uppercase hover:underline">
             ← All packages
           </Link>
