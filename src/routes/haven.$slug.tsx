@@ -1,7 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RateTable } from "@/components/haven/RateTable";
 import { StayRequest } from "@/components/haven/StayRequest";
+import { GalleryNavButton } from "@/components/site/GalleryNavButton";
 import { fromNight } from "@/data/havenRates";
 import { getRoom, HAVEN_ADDRESS, HAVEN_SHARED, type RoomSlug } from "@/data/rooms";
 import { cad } from "@/lib/format";
@@ -27,16 +28,57 @@ export const Route = createFileRoute("/haven/$slug")({
   },
 });
 
+function SuiteLightbox({
+  images,
+  index,
+  onIndex,
+  onClose,
+}: {
+  images: string[];
+  index: number;
+  onIndex: (index: number) => void;
+  onClose: () => void;
+}) {
+  const count = images.length;
+  const step = (delta: number) => onIndex((index + delta + count) % count);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") step(-1);
+      if (event.key === "ArrowRight") step(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, count, onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Photo ${index + 1} of ${count}`}
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-coal/85 p-4 md:p-10"
+      onClick={onClose}
+    >
+      <div className="relative w-fit max-w-full" onClick={(event) => event.stopPropagation()}>
+        <img src={images[index]} alt="" className="max-h-[85vh] max-w-full object-contain" />
+        <GalleryNavButton direction="previous" onClick={() => step(-1)} />
+        <GalleryNavButton direction="next" onClick={() => step(1)} />
+      </div>
+    </div>
+  );
+}
+
 function RoomPage() {
   const { room } = Route.useLoaderData();
-  const [active, setActive] = useState(0);
-  const image = room.images[active] ?? room.images[0];
+  const hero = room.images[0];
+  const [openAt, setOpenAt] = useState<number | null>(null);
   const slug = room.slug as RoomSlug;
 
   return (
     <>
       <section className="relative min-h-[62vh] overflow-hidden bg-coal text-fossil">
-        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/40 to-coal/20" />
         <div className="relative z-10 mx-auto flex min-h-[62vh] max-w-7xl flex-col justify-end px-4 pb-10 pt-28">
           <Link to="/haven" className="text-[0.8rem] font-semibold tracking-[0.12em] text-sandstone uppercase">
@@ -54,19 +96,22 @@ function RoomPage() {
             <button
               key={src}
               type="button"
-              onClick={() => setActive(i)}
+              onClick={() => setOpenAt(i)}
               className={
                 "overflow-hidden border " +
-                (i === active ? "border-sandstone" : "border-transparent opacity-70 hover:opacity-100")
+                (i === 0 ? "border-sandstone" : "border-transparent opacity-70 hover:opacity-100")
               }
               aria-label={`Photo ${i + 1}`}
-              aria-pressed={i === active}
             >
               <img src={src} alt="" className="aspect-[3/2] h-full w-full object-cover" />
             </button>
           ))}
         </div>
       </section>
+
+      {openAt !== null && (
+        <SuiteLightbox images={room.images} index={openAt} onIndex={setOpenAt} onClose={() => setOpenAt(null)} />
+      )}
 
       <section className="px-4 py-20">
         <div className="mx-auto grid max-w-7xl gap-14 md:grid-cols-[1fr_1fr]">

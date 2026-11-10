@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { GalleryNavButton } from "@/components/site/GalleryNavButton";
 
 const GALLERY = [
   { src: "/images/bootcamp-crew.jpg", alt: "Bootcamp crew" },
@@ -35,26 +36,8 @@ export function HomeGallery() {
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={prev}
-          aria-label="Previous image"
-          className="absolute top-1/2 left-3 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-coal/70 text-fossil transition-colors hover:bg-ember hover:text-white focus-visible:outline-2 focus-visible:outline-ember"
-        >
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={next}
-          aria-label="Next image"
-          className="absolute top-1/2 right-3 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-coal/70 text-fossil transition-colors hover:bg-ember hover:text-white focus-visible:outline-2 focus-visible:outline-ember"
-        >
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+        <GalleryNavButton direction="previous" onClick={prev} />
+        <GalleryNavButton direction="next" onClick={next} />
       </div>
     </section>
   );
