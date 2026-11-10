@@ -30,15 +30,15 @@ function Home() {
         <div className="absolute inset-0 bg-gradient-to-t from-coal via-coal/55 to-coal/10" />
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 pt-28">
           <p className="mb-4 text-[0.72rem] tracking-[0.28em] text-sandstone uppercase">
-            Canadian Badlands, Drumheller, Alberta
+            Canadian Badlands · Drumheller, AB
           </p>
           <h1 className="font-display mb-5 text-[clamp(2.8rem,8vw,5.6rem)] leading-[0.9] uppercase">
-            Retreats
+            Come for
             <br />
-            on the land.
+            the land.
           </h1>
           <p className="max-w-[38ch] text-lg text-fossil/85">
-            We host immersive adventure wellness retreats here for corporate teams and private groups.
+            Immersive adventure wellness retreats for corporate teams and private groups
           </p>
         </div>
       </section>
@@ -70,27 +70,27 @@ function Home() {
               Badlands Bootcamp
             </h2>
             <p className="mb-6 text-[0.82rem] tracking-[0.16em] text-sandstone uppercase sm:text-[0.95rem]">
-              Three days, two nights, groups of 6 to 30
+              Three days · Two nights · Groups of 6–30
               <br />
               90 minutes from Calgary
             </p>
             <p className="text-lg leading-relaxed text-fossil/85">
-              Badlands Bootcamp is our flagship. A group spends three days and two nights on outdoor
-              quests, guided reflection and restorative wellness, and comes back more able to reset,
-              reconnect and respond to a challenge with flexibility and choice.
+              Our flagship experience combines outdoor quests, guided reflection and
+              restorative wellness to help people reset, reconnect and respond to
+              challenge with greater flexibility and choice.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link
                 to="/bootcamp"
                 className="inline-flex rounded-[2px] bg-ember px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-white uppercase"
               >
-                See Badlands Bootcamp
+                Explore bootcamp
               </Link>
               <Link
                 to="/builder"
                 className="inline-flex rounded-[2px] border border-fossil/25 px-7 py-3.5 text-[0.78rem] font-semibold tracking-[0.16em] text-fossil uppercase hover:border-sandstone hover:text-sandstone"
               >
-                Build a retreat
+                Build retreat
               </Link>
             </div>
           </div>
@@ -108,9 +108,9 @@ function Home() {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
               />
             </div>
-            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Wellness centre</p>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Spa & Wellness Center</p>
             <h3 className="font-display mt-1 text-3xl uppercase">Basecamp</h3>
-            <p className="mt-2 text-fossil/65">Come in to the refurbished spa in downtown Drumheller. You can book red light, body wraps, massage, a cold plunge, infrared saunas and more.</p>
+            <p className="mt-2 text-fossil/65">Come experience our newly refurbished spa facility in the heart of downtown Drumheller. We offer red light therapy, body wraps, massage, cold plunge, infrared saunas and more.</p>
           </Link>
           <Link to="/haven" className="group block">
             <div className="aspect-[4/3] overflow-hidden bg-shale">
@@ -120,9 +120,9 @@ function Home() {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" 
               />
             </div>
-            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Four suites</p>
+            <p className="mt-4 text-[0.68rem] tracking-[0.18em] text-sandstone uppercase">Boutique Hotel</p>
             <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
-            <p className="mt-2 text-fossil/65">Four apartment suites, a short walk from downtown bars, restaurants and shopping.</p>
+            <p className="mt-2 text-fossil/65">Drumheller's premier hotel accommodation. Four luxury apartment suites conveniently located within a short walking distance of downtown's bars, restaurants and shopping.</p>
           </Link>
         </div>
       </section>
