@@ -83,7 +83,7 @@ export function TreatmentBook() {
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">{MENU_LABEL}</p>
             <h2 className="font-display mb-4 text-4xl uppercase">{MENU_HEADING}</h2>
           </div>
-          <p className="mb-14 max-w-[46ch] text-fossil/70">{MENU_NOTE}</p>
+          <p className="mx-auto mb-14 max-w-[46ch] text-center text-fossil/70">{MENU_NOTE}</p>
           <div className="grid gap-16">
             {TREATMENT_GROUPS.map((g) => (
               <div key={g.id}>

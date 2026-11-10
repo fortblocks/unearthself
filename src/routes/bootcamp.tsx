@@ -205,11 +205,11 @@ function BootcampPage() {
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">PACE</p>
             <h2 className="font-display mb-6 text-4xl uppercase">Four Runes. One expedition.</h2>
           </div>
-          <p className="mb-4 max-w-[58ch] text-lg text-fossil/80">
+          <p className="mx-auto mb-4 max-w-[58ch] text-center text-lg text-fossil/80">
             A Rune is a mark for a way of moving through the Badlands, a capacity you practise on the
             land and then carry when you leave.
           </p>
-          <p className="mb-12 max-w-[58ch] text-fossil/65">
+          <p className="mx-auto mb-12 max-w-[58ch] text-center text-fossil/65">
             PACE is the sequence: Play, Adaptability, Connection, Experience. Each day of Bootcamp
             reveals one, puts you inside it, and asks you to choose again. The four marks below are how
             that sequence is held, on the wall at Basecamp, in Trail Quest, and on the thing you take home.
