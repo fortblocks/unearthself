@@ -11,7 +11,7 @@
 |---|---|---|---|
 | Overflow rooms | Canalta / Ramada | Large Bootcamp nights | ramadadrumheller@canalra.com |
 | Overflow | Jurassic Inn | Canalta family | canaltajurassic@canalta.com |
-| Land / fossils | Royal Tyrrell | Existence-day option | tyrrell.info@gov.ab.ca |
+| Land / fossils | Royal Tyrrell | Experience-day option | tyrrell.info@gov.ab.ca |
 | Land | Atlas Coal Mine | Story, not a gym | info@atlascoalmine.ab.ca |
 | Land | The Fossil Shop | Walk-over after Rosedale | miles@thefossilshop.com |
 | Table | Heller Good | Decent food, walkable | hello@hellergood.ca |

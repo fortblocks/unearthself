@@ -283,7 +283,7 @@ Facilitator is the geofence when silicon fails. Two dead phones still finish the
 | Social / team feed of notes | Privacy |
 | Connection town geofences | Partners and D08 not closed; pack can stub |
 | Fourth-day route | D07. APP-01 stubbed it; do not invent Last Chance timing |
-| Public fourth-Rune word | D02 still open. PDF and `04` say Existence. `00_README` says Experience. APP-01 used “Experience-day” as a stub label only. **Do not print either word as locked.** |
+| Public fourth-Rune word | **Experience** — D02 decided by Christopher 28 Oct 2026. Do not print Existence. |
 
 ---
 
