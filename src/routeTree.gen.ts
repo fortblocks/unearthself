@@ -74,6 +74,7 @@ import { Route as ThingsToSeeIndexRouteImport } from './routes/things-to-see.ind
 import { Route as ThingsToSeeSlugRouteImport } from './routes/things-to-see.$slug'
 import { Route as AdminMinutesIndexRouteImport } from './routes/admin.minutes.index'
 import { Route as AdminMinutesMeetingIdRouteImport } from './routes/admin.minutes.$meetingId'
+import { Route as ApiCronLeadsScoutRouteImport } from './routes/api.cron.leads-scout'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
 import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
 import { Route as QuestAdminBroadcastRouteImport } from './routes/quest.admin.broadcast'
@@ -408,6 +409,11 @@ const AdminMinutesMeetingIdRoute = AdminMinutesMeetingIdRouteImport.update({
   path: '/$meetingId',
   getParentRoute: () => AdminMinutesRoute,
 } as any)
+const ApiCronLeadsScoutRoute = ApiCronLeadsScoutRouteImport.update({
+  id: '/api/cron/leads-scout',
+  path: '/api/cron/leads-scout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuestAdminIndexRoute = QuestAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -514,6 +520,7 @@ export interface FileRoutesByFullPath {
   '/quest/': typeof QuestIndexRoute
   '/things-to-see/': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
+  '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -582,6 +589,7 @@ export interface FileRoutesByTo {
   '/quest': typeof QuestIndexRoute
   '/things-to-see': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
+  '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -658,6 +666,7 @@ export interface FileRoutesById {
   '/quest/': typeof QuestIndexRoute
   '/things-to-see/': typeof ThingsToSeeIndexRoute
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
+  '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -735,6 +744,7 @@ export interface FileRouteTypes {
     | '/quest/'
     | '/things-to-see/'
     | '/admin/minutes/$meetingId'
+    | '/api/cron/leads-scout'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -803,6 +813,7 @@ export interface FileRouteTypes {
     | '/quest'
     | '/things-to-see'
     | '/admin/minutes/$meetingId'
+    | '/api/cron/leads-scout'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -878,6 +889,7 @@ export interface FileRouteTypes {
     | '/quest/'
     | '/things-to-see/'
     | '/admin/minutes/$meetingId'
+    | '/api/cron/leads-scout'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -922,6 +934,7 @@ export interface RootRouteChildren {
   ThingsToSeeSlugRoute: typeof ThingsToSeeSlugRoute
   PackagesIndexRoute: typeof PackagesIndexRoute
   ThingsToSeeIndexRoute: typeof ThingsToSeeIndexRoute
+  ApiCronLeadsScoutRoute: typeof ApiCronLeadsScoutRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1381,6 +1394,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMinutesMeetingIdRouteImport
       parentRoute: typeof AdminMinutesRoute
     }
+    '/api/cron/leads-scout': {
+      id: '/api/cron/leads-scout'
+      path: '/api/cron/leads-scout'
+      fullPath: '/api/cron/leads-scout'
+      preLoaderRoute: typeof ApiCronLeadsScoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/quest/admin/': {
       id: '/quest/admin/'
       path: '/'
@@ -1616,6 +1636,7 @@ const rootRouteChildren: RootRouteChildren = {
   ThingsToSeeSlugRoute: ThingsToSeeSlugRoute,
   PackagesIndexRoute: PackagesIndexRoute,
   ThingsToSeeIndexRoute: ThingsToSeeIndexRoute,
+  ApiCronLeadsScoutRoute: ApiCronLeadsScoutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

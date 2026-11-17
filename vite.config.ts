@@ -9,7 +9,18 @@ export default defineConfig(({ command, isPreview }) => ({
   plugins: [
     tailwindcss(),
     tanstackStart(),
-    ...(command === "build" || isPreview ? [nitro({ preset: "vercel" })] : []),
+    ...(command === "build" || isPreview
+      ? [
+          nitro({
+            preset: "vercel",
+            vercel: {
+              config: {
+                crons: [{ path: "/api/cron/leads-scout", schedule: "0 11 * * *" }],
+              },
+            },
+          }),
+        ]
+      : []),
     viteReact(),
   ],
 }));

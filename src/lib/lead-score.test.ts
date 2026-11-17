@@ -9,8 +9,10 @@ import {
   mergeScoutRows,
   normalizeDomain,
   parseScoutBatch,
+  recencyFactor,
   scoreCompany,
   sourcedEmail,
+  timingFromSignals,
   type Company,
 } from "./lead-score.ts";
 
@@ -212,4 +214,98 @@ test("seed is ~30 Alberta first-wave cards with no invented personal emails", ()
     assert.ok(n >= 120 && n <= 180, `${c.org} draft is ${n} words`);
     assert.deepEqual(draftProblems(draft.body), []);
   }
+});
+
+test("recency decay falls off after two weeks, then 45, 90 and 180 days", () => {
+  assert.equal(recencyFactor(0), 1);
+  assert.equal(recencyFactor(14), 1);
+  assert.equal(recencyFactor(15), 0.7);
+  assert.equal(recencyFactor(45), 0.7);
+  assert.equal(recencyFactor(46), 0.4);
+  assert.equal(recencyFactor(90), 0.4);
+  assert.equal(recencyFactor(91), 0.2);
+  assert.equal(recencyFactor(180), 0.2);
+  assert.equal(recencyFactor(181), 0);
+  assert.equal(recencyFactor(-1), 0);
+});
+
+test("timingFromSignals uses dated signals and last touch, not a typed score", () => {
+  const fresh = timingFromSignals({
+    today: "2026-11-17",
+    lastTouch: "2026-10-01",
+    signals: [
+      { kind: "hiring", date: "2026-11-10", sourceUrl: "https://example.com/jobs" },
+      { kind: "win", date: "2026-09-01", sourceUrl: "https://example.com/news" },
+    ],
+  });
+  // hiring 8 within 14 days, win 5 at 77 days (factor 0.4), last touch 47 days adds 3
+  assert.equal(fresh.signalPoints, 10);
+  assert.equal(fresh.touchPoints, 3);
+  assert.equal(fresh.timing, 13);
+
+  const recentTouch = timingFromSignals({
+    today: "2026-11-17",
+    lastTouch: "2026-11-16",
+    signals: [{ kind: "hiring", date: "2026-11-10", sourceUrl: "https://example.com/jobs" }],
+  });
+  assert.equal(recentTouch.touchPoints, -4);
+  assert.equal(recentTouch.timing, 4);
+
+  const ignored = timingFromSignals({
+    today: "2026-11-17",
+    signals: [
+      { kind: "office", date: "2026-11-01", sourceUrl: "" },
+      { kind: "expansion", date: "not-a-date", sourceUrl: "https://example.com/move" },
+      { kind: "year-end", date: "2025-01-01", sourceUrl: "https://example.com/year" },
+    ],
+  });
+  assert.equal(ignored.signalPoints, 0);
+  assert.equal(ignored.timing, 0);
+});
+
+test("scoreCompany uses signals when they are stored and ignores a typed timing number", () => {
+  const scored = scoreCompany({
+    city: "Calgary",
+    industry: "construction",
+    sizeBand: "80-800",
+    sourceUrl: "https://scottbuilders.com",
+    buyerName: "Scott Builders",
+    email: "info@scottbuilders.com",
+    emailSource: "https://scottbuilders.com/contact",
+    timingScore: 15,
+    today: "2026-11-17",
+    lastTouch: "2026-09-01",
+    signals: [
+      {
+        id: "S-1",
+        kind: "hiring",
+        date: "2026-11-12",
+        sourceUrl: "https://scottbuilders.com/careers",
+        note: "Hiring post",
+      },
+    ],
+  });
+  assert.equal(scored.fit, 60);
+  assert.equal(scored.access, 25);
+  // hiring 8, last touch 77 days adds 1
+  assert.equal(scored.timing, 9);
+  assert.equal(scored.total, 94);
+  assert.equal(scored.band, "pursue");
+});
+
+test("scoreCompany keeps a stored timing number when the company has no signal list", () => {
+  const scored = scoreCompany({
+    city: "Edmonton",
+    industry: "energy",
+    sizeBand: "80-800",
+    sourceUrl: "https://firm.example",
+    buyerName: "",
+    email: "",
+    emailSource: "",
+    timingScore: 11,
+  });
+  assert.equal(scored.timing, 11);
+  assert.equal(scored.fit, 58);
+  assert.equal(scored.access, 3);
+  assert.equal(scored.total, 72);
 });

@@ -1,34 +1,37 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Chip } from "@/components/desk/Chip";
 import { Section } from "@/components/desk/Section";
-import { Stat } from "@/components/desk/Stat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { companyStats, useDesk } from "@/lib/desk-store";
+import { SEED_COMPANIES } from "@/data/leads";
+import { useDesk } from "@/lib/desk-store";
 import { draftProblems, wordCount } from "@/lib/lead-copy";
 import {
+  clampMorningCount,
+  DESK_STORAGE_KEY,
+  morningCompanies,
+  readLocalCompanies,
+  type MorningBatch,
+} from "@/lib/leads-book";
+import { getLeadsBook, importLeadsCompanies, replaceLeadsCompanies, setLeadsMorningCount } from "@/lib/leads-api";
+import {
   bandLabel,
+  daysBetween,
+  edmontonToday,
   hasAccess,
   isSendable,
   scoreCompany,
+  signalContribution,
   type Company,
   type Industry,
   type LeadCity,
   type ScoreBand,
 } from "@/lib/lead-score";
 
-export const Route = createFileRoute("/admin/leads")({
-  component: LeadsPage,
-  validateSearch: (s: Record<string, unknown>): { company?: string } => {
-    const company = typeof s.company === "string" && s.company ? s.company : undefined;
-    return company ? { company } : {};
-  },
-  head: () => ({ meta: [{ title: "Leads — Unearth Self Desk" }] }),
-});
+const MORNING_LOCAL_KEY = "unearthself-leads-morning-count";
 
 const SEND_ERR: Record<string, string> = {
   missing: "That card is not on the list.",
@@ -53,487 +56,569 @@ const INDUSTRIES: Array<Industry | "all"> = [
   "education",
   "civic",
   "tech",
+  "other",
 ];
 
+const fieldClass =
+  "h-11 w-full rounded-sm border border-line bg-paper px-3 text-sm text-coal outline-none focus:border-ember focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember";
+
+export const Route = createFileRoute("/admin/leads")({
+  loader: () => getLeadsBook(),
+  component: LeadsPage,
+  pendingComponent: () => (
+    <Section kicker="Leads">
+      <div className="border border-line bg-paper p-8 text-center text-sm text-muted">Loading leads.</div>
+    </Section>
+  ),
+  errorComponent: ({ error, reset }) => (
+    <Section kicker="Leads">
+      <div className="border border-line bg-paper p-8 text-center">
+        <p className="text-sm text-coal">{error instanceof Error ? error.message : "Could not load leads."}</p>
+        <Button onClick={() => reset()} className="mt-4">
+          Try again
+        </Button>
+      </div>
+    </Section>
+  ),
+  head: () => ({ meta: [{ title: "Leads - Unearth Self Desk" }] }),
+});
+
 function LeadsPage() {
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const companies = useDesk((s) => s.companies);
+  const loaded = Route.useLoaderData();
   const threads = useDesk((s) => s.threads);
-  const ingestScout = useDesk((s) => s.ingestScout);
-  const generateCompanyDraft = useDesk((s) => s.generateCompanyDraft);
-  const saveCompanyDraft = useDesk((s) => s.saveCompanyDraft);
-  const approveCompanyDraft = useDesk((s) => s.approveCompanyDraft);
-  const sendCompany = useDesk((s) => s.sendCompany);
-  const stopCompany = useDesk((s) => s.stopCompany);
-  const fileCompany = useDesk((s) => s.fileCompany);
-  const setCompanyAccess = useDesk((s) => s.setCompanyAccess);
-  const stats = companyStats(companies);
+  const [rows, setRows] = useState<Company[] | null>(null);
+  const [storage, setStorage] = useState<"redis" | "browser" | null>(null);
+  const [holdingSeed, setHoldingSeed] = useState(false);
+  const [morningCount, setMorningCount] = useState(10);
+  const [morning, setMorning] = useState<MorningBatch | null>(null);
+  const [query, setQuery] = useState("");
   const [city, setCity] = useState<LeadCity | "all">("all");
-  const [band, setBand] = useState<ScoreBand | "all">("all");
   const [industry, setIndustry] = useState<Industry | "all">("all");
-  const [sendableOnly, setSendableOnly] = useState(false);
-  const [q, setQ] = useState("");
-  const [showIngest, setShowIngest] = useState(false);
-  const [activeId, setActiveId] = useState(search.company || "");
+  const [band, setBand] = useState<ScoreBand | "all">("all");
+  const [openId, setOpenId] = useState("");
+  const rowsRef = useRef<Company[]>([]);
+  rowsRef.current = rows ?? [];
+  const today = edmontonToday();
 
-  const ranked = useMemo(() => {
-    return companies
-      .map((c) => ({ c, s: scoreCompany(c) }))
-      .sort((a, b) => b.s.total - a.s.total || a.c.org.localeCompare(b.c.org));
-  }, [companies]);
+  useEffect(() => {
+    let gone = false;
+    const run = () => {
+      void (async () => {
+        if (loaded.storage === "browser") {
+          const saved = Number(localStorage.getItem(MORNING_LOCAL_KEY));
+          if (gone) return;
+          setStorage("browser");
+          setMorningCount(clampMorningCount(Number.isFinite(saved) && saved > 0 ? saved : 10));
+          setMorning(null);
+          setHoldingSeed(false);
+          setRows(useDesk.getState().companies);
+          return;
+        }
+        let book = loaded.book;
+        if (book.companies.length === 0) {
+          const local = readLocalCompanies(localStorage.getItem(DESK_STORAGE_KEY));
+          if (local.length) {
+            book = await importLeadsCompanies({ data: { companies: local } });
+          }
+        }
+        if (gone) return;
+        setStorage("redis");
+        setMorningCount(book.morningCount);
+        setMorning(book.morning);
+        if (book.companies.length) {
+          setRows(book.companies);
+          useDesk.setState({ companies: book.companies });
+          setHoldingSeed(false);
+        } else {
+          setRows(SEED_COMPANIES);
+          useDesk.setState({ companies: SEED_COMPANIES });
+          setHoldingSeed(true);
+        }
+      })().catch((error: unknown) => {
+        if (!gone) toast.error(error instanceof Error ? error.message : "Could not load leads");
+      });
+    };
+    const unsub = useDesk.persist.hasHydrated()
+      ? () => undefined
+      : useDesk.persist.onFinishHydration(() => run());
+    if (useDesk.persist.hasHydrated()) run();
+    return () => {
+      gone = true;
+      unsub();
+    };
+  }, [loaded]);
 
-  const filtered = ranked.filter(({ c, s }) => {
-    if (city !== "all" && c.city !== city) return false;
-    if (band !== "all" && s.band !== band) return false;
-    if (industry !== "all" && c.industry !== industry) return false;
-    if (sendableOnly && !isSendable(c, s)) return false;
-    if (q) {
-      const hay = `${c.org} ${c.domain} ${c.why} ${c.buyerName}`.toLowerCase();
-      if (!hay.includes(q.toLowerCase())) return false;
+  const scored = useMemo(() => {
+    return (rows ?? []).map((company) => ({
+      company,
+      score: scoreCompany({ ...company, today }),
+    }));
+  }, [rows, today]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return scored.filter(({ company, score }) => {
+      if (city !== "all" && company.city !== city) return false;
+      if (industry !== "all" && company.industry !== industry) return false;
+      if (band !== "all" && score.band !== band) return false;
+      if (!q) return true;
+      return [company.org, company.city, company.domain, company.buyerName, company.email]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [scored, query, city, industry, band]);
+
+  const morningRows = useMemo(() => {
+    if (!rows || !morning) return [];
+    const ids = new Set(morningCompanies({ companies: rows, morningCount, morning }, today).map((company) => company.id));
+    return filtered.filter(({ company }) => ids.has(company.id));
+  }, [rows, morning, morningCount, today, filtered]);
+
+  async function persist(next: Company[]) {
+    setRows(next);
+    useDesk.setState({ companies: next });
+    if (storage !== "redis") return;
+    await replaceLeadsCompanies({ data: { companies: next } });
+    setHoldingSeed(false);
+  }
+
+  async function mutate(id: string, act: () => string | null) {
+    useDesk.setState({ companies: rowsRef.current });
+    const err = act();
+    const next = useDesk.getState().companies;
+    try {
+      await persist(next);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save");
     }
-    return true;
-  });
+    if (err) toast.error(SEND_ERR[err] ?? err);
+    return err;
+  }
 
-  const active = companies.find((c) => c.id === activeId) ?? filtered[0]?.c ?? companies[0];
-  const activeScore = active ? scoreCompany(active) : null;
-  const mail = active ? threads.filter((m) => m.companyId === active.id) : [];
+  async function changeCount(value: string) {
+    const count = clampMorningCount(Number(value));
+    setMorningCount(count);
+    if (storage === "redis") {
+      try {
+        const book = await setLeadsMorningCount({ data: { morningCount: count } });
+        setMorning(book.morning);
+        setMorningCount(book.morningCount);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not save the morning count");
+      }
+      return;
+    }
+    localStorage.setItem(MORNING_LOCAL_KEY, String(count));
+  }
 
   return (
     <div className="grid gap-10">
-      <p className="max-w-prose text-pretty text-muted">
-        Long list of companies. Not the pipeline. Score 100 = Fit 60 + Access 25 + Timing 15.
-        Calgary / Edmonton / Red Deer, headcount 80–800, first-wave industries. Send needs a named
-        person, a published email, and a source URL. No Apollo. No invented emails. Gmail is not
-        connected — send opens mailto and logs the thread.
-      </p>
-
-      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="List" value={String(stats.list)} hint="Research cards" />
-        <Stat label="Sendable" value={String(stats.sendable)} hint="Access + 70+" />
-        <Stat label="In sequence" value={String(stats.sequence)} hint="Draft approved, not filed" />
-        <Stat label="Stopped" value={String(stats.stopped)} hint="Do not email" />
-      </section>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {CITIES.map((c) => (
-          <Chip key={c} active={city === c} onClick={() => setCity(c)}>
-            {c === "all" ? "All cities" : c}
-          </Chip>
-        ))}
-        <Chip active={sendableOnly} onClick={() => setSendableOnly((v) => !v)}>
-          Sendable
-        </Chip>
-        <div className="ml-auto">
-          <Button type="button" variant="outline" onClick={() => setShowIngest((v) => !v)}>
-            {showIngest ? "Close ingest" : "Scout ingest"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto">
-        {BANDS.map((b) => (
-          <Chip key={b} active={band === b} onClick={() => setBand(b)}>
-            {b === "all" ? "All bands" : bandLabel(b)}
-          </Chip>
-        ))}
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto">
-        {INDUSTRIES.map((i) => (
-          <Chip key={i} active={industry === i} onClick={() => setIndustry(i)}>
-            {i === "all" ? "All industries" : i}
-          </Chip>
-        ))}
-      </div>
-
-      <label className="max-w-md">
-        <Label>Find</Label>
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Org, domain, buyer" />
-      </label>
-
-      {showIngest ? (
-        <IngestForm
-          onDone={(msg) => {
-            setShowIngest(false);
-            toast(msg);
-          }}
-          ingest={ingestScout}
-        />
-      ) : null}
-
-      {filtered.length === 0 ? (
-        <p className="text-muted">Nothing matches. Clear a filter.</p>
-      ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_1fr]">
-          <Section kicker={`${filtered.length} on the list`}>
-            <ul className="divide-y divide-line border-y border-line">
-              {filtered.map(({ c, s }) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveId(c.id);
-                      void navigate({ search: { company: c.id } });
-                    }}
-                    className={
-                      c.id === active?.id
-                        ? "flex w-full flex-col items-start gap-1 py-3 text-left"
-                        : "flex w-full flex-col items-start gap-1 py-3 text-left text-muted"
-                    }
-                  >
-                    <span className="font-semibold">{c.org}</span>
-                    <span className="text-xs tabular-nums">
-                      {s.total} · {c.city} · {c.industry}
-                      {isSendable(c, s) ? " · sendable" : ""}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          {active && activeScore ? (
-            <CompanyPanel
-              key={active.id}
-              company={active}
-              score={activeScore}
-              mail={mail}
-              onGenerate={() => {
-                const err = generateCompanyDraft(active.id);
-                if (err) toast(SEND_ERR[err] ?? err);
-                else toast("House-voice draft on the card");
-              }}
-              onSave={(subject, body) => {
-                const err = saveCompanyDraft(active.id, subject, body);
-                if (err) toast(SEND_ERR[err] ?? err);
-                else toast("Draft saved");
-              }}
-              onApprove={() => {
-                const err = approveCompanyDraft(active.id);
-                if (err) toast(SEND_ERR[err] ?? err);
-                else toast("Approved · on the thread");
-              }}
-              onSend={() => {
-                const err = sendCompany(active.id);
-                if (err) toast(SEND_ERR[err] ?? err);
-                else toast("Logged · mailto opened");
-              }}
-              onStop={() => {
-                stopCompany(active.id);
-                toast("Stopped. Do not email.");
-              }}
-              onFile={() => {
-                const id = fileCompany(active.id);
-                if (id) toast(`Filed on pipeline · ${id}`);
-              }}
-              onAccess={(input) => {
-                const err = setCompanyAccess(active.id, input);
-                if (err) toast(SEND_ERR[err] ?? err);
-                else toast("Access updated. Email only if sourced.");
-              }}
-            />
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CompanyPanel({
-  company,
-  score,
-  mail,
-  onGenerate,
-  onSave,
-  onApprove,
-  onSend,
-  onStop,
-  onFile,
-  onAccess,
-}: {
-  company: Company;
-  score: ReturnType<typeof scoreCompany>;
-  mail: { id: string; dir: string; bot: string; subject: string; body: string }[];
-  onGenerate: () => void;
-  onSave: (subject: string, body: string) => void;
-  onApprove: () => void;
-  onSend: () => void;
-  onStop: () => void;
-  onFile: () => void;
-  onAccess: (input: {
-    buyerName: string;
-    buyerTitle: string;
-    email: string;
-    emailSource: string;
-    sourceUrl: string;
-  }) => void;
-}) {
-  const [subject, setSubject] = useState(company.draftSubject);
-  const [body, setBody] = useState(company.draftBody);
-  useEffect(() => {
-    setSubject(company.draftSubject);
-    setBody(company.draftBody);
-  }, [company.id, company.draftSubject, company.draftBody]);
-  const sendable = isSendable(company, score);
-  const access = hasAccess(company);
-  const problems = draftProblems(body);
-  const words = wordCount(body);
-
-  return (
-    <div className="grid gap-6">
-      <div className="border border-line border-l-2 border-l-coal bg-paper p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={score.band === "pursue" ? "bootcamp" : score.band === "sequence" ? "proposal" : score.band === "watch" ? "hold" : "lost"}>
-            {bandLabel(score.band)}
-          </Badge>
-          <Badge tone={company.status === "filed" ? "won" : company.status === "stopped" ? "lost" : company.status === "sequence" ? "proposal" : "new"}>
-            {company.status}
-          </Badge>
-          <span className="text-xs tabular-nums text-muted">{company.id}</span>
-        </div>
-        <h2 className="mt-2 font-display text-4xl font-black uppercase leading-none">{company.org}</h2>
-        <p className="mt-2 text-sm text-muted">
-          {company.city} · {company.industry} · {company.sizeBand} · {company.domain}
-        </p>
-        <p className="mt-2 text-sm">
-          <span className="tabular-nums font-semibold">{score.total}</span>
-          <span className="text-muted">
-            {" "}
-            · Fit {score.fit}/60 · Access {score.access}/25 · Timing {score.timing}/15
-          </span>
-        </p>
-        <p className="mt-3 max-w-prose text-sm text-pretty">{company.why}</p>
-        <p className="mt-2 text-sm text-muted">{company.timingNote}</p>
-        <p className="mt-3 text-sm">
-          {company.buyerName ? (
-            <>
-              {company.buyerName}
-              {company.buyerTitle ? ` · ${company.buyerTitle}` : ""}
-              {company.email ? ` · ${company.email}` : " · no published email"}
-            </>
-          ) : (
-            <span className="text-sandstone">No named buyer. Draft allowed. Send blocked.</span>
-          )}
-        </p>
-        {company.sourceUrl ? (
-          <p className="mt-2">
-            <a
-              href={company.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-semibold text-ember hover:underline"
-            >
-              Source
-            </a>
-            {company.emailSource ? (
-              <>
-                <span className="text-muted"> · </span>
-                <a
-                  href={company.emailSource}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-semibold text-ember hover:underline"
-                >
-                  Email source
-                </a>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-
-        <AccessForm company={company} onAccess={onAccess} />
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" onClick={onGenerate}>
-            House-voice draft
-          </Button>
-          <Button type="button" variant="outline" onClick={onApprove} disabled={problems.length > 0}>
-            Approve to thread
-          </Button>
-          <Button type="button" variant="outline" onClick={onSend} disabled={!sendable || problems.length > 0}>
-            Send
-          </Button>
-          <Button type="button" variant="outline" onClick={onFile} disabled={company.status === "filed"}>
-            Hand file
-          </Button>
-          <Button type="button" variant="outline" onClick={onStop}>
-            Stop
-          </Button>
-          {company.filedLeadId ? (
-            <Link
-              to="/admin/pipeline"
-              className="inline-flex min-h-11 items-center justify-center rounded-xs border border-line-strong px-4 text-sm font-semibold text-coal hover:border-coal"
-            >
-              Pipeline {company.filedLeadId}
-            </Link>
-          ) : null}
-        </div>
-        {!access ? (
-          <p className="mt-3 text-sm text-sandstone">
-            Access incomplete. You may draft. You may not send. Cite a person and a published inbox
-            with a URL — do not guess.
-          </p>
-        ) : null}
-      </div>
-
-      <Section kicker={`Draft tray · ${words} words`}>
-        <form
-          className="grid gap-3 border border-line bg-paper p-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(subject, body);
-          }}
-        >
-          <label>
-            <Label>Subject</Label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-          </label>
-          <label>
-            <Label>Body</Label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={12}
-              className="min-h-40 w-full resize-y rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal outline-none focus:border-coal"
-            />
-          </label>
-          {problems.length ? (
-            <ul className="list-disc pl-5 text-sm text-ember">
-              {problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted">120–180 words. No price. No canyon product until D13.</p>
-          )}
+      <Section kicker="Leads">
+        <div className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div>
-            <Button type="submit" variant="outline">
-              Save draft
-            </Button>
+            <Label htmlFor="lead-search">Search</Label>
+            <Input id="lead-search" value={query} onChange={(event) => setQuery(event.target.value)} />
           </div>
-        </form>
+          <div>
+            <Label htmlFor="lead-city">City</Label>
+            <select id="lead-city" className={fieldClass} value={city} onChange={(event) => setCity(event.target.value as LeadCity | "all")}>
+              {CITIES.map((item) => (
+                <option key={item} value={item}>
+                  {item === "all" ? "All cities" : item}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="lead-industry">Industry</Label>
+            <select
+              id="lead-industry"
+              className={fieldClass}
+              value={industry}
+              onChange={(event) => setIndustry(event.target.value as Industry | "all")}
+            >
+              {INDUSTRIES.map((item) => (
+                <option key={item} value={item}>
+                  {item === "all" ? "All industries" : item}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="lead-band">Score band</Label>
+            <select id="lead-band" className={fieldClass} value={band} onChange={(event) => setBand(event.target.value as ScoreBand | "all")}>
+              {BANDS.map((item) => (
+                <option key={item} value={item}>
+                  {item === "all" ? "All bands" : bandLabel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {storage === "browser" ? (
+          <p className="mt-3 text-sm text-shale">Redis is not connected. Changes stay in this browser.</p>
+        ) : null}
+        {holdingSeed ? (
+          <p className="mt-3 text-sm text-shale">Redis has no saved companies yet. Showing the seed list.</p>
+        ) : null}
       </Section>
 
-      <Section kicker="Thread">
-        {mail.length === 0 ? (
-          <p className="text-sm text-muted">No mail yet. Approve puts a draft on the thread.</p>
+      <Section
+        kicker="This morning"
+        action={
+          <label className="flex items-center gap-2 whitespace-nowrap text-xs tracking-widest text-sandstone uppercase">
+            How many
+            <select className={`${fieldClass} w-20`} value={morningCount} onChange={(event) => void changeCount(event.target.value)} aria-label="How many each morning">
+              {Array.from({ length: 11 }, (_, index) => 10 + index).map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      >
+        {rows == null ? (
+          <p className="border-y border-line py-4 text-sm text-muted">Loading this morning.</p>
+        ) : morningRows.length === 0 ? (
+          <p className="border-y border-line py-4 text-sm text-shale">No new leads for this morning.</p>
         ) : (
-          <ul className="grid gap-3">
-            {mail.map((m) => (
-              <li key={m.id} className="border border-line bg-paper p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={m.dir === "out" ? "sent" : m.dir === "in" ? "won" : m.dir === "draft" ? "hold" : "new"}>
-                    {m.dir}
-                  </Badge>
-                  <span className="text-xs uppercase tracking-widest text-muted">{m.bot}</span>
-                </div>
-                <p className="mt-2 font-semibold">{m.subject}</p>
-                <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm text-pretty text-shale">{m.body}</p>
-              </li>
-            ))}
-          </ul>
+          <CompanyList
+            rows={morningRows}
+            openId={openId}
+            threads={threads}
+            today={today}
+            onToggle={setOpenId}
+            onMutate={mutate}
+          />
+        )}
+      </Section>
+
+      <Section kicker="All companies">
+        {rows == null ? (
+          <p className="border-y border-line py-4 text-sm text-muted">Loading companies.</p>
+        ) : filtered.length === 0 ? (
+          <p className="border-y border-line py-4 text-sm text-shale">No companies match.</p>
+        ) : (
+          <CompanyList
+            rows={filtered}
+            openId={openId}
+            threads={threads}
+            today={today}
+            onToggle={setOpenId}
+            onMutate={mutate}
+          />
         )}
       </Section>
     </div>
   );
 }
 
-function AccessForm({
-  company,
-  onAccess,
+function CompanyList({
+  rows,
+  openId,
+  threads,
+  today,
+  onToggle,
+  onMutate,
 }: {
-  company: Company;
-  onAccess: (input: {
-    buyerName: string;
-    buyerTitle: string;
-    email: string;
-    emailSource: string;
-    sourceUrl: string;
-  }) => void;
+  rows: Array<{ company: Company; score: ReturnType<typeof scoreCompany> }>;
+  openId: string;
+  threads: Array<{ id: string; companyId?: string; dir: string; subject: string; at: string }>;
+  today: string;
+  onToggle: (id: string) => void;
+  onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    onAccess({
-      buyerName: String(data.get("buyerName") || ""),
-      buyerTitle: String(data.get("buyerTitle") || ""),
-      email: String(data.get("email") || ""),
-      emailSource: String(data.get("emailSource") || ""),
-      sourceUrl: String(data.get("sourceUrl") || company.sourceUrl),
-    });
-  }
   return (
-    <form onSubmit={onSubmit} className="mt-5 grid gap-3 border-t border-line pt-4 md:grid-cols-2">
-      <p className="md:col-span-2 text-xs tracking-widest text-sandstone uppercase">Cite access — never invent</p>
-      <label>
-        <Label>Named buyer</Label>
-        <Input name="buyerName" defaultValue={company.buyerName} placeholder="First and last, from a page" />
-      </label>
-      <label>
-        <Label>Title</Label>
-        <Input name="buyerTitle" defaultValue={company.buyerTitle} placeholder="People / HR" />
-      </label>
-      <label>
-        <Label>Published email</Label>
-        <Input name="email" type="email" defaultValue={company.email} placeholder="Only if it is on a URL" />
-      </label>
-      <label>
-        <Label>Email source URL</Label>
-        <Input name="emailSource" defaultValue={company.emailSource} placeholder="https://…" />
-      </label>
-      <label className="md:col-span-2">
-        <Label>Company source URL</Label>
-        <Input name="sourceUrl" defaultValue={company.sourceUrl} />
-      </label>
-      <div>
-        <Button type="submit" variant="outline">
-          Save access
-        </Button>
-      </div>
-    </form>
+    <ul className="divide-y divide-line border-y border-line">
+      {rows.map(({ company, score }) => {
+        const open = openId === company.id;
+        const sendable = isSendable(company, score);
+        return (
+          <li key={company.id}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-4 py-3 text-left"
+              aria-expanded={open}
+              onClick={() => onToggle(open ? "" : company.id)}
+            >
+              <span
+                className={`size-2.5 shrink-0 rounded-full ${sendable ? "bg-ember" : "bg-line"}`}
+                aria-label={sendable ? "Sendable" : "Not sendable"}
+              />
+              <span className="min-w-0 flex-1 font-semibold">{company.org}</span>
+              <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{company.city}</span>
+              <span className="hidden w-24 shrink-0 text-sm text-shale md:block">{company.sizeBand}</span>
+              <span className="w-12 shrink-0 text-right text-sm tabular-nums">{score.total}</span>
+            </button>
+            {open ? (
+              <CompanyPanel
+                company={company}
+                score={score}
+                today={today}
+                threads={threads.filter((thread) => thread.companyId === company.id)}
+                onMutate={onMutate}
+              />
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-function IngestForm({
-  ingest,
-  onDone,
+function CompanyPanel({
+  company,
+  score,
+  today,
+  threads,
+  onMutate,
 }: {
-  ingest: (raw: string) => { added: number; merged: number; skipped: number; error: string | null };
-  onDone: (msg: string) => void;
+  company: Company;
+  score: ReturnType<typeof scoreCompany>;
+  today: string;
+  threads: Array<{ id: string; dir: string; subject: string; at: string }>;
+  onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    const raw = String(data.get("json") || "");
-    const result = ingest(raw);
-    if (result.error) {
-      toast(result.error);
-      return;
-    }
-    onDone(`Ingested ${result.added} new, merged ${result.merged}, skipped ${result.skipped}. Deduped on domain.`);
-  }
+  const [subject, setSubject] = useState(company.draftSubject);
+  const [body, setBody] = useState(company.draftBody);
+  const [buyerName, setBuyerName] = useState(company.buyerName);
+  const [buyerTitle, setBuyerTitle] = useState(company.buyerTitle);
+  const [email, setEmail] = useState(company.email);
+  const [emailSource, setEmailSource] = useState(company.emailSource);
+  const [sourceUrl, setSourceUrl] = useState(company.sourceUrl);
+
+  useEffect(() => {
+    setSubject(company.draftSubject);
+    setBody(company.draftBody);
+    setBuyerName(company.buyerName);
+    setBuyerTitle(company.buyerTitle);
+    setEmail(company.email);
+    setEmailSource(company.emailSource);
+    setSourceUrl(company.sourceUrl);
+  }, [company]);
+
+  const problems = body.trim() ? draftProblems(body) : [];
+  const since = company.lastTouch ? daysBetween(today, company.lastTouch) : null;
+
   return (
-    <form onSubmit={onSubmit} className="grid gap-3 border border-line bg-paper p-5">
-      <p className="max-w-prose text-sm text-pretty text-muted">
-        Paste JSON from the Lead Scout automation. Array, single object, or{" "}
-        <span className="font-semibold">{"{ companies: [] }"}</span>. Fields: domain, city, industry,
-        sizeBand, sourceUrl, why, buyer if cited. Emails without a source URL are dropped. Dedupes on
-        domain.
-      </p>
-      <label>
-        <Label>JSON</Label>
-        <textarea
-          name="json"
-          required
-          rows={10}
-          placeholder={`[\n  {\n    "domain": "example.com",\n    "city": "Calgary",\n    "industry": "energy",\n    "sizeBand": "80-800",\n    "sourceUrl": "https://example.com/about",\n    "why": "Teams of 12–20. Banff is the default.",\n    "buyer": { "name": "Alex Reid", "title": "VP People", "email": "people@example.com", "emailSource": "https://example.com/contact" }\n  }\n]`}
-          className="min-h-40 w-full resize-y rounded-sm border border-line bg-paper px-3 py-2 font-mono text-sm text-coal outline-none focus:border-coal"
-        />
-      </label>
-      <div>
-        <Button type="submit">File the batch</Button>
+    <div className="mb-4 grid gap-6 border border-line bg-paper p-4">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div>
+          <p className="text-xs tracking-widest text-sandstone uppercase">Company</p>
+          <p className="mt-2 text-sm text-coal">
+            {company.org} · {company.city} · {company.industry} · {company.sizeBand}
+          </p>
+          <p className="mt-1 text-sm text-shale">{company.domain}</p>
+          {company.sourceUrl ? (
+            <a className="mt-2 inline-block text-sm font-semibold text-ember hover:underline" href={company.sourceUrl}>
+              Company source
+            </a>
+          ) : (
+            <p className="mt-2 text-sm text-shale">No company source URL.</p>
+          )}
+          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Status</p>
+          <p className="mt-1 text-sm text-coal">
+            {company.status} · {bandLabel(score.band)}
+            {hasAccess(company) ? "" : " · access incomplete"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs tracking-widest text-sandstone uppercase">Named contact</p>
+          {company.buyerName ? (
+            <p className="mt-2 text-sm text-coal">
+              {company.buyerName}
+              {company.buyerTitle ? `, ${company.buyerTitle}` : ""}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-shale">No named contact on a published page.</p>
+          )}
+          {company.email ? <p className="mt-1 text-sm text-coal">{company.email}</p> : null}
+          {company.emailSource ? (
+            <a className="mt-2 inline-block text-sm font-semibold text-ember hover:underline" href={company.emailSource}>
+              Page where this contact was published
+            </a>
+          ) : (
+            <p className="mt-2 text-sm text-shale">No published page for this contact.</p>
+          )}
+        </div>
       </div>
-    </form>
+
+      <div>
+        <p className="text-xs tracking-widest text-sandstone uppercase">Why they fit</p>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-coal">{company.why}</p>
+        {company.whySources && company.whySources.length > 0 ? (
+          <ul className="mt-3 space-y-1">
+            {company.whySources.map((source) => (
+              <li key={source.url}>
+                <a className="text-sm font-semibold text-ember hover:underline" href={source.url}>
+                  {source.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      <div>
+        <p className="text-xs tracking-widest text-sandstone uppercase">Score</p>
+        <p className="mt-2 text-sm text-coal">
+          Fit {score.fit} / 60. City {score.geo}, size {score.size}, industry {score.industry}.
+        </p>
+        <p className="mt-1 text-sm text-coal">
+          Access {score.access} / 25. Named person {score.named}, published email {score.publishedEmail}, source {score.source}.
+        </p>
+        <p className="mt-1 text-sm text-coal">Timing {score.timing} / 15.</p>
+        {company.signals && company.signals.length > 0 ? (
+          <ul className="mt-3 space-y-2">
+            {company.signals.map((signal) => (
+              <li key={signal.id} className="text-sm text-shale">
+                {signal.kind} · {signal.date} · {signalContribution(signal, today)} points
+                {signal.note ? ` · ${signal.note}` : ""}{" "}
+                <a className="font-semibold text-ember hover:underline" href={signal.sourceUrl}>
+                  Source
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-shale">
+            No dated signals on this card yet.
+            {company.timingNote ? ` ${company.timingNote}` : ""}
+          </p>
+        )}
+        <p className="mt-2 text-sm text-shale">
+          {since == null
+            ? "No last touch."
+            : `Last touch ${company.lastTouch}. ${since} day${since === 1 ? "" : "s"} ago.`}
+        </p>
+      </div>
+
+      <form
+        className="grid gap-3 md:grid-cols-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onMutate(company.id, () =>
+            useDesk.getState().setCompanyAccess(company.id, { buyerName, buyerTitle, email, emailSource, sourceUrl }),
+          );
+        }}
+      >
+        <div>
+          <Label htmlFor={`${company.id}-name`}>Name</Label>
+          <Input id={`${company.id}-name`} value={buyerName} onChange={(event) => setBuyerName(event.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor={`${company.id}-title`}>Title</Label>
+          <Input id={`${company.id}-title`} value={buyerTitle} onChange={(event) => setBuyerTitle(event.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor={`${company.id}-email`}>Published email</Label>
+          <Input id={`${company.id}-email`} value={email} onChange={(event) => setEmail(event.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor={`${company.id}-email-source`}>Page where the email was published</Label>
+          <Input id={`${company.id}-email-source`} value={emailSource} onChange={(event) => setEmailSource(event.target.value)} />
+        </div>
+        <div className="md:col-span-2">
+          <Label htmlFor={`${company.id}-source`}>Company source URL</Label>
+          <Input id={`${company.id}-source`} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
+        </div>
+        <div>
+          <Button type="submit" variant="outline">
+            Save contact
+          </Button>
+        </div>
+      </form>
+
+      <div>
+        <p className="text-xs tracking-widest text-sandstone uppercase">Draft</p>
+        <p className="mt-2 text-sm text-shale">Approved sends go from chris@badlandsbootcamp.com.</p>
+        <label className="mt-3 block" htmlFor={`${company.id}-subject`}>
+          <span className="mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase">Subject</span>
+          <Input id={`${company.id}-subject`} value={subject} onChange={(event) => setSubject(event.target.value)} />
+        </label>
+        <label className="mt-3 block" htmlFor={`${company.id}-body`}>
+          <span className="mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase">Email</span>
+          <textarea
+            id={`${company.id}-body`}
+            className="min-h-48 w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal outline-none focus:border-ember"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+          />
+        </label>
+        <p className="mt-2 text-xs text-muted">
+          {body.trim() ? `${wordCount(body)} words` : "No draft yet."}
+          {problems.length ? ` · ${problems[0]}` : ""}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void onMutate(company.id, () => useDesk.getState().saveCompanyDraft(company.id, subject, body))}
+          >
+            Save draft
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void onMutate(company.id, () => useDesk.getState().generateCompanyDraft(company.id))}
+          >
+            Write the draft
+          </Button>
+          <Button
+            type="button"
+            variant="coal"
+            onClick={() => void onMutate(company.id, () => useDesk.getState().approveCompanyDraft(company.id))}
+          >
+            Approve
+          </Button>
+          <Button type="button" onClick={() => void onMutate(company.id, () => useDesk.getState().sendCompany(company.id))}>
+            Send
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              void onMutate(company.id, () => {
+                useDesk.getState().stopCompany(company.id);
+                return null;
+              })
+            }
+          >
+            Stop
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              void onMutate(company.id, () => {
+                const result = useDesk.getState().fileCompany(company.id);
+                return result === "missing" ? "missing" : null;
+              })
+            }
+          >
+            Hand file
+          </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge tone={score.band === "hold" ? "lost" : score.band === "pursue" ? "won" : "new"}>{score.total}</Badge>
+          {isSendable(company, score) ? <Badge tone="won">Sendable</Badge> : <Badge tone="new">Not sendable</Badge>}
+        </div>
+      </div>
+
+      {threads.length > 0 ? (
+        <div>
+          <p className="text-xs tracking-widest text-sandstone uppercase">Thread</p>
+          <ul className="mt-2 space-y-2">
+            {threads.map((thread) => (
+              <li key={thread.id} className="text-sm text-shale">
+                {thread.dir} · {thread.subject}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
