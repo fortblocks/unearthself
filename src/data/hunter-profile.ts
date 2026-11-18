@@ -174,9 +174,9 @@ export const HUNTER_DAILY_CALL_CAP = 48;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",
-  job: "Find ideal customers worldwide. Never sends.",
-  trigger: "Always on",
+  job: "Two runs, one bot. Nightly local sweep at 4am Mountain: Calgary, Edmonton, and Red Deer, headcount 80 to 800, first-wave industries. Always-on hunt for ideal customers anywhere, 48 model calls an Edmonton day. Never sends.",
+  trigger: "Nightly at 4am Mountain, and always on",
   owner: "christopher" as const,
   escalate: "A partnership flag, or a company outside this profile.",
-  limits: ["Never sends", "Never invents a fact", "No paid data"],
+  limits: ["Never sends", "Never invents a fact", "No paid data", "Pause stops both runs"],
 };

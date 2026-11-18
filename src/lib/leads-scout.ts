@@ -1,7 +1,7 @@
 /**
- * Overnight lead scout.
- * Researches public pages for Alberta companies. Does not call Apollo or Clay.
- * A name or email is kept only when that exact text is on the page at emailSource.
+ * Hunter's nightly local sweep.
+ * The route and this file keep their old names. Researches public pages for Alberta companies.
+ * Does not call Apollo or Clay. A name or email is kept only when that exact text is on the page at emailSource.
  */
 
 import { loadBook, saveBook } from "./leads-book.ts";

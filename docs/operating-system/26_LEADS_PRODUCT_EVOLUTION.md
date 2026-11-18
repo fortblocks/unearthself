@@ -27,7 +27,7 @@ This file is the next sales spec. `07` remains the workstream. Do not treat this
 
 Fit today is geo plus size plus industry. Access is 12 for a named person (two real name tokens, not "hr", "people", or "team"), 10 for an email that is valid and has an http(s) source, and 3 for an http(s) company source. Timing is computed from dated signals with source URLs and a last-touch adjustment. It is not typed in.
 
-The nightly scout looks only at Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`: energy, construction, professional, healthcare, engineering, logistics, education, civic. A name or email is kept only when that exact text is on the page at `emailSource`. Otherwise the field stays blank.
+Hunter's nightly run looks only at Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`: energy, construction, professional, healthcare, engineering, logistics, education, civic. A name or email is kept only when that exact text is on the page at `emailSource`. Otherwise the field stays blank.
 
 The draft generator in `lead-copy.ts` does not do that kind of care. It wraps one house paragraph around the company name and the stored "why" text. That paragraph is the failure this spec exists to replace. Section 4, the humanizer, is the most important part of the replacement. Enrichment, rewrite, and experiments exist so that a human-sounding letter has something true to stand on.
 
@@ -63,7 +63,7 @@ Add, only when a public page supports them:
 
 Flow:
 
-1. Scout, seed, or a hand entry writes the card. Blanks stay blank.
+1. Hunter's nightly run, the always-on hunt, a seed, or a hand entry writes the card. Blanks stay blank.
 2. Enrichment reads public URLs already on the card, then the company domain's obvious public pages. It does not crawl a login wall.
 3. A filler accepts a string only when `contactIfPresent` (or the same test) finds that string on the fetched page.
 4. The card stores the string and the URL. Unfilled fields are empty strings, not "Unknown" and not a department name standing in for a person.
@@ -150,7 +150,7 @@ Flow: enriched card, then generator, then humanizer, then the existing draft edi
 ### Open questions
 
 - How many signals may one letter cite? Working rule: one, the most recent that still scores, so the letter stays specific.
-- Whether `why` remains a scout note for the panel only, and never enters the model prompt. Working rule: the model may see `whySources`, not the prose `why`, so it cannot launder an unsourced sentence.
+- Whether `why` remains a research note for the panel only, and never enters the model prompt. Working rule: the model may see `whySources`, not the prose `why`, so it cannot launder an unsourced sentence.
 
 ## 3. Experiments module
 
@@ -415,7 +415,7 @@ Flow: customized letter (section 5), then two versions on one axis, then humaniz
 
 ## Geography, left open on purpose
 
-Leads are not only Calgary, Edmonton, and Red Deer. The Drumheller product has demand further afield in Canada and the United States. The scout and the Fit geo score still assume a local Alberta list. That should be revisited. It is an open question for the partners, not a change this spec makes.
+Leads are not only Calgary, Edmonton, and Red Deer. The Drumheller product has demand further afield in Canada and the United States. Hunter's nightly run and the Fit geo score still assume a local Alberta list. That should be revisited. It is an open question for the partners, not a change this spec makes.
 
 What the code does today, quoted from `src/lib/lead-score.ts`:
 
@@ -428,11 +428,11 @@ export function geoPoints(city: LeadCity): number {
 }
 ```
 
-`LeadCity` is Calgary, Edmonton, Red Deer, or Alberta. Anywhere else falls through `coerceCity` into Alberta and scores 6, out of 22 available geo points, inside a Fit score of 60. The scout prompt is narrower still: "Cities: Calgary, Edmonton, Red Deer." `selectScoutRows` drops any other city before scoring. Headcount must be 80 to 800 or the row is dropped. First-wave industry is required or the row is dropped.
+`LeadCity` is Calgary, Edmonton, Red Deer, or Alberta. Anywhere else falls through `coerceCity` into Alberta and scores 6, out of 22 available geo points, inside a Fit score of 60. Hunter's nightly prompt is narrower still: "Cities: Calgary, Edmonton, Red Deer." `selectScoutRows` drops any other city before scoring. Headcount must be 80 to 800 or the row is dropped. First-wave industry is required or the row is dropped.
 
 `07` describes the same local motion: "Build a Calgary / Edmonton corporate pipeline" and a research list of "Calgary / Edmonton / Red Deer, headcount 80 to 800."
 
-Do not quietly change the weights. A wider map needs a partner decision: which cities or countries enter the scout, what they score, and whether 80 to 800 still fits a US buyer. Until that decision, the scout stays on the three cities, and this spec does not pretend a Toronto or Houston card is in the morning batch.
+Do not quietly change the weights. A wider map needs a partner decision: which cities or countries enter the nightly run, what they score, and whether 80 to 800 still fits a US buyer. Until that decision, the nightly run stays on the three cities, and this spec does not pretend a Toronto or Houston card is in the morning batch.
 
 ## What this spec does not do
 

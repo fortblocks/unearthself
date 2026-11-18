@@ -7,7 +7,7 @@ describe("Shell PAGE header lookup", () => {
     "/admin": { kicker: "Wednesday 9 September 2026", title: "Today" },
     "/admin/pipeline": { kicker: "Live files only", title: "Pipeline" },
     "/admin/leads": { kicker: "Calgary · Edmonton · Red Deer", title: "Leads" },
-    "/admin/bots": { kicker: "First touch, follow-up, scout", title: "Bots" },
+    "/admin/bots": { kicker: "First touch, follow-up, hunter", title: "Bots" },
     "/admin/socials": { kicker: "Content on the book", title: "Socials" },
     "/admin/inventory": { kicker: "Haven and Basecamp", title: "Inventory" },
     "/admin/money": { kicker: "Deposits, invoices, refunds", title: "Money" },

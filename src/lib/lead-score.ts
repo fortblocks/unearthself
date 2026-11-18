@@ -62,7 +62,7 @@ export type Company = {
   draftBody: string;
   lastTouch: string;
   scoutBatch: string;
-  /** Who filed the card. Missing on older scout and hand cards. */
+  /** Who filed the card. Missing on older nightly and hand cards. The stored value "scout" is Hunter's nightly run. */
   source?: "scout" | "hunter" | "hand";
   /** City and country as printed on the source page. */
   place?: string;
@@ -368,7 +368,7 @@ export function isSendable(c: Company, score: ScoreBreak) {
 
 export function parseScoutBatch(raw: string): { rows: ScoutIngest[]; error: string | null } {
   const text = raw.trim();
-  if (!text) return { rows: [], error: "Paste JSON from the Lead Scout." };
+  if (!text) return { rows: [], error: "Paste JSON from Hunter's nightly run." };
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -499,7 +499,7 @@ export function mergeScoutRows(
       industry: coerceIndustry(row.industry),
       sizeBand: coerceSize(row.sizeBand),
       sourceUrl: row.sourceUrl || "",
-      why: row.why || "Scout ingest. Research card.",
+      why: row.why || "Nightly ingest. Research card.",
       whySources: incomingWhy,
       signals,
       buyerName: row.buyer?.name ?? "",

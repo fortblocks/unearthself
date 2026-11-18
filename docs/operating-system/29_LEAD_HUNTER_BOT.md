@@ -4,7 +4,7 @@
 **Date:** 18th November 2026  
 **Owner:** Christopher  
 **Builds on:** `07_WS_SALES_MARKETING.md`, `26_LEADS_PRODUCT_EVOLUTION.md`, `27_LEADS_SAMPLE_EMAILS.md`, `28_LEADS_OPEN_ITEMS.md`  
-**Code this spec describes, and does not change:** `src/lib/leads-scout.ts`, `src/lib/lead-score.ts`, `src/lib/leads-book.ts`, `src/routes/admin.leads.tsx`, `src/routes/admin.bots.tsx`, `src/data/bots.ts`
+**Code this spec describes, and does not change:** `src/lib/leads-scout.ts` (Hunter's nightly run; the file name stays), `src/lib/leads-hunter.ts`, `src/lib/lead-score.ts`, `src/lib/leads-book.ts`, `src/routes/admin.leads.tsx`, `src/routes/admin.bots.tsx`, `src/data/bots.ts`
 
 Hunter's sole job is to feed Chris, on an ongoing basis, companies with a high chance of converting to a team of six to twenty-four for the Unearth Self experience in Drumheller. It finds, researches and files. It never sends.
 
@@ -19,11 +19,15 @@ The job has two phases. Phase one is finding and filing. Phase two is enrichment
 - The access gate in `07` stays, and it controls sending, not filing. A card needs a named person, a published email and Approve before it can send, but any well-fitting company gets filed.
 - Partners by first name only. Basecamp is one word. Canadian spelling. No em dashes.
 
-## Why a second bot
+## Hunter's two runs
 
-The existing scout (`leads-scout.ts`, nightly cron at 4am Mountain) is deliberately local. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. That is right for a drive-in first wave and wrong for the bigger idea: Badlands Bootcamp could be an iconic experience that a company will fly a team to.
+Hunter is one bot with two runs. There is no separate local bot.
 
-The Hunter is the complement, not the replacement. The scout keeps doing local, nightly, by industry. The Hunter works everywhere, continuously, by ideal-customer fit.
+(a) Nightly local sweep, formerly its own bot. Cron `0 11 * * *`, which is 4am Mountain. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. The score is the existing one in `lead-score.ts`. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`, so the schedule is not registered twice. Behaviour of the sweep is unchanged.
+
+(b) Always-on ideal-customer hunt. Cron every minute. It stops after 48 model calls in an Edmonton day. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to.
+
+Pause on `/admin/bots` stops both runs. The same paused flag is read by the nightly route and by the every-minute route.
 
 ## 1. Ideal-customer profile first
 
@@ -54,7 +58,7 @@ Geography becomes a soft weight inside the score (a travel-likelihood factor), n
 
 ## 3. Right people
 
-Same card requirements as the scout:
+Same card requirements as the nightly run:
 
 - named contact (two real name tokens, never "HR" or "People team")
 - title as printed on the page
@@ -72,8 +76,8 @@ A separate fit score, out of 100, beside the existing one. Draft weights for the
 | Part | Points | Reads |
 |---|---|---|
 | Profile match | 50 | how many profile signals are shown, each with a source URL |
-| Access | 25 | same rules as the scout: named person, published email, source |
-| Timing | 15 | dated public signals, same as the scout |
+| Access | 25 | same rules as the nightly run: named person, published email, source |
+| Timing | 15 | dated public signals, same as the nightly run |
 | Travel likelihood | 10 | Canada and US higher, Europe lower, never zero |
 
 The 25 access points no longer decide whether a company is kept, only how ready it is to contact. A no-email company can still rank high on fit, timing and travel.
@@ -86,21 +90,21 @@ Alongside outbound fit, flag when a company looks like a partner, not only a buy
 
 ## 6. Same pipeline, sharper upstream
 
-Hunter cards go into the same lead book as the scout's (`leads-book.ts`), with `source: "hunter"`. From there everything is shared: enrichment, scoring display, the rewrite layer, customization from `27`, the humanizer, A/B testing, Approve, and send. No second pipeline.
+Both runs file into the same lead book (`leads-book.ts`). The always-on hunt writes `source: "hunter"`. The nightly sweep keeps the stored value `source: "scout"` so the desk can tell the runs apart. The desk shows that value as Hunter nightly. From there everything is shared: enrichment, scoring display, the rewrite layer, customization from `27`, the humanizer, A/B testing, Approve, and send. No second pipeline.
 
-De-duplication: a company already on the book by domain is updated, not filed twice. A company the scout already holds keeps its card, and the Hunter adds signals to it.
+De-duplication: a company already on the book by domain is updated, not filed twice. A company the nightly run already holds keeps its card, and the always-on run adds signals to it.
 
 ## 7. Dashboard and bot section
 
 ### How results surface
 
-- `/admin/leads` gets a source filter (Scout, Hunter, Hand) and a column for the Hunter fit score and the partnership flag.
+- `/admin/leads` filters by All, Hunter nightly, Hunter, and Hand, and shows the Hunter fit score and the partnership flag. Hand stays its own filter. Stored source values are not rewritten.
 - New Hunter cards land as research cards. Nothing moves to a sendable state without a named person, a published email, and Approve.
 - A short daily count of new Hunter cards can join the Morning Brief once it is live.
 
 ### The bot section today
 
-`/admin/bots` lists seven bots in `src/data/bots.ts`. Today they are a roster and a draft desk. Only the scout runs on its own:
+`/admin/bots` lists Hunter, then seven draft-desk bots in `src/data/bots.ts`. Hunter is the one that runs on its own, on the two schedules above. The other seven are a roster and a draft desk:
 
 - **Concierge.** Qualifies a new enquiry: audience, package, dates, headcount. No invented price.
 - **Corporate AE.** Named team enquiries: one-pager, three dates, a call.
@@ -110,11 +114,11 @@ De-duplication: a company already on the book by domain is updated, not filed tw
 - **Friday Digest.** Planned Friday commercial snapshot for Norah.
 - **Scribe.** Proposes a patch to these files after a partner meeting. A person merges.
 
-In the code, the first four write drafts from fixed templates in `bot-copy.ts` when a person clicks, and Send writes the thread and opens a mail draft, because Gmail is not connected. Morning Brief, Friday Digest, and Scribe have no scheduled job behind them. The page state is saved in the browser. The Scout tab shows six seeded example sectors, not the live nightly scout, which lives on `/admin/leads`.
+In the code, the first four write drafts from fixed templates in `bot-copy.ts` when a person clicks, and Send writes the thread and opens a mail draft, because Gmail is not connected. Morning Brief, Friday Digest, and Scribe have no scheduled job behind them. The page state for those seven is saved in the browser. Hunter's pause, last run, and daily counts are in Upstash. The live company list is `/admin/leads`. There is no separate tab for the nightly run.
 
-### Adding the Hunter
+### Hunter on the roster
 
-Add a "Lead Hunter" entry to the roster: job, trigger (always on), owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no paid data). Show its last run, cards filed today, and a pause switch.
+Hunter's roster entry shows the job (both runs), the trigger, owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no paid data, pause stops both runs). It shows the last always-on run, cards filed today, model calls today, and the pause switch.
 
 ## 8. Always on
 
@@ -124,7 +128,7 @@ The run method is a build decision for later: a frequent Vercel cron, or a durab
 
 ## 9. Enrichment, phase two
 
-Per Chris, 18th November. Finding and filing stays phase one. Enrichment is phase two, and it belongs to the Hunter. Scout cards are enriched by the Hunter too.
+Per Chris, 18th November. Finding and filing stays phase one. Enrichment is phase two, and it belongs to the Hunter. Cards from the nightly run are enriched by the same Hunter.
 
 ### What it must do
 
@@ -223,9 +227,9 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - Every filled field on a Hunter card shows the URL of the page it came from.
 - A company in Europe or the United States is filed and scored, not dropped.
 - No call is made to Apollo, Clay, or any paid data vendor.
-- The scout's nightly run and score are unchanged.
+- Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
 - A partnership flag carries a reason and a source URL, and creates no contact.
-- Pausing the Hunter on `/admin/bots` stops new batches.
+- Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
 - No card reaches Coco until its enrichment state is Enriched or No-signal, and every enriched fact shows its source URL.
 
 ## Open questions for partners
@@ -235,7 +239,7 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - The monthly spend cap for an always-on run.
 - How a team flying in is hosted: travel, transfers, and Haven or other lodging. Not in this folder, so the Hunter cannot promise any of it.
 - Who reviews partnership flags, and how often.
-- Whether the scout's 80 to 800 headcount band stays for the local list.
+- Whether the nightly run's 80 to 800 headcount band stays for the local list.
 - Whether paid data is ever on the table. Today the answer is no.
 
 ## Changelog
@@ -245,14 +249,15 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - 18th November 2026. Enrichment added as phase two of the Hunter's job (section 9), per Chris. Enrichment output is the input for Coco, the writer. Coco and Nova are not built.
 - 18th November 2026. Strategy section added (section 10), per Chris: all industries, existing budgets first, visible spend signals, daily ranking within the 48-call cap, and a monthly review against sent, replied, and booked, with revisions approved by Chris.
 - 18th November 2026. Monthly strategy revisions made self-executing, per Chris. Rex keeps oversight and flags anything that needs human attention. All other rules unchanged.
+- 18th November 2026. Scout folded into Hunter per Chris. Hunter owns the nightly local sweep and the always-on hunt. Scout is not a separate bot.
 
 ## Build notes
 
 Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, travel weights, and partnership terms can change without editing the prompt.
-- `src/lib/leads-hunter.ts` searches with xAI, the same model the scout uses. It verifies a name, title, and email with the scout's `contactIfPresent` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`, a separate fit score, and a partnership flag. A known domain is updated. The scout's nightly run and `lead-score.ts` are unchanged.
-- The cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 model calls in an Edmonton day. It ships running. Pause and resume on `/admin/bots` write the paused flag in Upstash. `/admin/leads` can filter by All, Scout, Hunter, or Hand, and shows the Hunter score and the partnership flag.
+- `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`, a separate fit score, and a partnership flag. A known domain is updated. The nightly sweep and `lead-score.ts` are unchanged.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 model calls in an Edmonton day. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. `/admin/leads` filters by All, Hunter nightly, Hunter, or Hand, and shows the Hunter score and the partnership flag. The stored source value for a nightly card stays `scout`.
 
 Left:
 

@@ -423,7 +423,7 @@ export const useDesk = create<DeskState>()(
               bot: "corporate",
               dir: "note",
               at: stamp(),
-              subject: "Scout filed",
+              subject: "Hunter nightly filed",
               body: `Research card filed from ${t.city}. No named contact. Concierge must not send.`,
             },
             ...s.threads,

@@ -511,8 +511,8 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
 }
 
 /**
- * Same book as the scout. A known domain is updated. A new domain is a research card.
- * Existing scout fields (why, buyer, batch, source) stay as they were.
+ * Same book as the nightly run. A known domain is updated. A new domain is a research card.
+ * Existing nightly fields (why, buyer, batch, source) stay as they were.
  */
 export function fileHunterCards(
   companies: Company[],

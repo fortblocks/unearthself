@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { PARTNERS, type Lead, type LeadKind, type LeadStatus, type Partner } from "@/data/desk";
+import { leadSourceLabel, PARTNERS, type Lead, type LeadKind, type LeadStatus, type Partner } from "@/data/desk";
 import { cad } from "@/lib/format";
 import { openPipeline, partnerFirst, partnerName, useDesk, weightedPipeline } from "@/lib/desk-store";
 
@@ -145,7 +145,7 @@ function LeadCard({
           <span className="tabular-nums font-semibold">{cad(lead.value)}</span>
           <span className="text-muted">
             {" "}
-            · {Math.round(lead.weight * 100)}% · {partnerFirst(lead.owner)} · {lead.source}
+            · {Math.round(lead.weight * 100)}% · {partnerFirst(lead.owner)} · {leadSourceLabel(lead.source)}
             {lead.nudges ? ` · ${lead.nudges}/3` : ""}
             {lead.stopped ? " · stopped" : ""}
           </span>

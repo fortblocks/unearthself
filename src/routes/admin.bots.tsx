@@ -7,6 +7,7 @@ import { Stat } from "@/components/desk/Stat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BOTS, type BotId } from "@/data/bots";
+import { leadSourceLabel } from "@/data/desk";
 import { HUNTER_ROSTER } from "@/data/hunter-profile";
 import { partnerFirst, useDesk } from "@/lib/desk-store";
 import { botForLead } from "@/lib/bot-copy";
@@ -49,16 +50,14 @@ function BotsPage() {
   const search = Route.useSearch();
   const leads = useDesk((s) => s.leads);
   const threads = useDesk((s) => s.threads);
-  const scout = useDesk((s) => s.scout);
   const paused = useDesk((s) => s.paused);
   const toggleBot = useDesk((s) => s.toggleBot);
   const draftMail = useDesk((s) => s.draftMail);
   const sendMail = useDesk((s) => s.sendMail);
   const logReply = useDesk((s) => s.logReply);
   const stopLead = useDesk((s) => s.stopLead);
-  const skipScout = useDesk((s) => s.skipScout);
   const [leadId, setLeadId] = useState(search.lead || leads[0]?.id || "");
-  const [tab, setTab] = useState<"queue" | "roster" | "scout">("queue");
+  const [tab, setTab] = useState<"queue" | "roster">("queue");
 
   const lead = leads.find((l) => l.id === leadId) ?? leads[0];
   const mail = useMemo(
@@ -69,8 +68,6 @@ function BotsPage() {
   const dueFollow = leads.filter(
     (l) => !l.stopped && l.status !== "lost" && l.status !== "won" && l.nudges > 0 && l.nudges < 3,
   ).length;
-  const watch = scout.filter((t) => t.status === "watch");
-
   async function toggleHunter() {
     if (hunter.storage !== "redis") {
       toast("Redis is not connected. Pause cannot be saved.");
@@ -105,7 +102,7 @@ function BotsPage() {
       <section className="grid gap-6 sm:grid-cols-3">
         <Stat label="Drafts waiting" value={String(queued)} hint="Human still sends" />
         <Stat label="Follow-up live" value={String(dueFollow)} hint="Nudge 1 or 2" />
-        <Stat label="Scout watch" value={String(watch.length)} hint="Not a named person" />
+        <Stat label="Hunter" value={hunter.paused ? "Paused" : "Running"} hint="Nightly and always on" />
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -114,9 +111,6 @@ function BotsPage() {
         </Chip>
         <Chip active={tab === "roster"} onClick={() => setTab("roster")}>
           Roster
-        </Chip>
-        <Chip active={tab === "scout"} onClick={() => setTab("scout")}>
-          Scout
         </Chip>
       </div>
 
@@ -131,6 +125,9 @@ function BotsPage() {
               <p className="mt-2 text-sm text-pretty">{HUNTER_ROSTER.job}</p>
               <p className="mt-2 text-sm text-pretty">
                 Also in Chris&apos;s Grok Bot dashboard as Hunter. Same job, same lead book. It finds and files. It never sends.
+              </p>
+              <p className="mt-2 text-sm text-pretty">
+                Pause stops the nightly local sweep and the always-on hunt.
               </p>
               <p className="mt-2 text-sm text-muted">
                 {HUNTER_ROSTER.trigger} · {partnerFirst(HUNTER_ROSTER.owner)}
@@ -185,48 +182,6 @@ function BotsPage() {
         </ul>
       ) : null}
 
-      {tab === "scout" ? (
-        <Section kicker="Research list moved">
-          <p className="mb-4 max-w-prose text-sm text-pretty text-muted">
-            The long company list is{" "}
-            <Link to="/admin/leads" className="font-semibold text-ember hover:underline">
-              /admin/leads
-            </Link>
-            . Pipeline stays live files. Scout JSON ingest lives on that page. These six sector
-            cards are leftovers — skip them. Do not dump unnamed research onto the pipeline.
-          </p>
-          <ul className="grid gap-3">
-            {scout.map((t) => (
-              <li key={t.id} className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[1fr_auto] md:items-start">
-                <div>
-                  <Badge tone={t.status === "filed" ? "won" : t.status === "skip" ? "lost" : "hold"}>
-                    {t.status}
-                  </Badge>
-                  <h2 className="mt-2 font-display text-3xl font-black uppercase leading-none">{t.org}</h2>
-                  <p className="mt-2 text-sm text-muted">
-                    {t.city} · {t.sector}
-                  </p>
-                  <p className="mt-2 max-w-prose text-sm text-pretty">{t.why}</p>
-                </div>
-                {t.status === "watch" ? (
-                  <div className="flex gap-2">
-                    <Link
-                      to="/admin/leads"
-                      className="inline-flex min-h-11 items-center justify-center rounded-xs bg-ember px-4 text-sm font-semibold text-white hover:bg-ember/90"
-                    >
-                      Open list
-                    </Link>
-                    <Button type="button" variant="outline" onClick={() => skipScout(t.id)}>
-                      Skip
-                    </Button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
       {tab === "queue" && lead ? (
         <div className="grid gap-8 lg:grid-cols-[16rem_1fr]">
           <Section kicker="Open files">
@@ -246,7 +201,7 @@ function BotsPage() {
                     >
                       <span className="font-semibold">{l.org}</span>
                       <span className="text-xs tabular-nums">
-                        {l.id} · {l.nudges}/3 · {l.source}
+                        {l.id} · {l.nudges}/3 · {leadSourceLabel(l.source)}
                       </span>
                     </button>
                   </li>

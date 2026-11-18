@@ -44,7 +44,7 @@ Pricing is still an open decision (`17` + `14`). Until locked, the site collects
 - Access gate: no named person + published email + source URL = draft allowed, send blocked. Do not invent emails. Do not buy Apollo.
 - Grok Bot: qualify, answer FAQs, propose three dates, book a call
 - One-pager PDF for corporate
-- Seed list of ~30 Calgary / Edmonton / Red Deer target accounts on `/admin/leads`. Scout JSON ingest on that page. Pipeline stays live files only.
+- Seed list of ~30 Calgary / Edmonton / Red Deer target accounts on `/admin/leads`. Hunter files the nightly local sweep and the always-on hunt onto that page. Pipeline stays live files only.
 
 **Days 15–45**
 

@@ -2,6 +2,11 @@ export type Partner = "christopher" | "tess" | "lisa" | "norah";
 export type LeadStatus = "new" | "hold" | "proposal" | "won" | "lost";
 export type LeadKind = "bootcamp" | "haven" | "basecamp";
 export type LeadSource = "web" | "scout" | "direct" | "referral" | "form";
+
+/** Desk label. The stored value "scout" is Hunter's nightly run. */
+export function leadSourceLabel(source: LeadSource): string {
+  return source === "scout" ? "hunter nightly" : source;
+}
 export type MoneyKind = "deposit" | "invoice" | "refund";
 export type MoneyStatus = "due" | "sent" | "paid" | "overdue";
 export type RiskKind = "waiver" | "weather" | "staffing";

@@ -21,7 +21,7 @@ const OWNER = {
   christopher: "Christopher",
 } as const;
 
-/** Sample classification until the outbound CRM sends direction itself. Scout is outbound. The rest came in. */
+/** Sample classification until the outbound CRM sends direction itself. The stored nightly source is outbound. The rest came in. */
 export function leadDirection(source: LeadSource): LeadDirection {
   return source === "scout" ? "outbound" : "inbound";
 }

@@ -46,7 +46,7 @@ export const BOTS: Bot[] = [
     id: "concierge",
     name: "Concierge",
     job: "Qualify a new enquiry. Audience, package, dates, headcount. No price invented.",
-    trigger: "New web form or filed scout",
+    trigger: "New web form or a filed lead",
     owner: "christopher",
     escalate: "Safety, accessibility, distress, or money over CAD 5,000",
     limits: ["Never invent a rate", "Offer a human on the first reply", "Do not promise a canyon day"],

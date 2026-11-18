@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { readHunterDesk } from "@/lib/leads-hunter";
 import { runNightlyScout } from "@/lib/leads-scout";
 
 /**
- * Vercel cron hits this with Authorization: Bearer $CRON_SECRET.
- * The schedule in vercel.json only runs after this branch is merged to main.
+ * Hunter's nightly local sweep. Vercel cron hits this with Authorization: Bearer $CRON_SECRET.
+ * The schedule lives in vite.config.ts, not vercel.json. The path is unchanged.
  */
 export const Route = createFileRoute("/api/cron/leads-scout")({
   server: {
@@ -14,6 +15,8 @@ export const Route = createFileRoute("/api/cron/leads-scout")({
         if (!secret || auth !== `Bearer ${secret}`) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const hunter = await readHunterDesk();
+        if (hunter.paused) return Response.json({ ok: true, skipped: "paused" });
         const result = await runNightlyScout();
         return Response.json(result, { status: result.ok ? 200 : 500 });
       },

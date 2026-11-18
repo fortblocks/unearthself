@@ -47,6 +47,13 @@ const SEND_ERR: Record<string, string> = {
 
 const CITIES: Array<LeadCity | "all"> = ["all", "Calgary", "Edmonton", "Red Deer", "Alberta", "Elsewhere"];
 const ORIGINS = ["all", "scout", "hunter", "hand"] as const;
+
+function originLabel(origin: (typeof ORIGINS)[number]) {
+  if (origin === "all") return "All";
+  if (origin === "scout") return "Hunter nightly";
+  if (origin === "hunter") return "Hunter";
+  return "Hand";
+}
 const BANDS: Array<ScoreBand | "all"> = ["all", "pursue", "sequence", "watch", "hold"];
 const INDUSTRIES: Array<Industry | "all"> = [
   "all",
@@ -281,7 +288,7 @@ function LeadsPage() {
             >
               {ORIGINS.map((item) => (
                 <option key={item} value={item}>
-                  {item === "all" ? "All" : item === "scout" ? "Scout" : item === "hunter" ? "Hunter" : "Hand"}
+                  {originLabel(item)}
                 </option>
               ))}
             </select>
@@ -394,7 +401,7 @@ function CompanyList({
               <span className="min-w-0 flex-1 font-semibold">
                 {company.org}
                 <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
-                  {cardSource(company)}
+                  {originLabel(cardSource(company))}
                 </span>
               </span>
               <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>

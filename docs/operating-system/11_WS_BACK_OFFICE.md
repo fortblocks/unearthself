@@ -28,8 +28,8 @@ Looking-as is a view label, not a login. Switch partner and **Today** rewrites t
 |---|---|---|---|
 | `/admin` | **Today** — briefing, keys, diary, next programme, open risk | Lisa / FOH | Partner briefing + Apex run-of-show |
 | `/admin/pipeline` | **Pipeline** — live files only: named enquiry, owner, next action, value | Christopher + Tess | File an enquiry, change status, filter mine/kind |
-| `/admin/leads` | **Leads** — long company list, scored. Not the pipeline | Christopher | Rank, draft, Access, scout ingest, promote |
-| `/admin/bots` | **Bots** — Grok roster, threads, send queue | Christopher | Draft / send / log reply. Scout JSON is on Leads |
+| `/admin/leads` | **Leads** — long company list, scored. Not the pipeline | Christopher | Rank, draft, Access, Hunter nightly and hunt, promote |
+| `/admin/bots` | **Bots** — Grok roster, threads, send queue | Christopher | Draft / send / log reply. Hunter's runs are on Leads |
 | `/admin/socials` | **Socials** — ideas, queue, logged performance | Christopher | File copy, mark posted, log numbers |
 | `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta overflow | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
 | `/admin/money` | **Money** — deposits due, invoices sent, refunds | Norah | Mark paid, file a line |

@@ -16,8 +16,9 @@ export default defineConfig(({ command, isPreview }) => ({
             vercel: {
               config: {
                 crons: [
+                  // Hunter nightly local sweep. Path kept so this cron is not registered twice.
                   { path: "/api/cron/leads-scout", schedule: "0 11 * * *" },
-                  // Pro allows once a minute. The hunter stops itself after its daily call cap.
+                  // Hunter always-on hunt. Pro allows once a minute. It stops after its daily call cap.
                   { path: "/api/cron/leads-hunter", schedule: "* * * * *" },
                 ],
               },
