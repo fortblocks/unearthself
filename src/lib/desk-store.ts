@@ -42,6 +42,7 @@ import { SEED_POSTS, type PostStatus, type SocialChannel, type SocialPost } from
 import { draftFor } from "@/lib/bot-copy";
 import { draftForCompany, draftProblems, refreshUnsentDrafts } from "@/lib/lead-copy";
 import {
+  asLeadCompany,
   hasAccess,
   isSendable,
   mergeScoutRows,
@@ -709,7 +710,7 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 10,
+      version: 11,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
         const priorCompanies = p.companies ?? [];
@@ -722,9 +723,11 @@ export const useDesk = create<DeskState>()(
             .map((company) => company.id),
         );
         const companies = keptCompanies.map((company) =>
-          company.filedLeadId && isDemoLead({ id: company.filedLeadId })
-            ? { ...company, filedLeadId: "" }
-            : company,
+          asLeadCompany(
+            company.filedLeadId && isDemoLead({ id: company.filedLeadId })
+              ? { ...company, filedLeadId: "" }
+              : company,
+          ),
         );
         const threads = (p.threads ?? seed.threads).filter(
           (thread) => !isDemoLead({ id: thread.leadId }) && !droppedCompanyIds.has(thread.companyId ?? ""),

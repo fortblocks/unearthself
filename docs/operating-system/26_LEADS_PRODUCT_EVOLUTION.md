@@ -23,7 +23,7 @@ This file is the next sales spec. `07` remains the workstream. Do not treat this
 
 ## What already exists
 
-`/admin/leads` is the research list, not the pipeline. Score is 100: Fit 60, Access 25, Timing 15. Bands are the ones in `07`: 90 and above pursue, 70 to 89 sequence if sendable, 50 to 69 watch, under 50 do not email.
+`/admin/leads` is the research list, not the pipeline. The companies table shows Company, Place, Size, and Score. Score is 100: Fit 60, Access 25, Timing 15. There is no second Hunter score and no Partner column. Bands are the ones in `07`: 90 and above pursue, 70 to 89 sequence if sendable, 50 to 69 watch, under 50 do not email.
 
 Fit today is geo plus size plus industry. Access is 12 for a named person (two real name tokens, not "hr", "people", or "team"), 10 for an email that is valid and has an http(s) source, and 3 for an http(s) company source. Timing is computed from dated signals with source URLs and a last-touch adjustment. It is not typed in.
 
@@ -444,4 +444,5 @@ Do not quietly change the weights. A wider map needs a partner decision: which c
 ## Changelog
 
 - 18 November 2026. Spec opened from the live leads desk. Humanizer marked as the most important element. 90 minutes from Calgary, and a boardroom or resort claim, left as pending partner confirmation.
+- 18 November 2026. The companies table is Company, Place, Size, and Score. A separate Hunter score and a Partner value are not stored on a lead. Chris asked for this.
 - 18 November 2026. Added section 5, per-email customization from the `27` template, and section 6, A/B testing with a default threshold of 20 sends per version, pending Chris setting the real number.

@@ -33,7 +33,6 @@ const company: Company = {
   draftBody: "",
   lastTouch: "",
   scoutBatch: "seed",
-  hunterScore: 40,
 };
 
 const PLAIN_OPENER = `Hi there,
@@ -124,7 +123,7 @@ test("refresh keeps sent and stopped cards, and rewrites only unsent drafts", ()
   assert.equal(peyto?.draftSubject, DRAFT_SUBJECT);
   assert.match(peyto?.draftBody ?? "", /^Hi there,/);
   assert.equal(peyto?.why, "Keep the research note.");
-  assert.equal(peyto?.hunterScore, 40);
+  assert.equal(peyto?.timingScore, 11);
   assert.equal(peyto?.status, "watch");
   assert.equal(nuvista?.draftBody, "Old body that was already sent.");
   assert.equal(nuvista?.why, "Keep this why.");

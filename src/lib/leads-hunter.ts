@@ -17,6 +17,7 @@ import {
 } from "./hunter-cap.ts";
 import { getRedisClient, loadBook, saveBook } from "./leads-book.ts";
 import {
+  asLeadCompany,
   coerceIndustry,
   coerceSize,
   edmontonToday,
@@ -505,7 +506,7 @@ function mergeHits(current: ProfileHit[] | undefined, incoming: ProfileHit[]) {
 }
 
 function blankCompany(card: HunterCard, id: string, today: string): Company {
-  return {
+  return asLeadCompany({
     id,
     org: card.org,
     domain: card.domain,
@@ -531,11 +532,8 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     scoutBatch: "",
     source: "hunter",
     hunterRegion: card.hunterRegion,
-    hunterScore: card.hunterScore,
-    hunterBreak: card.hunterBreak,
     profileHits: card.profileHits,
-    partnerFlag: card.partnerFlag,
-  };
+  });
 }
 
 /**
@@ -563,35 +561,14 @@ export function fileHunterCards(
     if (!existing) continue;
     const signals = mergeSignals(existing.signals, card.signals);
     const profileHits = mergeHits(existing.profileHits, card.profileHits);
-    const partnerFlag =
-      card.partnerFlag.flagged ? card.partnerFlag : (existing.partnerFlag ?? card.partnerFlag);
-    const scored = scoreHunter({
-      hitIds: profileHits.map((hit) => hit.id),
-      buyerName: existing.buyerName,
-      email: existing.email,
-      emailSource: existing.emailSource,
-      sourceUrl: existing.sourceUrl || card.sourceUrl,
-      signals,
-      lastTouch: existing.lastTouch,
-      today: opts.today,
-      regionId: existing.city === "Elsewhere" ? card.hunterRegion : "canada",
-    });
     next[index] = assignEnrichment(
-      {
+      asLeadCompany({
         ...existing,
         signals,
         profileHits,
-        partnerFlag,
         hunterRegion: existing.hunterRegion || card.hunterRegion,
-        hunterScore: scored.total,
-        hunterBreak: {
-          profile: scored.profile,
-          access: scored.access,
-          timing: scored.timing,
-          travel: scored.travel,
-        },
         place: existing.place || card.place,
-      },
+      }),
       opts.today,
     );
     updated += 1;

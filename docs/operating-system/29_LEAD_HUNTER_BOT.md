@@ -73,7 +73,17 @@ A missing public email never stops a company being filed. If no email is publish
 
 ## 4. Score against the ideal profile
 
-A separate fit score, out of 100, beside the existing one. Draft weights for the partners to set:
+The Leads page shows one score. It is the score in `lead-score.ts`, out of 100.
+
+| Part | Points | Reads |
+|---|---|---|
+| Fit | 60 | city, size, and industry |
+| Access | 25 | named person, published email, and a source URL |
+| Timing | 15 | dated public signals, and last touch |
+
+The companies table is Company, Place, Size, and Score. There is no second Hunter score on the card.
+
+Hunter still uses the weights below while it searches and checks a candidate. Those weights are not stored on the lead and are not a column. The morning list ranks by the single score above. Contact-ready still depends on a name, a title, an email, and an Enriched or No-signal mark.
 
 | Part | Points | Reads |
 |---|---|---|
@@ -82,13 +92,13 @@ A separate fit score, out of 100, beside the existing one. Draft weights for the
 | Timing | 15 | dated public signals, same as the nightly run |
 | Travel likelihood | 10 | Canada and US higher, Europe lower, never zero |
 
-The 25 access points no longer decide whether a company is kept, only how ready it is to contact. A no-email company can still rank high on fit, timing and travel.
+The 25 access points do not decide whether a company is kept. They measure how ready it is to contact. A company with no email can still be filed.
 
-The existing scorer in `lead-score.ts` is not changed. Hunter cards carry their own score and a label saying which score they use.
+The scorer in `lead-score.ts` is unchanged.
 
 ## 5. Partnership and collaboration flag
 
-Alongside outbound fit, flag when a company looks like a partner, not only a buyer: an outdoor or adventure brand, a sustainability-led company, a gear or apparel maker, a travel or retreat operator in another region, a media or events brand. The flag is a note with its source URL and a short reason. A partnership is never contacted from the Hunter. It goes to the partners as a suggestion.
+Per Chris, 18 November 2026. A partnership note describes a company that already has clients in place, so it is not a lead-gen metric. The Leads page does not store or show a Partner value. Hunter does not write a partnership flag onto the lead. A company that matches the profile is filed as a lead, in the same list as every other card.
 
 ## 6. Same pipeline, sharper upstream
 
@@ -100,7 +110,7 @@ De-duplication: a company already on the book by domain is updated, not filed tw
 
 ### How results surface
 
-- `/admin/leads` filters by All, Hunter nightly, Hunter, and Hand, and shows the Hunter fit score and the partnership flag. Hand stays its own filter. Stored source values are not rewritten.
+- `/admin/leads` shows Company, Place, Size, and Score. It filters by All, Hunter nightly, Hunter, and Hand. That filter is where the card came from, and Hand stays its own filter. Stored source values are not rewritten. The page does not show a Hunter score or a Partner column.
 - New Hunter cards land as research cards. Nothing moves to a sendable state without a named person, a published email, and Approve.
 - A short daily count of new Hunter cards can join the Morning Brief once it is live.
 
@@ -162,7 +172,7 @@ The enrichment output is the input Coco uses. Coco, the writer, drafts from the 
 - Enrichment never contacts anyone and never sends.
 - Licensed databases are allowed for names, titles, and emails, with the database logged on the card and stale or unverified rows flagged. No other paid data source without approval.
 - Never invent a name, title, email, or company fact. Never guess, infer, or build an address from a pattern.
-- A partnership flag found during enrichment goes to the partners as a suggestion, as in section 5.
+- Enrichment does not write a partnership flag onto the lead. See section 5.
 
 ## 10. Strategy
 
@@ -206,7 +216,7 @@ Every signal carries its source URL. A signal not on a cited page is not used.
 Each day, the highest-converting cards surface first, until 48 contact-ready cards are filed. Model calls are spent against a separate budget, currently 48, and are not themselves the cap:
 
 1. Spend the day's model calls where they are most likely to pay off. Enrich the strongest filed cards before searching for new ones, until today's top cards are ready for Coco.
-2. Rank ready cards by the section 4 fit score, then by visible existing spend, then by timing. A dated signal from the last ninety days ranks above an older one.
+2. Rank ready cards by the single lead score, then by visible existing spend. A dated signal from the last ninety days ranks above an older one.
 3. Put cards with a named person and a published email above cards that still need a contact. A no-email card stays on the list and keeps its fit rank.
 4. Rotate across industries and regions so one sector cannot fill the day.
 5. Show Chris a short ranked list each day, best first. Nothing is contacted from the list.
@@ -234,7 +244,7 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - A company in Europe or the United States is filed and scored, not dropped.
 - Stale or unverified database rows are flagged on the card, not used silently.
 - Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
-- A partnership flag carries a reason and a source URL, and creates no contact.
+- The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead does not store a separate Hunter score or a Partner value.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
 - Both runs stop for the Edmonton day once 48 contact-ready cards are filed. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
 - If the model-call budget runs out first, Hunter stops and records the date, cards filed, and calls used for Rex. The budget defaults to 48. The setting is `HUNTER_DAILY_CALL_BUDGET`. Raising it is spend and needs Chris's approval.
@@ -246,7 +256,6 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - Is Europe worth an email now, before a first season has run?
 - The monthly spend cap for an always-on run.
 - How a team flying in is hosted: travel, transfers, and Haven or other lodging. Not in this folder, so the Hunter cannot promise any of it.
-- Who reviews partnership flags, and how often.
 - Whether the nightly run's 80 to 800 headcount band stays for the local list.
 - Which licensed database to subscribe to, and at what cost. Chris approved the use on 18th November; the subscription itself is still spend that needs approval.
 
@@ -260,14 +269,15 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - 18th November 2026. Scout folded into Hunter per Chris. Hunter owns the nightly local sweep and the always-on hunt. Scout is not a separate bot.
 - 18th November 2026. Licensed databases (Apollo, ZoomInfo, and similar) allowed for names, titles, and emails, per Chris, with the source logged on the card and stale rows flagged. No guessed or pattern-built addresses. Chris accepts the costs, staleness risk, and CASL obligations; Rex keeps oversight. Finding the right person and verified contact details is now part of enrichment, and every card needs a name, title, and email before the approval queue.
 - 18th November 2026. The daily cap is 48 contact-ready cards filed per Edmonton day, per Chris, counted across both runs. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal. The model-call budget is a separate setting, currently 48, and raising it is spend that needs Chris's approval. If that budget runs out first, Hunter records a capacity problem for Rex. Monthly review counts cards filed against the 48 target, beside sent, replied, and booked. A revision still cannot change the card target or the budget.
+- 18 November 2026. The Leads table shows Company, Place, Size, and Score, per Chris. A separate Hunter score and a Partner value are not stored on a lead and are not shown. Score is the single lead score: Fit, Access, and Timing. The source filter stays.
 
 ## Build notes
 
 Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, travel weights, and partnership terms can change without editing the prompt.
-- `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`, a separate fit score, and a partnership flag. A known domain is updated. The nightly sweep and `lead-score.ts` are unchanged.
-- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 contact-ready cards in an Edmonton day, or sooner when the model-call budget runs out. That budget defaults to 48 and is `HUNTER_DAILY_CALL_BUDGET`. A budget stop is stored as a capacity problem for Rex and shown on the Hunter card. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. Both runs also stop when the card target or the call budget is spent. `/admin/leads` filters by All, Hunter nightly, Hunter, or Hand, and shows the Hunter score and the partnership flag. The stored source value for a nightly card stays `scout`.
+- `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`. A known domain is updated. The nightly sweep and `lead-score.ts` are unchanged. The lead stores no separate Hunter score and no Partner value.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 contact-ready cards in an Edmonton day, or sooner when the model-call budget runs out. That budget defaults to 48 and is `HUNTER_DAILY_CALL_BUDGET`. A budget stop is stored as a capacity problem for Rex and shown on the Hunter card. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. Both runs also stop when the card target or the call budget is spent. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`.
 
 Left:
 
@@ -275,4 +285,4 @@ Left:
 - There is no monthly spend cap. The daily model-call budget defaults to 48 and is the spend control until Chris raises it. The 48 card target is separate.
 - The Morning Brief does not yet count new Hunter cards.
 - Enrichment, the rewrite layer, and the humanizer from `26` are not built. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves.
-- Europe mail, lodging for a team that flies in, and who reviews partnership flags are still open in this spec.
+- Europe mail, and lodging for a team that flies in, are still open in this spec.

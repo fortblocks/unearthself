@@ -185,3 +185,27 @@ test("readLocalCompanies reads the desk persist blob and ignores junk", () => {
   assert.equal(readLocalCompanies("not json").length, 0);
   assert.equal(readLocalCompanies(null).length, 0);
 });
+
+test("a saved lead drops a separate Hunter score and a Partner flag", () => {
+  const book = parseBook({
+    companies: [
+      {
+        id: "C-003",
+        org: "Three",
+        domain: "three.example",
+        source: "hunter",
+        hunterScore: 80,
+        hunterBreak: { profile: 40, access: 20, timing: 10, travel: 10 },
+        partnerFlag: { flagged: true, reason: "Outdoor brand", sourceUrl: "https://three.example" },
+        profileHits: [{ id: "distributed", label: "Distributed", sourceUrl: "https://three.example" }],
+      },
+    ],
+  });
+  const company = book.companies[0];
+  assert.ok(company);
+  assert.equal(company.source, "hunter");
+  assert.equal(company.profileHits?.[0]?.id, "distributed");
+  assert.equal("hunterScore" in company, false);
+  assert.equal("hunterBreak" in company, false);
+  assert.equal("partnerFlag" in company, false);
+});

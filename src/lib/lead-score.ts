@@ -71,10 +71,7 @@ export type Company = {
   place?: string;
   /** Search region used when the Hunter filed or updated the card. */
   hunterRegion?: string;
-  hunterScore?: number;
-  hunterBreak?: { profile: number; access: number; timing: number; travel: number };
   profileHits?: { id: string; label: string; sourceUrl: string }[];
-  partnerFlag?: { flagged: boolean; reason: string; sourceUrl: string };
   /** Set when a Hunter run evaluates the card. Absent on older cards. */
   enrichment?: EnrichmentState;
   /** Edmonton date the card was marked Enriched or No-signal. */
@@ -98,6 +95,19 @@ export type ScoutIngest = {
   signals?: unknown;
   whySources?: unknown;
 };
+
+/** Drop a stored Hunter score or Partner flag so the leads table cannot grow those columns back. */
+export function asLeadCompany(company: Company): Company {
+  const next = { ...company } as Company & {
+    hunterScore?: unknown;
+    hunterBreak?: unknown;
+    partnerFlag?: unknown;
+  };
+  delete next.hunterScore;
+  delete next.hunterBreak;
+  delete next.partnerFlag;
+  return next;
+}
 
 export type ScoreBreak = {
   fit: number;

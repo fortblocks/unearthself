@@ -28,7 +28,7 @@ Looking-as is a view label, not a login. Switch partner and **Today** rewrites t
 |---|---|---|---|
 | `/admin` | **Today** — briefing, keys, diary, next programme, open risk | Lisa / FOH | Partner briefing + Apex run-of-show |
 | `/admin/pipeline` | **Pipeline** — live files only: named enquiry, owner, next action, value | Christopher + Tess | File an enquiry, change status, filter mine/kind |
-| `/admin/leads` | **Leads** — long company list, scored. Not the pipeline | Christopher | Rank, draft, Access, Hunter nightly and hunt, promote |
+| `/admin/leads` | **Leads.** Company, Place, Size, Score. Not the pipeline | Christopher | Rank, draft, Access, Hunter nightly and hunt, promote |
 | `/admin/bots` | **Bots** — Grok roster, threads, send queue | Christopher | Draft / send / log reply. Hunter's runs are on Leads |
 | `/admin/socials` | **Socials** — ideas, queue, logged performance | Christopher | File copy, mark posted, log numbers |
 | `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta overflow | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
@@ -67,6 +67,7 @@ Keep it to one page. The roadmap workbook holds the longer view.
 
 ## Changelog
 
+- 18 November 2026. The leads table is Company, Place, Size, and Score. No Hunter column and no Partner column.
 - 2026-09-17 — `/admin/leads` next to Pipeline. Research list, not live files. Friday pack: list size / sendable / in sequence / stopped. Promote on first approved send, `/spring` domain match, or hand file. D04 not closed.
 - 2026-09-09 — `/admin` gated with email/password. Shared staff account for team walkthroughs. Live on unearthself.xyz/admin.
 - 2026-09-09 — `/admin` house book shipped: Today, Pipeline, Inventory, Money, Risk, Friday. Looking-as rewrites Today.

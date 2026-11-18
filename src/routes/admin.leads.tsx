@@ -370,10 +370,8 @@ function CompanyList({
         <span className="size-2.5 shrink-0" />
         <span className="min-w-0 flex-1">Company</span>
         <span className="w-28 shrink-0">Place</span>
-        <span className="hidden w-24 shrink-0 lg:block">Size</span>
+        <span className="w-24 shrink-0">Size</span>
         <span className="w-14 shrink-0 text-right">Score</span>
-        <span className="w-16 shrink-0 text-right">Hunter</span>
-        <span className="w-16 shrink-0 text-right">Partner</span>
       </li>
       {rows.map(({ company, score }) => {
         const open = openId === company.id;
@@ -401,16 +399,10 @@ function CompanyList({
                 </span>
               </span>
               <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>
-              <span className="hidden w-24 shrink-0 text-sm text-shale lg:block">
+              <span className="hidden w-24 shrink-0 text-sm text-shale sm:block">
                 {company.sizeBand === "unknown" ? "not stated" : company.sizeBand}
               </span>
               <span className="w-14 shrink-0 text-right text-sm tabular-nums">{score.total}</span>
-              <span className="w-16 shrink-0 text-right text-sm tabular-nums">
-                {typeof company.hunterScore === "number" ? company.hunterScore : ""}
-              </span>
-              <span className="w-16 shrink-0 text-right text-sm">
-                {company.partnerFlag?.flagged ? "Yes" : typeof company.hunterScore === "number" ? "No" : ""}
-              </span>
             </button>
             {open ? (
               <CompanyPanel
@@ -555,41 +547,6 @@ function CompanyPanel({
             : `Last touch ${company.lastTouch}. ${since} day${since === 1 ? "" : "s"} ago.`}
         </p>
       </div>
-
-      {company.source === "hunter" || typeof company.hunterScore === "number" ? (
-        <div>
-          <p className="text-xs tracking-widest text-sandstone uppercase">Hunter fit</p>
-          <p className="mt-2 text-sm text-coal">
-            Hunter fit {company.hunterScore ?? 0} / 100. Profile {company.hunterBreak?.profile ?? 0} / 50. Access{" "}
-            {company.hunterBreak?.access ?? 0} / 25. Timing {company.hunterBreak?.timing ?? 0} / 15. Travel{" "}
-            {company.hunterBreak?.travel ?? 0} / 10.
-          </p>
-          {company.profileHits && company.profileHits.length > 0 ? (
-            <ul className="mt-3 space-y-1">
-              {company.profileHits.map((hit) => (
-                <li key={`${hit.id}-${hit.sourceUrl}`}>
-                  <a className="text-sm font-semibold text-ember hover:underline" href={hit.sourceUrl}>
-                    {hit.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-shale">No verified profile signal on this card.</p>
-          )}
-          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Partnership flag</p>
-          {company.partnerFlag?.flagged && company.partnerFlag.sourceUrl ? (
-            <p className="mt-2 text-sm text-coal">
-              {company.partnerFlag.reason}{" "}
-              <a className="font-semibold text-ember hover:underline" href={company.partnerFlag.sourceUrl}>
-                Source
-              </a>
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-shale">No partnership flag.</p>
-          )}
-        </div>
-      ) : null}
 
       <form
         className="grid gap-3 md:grid-cols-2"
