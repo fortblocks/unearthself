@@ -21,7 +21,7 @@ You lead [people and culture at Company], so I imagine you've planned more offsi
 
 At Unearth Self, a team of six to twenty-four heads out into the Alberta badlands for a multi-day expedition. The days are spent out on rugged ground in the land of the dinosaurs, working out the route together. The evenings end at Basecamp, our place in town for heat and cold.
 
-It's rugged country, some of the most beautiful in Canada, and the dinosaurs got there first. Spring 2027 is our first season.
+It's wild country, some of the most beautiful in Canada, and the dinosaurs got there first. Spring 2027 is our first season.
 
 All of it sits about ninety minutes from Calgary. Would a short call in January suit you?
 
