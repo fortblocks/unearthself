@@ -93,7 +93,7 @@ function FridayPage() {
 
       <Section kicker="Retreat files still open">
         {bootcamp.length === 0 ? (
-          <p className="text-muted">None. Unusual.</p>
+          <p className="text-muted">No retreat files.</p>
         ) : (
           <ul className="divide-y divide-line border-y border-line">
             {bootcamp.map((l) => (

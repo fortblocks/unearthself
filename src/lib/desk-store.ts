@@ -10,6 +10,8 @@ import {
 } from "@/data/bots";
 import { SEED_COMPANIES } from "@/data/leads";
 import {
+  isDemoLead,
+  isTestCompany,
   PARTNERS,
   SEED_CANALTA,
   SEED_LEADS,
@@ -707,24 +709,40 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 6,
+      version: 7,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
-        const companies = p.companies?.length ? p.companies : seed.companies;
-        const threads = p.threads ?? seed.threads;
+        const keptCompanies = (p.companies?.length ? p.companies : seed.companies).filter(
+          (company) => !isTestCompany(company.org, company.domain),
+        );
+        const droppedCompanyIds = new Set(
+          (p.companies ?? [])
+            .filter((company) => isTestCompany(company.org, company.domain))
+            .map((company) => company.id),
+        );
+        const companies = keptCompanies.map((company) =>
+          company.filedLeadId && isDemoLead({ id: company.filedLeadId })
+            ? { ...company, filedLeadId: "" }
+            : company,
+        );
+        const threads = (p.threads ?? seed.threads).filter(
+          (thread) => !isDemoLead({ id: thread.leadId }) && !droppedCompanyIds.has(thread.companyId ?? ""),
+        );
         const refreshed = refreshUnsentDrafts(companies, threads);
         return {
           ...seed,
           ...p,
-          leads: (p.leads ?? seed.leads).map((l) => ({
-            ...l,
-            email: l.email ?? "",
-            source: l.source ?? "direct",
-            nudges: l.nudges ?? 0,
-            lastTouch: l.lastTouch ?? "",
-            stopped: l.stopped ?? false,
-            companyId: l.companyId,
-          })),
+          leads: (p.leads ?? seed.leads)
+            .filter((lead) => !isDemoLead(lead))
+            .map((l) => ({
+              ...l,
+              email: l.email ?? "",
+              source: l.source ?? "direct",
+              nudges: l.nudges ?? 0,
+              lastTouch: l.lastTouch ?? "",
+              stopped: l.stopped ?? false,
+              companyId: l.companyId,
+            })),
           threads: refreshed.threads,
           scout: p.scout ?? seed.scout,
           companies: refreshed.companies,

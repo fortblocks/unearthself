@@ -44,10 +44,7 @@ test("leads split inbound and outbound by source, partners by first name", () =>
   assert.equal(leadDirection("scout"), "outbound");
   assert.equal(leadDirection("web"), "inbound");
   assert.equal(leadDirection("direct"), "inbound");
-  const leads = sampleLeads();
-  assert.ok(leads.some((lead) => lead.direction === "outbound" && lead.org === "Northwind Logistics"));
-  assert.ok(leads.some((lead) => lead.direction === "inbound"));
-  assert.ok(leads.every((lead) => ["Lisa", "Tess", "Norah", "Christopher"].includes(lead.owner)));
+  assert.deepEqual(sampleLeads(), []);
 });
 
 test("shift names use partner first names", () => {
@@ -65,6 +62,7 @@ test("sample stats count the sample book", async () => {
     assert.equal(stats.mode, "sample");
     assert.match(stats.data.inHouse, /\/ 4$/);
     assert.equal(stats.data.treatments, "3");
+    assert.equal(stats.data.pipeline, "0");
   }
   const live = await fetchStats("live");
   assert.equal(live.ok, false);

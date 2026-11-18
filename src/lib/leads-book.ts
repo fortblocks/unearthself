@@ -5,6 +5,7 @@
  * Secrets stay in the environment. Nothing here is a credential.
  */
 
+import { isTestCompany } from "../data/desk.ts";
 import { SEED_COMPANIES } from "../data/leads.ts";
 import { edmontonToday, timingFromSignals, type Company } from "./lead-score.ts";
 
@@ -139,10 +140,14 @@ export async function saveBook(book: LeadsBook): Promise<void> {
   const redis = await getRedisClient();
   if (!redis) throw new Error("Redis is not configured");
   const today = edmontonToday();
+  const companies = book.companies.filter((company) => !isTestCompany(company.org, company.domain));
+  const kept = new Set(companies.map((company) => company.id));
   const next: LeadsBook = {
-    companies: book.companies.map((company) => withTimingCache(company, today)),
+    companies: companies.map((company) => withTimingCache(company, today)),
     morningCount: clampMorningCount(book.morningCount),
-    morning: book.morning,
+    morning: book.morning
+      ? { ...book.morning, ids: book.morning.ids.filter((id) => kept.has(id)) }
+      : null,
     draftRevision: book.draftRevision === DRAFT_REVISION ? DRAFT_REVISION : 0,
   };
   await redis.set(LEADS_KEY, next);

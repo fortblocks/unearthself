@@ -105,127 +105,32 @@ export type CanaltaHold = {
   forLead: string;
 };
 
-export type RosBlock = { time: string; item: string; owner: string };
-export type RosDay = { date: string; label: string; blocks: RosBlock[] };
-
 export const TODAY = "2026-09-09";
 
-export const SEED_LEADS: Lead[] = [
-  {
-    id: "L-041",
-    kind: "bootcamp",
-    org: "Apex Energy",
-    contact: "Priya Shah · People",
-    email: "priya.shah@apexenergy.example",
-    owner: "christopher",
-    headcount: 18,
-    value: 54000,
-    weight: 0.6,
-    status: "proposal",
-    next: "Send one-pager Friday",
-    dates: "12–14 Nov",
-    note: "18 pax. Haven takes the lead rooms; Canalta 20-room hold. 30% deposit to lock. Do not sell outdoor until D13 is signed.",
-    source: "direct",
-    nudges: 1,
-    lastTouch: "2026-09-08",
-    stopped: false,
-  },
-  {
-    id: "L-038",
-    kind: "bootcamp",
-    org: "Drumheller Health",
-    contact: "Mara Quinn · Nursing",
-    email: "mara.quinn@dhhealth.example",
-    owner: "tess",
-    headcount: 8,
-    value: 16800,
-    weight: 0.4,
-    status: "hold",
-    next: "Confirm facilitator",
-    dates: "late Oct",
-    note: "Nursing team. Indoor / land-walk only until insurance closes. Tess holds the facilitator question.",
-    source: "referral",
-    nudges: 0,
-    lastTouch: "2026-09-05",
-    stopped: false,
-  },
-  {
-    id: "L-044",
-    kind: "haven",
-    org: "Water Mark weekend",
-    contact: "James Holt",
-    email: "james.holt@example.com",
-    owner: "lisa",
-    headcount: 2,
-    value: 590,
-    weight: 0.8,
-    status: "new",
-    next: "Confirm 19–21 Sep",
-    dates: "19–21 Sep",
-    note: "Asked for Hidden Hollow. Direct. No deposit yet.",
-    source: "web",
-    nudges: 0,
-    lastTouch: "2026-09-09",
-    stopped: false,
-  },
-  {
-    id: "L-040",
-    kind: "basecamp",
-    org: "Local circuit pack",
-    contact: "Elena Voss",
-    email: "elena.voss@example.com",
-    owner: "norah",
-    headcount: 1,
-    value: 320,
-    weight: 0.9,
-    status: "won",
-    next: "Book Fire & Ice Thu",
-    dates: "11 Sep",
-    note: "Won. Invoice sent. Unearthed Bodyworks today, circuit Thursday.",
-    source: "direct",
-    nudges: 0,
-    lastTouch: "2026-09-09",
-    stopped: true,
-  },
-  {
-    id: "L-036",
-    kind: "bootcamp",
-    org: "Calgary stagette",
-    contact: "Sophie Grant",
-    email: "sophie.grant@example.com",
-    owner: "tess",
-    headcount: 12,
-    value: 21600,
-    weight: 0.25,
-    status: "new",
-    next: "Call back this week",
-    dates: "spring 2027",
-    note: "Friends group. Not a humiliation brief. Spring 2027 — do not let it eat a facilitator day this year.",
-    source: "web",
-    nudges: 0,
-    lastTouch: "2026-09-07",
-    stopped: false,
-  },
-  {
-    id: "L-029",
-    kind: "bootcamp",
-    org: "Northwind Logistics",
-    contact: "Dan Reid · HR",
-    email: "dan.reid@northwind.example",
-    owner: "christopher",
-    headcount: 22,
-    value: 66000,
-    weight: 0.15,
-    status: "lost",
-    next: "Closed — Banff lodge",
-    dates: "Oct",
-    note: "Lost to a Banff lodge. Keep on the book so we do not chase the corpse.",
-    source: "scout",
-    nudges: 3,
-    lastTouch: "2026-08-22",
-    stopped: true,
-  },
-];
+/** Demo files removed from the desk. Also dropped from already-saved browser state. */
+export const DEMO_LEAD_IDS = new Set([
+  "L-029",
+  "L-036",
+  "L-038",
+  "L-040",
+  "L-041",
+  "L-044",
+  "L-045",
+  "L-046",
+]);
+
+export function isTestCompany(org: string, domain = "") {
+  const name = org.trim().toLowerCase();
+  const host = domain.trim().toLowerCase().replace(/\./g, "");
+  return name === "ridiculous corporation limited" || host.includes("ridiculouscorporation");
+}
+
+export function isDemoLead(lead: { id?: string; org?: string }) {
+  if (lead.id && DEMO_LEAD_IDS.has(lead.id)) return true;
+  return isTestCompany(lead.org ?? "");
+}
+
+export const SEED_LEADS: Lead[] = [];
 
 export const SEED_STAYS: Stay[] = [
   {
@@ -401,40 +306,6 @@ export const SEED_CANALTA: CanaltaHold[] = [
     forLead: "Apex Energy",
   },
 ];
-
-export const APEX_ROS: { leadId: string; title: string; days: RosDay[] } = {
-  leadId: "L-041",
-  title: "Apex Energy · 12–14 Nov",
-  days: [
-    {
-      date: "2026-11-12",
-      label: "Thu 12",
-      blocks: [
-        { time: "16:00", item: "Arrive · Elowen lead + Canalta overflow", owner: "Lisa" },
-        { time: "18:00", item: "Land walk — town rim. No canyon.", owner: "Tess" },
-        { time: "19:30", item: "Fire & Ice, split groups of 9", owner: "Norah" },
-      ],
-    },
-    {
-      date: "2026-11-13",
-      label: "Fri 13",
-      blocks: [
-        { time: "07:30", item: "Quiet breakfast. No agenda talk.", owner: "Lisa" },
-        { time: "09:00", item: "Adaptability morning (Dunning)", owner: "Tess" },
-        { time: "14:00", item: "Connection work indoors", owner: "Tess" },
-        { time: "17:00", item: "Contrast circuit + dinner", owner: "Norah" },
-      ],
-    },
-    {
-      date: "2026-11-14",
-      label: "Sat 14",
-      blocks: [
-        { time: "08:00", item: "Play close + debrief", owner: "Tess" },
-        { time: "11:30", item: "Keys back. Canalta release.", owner: "Lisa" },
-      ],
-    },
-  ],
-};
 
 export const SUPPLIERS: { name: string; job: string; status: string; owner: string }[] = [
   { name: "Canalta Drumheller", job: "Overflow rooms", status: "Hold live for Apex. Terms unsigned (D12).", owner: "Lisa" },

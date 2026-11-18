@@ -158,41 +158,4 @@ export const SEED_SCOUT: ScoutTarget[] = [
   },
 ];
 
-export const SEED_THREADS: ThreadMsg[] = [
-  {
-    id: "M-001",
-    leadId: "L-041",
-    bot: "corporate",
-    dir: "out",
-    at: "2026-09-08T15:10:00",
-    subject: "Apex Energy — dates and a hold",
-    body: "Priya — thank you for the time last week. 12–14 Nov still sits on our book for 18 people. Haven takes the lead rooms; overflow is a Canalta hold, not a promise until Lisa has terms. I will not put a number on this mail. If the window is still live, Tess and I can do a twenty-minute call Friday.",
-  },
-  {
-    id: "M-002",
-    leadId: "L-041",
-    bot: "followup",
-    dir: "draft",
-    at: "2026-09-10T11:00:00",
-    subject: "Apex Energy — still holding 12–14 Nov",
-    body: "Priya — a short note. The November window is still open. If it has moved, say so and we will release the hold. If it has not, I can send the one-pager and three other dates.",
-  },
-  {
-    id: "M-003",
-    leadId: "L-044",
-    bot: "stay",
-    dir: "draft",
-    at: "2026-09-10T09:30:00",
-    subject: "Hidden Hollow 19–21 Sep",
-    body: "James — Hidden Hollow is free those nights. Two nights, direct. Reply and Lisa will hold it. Deposit follows.",
-  },
-  {
-    id: "M-004",
-    leadId: "L-029",
-    bot: "followup",
-    dir: "note",
-    at: "2026-08-22T10:00:00",
-    subject: "Stopped",
-    body: "Three nudges, then Banff. Sequence stopped. Do not reopen from a bot.",
-  },
-];
+export const SEED_THREADS: ThreadMsg[] = [];

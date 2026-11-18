@@ -57,7 +57,7 @@ function BotsPage() {
   const logReply = useDesk((s) => s.logReply);
   const stopLead = useDesk((s) => s.stopLead);
   const [leadId, setLeadId] = useState(search.lead || leads[0]?.id || "");
-  const [tab, setTab] = useState<"queue" | "roster">("queue");
+  const [tab, setTab] = useState<"queue" | "roster">("roster");
 
   const lead = leads.find((l) => l.id === leadId) ?? leads[0];
   const mail = useMemo(
@@ -97,6 +97,10 @@ function BotsPage() {
         Grok Bots do first touch and follow-up. Humans close. Gmail is not connected yet, so send
         writes the thread and opens a mail draft. Three unanswered nudges, then stop. Do not invent
         a price.
+      </p>
+      <p className="max-w-prose text-pretty text-muted">
+        Want a new bot? Raise it with Rex, the Chief of Staff. New bots are added through the
+        operating-system docs, with human approval before anything goes live.
       </p>
 
       <section className="grid gap-6 sm:grid-cols-3">
@@ -181,6 +185,8 @@ function BotsPage() {
           ))}
         </ul>
       ) : null}
+
+      {tab === "queue" && !lead ? <p className="text-muted">No open files.</p> : null}
 
       {tab === "queue" && lead ? (
         <div className="grid gap-8 lg:grid-cols-[16rem_1fr]">

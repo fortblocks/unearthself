@@ -93,7 +93,9 @@ function PipelinePage() {
         />
       ) : null}
 
-      {filtered.length === 0 ? (
+      {leads.length === 0 ? (
+        <p className="text-muted">No files yet.</p>
+      ) : filtered.length === 0 ? (
         <p className="text-muted">Nothing matches. Clear a filter.</p>
       ) : (
         <ul className="grid gap-3">

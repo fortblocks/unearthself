@@ -81,14 +81,11 @@ export function buildBrief(args: {
     };
   }
 
-  const apex = leads.find((l) => l.id === "L-041" && l.status !== "lost" && l.status !== "won");
   return {
     kicker: `Your desk · ${first}`,
-    line: apex
-      ? `Apex one-pager is Friday. ${openPipeline(leads).length} files open, ${cad(weightedPipeline(leads))} weighted.`
-      : `${openPipeline(leads).length} files open, ${cad(weightedPipeline(leads))} weighted.`,
+    line: `${openPipeline(leads).length} files open, ${cad(weightedPipeline(leads))} weighted.`,
     pulls: [
-      { label: apex ? "Apex Energy" : "Pipeline", to: "/admin/pipeline" },
+      { label: "Pipeline", to: "/admin/pipeline" },
       { label: "Leads", to: "/admin/leads" },
       { label: "Bots", to: "/admin/bots" },
       ...mineRisk.slice(0, 1).map((r) => ({ label: r.title, to: "/admin/risk" as const })),

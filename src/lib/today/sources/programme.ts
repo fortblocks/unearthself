@@ -1,4 +1,3 @@
-import { APEX_ROS } from "../../../data/desk.ts";
 import { sectionSources } from "../registry.ts";
 import { sectionError } from "../load.ts";
 import type { SectionResult, SourceMode } from "../types.ts";
@@ -9,13 +8,9 @@ export type Programme = { title: string; note: string; days: ProgrammeDay[] };
 
 export function sampleProgramme(): Programme {
   return {
-    title: APEX_ROS.title,
-    note: "Draft. Outdoor stays off the card until D13.",
-    days: APEX_ROS.days.map((day) => ({
-      date: day.date,
-      label: day.label,
-      blocks: day.blocks.map((block) => ({ time: block.time, item: block.item, owner: block.owner })),
-    })),
+    title: "No programme filed",
+    note: "A programme appears here when a live file has one.",
+    days: [],
   };
 }
 
