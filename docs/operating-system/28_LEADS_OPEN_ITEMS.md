@@ -1,6 +1,6 @@
 # 28 Leads: open items and discrepancies
 
-As of 18th November 2026. A running log of discrepancies and items to align before the lead system sends real email. Add items as and when they become pertinent, and mark them closed with the date and who closed them. Companion to `26_LEADS_PRODUCT_EVOLUTION.md` and `27_LEADS_SAMPLE_EMAILS.md`.
+As of 17th November 2026. A running log of discrepancies and items to align before the lead system sends real email. Add items as and when they become pertinent, and mark them closed with the date and who closed them. Companion to `26_LEADS_PRODUCT_EVOLUTION.md` and `27_LEADS_SAMPLE_EMAILS.md`.
 
 ## Open
 
