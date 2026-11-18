@@ -32,7 +32,7 @@ export const Route = createFileRoute("/spring")({
 });
 
 const facts = [
-  { k: "Group", v: "6–30 people" },
+  { k: "Group", v: "6–24 people" },
   { k: "Length", v: "2–5 days" },
   { k: "From Calgary", v: "90 minutes" },
   { k: "Season", v: "Spring 2027" },
@@ -77,7 +77,7 @@ function SpringPage() {
             A new kind of corporate retreat. The Badlands. Your team among the first.
           </h2>
           <p className="mb-4 text-lg text-pretty text-fossil/80">
-            Canada does not have this yet: an expedition built for six to thirty people, ninety
+            Canada does not have this yet: an expedition built for six to twenty-four people, ninety
             minutes from Calgary, with a house for heat and cold when the day is done. Spring 2027
             is the first season we will run it for teams.
           </p>
@@ -298,7 +298,6 @@ function Enquire() {
                   <option value="6–10">6–10</option>
                   <option value="11–16">11–16</option>
                   <option value="17–24">17–24</option>
-                  <option value="25–30">25–30</option>
                 </NativeSelect>
               </label>
               <label>

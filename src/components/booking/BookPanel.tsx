@@ -18,7 +18,7 @@ const field =
 const label = "mb-1.5 block text-[0.68rem] font-semibold tracking-[0.14em] text-shale uppercase";
 
 const FACES: { id: BookFace; title: string; line: string }[] = [
-  { id: "bootcamp", title: "Bootcamp", line: "Hold a date for a group of 6 to 30." },
+  { id: "bootcamp", title: "Bootcamp", line: "Hold a date for a group of 6 to 24." },
   { id: "basecamp", title: "Basecamp", line: "Book a treatment, or time in the heat and the cold." },
   { id: "haven", title: "Haven", line: "Ask about one of the four suites." },
 ];
@@ -195,7 +195,7 @@ function BootcampFace() {
       <div className="grid grid-cols-2 gap-2">
         <label>
           <span className={label}>Headcount</span>
-          <input required type="number" min={6} max={30} className={field} value={headcount} onChange={(e) => setHeadcount(e.target.value)} />
+          <input required type="number" min={6} max={24} className={field} value={headcount} onChange={(e) => setHeadcount(e.target.value)} />
         </label>
         <label>
           <span className={label}>Preferred dates</span>
@@ -215,7 +215,7 @@ function BootcampFace() {
       <button type="submit" disabled={status === "sending"} className="mt-1 w-full rounded-[2px] bg-ember py-3.5 font-semibold text-white disabled:opacity-60">
         {status === "sending" ? "Sending…" : "Hold a date"}
       </button>
-      <p className="text-xs text-coal/45">6–30 people. Two to five days. Nothing charged until we confirm.</p>
+      <p className="text-xs text-coal/45">6–24 people. Two to five days. Nothing charged until we confirm.</p>
     </form>
   );
 }

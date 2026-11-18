@@ -9,7 +9,7 @@ export const Route = createFileRoute("/for/friends")({
       {
         name: "description",
         content:
-          "Friends who want the outdoors together. A 2 to 5 day expedition for groups of 6 to 30, ninety minutes from Calgary.",
+          "Friends who want the outdoors together. A 2 to 5 day expedition for groups of 6 to 24, ninety minutes from Calgary.",
       },
     ],
   }),
@@ -24,7 +24,7 @@ function FriendsLander() {
       introLabel="For friends"
       introHeading="Days on the land, together."
       intro={[
-        "Badlands Bootcamp works for groups of friends too: six to thirty people who want the outdoors together, for a few days on the land.",
+        "Badlands Bootcamp works for groups of friends too: six to twenty-four people who want the outdoors together, for a few days on the land.",
         "Days are spent on the land, nights at Haven or Canalta, and recovery happens next door at Basecamp. It all sits ninety minutes from Calgary, in a town that is small on land that is not.",
       ]}
       heroImage="/images/hero-badlands-dusk.jpg"
@@ -49,7 +49,7 @@ function FriendsLander() {
       ]}
       quote="The town is small. The land is not."
       quoteLabel="Ninety minutes from Calgary"
-      closingHeading="6 to 30 people. Two to five days."
+      closingHeading="6 to 24 people. Two to five days."
       closingLine="Tell us who is coming and when you can travel."
     />
   );

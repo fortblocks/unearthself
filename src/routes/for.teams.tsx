@@ -9,7 +9,7 @@ export const Route = createFileRoute("/for/teams")({
       {
         name: "description",
         content:
-          "A 2 to 5 day expedition in the Canadian Badlands for groups of 6 to 30. Ninety minutes from Calgary.",
+          "A 2 to 5 day expedition in the Canadian Badlands for groups of 6 to 24. Ninety minutes from Calgary.",
       },
     ],
   }),
@@ -20,11 +20,11 @@ function TeamsLander() {
     <AudiencePage
       word="Teams"
       eyebrow="For the person who sends the invite"
-      lede="Take the team somewhere the job title will not follow: six to thirty people, two to five days, ninety minutes from Calgary."
+      lede="Take the team somewhere the job title will not follow: six to twenty-four people, two to five days, ninety minutes from Calgary."
       introLabel="For corporate teams"
       introHeading="A few days on the land, for the same company."
       intro={[
-        "Badlands Bootcamp for teams is a two-to-five-day expedition for six to thirty people from the same company: founders, senior teams and leadership groups who need more than a change of hotel. It sits close enough that Calgary and Edmonton can leave in the morning and be on the land by lunch.",
+        "Badlands Bootcamp for teams is a two-to-five-day expedition for six to twenty-four people from the same company: founders, senior teams and leadership groups who need more than a change of hotel. It sits close enough that Calgary and Edmonton can leave in the morning and be on the land by lunch.",
         "The days are spent on the land, working through a sequence the group can keep using on Monday, and the recovery afterwards is genuinely quiet. It is not therapy, and it is not a circle that never ends.",
       ]}
       heroImage="/images/exp-hoodoos.jpg"
@@ -48,7 +48,7 @@ function TeamsLander() {
       ]}
       quote="Arrive as a roster. Leave as a crew."
       quoteLabel="A typical three days"
-      closingHeading="6 to 30 people. Two to five days. Drumheller."
+      closingHeading="6 to 24 people. Two to five days. Drumheller."
       closingLine="Tell us who is coming and when you can travel."
     />
   );

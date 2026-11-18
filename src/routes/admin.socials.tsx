@@ -24,7 +24,7 @@ const SUGGESTIONS: { channel: SocialChannel; title: string; body: string }[] = [
   {
     channel: "linkedin",
     title: "Spring first-wave",
-    body: "Spring 2027 is open for first teams. Eight to twenty-four people, two or three days, Drumheller. unearthself.xyz/spring",
+    body: "Spring 2027 is open for first teams. Six to twenty-four people, two or three days, Drumheller. unearthself.xyz/spring",
   },
   {
     channel: "x",

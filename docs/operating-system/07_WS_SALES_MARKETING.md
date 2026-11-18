@@ -31,7 +31,7 @@ A beautiful site with no booking is a brochure. A booking engine with no story w
 - Enquire on Getaway Day, Adaptation Lab, PACE Expedition
 - “Build a programme” form that creates a CRM record, not a dead email
 
-Pricing is still an open decision (`17` + `14`). Until locked, the site collects qualified enquiries with a published *from* price or “teams of 8–24, 2–3 days”. Do not hide that this costs real money.
+Pricing is still an open decision (`17` + `14`). Until locked, the site collects qualified enquiries with a published *from* price or “teams of 6–24, 2–3 days”. Do not hide that this costs real money.
 
 ## 90-day sales motion
 
@@ -91,6 +91,7 @@ Working lines:
 
 ## Changelog
 
+- 18 November 2026. Enquiry group size is 6 to 24. Chris approved this on a call. Day counts are unchanged.
 - 2026-09-17 — `/admin/leads` is the research list. Pipeline is live files only. Score and Access gate as specified. Scout ingest on the page. D04 not closed. No Apollo. No invented emails.
 - 2026-09-08 — Sales workstream opened. Booking before brand theatre.
 - 2026-09-10 — House-book bots + socials. `/spring` files Concierge. Outbound still human-send until Gmail.

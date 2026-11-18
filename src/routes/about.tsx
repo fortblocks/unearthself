@@ -54,7 +54,7 @@ function AboutPage() {
             are at Canalta.
           </p>
           <p className="text-lg text-fossil/80">
-            Badlands Bootcamp is two to five days on the land, for a group of six to thirty. It is built
+            Badlands Bootcamp is two to five days on the land, for a group of six to twenty-four. It is built
             first for teams, and private groups come the same way. A small group of partners runs the place.
           </p>
         </div>

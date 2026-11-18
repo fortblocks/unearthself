@@ -10,14 +10,14 @@ export const Route = createFileRoute("/bootcamp")({
       {
         name: "description",
         content:
-          "A 2 to 5 day expedition in the Canadian Badlands for groups of 6 to 30. Land, PACE, recovery at Basecamp. Drumheller.",
+          "A 2 to 5 day expedition in the Canadian Badlands for groups of 6 to 24. Land, PACE, recovery at Basecamp. Drumheller.",
       },
     ],
   }),
 });
 
 const facts = [
-  { k: "Group", v: "6–30 people" },
+  { k: "Group", v: "6–24 people" },
   { k: "Length", v: "2–5 days" },
   { k: "From Calgary", v: "90 minutes" },
   { k: "Sleep", v: "Haven + Canalta" },
@@ -100,7 +100,7 @@ function BootcampPage() {
           <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">What it is</p>
           <h2 className="font-display mb-6 text-4xl uppercase">A few days on the land, for a group.</h2>
           <p className="mb-4 text-lg text-fossil/80">
-            Badlands Bootcamp is a 2 to 5 day expedition for a group of six to thirty. It is built first
+            Badlands Bootcamp is a 2 to 5 day expedition for a group of six to twenty-four. It is built first
             for teams: Calgary and Edmonton companies, clubs, families, and the people who need to be
             useful to each other when the plan dies.
           </p>
@@ -282,7 +282,7 @@ function BootcampPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[0.7rem] tracking-[0.2em] text-shale uppercase">Start a conversation</p>
-            <h2 className="font-display text-4xl uppercase">6 to 30 people. Two to five days.</h2>
+            <h2 className="font-display text-4xl uppercase">6 to 24 people. Two to five days.</h2>
             <p className="mt-3 max-w-[42ch] text-coal/70">
               Tell us who is coming and when you can travel. Availability and a figure come back by email.
             </p>

@@ -35,7 +35,7 @@ export function draftForCompany(c: Company): { subject: string; body: string } {
   const why = c.why.replace(/\s+/g, " ").trim();
   const body = `${greet} —
 
-Unearth Self is a two or three day expedition for teams of 8–24, ninety minutes from Calgary, at Basecamp in Drumheller. Not a hotel ballroom with a hike attached. Land, sequence, recovery. Spring 2027 is the first window we are holding.
+Unearth Self is a two or three day expedition for teams of 6–24, ninety minutes from Calgary, at Basecamp in Drumheller. Not a hotel ballroom with a hike attached. Land, sequence, recovery. Spring 2027 is the first window we are holding.
 
 I am writing because ${why} Banff is the default offsite from the corridor. We are the other option, and we are taking a handful of first teams.
 

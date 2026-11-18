@@ -14,7 +14,7 @@ export function draftFor(bot: BotId, lead: Lead): { subject: string; body: strin
     return {
       subject: `${lead.org} — Unearth Self, Drumheller`,
       body: named
-        ? `${name} — thanks for writing. We take teams of 8–24 for two or three days at Basecamp in Drumheller. Spring 2027 is the first window we are holding.\n\nI am not going to put a price in this mail. Send headcount and a week that works and Tess and I will come back with three dates and what a hold looks like.\n\nChristopher`
+        ? `${name} — thanks for writing. We take teams of 6–24 for two or three days at Basecamp in Drumheller. Spring 2027 is the first window we are holding.\n\nI am not going to put a price in this mail. Send headcount and a week that works and Tess and I will come back with three dates and what a hold looks like.\n\nChristopher`
         : `${lead.org} — this is a research file, not a conversation. Do not send until a named person exists. File sits on Christopher’s desk.`,
     };
   }

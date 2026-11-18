@@ -24,7 +24,7 @@ export type AudiencePageProps = {
 };
 
 const FACTS = [
-  { k: "Group", v: "6–30 people" },
+  { k: "Group", v: "6–24 people" },
   { k: "Length", v: "2–5 days" },
   { k: "From Calgary", v: "90 minutes" },
   { k: "Sleep", v: "Haven + Canalta" },
