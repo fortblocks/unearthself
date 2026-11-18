@@ -2,11 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "crons": [
-    {
-      "path": "/api/cron/leads-scout",
-      "schedule": "0 11 * * *"
-    }
-  ]
+  "installCommand": "npm install"
 }
