@@ -31,18 +31,29 @@ export function draftProblems(body: string): string[] {
 
 export const DRAFT_SUBJECT = "Two days on the land with your team";
 
+/** A printed job title, not a department label such as "People / HR". */
+const ROLE_WORD =
+  /\b(director|manager|head|lead|vp|svp|evp|chief|officer|partner|coordinator|specialist|advisor|adviser|founder|president)\b/i;
+
+function realJobTitle(title: string) {
+  return ROLE_WORD.test(title);
+}
+
 /**
  * The one letter from docs/operating-system/27_LEADS_SAMPLE_EMAILS.md.
- * Only the greeting and the "You lead ..." line change. Nothing else is added.
+ * The "You lead ..." clause stays only for a named contact with a real job title.
  */
 export function draftForCompany(c: Company): { subject: string; body: string } {
   const name = firstName(c.buyerName);
   const greeting = name ? `Hi ${name},` : "Hi there,";
   const title = (c.buyerTitle ?? "").trim();
-  const role = title ? `${title} at ${c.org}` : `the team side at ${c.org}`;
+  const opener =
+    name && realJobTitle(title)
+      ? `You lead ${title} at ${c.org}, so I imagine you've planned more offsites than you'd care to count. I'd love to show you a new one.`
+      : `I imagine you've planned more offsites than you'd care to count. I'd love to show you a new one.`;
   const body = `${greeting}
 
-You lead ${role}, so I imagine you've planned more offsites than you'd care to count. I'd love to show you a new one.
+${opener}
 
 Unearth Self is Canada's newest and most exciting corporate retreat concept. A team of six to twenty-four heads out into Alberta's badlands for a multi-day expedition. The days are spent out on rugged ground in the land of the dinosaurs, working out the route together. The evenings end at Basecamp, our refurbished spa in downtown Drumheller, where an infrared sauna, a salt stone steam room and a cold plunge lead to a slow finish on the treatment table.
 

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   clampMorningCount,
+  DRAFT_REVISION,
   loadBook,
   saveBook,
   upsertCompany,
@@ -52,7 +53,7 @@ export const replaceLeadsCompanies = createServerFn({ method: "POST" })
     const next: LeadsBook = {
       ...loaded.book,
       companies: data.companies,
-      draftRevision: data.draftRevision === 1 ? 1 : loaded.book.draftRevision,
+      draftRevision: data.draftRevision === DRAFT_REVISION ? DRAFT_REVISION : loaded.book.draftRevision,
     };
     await saveBook(next);
     return next;

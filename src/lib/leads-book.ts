@@ -23,11 +23,11 @@ export type LeadsBook = {
   companies: Company[];
   morningCount: number;
   morning: MorningBatch | null;
-  /** 1 after unsent drafts were rewritten to the current letter. */
+  /** 2 after unsent drafts dropped the department-label opener. */
   draftRevision: number;
 };
 
-export const DRAFT_REVISION = 1;
+export const DRAFT_REVISION = 2;
 
 export function clampMorningCount(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);

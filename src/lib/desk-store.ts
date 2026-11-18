@@ -707,7 +707,7 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 5,
+      version: 6,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
         const companies = p.companies?.length ? p.companies : seed.companies;

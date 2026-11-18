@@ -35,7 +35,11 @@ const company: Company = {
   hunterScore: 40,
 };
 
-test("Peyto draft is the combined letter, with the real title and no invented signal", () => {
+const PLAIN_OPENER = `Hi there,
+
+I imagine you've planned more offsites than you'd care to count. I'd love to show you a new one.`;
+
+test("Peyto with no named contact uses the plain opener", () => {
   const { subject, body } = draftForCompany(company);
   const n = wordCount(body);
   assert.equal(subject, DRAFT_SUBJECT);
@@ -43,8 +47,9 @@ test("Peyto draft is the combined letter, with the real title and no invented si
   assert.ok(n >= 120 && n <= 180, `got ${n}`);
   assert.deepEqual(draftProblems(body), []);
   assert.equal(draftSellsCanyon(body), false);
-  assert.match(body, /^Hi there,/);
-  assert.match(body, /You lead People \/ HR at Peyto Exploration & Development,/);
+  assert.ok(body.startsWith(PLAIN_OPENER));
+  assert.doesNotMatch(body, /You lead/);
+  assert.doesNotMatch(body, /People \/ HR/);
   assert.match(body, /six to twenty-four/);
   assert.match(body, /Basecamp/);
   assert.match(body, /\nChris$/);
@@ -54,16 +59,29 @@ test("Peyto draft is the combined letter, with the real title and no invented si
   assert.doesNotMatch(body, /two or three day/);
   assert.equal(SEED_COMPANIES.length, 30);
   assert.ok(SEED_COMPANIES.every((card) => card.draftSubject === DRAFT_SUBJECT));
+  const titled = SEED_COMPANIES.filter((card) => card.draftBody.includes("You lead"));
+  assert.deepEqual(
+    titled.map((card) => card.org),
+    ["Scott Builders"],
+  );
 });
 
-test("named buyer greets by first name, and a missing title uses the team-side line", () => {
+test("a real job title keeps the clause, and a department label does not", () => {
   const named = draftForCompany({ ...company, buyerName: "Laura Starchuk", buyerTitle: "Human Resource Manager" });
   assert.match(named.body, /^Hi Laura,/);
-  assert.match(named.body, /You lead Human Resource Manager at Peyto Exploration & Development,/);
+  assert.match(named.body, /You lead Human Resource Manager at Peyto Exploration & Development, so I imagine/);
 
-  const noTitle = draftForCompany({ ...company, buyerTitle: "" });
-  assert.match(noTitle.body, /^Hi there,/);
-  assert.match(noTitle.body, /You lead the team side at Peyto Exploration & Development,/);
+  const department = draftForCompany({ ...company, buyerName: "Laura Starchuk", buyerTitle: "People / HR" });
+  assert.ok(department.body.startsWith(`Hi Laura,\n\nI imagine you've planned more offsites than you'd care to count.`));
+  assert.doesNotMatch(department.body, /You lead/);
+
+  const culture = draftForCompany({ ...company, buyerName: "Laura Starchuk", buyerTitle: "People & Culture" });
+  assert.ok(culture.body.startsWith("Hi Laura,"));
+  assert.doesNotMatch(culture.body, /You lead/);
+
+  const untitled = draftForCompany({ ...company, buyerTitle: "Director of People" });
+  assert.ok(untitled.body.startsWith(PLAIN_OPENER));
+  assert.doesNotMatch(untitled.body, /You lead/);
 });
 
 test("refresh keeps sent and stopped cards, and rewrites only unsent drafts", () => {
@@ -106,6 +124,7 @@ test("refresh keeps sent and stopped cards, and rewrites only unsent drafts", ()
   assert.equal(headwater?.draftBody, "Stopped body.");
   assert.equal(next.threads.find((thread) => thread.id === "M-out")?.body, "Sent body.");
   assert.equal(next.threads.find((thread) => thread.id === "M-draft")?.subject, DRAFT_SUBJECT);
-  assert.match(next.threads.find((thread) => thread.id === "M-draft")?.body ?? "", /People \/ HR at Peyto/);
+  assert.ok((next.threads.find((thread) => thread.id === "M-draft")?.body ?? "").startsWith(PLAIN_OPENER));
+  assert.doesNotMatch(next.threads.find((thread) => thread.id === "M-draft")?.body ?? "", /You lead/);
   assert.equal(next.threads.find((thread) => thread.id === "M-note")?.body, "Leave this note.");
 });
