@@ -367,7 +367,7 @@ Flow: enriched card (section 1), then the `27` template filled from that card's 
 
 ### Open questions
 
-- Which `27` lines fail the section 4 reject list as written today (see section 6 note below and the outstanding list in `27`), and whether the partners update the template or the reject list.
+- `27` as written today trips the section 4 checks: it states six to twenty-four, ninety minutes from Calgary and Spring 2027, and it signs off as Chris. Whether the partners update the template or the reject list.
 
 ## 6. A/B testing
 
