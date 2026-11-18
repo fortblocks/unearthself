@@ -325,6 +325,94 @@ Warrant: the expedition is multi-day in the SoT, so "a week" is fair for the two
 - Tess reviews product language when a letter names PACE, a Rune, or the Echo Mirror (`25`). Most first-touch letters should not need those words. If one does, her pass is required before Approve. Confirm with Tess whether first-touch mail should avoid Rune names entirely.
 - The 90-minute line, the boardroom or resort line, and any "first season" date. Pending partner confirmation. Do not write them into `07` from this spec. A partner has to put them there.
 
+## 5. Per-email customization
+
+### Problem
+
+`27_LEADS_SAMPLE_EMAILS.md` holds one combined sample email that Chris approved as the starting template. Sent as is, it would be the same letter on every card, which is the failure section 2 exists to remove.
+
+### What it must do
+
+Start every draft from the `27` template, then customize it for the one person it is going to:
+
+- greet the recipient by first name, from `buyerName` or `peopleLeadName`
+- name their title and company, from `buyerTitle` or `peopleLeadTitle` and `org`
+- fit the opener to their industry, from the card's first-wave industry
+- use one other enriched field when it has a source URL, such as one dated signal
+
+Keep the template's storytelling prose and its order: who they are, what the days and evenings are like, the land, where it sits, the close. The humanizer (section 4) still runs on every customized letter. It must read as Christopher writing to this one person, humble and confident, in short sentences, never bullet points.
+
+### Data fields and flow
+
+| Field | Meaning |
+|---|---|
+| `templateId` | The `27` template version the draft started from |
+| `customFields` | Card fields the letter used, each with its source URL |
+| `customNotes` | Template slots left as written because the field was empty |
+
+Flow: enriched card (section 1), then the `27` template filled from that card's sourced fields, then the rewrite layer (section 2), then the humanizer (section 4), then Approve, then the person sends from chris@badlandsbootcamp.com.
+
+### Acceptance criteria
+
+- No two drafts for different recipients share the same greeting and opener.
+- Every filled slot shows its field and source URL beside the draft.
+- An empty name, title, or people lead is never guessed. The slot falls back to plain wording, never a department greeting.
+- The template's product facts are not changed by customization. Only the recipient slots change.
+
+### Guardrails
+
+- No field without a source URL goes into a letter.
+- Customization never changes a land, building, programme, pricing, partner, or date fact.
+- Approve and the access gate are unchanged.
+
+### Open questions
+
+- Which `27` lines fail the section 4 reject list as written today (see section 6 note below and the outstanding list in `27`), and whether the partners update the template or the reject list.
+
+## 6. A/B testing
+
+### Problem
+
+Section 3 sets out the experiments module. Chris asked on 18 November for A/B testing to be named as its own working layer on top of the customized `27` letter, with a default threshold so it can run.
+
+### What it must do
+
+- Split approved sends between two versions of the customized letter, one axis at a time (subject, opener, or angle, as section 3 sets).
+- Track open rate and reply rate per version. Reply rate decides. Open rate is shown and marked untrusted.
+- Once each version has the threshold number of sends, mark the better reply rate as the winner.
+- Feed the winner back into the generator as an example for the next drafts.
+- Discard the loser so it is never drafted again.
+
+### Data fields and flow
+
+Uses the section 3 fields (`experimentId`, `axis`, `variants`, `assignments`, `replyAt`, `openAt`, `sampleFloor`, `promotedExample`). Adds:
+
+| Field | Meaning |
+|---|---|
+| `sampleFloorSource` | Who set the threshold and when |
+
+Default `sampleFloor` is 20 sends per version (Chris, 18 November call). It is still pending Chris setting the real number. For this layer it replaces the section 3 working rule that no winner may be named until the partners set a number.
+
+Flow: customized letter (section 5), then two versions on one axis, then humanizer on each, then Approve per recipient, then send, then reply logged on the card, then the compare job at the threshold, then the winner promoted and the loser retired.
+
+### Acceptance criteria
+
+- No winner before 20 sends per version, or the number Chris later sets.
+- A retired version never appears in a new draft.
+- The winner's text shows up as a generator example with the card facts it was allowed to use.
+- Every send in a test still passed the access gate, the humanizer, and Approve.
+
+### Guardrails
+
+- Do not send in bulk to reach the threshold. Each send is still one approved recipient.
+- Versions never differ on a fact, a price, or the offer.
+- Nothing about GeoLab or Geolab Studio.
+
+### Open questions
+
+- The real threshold. Pending Chris.
+- Who logs replies until a mailbox is connected. Section 3 working rule stands: Christopher, on the card.
+
 ## Geography, left open on purpose
 
 Leads are not only Calgary, Edmonton, and Red Deer. The Drumheller product has demand further afield in Canada and the United States. The scout and the Fit geo score still assume a local Alberta list. That should be revisited. It is an open question for the partners, not a change this spec makes.
@@ -356,3 +444,4 @@ Do not quietly change the weights. A wider map needs a partner decision: which c
 ## Changelog
 
 - 18 November 2026. Spec opened from the live leads desk. Humanizer marked as the most important element. 90 minutes from Calgary, and a boardroom or resort claim, left as pending partner confirmation.
+- 18 November 2026. Added section 5, per-email customization from the `27` template, and section 6, A/B testing with a default threshold of 20 sends per version, pending Chris setting the real number.
