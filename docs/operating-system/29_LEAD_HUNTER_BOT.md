@@ -8,6 +8,8 @@
 
 Hunter's sole job is to feed Chris, on an ongoing basis, companies with a high chance of converting to a team of six to twenty-four for the Unearth Self experience in Drumheller. It finds, researches and files. It never sends.
 
+The job has two phases. Phase one is finding and filing. Phase two is enrichment (section 9). A card is not ready for Coco, the writer, until enrichment is done or the card is explicitly marked no-signal.
+
 ## Hard rules
 
 - Human approval before any publish, contact, or spend. The Hunter never emails anyone. Every send still goes through Approve and goes from chris@badlandsbootcamp.com.
@@ -120,6 +122,40 @@ The Hunter runs in short batches, back to back, so it is always working without 
 
 The run method is a build decision for later: a frequent Vercel cron, or a durable workflow or queue. Either way, every model call costs money, so the run rate and a monthly cap need approval before it is switched on.
 
+## 9. Enrichment, phase two
+
+Per Chris, 18th November. Finding and filing stays phase one. Enrichment is phase two, and it belongs to the Hunter. Scout cards are enriched by the Hunter too.
+
+### What it must do
+
+Once a company is filed, the Hunter goes back and gathers the facts that make that company particularly relevant to a team of six to twenty-four in Drumheller:
+
+- **One true thing.** The single citable fact worth mentioning in a first email, such as a public offsite, a new people leader, a growth announcement, a B Corp or sustainability commitment, or an outdoor or adventure link. One fact, or none. Never a guess.
+- **Profile signals.** Which ideal-customer signals from section 1 the company shows.
+- **Likely team.** The team of six to twenty-four inside the company that fits best.
+- **Role to approach.** The person or role who would own the decision, with a name and title only when they are printed on the page.
+
+Every item carries the source URL of the page it came from. Anything not on a cited page stays blank.
+
+### Ready for Coco
+
+A card has one enrichment state:
+
+- **Not enriched.** Filed in phase one only. Not ready for Coco.
+- **Enriched.** At least the one true thing or a profile signal is filled, each with a source URL. Ready for Coco.
+- **No-signal.** The Hunter looked and found nothing citable. It is marked explicitly, with the date it looked. Ready for Coco, which then writes the honest general version of the `27` letter and does not fake a personal line.
+
+### Enrichment feeds Coco
+
+The enrichment output is the input Coco uses. Coco, the writer, drafts from the `27` template plus the card's enriched facts, so a draft cites a real signal rather than generic copy. Coco may only use facts that are on the card with a source URL. Coco and Nova, the sender, are not built yet. Until they are, a person writes the draft from the enriched card, and every send still needs a named person, a published email, and Approve.
+
+### Guardrails
+
+- Enrichment never contacts anyone and never sends.
+- No Apollo, Clay, or paid data vendor.
+- Never invent a name, title, email, or company fact. Never guess or build an address.
+- A partnership flag found during enrichment goes to the partners as a suggestion, as in section 5.
+
 ## Acceptance criteria
 
 - The Hunter never sends mail, and Send for its cards is blocked by the same gate as every other card.
@@ -129,6 +165,7 @@ The run method is a build decision for later: a frequent Vercel cron, or a durab
 - The scout's nightly run and score are unchanged.
 - A partnership flag carries a reason and a source URL, and creates no contact.
 - Pausing the Hunter on `/admin/bots` stops new batches.
+- No card reaches Coco until its enrichment state is Enriched or No-signal, and every enriched fact shows its source URL.
 
 ## Open questions for partners
 
@@ -144,6 +181,7 @@ The run method is a build decision for later: a frequent Vercel cron, or a durab
 
 - 18th November 2026. Spec opened from Chris's call. Not built.
 - 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.
+- 18th November 2026. Enrichment added as phase two of the Hunter's job (section 9), per Chris. Enrichment output is the input for Coco, the writer. Coco and Nova are not built.
 
 ## Build notes
 
