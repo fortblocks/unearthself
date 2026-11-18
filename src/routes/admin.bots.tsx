@@ -32,6 +32,20 @@ const SEND_ERR: Record<string, string> = {
   access: "Send blocked. Named person, published email, and source URL.",
 };
 
+function runLabel(run: "always-on" | "nightly") {
+  return run === "nightly" ? "Nightly" : "Always on";
+}
+
+function outcomeLabel(outcome: string) {
+  if (outcome === "fired") return "Fired";
+  if (outcome === "skipped-paused") return "Skipped, paused";
+  if (outcome === "skipped-target-met") return "Skipped, target met";
+  if (outcome === "capped-budget") return "Capped, model-call budget";
+  if (outcome === "skipped-busy") return "Skipped, already running";
+  if (outcome === "error") return "Error";
+  return outcome;
+}
+
 function formatRun(iso: string) {
   if (!iso) return "No run yet.";
   const date = new Date(iso);
@@ -150,6 +164,32 @@ function BotsPage() {
               <p className="mt-1 text-sm text-muted">
                 Model calls today: {hunter.callsToday} of {hunter.callBudget}.
               </p>
+              <p className="mt-1 text-sm text-muted">
+                Apollo reveals today: {hunter.apolloRevealsToday} of {hunter.apolloCreditCap}. Search is not counted.
+              </p>
+              <div className="mt-4">
+                <p className="text-xs tracking-widest text-sandstone uppercase">Run log</p>
+                <p className="mt-1 text-sm text-muted">Last 20 runs. Read only.</p>
+                {hunter.recentRuns.length === 0 ? (
+                  <p className="mt-2 text-sm text-shale">No runs logged yet.</p>
+                ) : (
+                  <ol className="mt-2 grid gap-2">
+                    {hunter.recentRuns.map((run) => (
+                      <li key={`${run.at}-${run.run}`} className="border border-line p-3 text-sm">
+                        <p className="text-coal">
+                          {formatRun(run.at)} · {runLabel(run.run)} · {outcomeLabel(run.outcome)}
+                        </p>
+                        <p className="mt-1 text-muted">
+                          Model calls {run.modelCalls}. Candidates {run.candidates}. Cards filed {run.cardsFiled}.
+                          Contact-ready {run.contactReady}. Apollo searches {run.apolloSearches}. Apollo reveals{" "}
+                          {run.apolloReveals}.
+                        </p>
+                        {run.error ? <p className="mt-1 text-shale">{run.error}</p> : null}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
               {hunter.capacityActive && hunter.capacity ? (
                 <p className="mt-2 border border-ember bg-paper p-3 text-sm text-coal" role="status">
                   Capacity problem. The model-call budget ran out before 48 contact-ready cards were filed.

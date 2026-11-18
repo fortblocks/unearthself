@@ -15,7 +15,7 @@ The job has two phases. Phase one is finding and filing. Phase two is enrichment
 - Human approval before any publish, contact, or spend. The Hunter never emails anyone. Every send still goes through Approve and goes from chris@badlandsbootcamp.com.
 - Unearth Self is completely separate from GeoLab and Geolab Studio. No shared data, tools, or copy.
 - Never invent a name, title, email, company fact, land, building, programme, pricing, partner, or date fact. A field is kept only when its exact text is on the cited public page or comes from a licensed database row, as below.
-- Licensed, published directories such as Apollo, ZoomInfo, and similar are allowed as sources for names, titles, and email addresses, per Chris, 18th November. Hunter logs on the card which database each name and address came from. The no-guessing rule still applies to anything not from a licensed database or a cited public page: Hunter never builds an address from a pattern or infers one. Unverified or stale database rows are flagged on the card, never silently used. Chris accepts the subscription costs, the staleness risk, and the Canadian anti-spam (CASL) obligations that come with these databases. Rex keeps oversight of this as part of ongoing performance review. Buying or connecting a subscription is still spend and needs approval first.
+- Licensed, published directories are allowed as sources for names, titles, and email addresses, per Chris, 18th November. Apollo is the chosen licensed database. The integration is in progress and gated on `APOLLO_API_KEY`. Hunter logs on the card which database each name and address came from. The no-guessing rule still applies to anything not from Apollo or a cited public page: Hunter never builds an address from a pattern or infers one. Unverified or stale database rows are flagged on the card, never silently used. Chris accepts the subscription costs, the staleness risk, and the Canadian anti-spam (CASL) obligations that come with Apollo. Rex keeps oversight of this as part of ongoing performance review. Buying or connecting any other subscription is still spend and needs approval first.
 - The access gate in `07` stays, and it controls sending, not filing. A card needs a named person, a published email and Approve before it can send, but any well-fitting company gets filed.
 - Partners by first name only. Basecamp is one word. Canadian spelling. No em dashes.
 
@@ -149,9 +149,23 @@ Once a company is filed, the Hunter goes back and gathers the facts that make th
 - **One true thing.** The single citable fact worth mentioning in a first email, such as a public offsite, a new people leader, a growth announcement, a B Corp or sustainability commitment, or an outdoor or adventure link. One fact, or none. Never a guess.
 - **Profile signals.** Which ideal-customer signals from section 1 the company shows.
 - **Likely team.** The team of six to twenty-four inside the company that fits best.
-- **Right person and verified contact.** The person who would own the decision, such as a marketing director, sales director, HR director, or people and culture lead, with their name, title, and email. Each comes from a cited public page or a licensed database such as Apollo or ZoomInfo, with the database logged on the card. Unverified or stale database rows are flagged. Finding the right person and their contact details is part of enrichment, not a separate step.
+- **Right person and verified contact.** The person who would own the decision, such as a marketing director, sales director, HR director, or people and culture lead, with their name, title, and email. Each comes from a cited public page or from Apollo, with the source logged on the card. Unverified or stale Apollo rows are flagged. Finding the right person and their contact details is part of enrichment, not a separate step.
 
-Every item carries the source URL of the page it came from, or the licensed database it came from. Anything from neither stays blank.
+Every item carries the source URL of the page it came from, or Apollo when the contact came from Apollo. Anything from neither stays blank.
+
+### Apollo, the licensed contact
+
+Apollo is the chosen licensed database. The integration is in progress and does nothing until `APOLLO_API_KEY` is set. When the key is missing, Hunter makes no Apollo call and writes `Apollo off: no key` on the run log.
+
+When a filed company has no name, title, or email from a public page, Hunter searches Apollo by the company domain, or by the company name when there is no domain, plus the target titles (marketing director, sales director, HR or people director, people and culture lead, head of people, office or operations manager, executive assistant to the CEO, and similar). Search costs nothing. Hunter then reveals one person. A reveal counts toward `APOLLO_DAILY_CREDIT_CAP`, which defaults to 48. Reveals stop once that ceiling is reached, so a bug cannot keep spending. Phone numbers are never requested. Waterfall enrichment stays off.
+
+An email is used only when Apollo marks it verified. If the status is guessed, extrapolated, unavailable, catch-all, or likely to engage, the email is not put on the card. The card is flagged `Apollo email not verified` and it does not count as contact-ready. Hunter never builds an email from a pattern. A verified Apollo name, title, and email can count as contact-ready. The card is then marked Enriched when a sourced fact is on file, or No-signal when the contact is on file and the look found nothing else citable.
+
+Each Apollo card stores the source (`Apollo` or `Public page`), the Apollo person id, the email status, the date retrieved, and Apollo's last-updated date when Apollo returns one. The card is flagged `Stale` when that date is more than 12 months old, or when the person's listed employer no longer matches the company. The Leads card shows the source and the flags. The table stays Company, Place, Size, and Score.
+
+### Run log
+
+Every always-on run and every 4am nightly run appends one entry to `unearth:hunter:runs:v1`. The list keeps about 90 days. Each entry has the timestamp, which run, the outcome (fired, skipped-paused, skipped-target-met, capped-budget, or error), model calls, candidates returned, cards filed, contact-ready cards, Apollo searches, Apollo reveals, and error text. When a model call fails, the error text includes the xAI HTTP status and message. The Bots page shows the last 20 entries, read only.
 
 The goal is that every card presented to Chris has a name, title, and email on file before it reaches the approval queue. A card without all three stays a research card and does not enter the queue.
 
@@ -257,7 +271,7 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - The monthly spend cap for an always-on run.
 - How a team flying in is hosted: travel, transfers, and Haven or other lodging. Not in this folder, so the Hunter cannot promise any of it.
 - Whether the nightly run's 80 to 800 headcount band stays for the local list.
-- Which licensed database to subscribe to, and at what cost. Chris approved the use on 18th November; the subscription itself is still spend that needs approval.
+- Apollo is the chosen licensed database. The integration is in progress and gated on `APOLLO_API_KEY`. The reveal ceiling defaults to 48 (`APOLLO_DAILY_CREDIT_CAP`). Phone numbers are not requested.
 
 ## Changelog
 
@@ -270,6 +284,7 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - 18th November 2026. Licensed databases (Apollo, ZoomInfo, and similar) allowed for names, titles, and emails, per Chris, with the source logged on the card and stale rows flagged. No guessed or pattern-built addresses. Chris accepts the costs, staleness risk, and CASL obligations; Rex keeps oversight. Finding the right person and verified contact details is now part of enrichment, and every card needs a name, title, and email before the approval queue.
 - 18th November 2026. The daily cap is 48 contact-ready cards filed per Edmonton day, per Chris, counted across both runs. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal. The model-call budget is a separate setting, currently 48, and raising it is spend that needs Chris's approval. If that budget runs out first, Hunter records a capacity problem for Rex. Monthly review counts cards filed against the 48 target, beside sent, replied, and booked. A revision still cannot change the card target or the budget.
 - 18 November 2026. The Leads table shows Company, Place, Size, and Score, per Chris. A separate Hunter score and a Partner value are not stored on a lead and are not shown. Score is the single lead score: Fit, Access, and Timing. The source filter stays.
+- 18 November 2026. Apollo is the chosen licensed database, per Chris. The integration is in progress and gated on `APOLLO_API_KEY`. Only a verified Apollo email can be used. Guessed, extrapolated, unavailable, catch-all, and likely-to-engage emails are flagged `Apollo email not verified` and left out of the contact-ready count. Reveals stop at `APOLLO_DAILY_CREDIT_CAP`, default 48. Cards store the source, Apollo person id, email status, date retrieved, and Apollo's last-updated date. A `Stale` flag shows when that date is more than 12 months old or the employer does not match. Both runs append to the run log, and the Bots page shows the last 20 entries.
 
 ## Build notes
 
@@ -284,5 +299,5 @@ Left:
 - The partners have not ranked the signals. The points in the profile file are the draft weights from this spec.
 - There is no monthly spend cap. The daily model-call budget defaults to 48 and is the spend control until Chris raises it. The 48 card target is separate.
 - The Morning Brief does not yet count new Hunter cards.
-- Enrichment, the rewrite layer, and the humanizer from `26` are not built. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves.
+- Apollo enrichment is wired and stays off until `APOLLO_API_KEY` is set. It reveals one contact for a filed company that has no public name, title, or email, and it will not spend past the daily reveal ceiling. The one true thing, the likely team, the rewrite layer, and the humanizer from `26` are not a separate pass. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves. The run log is `unearth:hunter:runs:v1`, shown on the Hunter card.
 - Europe mail, and lodging for a team that flies in, are still open in this spec.

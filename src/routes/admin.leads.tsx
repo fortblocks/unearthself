@@ -519,16 +519,31 @@ function CompanyPanel({
               {company.buyerTitle ? `, ${company.buyerTitle}` : ""}
             </p>
           ) : (
-            <p className="mt-2 text-sm text-shale">No named contact on a published page.</p>
+            <p className="mt-2 text-sm text-shale">No named contact yet.</p>
           )}
           {company.email ? <p className="mt-1 text-sm text-coal">{company.email}</p> : null}
-          {company.emailSource ? (
+          {company.contactSource === "Apollo" ? (
+            <p className="mt-2 text-sm text-coal">Source: Apollo</p>
+          ) : company.emailSource ? (
             <a className="mt-2 inline-block text-sm font-semibold text-ember hover:underline" href={company.emailSource}>
               Page where this contact was published
             </a>
           ) : (
             <p className="mt-2 text-sm text-shale">No published page for this contact.</p>
           )}
+          {company.contactSource === "Public page" ? <p className="mt-2 text-sm text-coal">Source: Public page</p> : null}
+          {company.contactSource === "Apollo" && company.apolloEmailStatus ? (
+            <p className="mt-1 text-sm text-shale">Email status: {company.apolloEmailStatus}</p>
+          ) : null}
+          {company.contactRetrievedOn ? (
+            <p className="mt-1 text-sm text-shale">Retrieved {company.contactRetrievedOn}</p>
+          ) : null}
+          {company.apolloUpdatedOn ? (
+            <p className="mt-1 text-sm text-shale">Apollo last updated {company.apolloUpdatedOn}</p>
+          ) : null}
+          {company.cardFlags && company.cardFlags.length > 0 ? (
+            <p className="mt-2 text-sm text-coal">Flags: {company.cardFlags.join(", ")}</p>
+          ) : null}
         </div>
       </div>
 

@@ -341,7 +341,8 @@ test("the hunter prompt is driven by the profile and does not name a data vendor
   assert.equal(/apollo|clay|geolab/i.test(prompt), false);
 });
 
-test("the hunter module has no send path and no paid data vendor", () => {
+test("the hunter module has no send path", () => {
   const source = readFileSync(new URL("./leads-hunter.ts", import.meta.url), "utf8");
-  assert.equal(/sendMail|mailto:|resend|apollo|clay/i.test(source), false);
+  assert.equal(/sendMail|mailto:|resend|clay/i.test(source), false);
+  assert.equal(/api_key=|APOLLO_API_KEY\s*[:=]\s*["'][^"']+["']/i.test(source), false);
 });

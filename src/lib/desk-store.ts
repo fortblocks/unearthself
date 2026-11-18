@@ -659,6 +659,7 @@ export const useDesk = create<DeskState>()(
         const email = input.email.trim().toLowerCase();
         const emailSource = input.emailSource.trim();
         if (email && !emailSource) return "unsourced";
+        const keepingApollo = emailSource.toLowerCase() === "apollo";
         set((s) => ({
           companies: s.companies.map((x) =>
             x.id === id
@@ -670,6 +671,14 @@ export const useDesk = create<DeskState>()(
                   emailSource: email && emailSource ? emailSource : "",
                   sourceUrl: input.sourceUrl.trim() || x.sourceUrl,
                   lastTouch: today(),
+                  contactSource: keepingApollo
+                    ? "Apollo"
+                    : email && /^https?:\/\//i.test(emailSource)
+                      ? "Public page"
+                      : undefined,
+                  apolloPersonId: keepingApollo ? x.apolloPersonId : "",
+                  apolloEmailStatus: keepingApollo ? x.apolloEmailStatus : "",
+                  cardFlags: keepingApollo ? x.cardFlags : [],
                 }
               : x,
           ),

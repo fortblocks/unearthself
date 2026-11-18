@@ -42,6 +42,9 @@ export type WhySource = {
 /** Section 9 of the Hunter spec. Only Enriched and No-signal can count as contact-ready. */
 export type EnrichmentState = "not-enriched" | "enriched" | "no-signal";
 
+/** Where the name, title, and email on a card came from. */
+export type ContactSource = "Apollo" | "Public page";
+
 export type Company = {
   id: string;
   org: string;
@@ -76,6 +79,20 @@ export type Company = {
   enrichment?: EnrichmentState;
   /** Edmonton date the card was marked Enriched or No-signal. */
   enrichmentOn?: string;
+  /** Apollo or a public page. Absent until a contact is sourced. */
+  contactSource?: ContactSource;
+  /** Apollo person id. The logged source for a licensed contact. */
+  apolloPersonId?: string;
+  /** Apollo email_status, stored even when the email is not used. */
+  apolloEmailStatus?: string;
+  /** Edmonton date the contact was retrieved. */
+  contactRetrievedOn?: string;
+  /** Apollo's last-updated date, when the response includes one. */
+  apolloUpdatedOn?: string;
+  /** Set after a search, including a search that found nobody, so the same company is not revealed again. */
+  apolloCheckedOn?: string;
+  /** Visible flags such as Stale or Apollo email not verified. */
+  cardFlags?: string[];
 };
 
 export type ScoutIngest = {
@@ -161,6 +178,7 @@ function namedPerson(name: string) {
 function publishedEmail(email: string, emailSource: string) {
   if (!email.trim() || !emailSource.trim()) return false;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase())) return false;
+  if (emailSource.trim().toLowerCase() === "apollo") return true;
   return /^https?:\/\//i.test(emailSource.trim());
 }
 

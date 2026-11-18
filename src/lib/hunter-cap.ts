@@ -107,6 +107,9 @@ export function hasBuyerContact(input: {
   buyerTitle: string;
   email: string;
   emailSource: string;
+  contactSource?: "Apollo" | "Public page";
+  apolloPersonId?: string;
+  apolloEmailStatus?: string;
 }) {
   const name = input.buyerName.trim();
   if (!name || ROLE_NAMES.has(name.toLowerCase())) return false;
@@ -114,14 +117,29 @@ export function hasBuyerContact(input: {
   if (input.buyerTitle.trim().length < 2) return false;
   const email = input.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+  if (input.contactSource === "Apollo") {
+    if (!input.apolloPersonId?.trim()) return false;
+    if (input.apolloEmailStatus?.trim().toLowerCase() !== "verified") return false;
+    return input.emailSource.trim().length > 0;
+  }
   return httpUrl(input.emailSource);
 }
 
 function hasSourcedFact(input: {
+  contactSource?: "Apollo" | "Public page";
+  apolloPersonId?: string;
+  apolloEmailStatus?: string;
   profileHits?: { sourceUrl: string }[];
   signals?: { sourceUrl: string }[];
   whySources?: { url: string }[];
 }) {
+  if (
+    input.contactSource === "Apollo" &&
+    input.apolloPersonId?.trim() &&
+    input.apolloEmailStatus?.trim().toLowerCase() === "verified"
+  ) {
+    return true;
+  }
   if ((input.profileHits ?? []).some((hit) => httpUrl(hit.sourceUrl))) return true;
   if ((input.signals ?? []).some((signal) => httpUrl(signal.sourceUrl))) return true;
   return (input.whySources ?? []).some((source) => httpUrl(source.url));
@@ -145,6 +163,9 @@ export function isContactReady(company: {
   buyerTitle: string;
   email: string;
   emailSource: string;
+  contactSource?: "Apollo" | "Public page";
+  apolloPersonId?: string;
+  apolloEmailStatus?: string;
   enrichment?: EnrichmentState;
   profileHits?: { sourceUrl: string }[];
   signals?: { sourceUrl: string }[];

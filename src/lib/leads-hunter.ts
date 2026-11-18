@@ -1,10 +1,12 @@
 /**
  * Lead Hunter. Finds ideal customers for Unearth Self and files research cards.
- * It never sends mail and never calls a paid data vendor.
- * A name, title, or email is kept only when that exact text is on the fetched page.
+ * It never sends mail.
+ * A public name, title, or email is kept only when that exact text is on the fetched page.
+ * Apollo may add one licensed contact when APOLLO_API_KEY is set. The key is never logged.
  */
 
 import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, PARTNER_KINDS } from "../data/hunter-profile.ts";
+import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
 import {
   applyHunterWork,
   assignEnrichment,
@@ -15,6 +17,7 @@ import {
   hunterStop,
   type CapacityProblem,
 } from "./hunter-cap.ts";
+import { appendHunterRun, hunterRunEntry, readHunterRuns, type HunterRunOutcome } from "./hunter-runs.ts";
 import { getRedisClient, loadBook, saveBook } from "./leads-book.ts";
 import {
   asLeadCompany,
@@ -58,6 +61,10 @@ export type HunterState = {
   capacity: CapacityProblem | null;
   cursor: number;
   lockedUntil: number;
+  /** Edmonton date the Apollo reveal counter belongs to. */
+  apolloOn: string;
+  /** People-match calls sent today. Search does not count. */
+  apolloReveals: number;
 };
 
 export type ProfileHit = { id: string; label: string; sourceUrl: string };
@@ -112,6 +119,8 @@ export function freshHunterState(): HunterState {
     capacity: null,
     cursor: 0,
     lockedUntil: 0,
+    apolloOn: "",
+    apolloReveals: 0,
   };
 }
 
@@ -130,6 +139,8 @@ export function parseHunterState(raw: unknown): HunterState {
     capacity: parseCapacity(row.capacity),
     cursor: numberOrZero(row.cursor),
     lockedUntil: numberOrZero(row.lockedUntil),
+    apolloOn: typeof row.apolloOn === "string" ? row.apolloOn : "",
+    apolloReveals: numberOrZero(row.apolloReveals),
   };
 }
 
@@ -629,6 +640,8 @@ export async function researchHunterSlot(
       ],
       temperature: 0,
       response_format: { type: "json_object" },
+      // Legacy live search. Left unchanged: xAI's current docs say this field fails
+      // and that web search belongs on the Responses API. The run log keeps the HTTP error.
       search_parameters: {
         mode: "on",
         return_citations: true,
@@ -703,6 +716,68 @@ async function saveHunterState(state: HunterState) {
   await redis.set(HUNTER_KEY, state);
 }
 
+function revealsOn(state: HunterState, today: string) {
+  return state.apolloOn === today ? state.apolloReveals : 0;
+}
+
+function runNote(extra = "") {
+  const off = apolloApiKey() ? "" : "Apollo off: no key";
+  return [extra.trim(), off].filter(Boolean).join(" ");
+}
+
+async function rememberRun(input: {
+  run: "always-on" | "nightly";
+  outcome: HunterRunOutcome;
+  modelCalls?: number;
+  candidates?: number;
+  cardsFiled?: number;
+  contactReady?: number;
+  apolloSearches?: number;
+  apolloReveals?: number;
+  error?: string;
+}) {
+  await appendHunterRun(
+    hunterRunEntry({
+      run: input.run,
+      outcome: input.outcome,
+      modelCalls: input.modelCalls ?? 0,
+      candidates: input.candidates ?? 0,
+      cardsFiled: input.cardsFiled ?? 0,
+      contactReady: input.contactReady ?? 0,
+      apolloSearches: input.apolloSearches ?? 0,
+      apolloReveals: input.apolloReveals ?? 0,
+      error: input.error ?? "",
+    }),
+  );
+}
+
+export async function enrichUnderApolloCap(input: {
+  companies: Company[];
+  domains: string[];
+  today: string;
+  limit: number;
+}) {
+  const state = await loadHunterState();
+  const result = await enrichHunterContacts({
+    companies: input.companies,
+    domains: input.domains,
+    today: input.today,
+    revealsUsed: revealsOn(state, input.today),
+    cap: apolloCreditCap(),
+    apiKey: apolloApiKey(),
+    limit: input.limit,
+  });
+  if (result.reveals > 0) {
+    const fresh = await loadHunterState();
+    await saveHunterState({
+      ...fresh,
+      apolloOn: input.today,
+      apolloReveals: revealsOn(fresh, input.today) + result.reveals,
+    });
+  }
+  return result;
+}
+
 function dayStopCopy(stop: "cards" | "budget", state: HunterState, today: string, budget: number) {
   const counts = countsForToday(state, today);
   if (stop === "cards") return `Daily target of ${HUNTER_DAILY_CARD_TARGET} contact-ready cards filed.`;
@@ -722,12 +797,14 @@ export async function runHunterBatch(): Promise<
   let state = await loadHunterState();
   if (state.lockedUntil > now) {
     const counts = countsForToday(state, today);
+    await rememberRun({ run: "always-on", outcome: "skipped-busy", error: runNote() });
     return { ok: true, skipped: "busy", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   if (state.paused) {
     state = { ...state, lastRunAt: new Date(now).toISOString(), lastRunResult: "Paused. No search." };
     await saveHunterState(state);
     const counts = countsForToday(state, today);
+    await rememberRun({ run: "always-on", outcome: "skipped-paused", error: runNote() });
     return { ok: true, skipped: "paused", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   const stop = hunterStop(state, today, budget);
@@ -740,6 +817,11 @@ export async function runHunterBatch(): Promise<
       lastRunResult: dayStopCopy(stop, state, today, budget),
     };
     await saveHunterState(state);
+    await rememberRun({
+      run: "always-on",
+      outcome: stop === "cards" ? "skipped-target-met" : "capped-budget",
+      error: runNote(),
+    });
     return { ok: true, skipped: stop, callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
 
@@ -765,6 +847,7 @@ export async function runHunterBatch(): Promise<
         lastRunAt: new Date().toISOString(),
         lastRunResult: "Redis is not configured.",
       });
+      await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote("Redis is not configured.") });
       return { ok: false, error: "Redis is not configured" };
     }
 
@@ -780,6 +863,7 @@ export async function runHunterBatch(): Promise<
         lastRunAt: new Date().toISOString(),
         lastRunResult: research.error,
       });
+      await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote(research.error) });
       return { ok: false, error: research.error };
     }
 
@@ -787,19 +871,40 @@ export async function runHunterBatch(): Promise<
     const pages = await readPages(urlsForDrafts(drafts));
     const verified = verifyHunterDrafts(drafts, pages, { regionId: slot.regionId, today });
     const filed = fileHunterCards(loaded.book.companies, verified, { today });
-    await saveBook({ ...loaded.book, companies: filed.companies });
-    const settled = applyHunterWork(state, today, { calls: 0, contactReady: filed.contactReady }, budget);
+    const apollo = await enrichUnderApolloCap({
+      companies: filed.companies,
+      domains: verified.map((card) => card.domain),
+      today,
+      limit: 8,
+    });
+    const contactReady = countContactReadyGain(loaded.book.companies, apollo.companies);
+    await saveBook({ ...loaded.book, companies: apollo.companies });
+    const settled = applyHunterWork(state, today, { calls: 0, contactReady }, budget);
+    const fresh = await loadHunterState();
     await saveHunterState({
       ...settled,
+      apolloOn: fresh.apolloOn,
+      apolloReveals: fresh.apolloReveals,
       lockedUntil: 0,
       cursor: advanceCursor(state.cursor),
       lastRunAt: new Date().toISOString(),
-      lastRunResult: `Contact-ready cards today ${settled.filedToday} of ${HUNTER_DAILY_CARD_TARGET}. This batch ${filed.contactReady}. Updated ${filed.updated}. Slot: ${slot.signalLabel} in ${slot.regionLabel}. Model calls ${settled.callsToday} of ${budget}.`,
+      lastRunResult: `Contact-ready cards today ${settled.filedToday} of ${HUNTER_DAILY_CARD_TARGET}. This batch ${contactReady}. Updated ${filed.updated}. Slot: ${slot.signalLabel} in ${slot.regionLabel}. Model calls ${settled.callsToday} of ${budget}.`,
+    });
+    await rememberRun({
+      run: "always-on",
+      outcome: "fired",
+      modelCalls: 1,
+      candidates: drafts.length,
+      cardsFiled: filed.filed,
+      contactReady,
+      apolloSearches: apollo.searches,
+      apolloReveals: apollo.reveals,
+      error: apollo.note,
     });
     return {
       ok: true,
       filed: filed.filed,
-      contactReady: filed.contactReady,
+      contactReady,
       updated: filed.updated,
       callsToday: settled.callsToday,
       filedToday: settled.filedToday,
@@ -814,6 +919,7 @@ export async function runHunterBatch(): Promise<
       lastRunAt: new Date().toISOString(),
       lastRunResult: message,
     });
+    await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote(message) });
     return { ok: false, error: message };
   }
 }
@@ -864,6 +970,7 @@ export async function readHunterDesk(today = edmontonToday()) {
   const redis = await getRedisClient();
   const state = redis ? parseHunterState(await redis.get<unknown>(HUNTER_KEY)) : freshHunterState();
   const counts = countsForToday(state, today);
+  const recentRuns = redis ? await readHunterRuns(20) : [];
   return {
     storage: redis ? ("redis" as const) : ("browser" as const),
     paused: state.paused,
@@ -873,8 +980,11 @@ export async function readHunterDesk(today = edmontonToday()) {
     cardTarget: HUNTER_DAILY_CARD_TARGET,
     callsToday: counts.callsToday,
     callBudget: hunterCallBudget(),
+    apolloRevealsToday: revealsOn(state, today),
+    apolloCreditCap: apolloCreditCap(),
     capacity: state.capacity,
     capacityActive: state.capacity?.date === today,
+    recentRuns,
     today,
   };
 }

@@ -1,10 +1,12 @@
 /**
  * Hunter's nightly local sweep.
  * The route and this file keep their old names. Researches public pages for Alberta companies.
- * Does not call Apollo or Clay. A name or email is kept only when that exact text is on the page at emailSource.
+ * A public name or email is kept only when that exact text is on the page at emailSource.
+ * Apollo enrichment is optional and runs only when the cron passes it in.
  */
 
 import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
+import { markPublicContact } from "./apollo.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
 import {
   FIRST_WAVE,
@@ -186,6 +188,8 @@ export async function researchCompanies(knownDomains: string[]): Promise<{ compa
       ],
       temperature: 0,
       response_format: { type: "json_object" },
+      // Legacy live search. Left unchanged: xAI's current docs say this field fails
+      // and that web search belongs on the Responses API. The run log keeps the HTTP error.
       search_parameters: {
         mode: "on",
         return_citations: true,
@@ -238,8 +242,25 @@ export async function verifyRows(rows: ScoutIngest[]): Promise<ScoutIngest[]> {
   return applyVerifiedContacts(rows, pages);
 }
 
-export async function runNightlyScout(): Promise<
-  | { ok: true; date: string; stored: number; considered: number; called: true; contactReady: number }
+export type NightlyEnrichment = (
+  companies: Company[],
+  domains: string[],
+  today: string,
+) => Promise<{ companies: Company[]; searches: number; reveals: number; note: string }>;
+
+export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Promise<
+  | {
+      ok: true;
+      date: string;
+      stored: number;
+      considered: number;
+      candidates: number;
+      called: true;
+      contactReady: number;
+      apolloSearches: number;
+      apolloReveals: number;
+      apolloNote: string;
+    }
   | { ok: false; error: string; called: boolean }
 > {
   const loaded = await loadBook();
@@ -260,14 +281,30 @@ export async function runNightlyScout(): Promise<
     limit: loaded.book.morningCount,
   });
   const priorIds = new Set(loaded.book.companies.map((company) => company.id));
-  const companies = batch.companies.map((company) =>
-    priorIds.has(company.id) ? company : assignEnrichment(company, today),
-  );
-  const contactReady = countContactReadyGain(loaded.book.companies, companies);
+  const marked = batch.companies.map((company) => {
+    const next = priorIds.has(company.id) ? company : assignEnrichment(company, today);
+    return markPublicContact(next, today);
+  });
+  const domains = verified.map((row) => row.domain);
+  const enriched = opts?.enrich
+    ? await opts.enrich(marked, domains, today)
+    : { companies: marked, searches: 0, reveals: 0, note: "" };
+  const contactReady = countContactReadyGain(loaded.book.companies, enriched.companies);
   await saveBook({
     ...loaded.book,
-    companies,
+    companies: enriched.companies,
     morning: { date: today, ids: batch.morningIds },
   });
-  return { ok: true, date: today, stored: batch.morningIds.length, considered: batch.added, called: true, contactReady };
+  return {
+    ok: true,
+    date: today,
+    stored: batch.morningIds.length,
+    considered: batch.added,
+    candidates: selected.length,
+    called: true,
+    contactReady,
+    apolloSearches: enriched.searches,
+    apolloReveals: enriched.reveals,
+    apolloNote: enriched.note,
+  };
 }
