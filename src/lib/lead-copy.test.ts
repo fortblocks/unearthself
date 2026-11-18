@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSeedCompany, SEED_COMPANIES } from "../data/leads.ts";
+import { isSeedCompany, septemberHandCompanies, SEED_COMPANIES } from "../data/leads.ts";
 import {
   draftForCompany,
   draftProblems,
@@ -60,7 +60,15 @@ test("Peyto with no named contact uses the plain opener", () => {
   assert.equal(SEED_COMPANIES.length, 30);
   assert.ok(SEED_COMPANIES.every((card) => isSeedCompany(card)));
   assert.equal(isSeedCompany({ scoutBatch: "seed-2026-09", source: "hunter" }), false);
+  assert.equal(isSeedCompany({ scoutBatch: "seed-2026-09", source: "hand" }), false);
   assert.equal(isSeedCompany({ scoutBatch: "2026-11-18", source: "scout" }), false);
+  const hand = septemberHandCompanies();
+  assert.equal(hand.length, 30);
+  assert.ok(hand.every((card) => card.source === "hand" && card.draftSubject === DRAFT_SUBJECT));
+  assert.deepEqual(
+    hand.filter((card) => card.draftBody.includes("You lead")).map((card) => card.org),
+    ["Scott Builders"],
+  );
   assert.ok(SEED_COMPANIES.every((card) => card.draftSubject === DRAFT_SUBJECT));
   const titled = SEED_COMPANIES.filter((card) => card.draftBody.includes("You lead"));
   assert.deepEqual(

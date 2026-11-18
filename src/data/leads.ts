@@ -19,12 +19,39 @@ function card(row: Seed): Company {
   return { ...company, draftSubject: draft.subject, draftBody: draft.body };
 }
 
+/** The September target list, marked Hand, with the current unsent letter. */
+export function septemberHandCompanies(): Company[] {
+  return SEED_COMPANIES.map((company) => {
+    const next: Company = { ...company, source: "hand" };
+    const draft = draftForCompany(next);
+    return { ...next, draftSubject: draft.subject, draftBody: draft.body };
+  });
+}
+
+/**
+ * Keep any saved September card, mark it Hand, and put back any of the 30 that are missing.
+ * A Hunter or Hunter nightly source on the same id is left as it is.
+ */
+export function withSeptemberHandList(companies: Company[]): Company[] {
+  const byId = new Map(companies.map((company) => [company.id, company]));
+  const hand = septemberHandCompanies().map((seed) => {
+    const existing = byId.get(seed.id);
+    if (!existing) return seed;
+    const source =
+      existing.source === "hunter" || existing.source === "scout" ? existing.source : ("hand" as const);
+    return { ...seed, ...existing, source };
+  });
+  const handIds = new Set(hand.map((company) => company.id));
+  return [...hand, ...companies.filter((company) => !handIds.has(company.id))];
+}
+
 /**
  * Research cards. No invented personal emails.
  * Published generic inboxes only when they sit on the company's own contact page.
  * Named buyers only when the name is on that page.
+ * The September list is Chris's real target list. Once marked Hand, it stays on the book.
  */
-/** The September research list. It is not a live card. Hunter and hand cards are kept. */
+/** An unmarked seed batch is not written back. Hand, Hunter, and Hunter nightly stay. */
 export function isSeedCompany(company: { scoutBatch?: string; source?: string }) {
   const batch = (company.scoutBatch ?? "").trim().toLowerCase();
   if (!batch.startsWith("seed")) return false;
