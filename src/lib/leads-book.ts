@@ -23,7 +23,11 @@ export type LeadsBook = {
   companies: Company[];
   morningCount: number;
   morning: MorningBatch | null;
+  /** 1 after unsent drafts were rewritten to the current letter. */
+  draftRevision: number;
 };
+
+export const DRAFT_REVISION = 1;
 
 export function clampMorningCount(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
@@ -32,11 +36,11 @@ export function clampMorningCount(value: unknown): number {
 }
 
 export function emptyBook(): LeadsBook {
-  return { companies: [], morningCount: MORNING_DEFAULT, morning: null };
+  return { companies: [], morningCount: MORNING_DEFAULT, morning: null, draftRevision: 0 };
 }
 
 export function seedBook(): LeadsBook {
-  return { companies: SEED_COMPANIES, morningCount: MORNING_DEFAULT, morning: null };
+  return { companies: SEED_COMPANIES, morningCount: MORNING_DEFAULT, morning: null, draftRevision: DRAFT_REVISION };
 }
 
 function isCompany(row: unknown): row is Company {
@@ -56,10 +60,12 @@ function parseMorning(raw: unknown): MorningBatch | null {
 export function parseBook(raw: unknown): LeadsBook {
   if (!raw || typeof raw !== "object") return emptyBook();
   const row = raw as Partial<LeadsBook>;
+  const revision = (row as { draftRevision?: unknown }).draftRevision;
   return {
     companies: Array.isArray(row.companies) ? row.companies.filter(isCompany) : [],
     morningCount: clampMorningCount(row.morningCount),
     morning: parseMorning(row.morning),
+    draftRevision: revision === DRAFT_REVISION ? DRAFT_REVISION : 0,
   };
 }
 
@@ -137,6 +143,7 @@ export async function saveBook(book: LeadsBook): Promise<void> {
     companies: book.companies.map((company) => withTimingCache(company, today)),
     morningCount: clampMorningCount(book.morningCount),
     morning: book.morning,
+    draftRevision: book.draftRevision === DRAFT_REVISION ? DRAFT_REVISION : 0,
   };
   await redis.set(LEADS_KEY, next);
 }

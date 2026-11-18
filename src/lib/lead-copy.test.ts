@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { draftForCompany, draftProblems, draftSellsCanyon, wordCount } from "./lead-copy.ts";
+import { SEED_COMPANIES } from "../data/leads.ts";
+import {
+  draftForCompany,
+  draftProblems,
+  draftSellsCanyon,
+  DRAFT_SUBJECT,
+  refreshUnsentDrafts,
+  wordCount,
+} from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
 
 const company: Company = {
@@ -24,19 +32,80 @@ const company: Company = {
   draftBody: "",
   lastTouch: "",
   scoutBatch: "seed",
+  hunterScore: 40,
 };
 
-test("house voice is 120–180 words, no price, no canyon", () => {
-  const { body } = draftForCompany(company);
+test("Peyto draft is the combined letter, with the real title and no invented signal", () => {
+  const { subject, body } = draftForCompany(company);
   const n = wordCount(body);
+  assert.equal(subject, DRAFT_SUBJECT);
+  assert.equal(subject, "Two days on the land with your team");
   assert.ok(n >= 120 && n <= 180, `got ${n}`);
   assert.deepEqual(draftProblems(body), []);
   assert.equal(draftSellsCanyon(body), false);
-  assert.match(body, /People team/);
+  assert.match(body, /^Hi there,/);
+  assert.match(body, /You lead People \/ HR at Peyto Exploration & Development,/);
+  assert.match(body, /six to twenty-four/);
+  assert.match(body, /Basecamp/);
+  assert.match(body, /\nChris$/);
+  assert.doesNotMatch(body, /—/);
   assert.doesNotMatch(body, /\$\s*\d/);
+  assert.doesNotMatch(body, /Deep Basin/);
+  assert.doesNotMatch(body, /two or three day/);
+  assert.equal(SEED_COMPANIES.length, 30);
+  assert.ok(SEED_COMPANIES.every((card) => card.draftSubject === DRAFT_SUBJECT));
 });
 
-test("named buyer greets by first name", () => {
-  const { body } = draftForCompany({ ...company, buyerName: "Laura Starchuk" });
-  assert.match(body, /^Laura —/);
+test("named buyer greets by first name, and a missing title uses the team-side line", () => {
+  const named = draftForCompany({ ...company, buyerName: "Laura Starchuk", buyerTitle: "Human Resource Manager" });
+  assert.match(named.body, /^Hi Laura,/);
+  assert.match(named.body, /You lead Human Resource Manager at Peyto Exploration & Development,/);
+
+  const noTitle = draftForCompany({ ...company, buyerTitle: "" });
+  assert.match(noTitle.body, /^Hi there,/);
+  assert.match(noTitle.body, /You lead the team side at Peyto Exploration & Development,/);
+});
+
+test("refresh keeps sent and stopped cards, and rewrites only unsent drafts", () => {
+  const sent: Company = {
+    ...company,
+    id: "C-02",
+    org: "NuVista Energy",
+    domain: "nuvistaenergy.com",
+    draftSubject: "Old subject",
+    draftBody: "Old body that was already sent.",
+    status: "sequence",
+    filedLeadId: "L-02",
+    why: "Keep this why.",
+  };
+  const stopped: Company = {
+    ...company,
+    id: "C-03",
+    org: "Headwater Exploration",
+    draftSubject: "Stopped subject",
+    draftBody: "Stopped body.",
+    status: "stopped",
+  };
+  const open: Company = { ...company, draftSubject: "Old", draftBody: "Old body.", why: "Keep the research note." };
+  const threads = [
+    { id: "M-out", companyId: "C-02", leadId: "L-02", dir: "out", subject: "Sent subject", body: "Sent body." },
+    { id: "M-draft", companyId: "C-99", leadId: "", dir: "draft", subject: "Old", body: "Old body." },
+    { id: "M-note", companyId: "C-99", leadId: "", dir: "note", subject: "Note", body: "Leave this note." },
+  ];
+  const next = refreshUnsentDrafts([open, sent, stopped], threads);
+  const peyto = next.companies.find((card) => card.id === "C-99");
+  const nuvista = next.companies.find((card) => card.id === "C-02");
+  const headwater = next.companies.find((card) => card.id === "C-03");
+  assert.equal(peyto?.draftSubject, DRAFT_SUBJECT);
+  assert.match(peyto?.draftBody ?? "", /^Hi there,/);
+  assert.equal(peyto?.why, "Keep the research note.");
+  assert.equal(peyto?.hunterScore, 40);
+  assert.equal(peyto?.status, "watch");
+  assert.equal(nuvista?.draftBody, "Old body that was already sent.");
+  assert.equal(nuvista?.why, "Keep this why.");
+  assert.equal(headwater?.draftBody, "Stopped body.");
+  assert.equal(next.threads.find((thread) => thread.id === "M-out")?.body, "Sent body.");
+  assert.equal(next.threads.find((thread) => thread.id === "M-draft")?.subject, DRAFT_SUBJECT);
+  assert.match(next.threads.find((thread) => thread.id === "M-draft")?.body ?? "", /People \/ HR at Peyto/);
+  assert.equal(next.threads.find((thread) => thread.id === "M-note")?.body, "Leave this note.");
 });

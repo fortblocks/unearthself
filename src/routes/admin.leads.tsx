@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SEED_COMPANIES } from "@/data/leads";
 import { useDesk } from "@/lib/desk-store";
-import { draftProblems, wordCount } from "@/lib/lead-copy";
+import { draftProblems, refreshUnsentDrafts, wordCount } from "@/lib/lead-copy";
+import { DRAFT_REVISION } from "@/lib/leads-book";
 import {
   clampMorningCount,
   DESK_STORAGE_KEY,
@@ -129,8 +130,17 @@ function LeadsPage() {
         setMorningCount(book.morningCount);
         setMorning(book.morning);
         if (book.companies.length) {
-          setRows(book.companies);
-          useDesk.setState({ companies: book.companies });
+          let companies = book.companies;
+          if (book.draftRevision !== DRAFT_REVISION) {
+            const refreshed = refreshUnsentDrafts(companies, useDesk.getState().threads);
+            companies = refreshed.companies;
+            useDesk.setState({ threads: refreshed.threads });
+            book = await replaceLeadsCompanies({ data: { companies, draftRevision: DRAFT_REVISION } });
+            if (gone) return;
+            companies = book.companies;
+          }
+          setRows(companies);
+          useDesk.setState({ companies });
           setHoldingSeed(false);
         } else {
           setRows(SEED_COMPANIES);
@@ -175,7 +185,9 @@ function LeadsPage() {
 
   const morningRows = useMemo(() => {
     if (!rows || !morning) return [];
-    const ids = new Set(morningCompanies({ companies: rows, morningCount, morning }, today).map((company) => company.id));
+    const ids = new Set(
+      morningCompanies({ companies: rows, morningCount, morning, draftRevision: 0 }, today).map((company) => company.id),
+    );
     return filtered.filter(({ company }) => ids.has(company.id));
   }, [rows, morning, morningCount, today, filtered]);
 

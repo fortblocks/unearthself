@@ -38,7 +38,7 @@ import {
 } from "@/data/desk";
 import { SEED_POSTS, type PostStatus, type SocialChannel, type SocialPost } from "@/data/socials";
 import { draftFor } from "@/lib/bot-copy";
-import { draftForCompany, draftProblems } from "@/lib/lead-copy";
+import { draftForCompany, draftProblems, refreshUnsentDrafts } from "@/lib/lead-copy";
 import {
   hasAccess,
   isSendable,
@@ -707,9 +707,12 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 4,
+      version: 5,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
+        const companies = p.companies?.length ? p.companies : seed.companies;
+        const threads = p.threads ?? seed.threads;
+        const refreshed = refreshUnsentDrafts(companies, threads);
         return {
           ...seed,
           ...p,
@@ -722,9 +725,9 @@ export const useDesk = create<DeskState>()(
             stopped: l.stopped ?? false,
             companyId: l.companyId,
           })),
-          threads: p.threads ?? seed.threads,
+          threads: refreshed.threads,
           scout: p.scout ?? seed.scout,
-          companies: p.companies?.length ? p.companies : seed.companies,
+          companies: refreshed.companies,
           posts: p.posts ?? seed.posts,
           paused: { ...seed.paused, ...p.paused },
         };
