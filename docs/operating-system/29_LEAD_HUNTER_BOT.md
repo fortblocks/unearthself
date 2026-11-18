@@ -156,6 +156,66 @@ The enrichment output is the input Coco uses. Coco, the writer, drafts from the 
 - Never invent a name, title, email, or company fact. Never guess or build an address.
 - A partnership flag found during enrichment goes to the partners as a suggestion, as in section 5.
 
+## 10. Strategy
+
+Per Chris, 18th November. The Hunter follows this strategy and proposes the best way to meet the objective: feed Chris companies with a high chance of converting to a team of six to twenty-four for the Unearth Self experience in Drumheller.
+
+### Starting position
+
+- Signal density should be high. Unearth Self is open to every industry, not one vertical, and the corporate travel and offsite market is large even in Canada alone, before the United States.
+- The Hunter taps budgets companies already have. It looks for money already being spent on corporate travel, offsites, leadership development, or team experiences. It does not try to create new spend.
+
+### 1. All industries, weighted by place
+
+- Hunt across all industries. Do not narrow to a short list. Industry is never a filter, only a note on the card.
+- Canada and the United States carry the most travel weight. Europe and anywhere else stay in scope when the fit is strong. Geography stays a soft weight, as in section 2.
+
+### 2. Existing budgets first
+
+Look first for companies already spending in this space:
+
+- corporate travel, offsites, or company retreats they talk about in public
+- leadership development, management training, or culture programmes
+- team experiences, incentive trips, or sales kick-offs held away from the office
+
+A company with visible spend ranks above one that only matches the profile.
+
+### 3. Signals, and where spend shows
+
+Use the profile signals in section 1: B Corp, sustainability or purpose positioning, outdoor or adventure brands, offsite or culture programmes, leadership budgets, recent growth, and new people leaders.
+
+Also look for spend made visible in public:
+
+- **Job postings.** Roles such as events, offsites, travel, employee experience, or learning and development, or postings that mention team retreats as a benefit.
+- **Press.** Announcements of offsites, leadership programmes, funding, expansion, awards, or a new people or culture leader.
+- **Conference presence.** Companies that sponsor, speak at, or send teams to industry events, which shows a travel budget and a habit of gathering people.
+- **Partnerships.** Tie-ups with travel, wellness, outdoor, or experience providers.
+
+Every signal carries its source URL. A signal not on a cited page is not used.
+
+### 4. Ranking and daily sequence
+
+Each day, the highest-converting cards surface first, within the 48 model calls a day:
+
+1. Spend the day's calls where they are most likely to pay off. Enrich the strongest filed cards before searching for new ones, until today's top cards are ready for Coco.
+2. Rank ready cards by the section 4 fit score, then by visible existing spend, then by timing. A dated signal from the last ninety days ranks above an older one.
+3. Put cards with a named person and a published email above cards that still need a contact. A no-email card stays on the list and keeps its fit rank.
+4. Rotate across industries and regions so one sector cannot fill the day.
+5. Show Chris a short ranked list each day, best first. Nothing is contacted from the list.
+
+### Learning from results
+
+- The strategy is a living document. The Hunter reviews it once a month against real outcomes: emails sent, replies, and calls booked, by industry, signal, region, and company size.
+- From that review the Hunter writes a dated proposed revision: which signals, industries, and regions to weight up or down, and why, with the numbers behind it.
+- Chris approves a revision before it changes this section or `src/data/hunter-profile.ts`. Each approved revision gets a changelog line.
+- Opens are not an outcome. Only sent, replied, and booked count. With too few sends to read, the Hunter says so and changes nothing.
+
+### Guardrails
+
+- No contact, publish, or spend without human approval. The strategy ranks and files. It never sends.
+- No Apollo, Clay, or paid data vendor.
+- Never invent a company fact, budget, or spend figure. A budget is only noted when a public page shows it.
+
 ## Acceptance criteria
 
 - The Hunter never sends mail, and Send for its cards is blocked by the same gate as every other card.
@@ -182,6 +242,7 @@ The enrichment output is the input Coco uses. Coco, the writer, drafts from the 
 - 18th November 2026. Spec opened from Chris's call. Not built.
 - 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.
 - 18th November 2026. Enrichment added as phase two of the Hunter's job (section 9), per Chris. Enrichment output is the input for Coco, the writer. Coco and Nova are not built.
+- 18th November 2026. Strategy section added (section 10), per Chris: all industries, existing budgets first, visible spend signals, daily ranking within the 48-call cap, and a monthly review against sent, replied, and booked, with revisions approved by Chris.
 
 ## Build notes
 
