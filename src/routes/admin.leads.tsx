@@ -18,6 +18,7 @@ import {
 } from "@/lib/leads-book";
 import { getLeadsBook, importLeadsCompanies, replaceLeadsCompanies, setLeadsMorningCount } from "@/lib/leads-api";
 import { cardSource } from "@/lib/leads-hunter";
+import { DEFAULT_LEAD_SORT, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
 import {
   bandLabel,
   daysBetween,
@@ -349,6 +350,37 @@ function LeadsPage() {
   );
 }
 
+function SortHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  className,
+  align = "left",
+}: {
+  label: string;
+  column: LeadSortKey;
+  sort: { key: LeadSortKey; dir: "asc" | "desc" };
+  onSort: (column: LeadSortKey) => void;
+  className: string;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === column;
+  return (
+    <span className={className}>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 bg-transparent p-0 text-xs tracking-widest uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember ${align === "right" ? "w-full justify-end" : ""} ${active ? "text-coal" : "text-sandstone"}`}
+        aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+        onClick={() => onSort(column)}
+      >
+        {label}
+        {active ? <span aria-hidden="true">{sort.dir === "asc" ? "↑" : "↓"}</span> : null}
+      </button>
+    </span>
+  );
+}
+
 function CompanyList({
   rows,
   openId,
@@ -364,16 +396,18 @@ function CompanyList({
   onToggle: (id: string) => void;
   onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
+  const [sort, setSort] = useState(DEFAULT_LEAD_SORT);
+  const ordered = useMemo(() => sortLeadRows(rows, sort), [rows, sort]);
   return (
     <ul className="divide-y divide-line border-y border-line">
-      <li className="hidden items-center gap-4 py-2 text-xs tracking-widest text-sandstone uppercase md:flex">
+      <li className="flex items-center gap-4 py-2 text-xs tracking-widest uppercase">
         <span className="size-2.5 shrink-0" />
-        <span className="min-w-0 flex-1">Company</span>
-        <span className="w-28 shrink-0">Place</span>
-        <span className="w-24 shrink-0">Size</span>
-        <span className="w-14 shrink-0 text-right">Score</span>
+        <SortHeader label="Company" column="company" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="min-w-0 flex-1" />
+        <SortHeader label="Place" column="place" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="hidden w-28 shrink-0 sm:block" />
+        <SortHeader label="Size" column="size" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="hidden w-24 shrink-0 sm:block" />
+        <SortHeader label="Score" column="score" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="w-14 shrink-0" align="right" />
       </li>
-      {rows.map(({ company, score }) => {
+      {ordered.map(({ company, score }) => {
         const open = openId === company.id;
         const sendable =
           company.source === "hunter"
