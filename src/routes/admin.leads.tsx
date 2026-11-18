@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SEED_COMPANIES } from "@/data/leads";
 import { useDesk } from "@/lib/desk-store";
 import { draftProblems, refreshUnsentDrafts, wordCount } from "@/lib/lead-copy";
 import { DRAFT_REVISION } from "@/lib/leads-book";
@@ -98,7 +97,6 @@ function LeadsPage() {
   const threads = useDesk((s) => s.threads);
   const [rows, setRows] = useState<Company[] | null>(null);
   const [storage, setStorage] = useState<"redis" | "browser" | null>(null);
-  const [holdingSeed, setHoldingSeed] = useState(false);
   const [morningCount, setMorningCount] = useState(10);
   const [morning, setMorning] = useState<MorningBatch | null>(null);
   const [query, setQuery] = useState("");
@@ -121,7 +119,6 @@ function LeadsPage() {
           setStorage("browser");
           setMorningCount(clampMorningCount(Number.isFinite(saved) && saved > 0 ? saved : 10));
           setMorning(null);
-          setHoldingSeed(false);
           setRows(useDesk.getState().companies);
           return;
         }
@@ -148,11 +145,9 @@ function LeadsPage() {
           }
           setRows(companies);
           useDesk.setState({ companies });
-          setHoldingSeed(false);
         } else {
-          setRows(SEED_COMPANIES);
-          useDesk.setState({ companies: SEED_COMPANIES });
-          setHoldingSeed(true);
+          setRows([]);
+          useDesk.setState({ companies: [] });
         }
       })().catch((error: unknown) => {
         if (!gone) toast.error(error instanceof Error ? error.message : "Could not load leads");
@@ -203,7 +198,6 @@ function LeadsPage() {
     useDesk.setState({ companies: next });
     if (storage !== "redis") return;
     await replaceLeadsCompanies({ data: { companies: next } });
-    setHoldingSeed(false);
   }
 
   async function mutate(id: string, act: () => string | null) {
@@ -294,11 +288,11 @@ function LeadsPage() {
             </select>
           </div>
         </div>
+        <p className="mt-3 text-sm text-coal">
+          Real data only. Every row here was filed by Hunter or added by hand.
+        </p>
         {storage === "browser" ? (
           <p className="mt-3 text-sm text-shale">Redis is not connected. Changes stay in this browser.</p>
-        ) : null}
-        {holdingSeed ? (
-          <p className="mt-3 text-sm text-shale">Redis has no saved companies yet. Showing the seed list.</p>
         ) : null}
       </Section>
 
@@ -336,6 +330,8 @@ function LeadsPage() {
       <Section kicker="All companies">
         {rows == null ? (
           <p className="border-y border-line py-4 text-sm text-muted">Loading companies.</p>
+        ) : rows.length === 0 ? (
+          <p className="border-y border-line py-4 text-sm text-shale">No companies filed yet.</p>
         ) : filtered.length === 0 ? (
           <p className="border-y border-line py-4 text-sm text-shale">No companies match.</p>
         ) : (

@@ -24,6 +24,14 @@ function card(row: Seed): Company {
  * Published generic inboxes only when they sit on the company's own contact page.
  * Named buyers only when the name is on that page.
  */
+/** The September research list. It is not a live card. Hunter and hand cards are kept. */
+export function isSeedCompany(company: { scoutBatch?: string; source?: string }) {
+  const batch = (company.scoutBatch ?? "").trim().toLowerCase();
+  if (!batch.startsWith("seed")) return false;
+  if (company.source === "hunter" || company.source === "scout" || company.source === "hand") return false;
+  return true;
+}
+
 export const SEED_COMPANIES: Company[] = [
   card({
     id: "C-01",

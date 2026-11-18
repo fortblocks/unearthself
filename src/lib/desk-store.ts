@@ -8,7 +8,7 @@ import {
   type ThreadDir,
   type ThreadMsg,
 } from "@/data/bots";
-import { SEED_COMPANIES } from "@/data/leads";
+import { isSeedCompany } from "@/data/leads";
 import {
   isDemoLead,
   isTestCompany,
@@ -150,7 +150,7 @@ const seed = {
   canalta: SEED_CANALTA,
   threads: SEED_THREADS,
   scout: SEED_SCOUT,
-  companies: SEED_COMPANIES,
+  companies: [],
   posts: SEED_POSTS,
   paused: {
     concierge: false,
@@ -709,15 +709,16 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "unearthself-desk-v3",
-      version: 7,
+      version: 8,
       migrate: (persisted) => {
         const p = (persisted ?? {}) as Partial<DeskState>;
-        const keptCompanies = (p.companies?.length ? p.companies : seed.companies).filter(
-          (company) => !isTestCompany(company.org, company.domain),
+        const priorCompanies = p.companies ?? [];
+        const keptCompanies = priorCompanies.filter(
+          (company) => !isTestCompany(company.org, company.domain) && !isSeedCompany(company),
         );
         const droppedCompanyIds = new Set(
-          (p.companies ?? [])
-            .filter((company) => isTestCompany(company.org, company.domain))
+          priorCompanies
+            .filter((company) => isTestCompany(company.org, company.domain) || isSeedCompany(company))
             .map((company) => company.id),
         );
         const companies = keptCompanies.map((company) =>

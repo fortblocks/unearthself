@@ -6,7 +6,7 @@
  */
 
 import { isTestCompany } from "../data/desk.ts";
-import { SEED_COMPANIES } from "../data/leads.ts";
+import { isSeedCompany } from "../data/leads.ts";
 import { edmontonToday, timingFromSignals, type Company } from "./lead-score.ts";
 
 export const LEADS_KEY = "unearth:leads:v1";
@@ -41,7 +41,11 @@ export function emptyBook(): LeadsBook {
 }
 
 export function seedBook(): LeadsBook {
-  return { companies: SEED_COMPANIES, morningCount: MORNING_DEFAULT, morning: null, draftRevision: DRAFT_REVISION };
+  return emptyBook();
+}
+
+export function liveCompanies(companies: Company[]) {
+  return companies.filter((company) => !isSeedCompany(company) && !isTestCompany(company.org, company.domain));
 }
 
 function isCompany(row: unknown): row is Company {
@@ -62,10 +66,13 @@ export function parseBook(raw: unknown): LeadsBook {
   if (!raw || typeof raw !== "object") return emptyBook();
   const row = raw as Partial<LeadsBook>;
   const revision = (row as { draftRevision?: unknown }).draftRevision;
+  const companies = liveCompanies(Array.isArray(row.companies) ? row.companies.filter(isCompany) : []);
+  const kept = new Set(companies.map((company) => company.id));
+  const morning = parseMorning(row.morning);
   return {
-    companies: Array.isArray(row.companies) ? row.companies.filter(isCompany) : [],
+    companies,
     morningCount: clampMorningCount(row.morningCount),
-    morning: parseMorning(row.morning),
+    morning: morning ? { ...morning, ids: morning.ids.filter((id) => kept.has(id)) } : null,
     draftRevision: revision === DRAFT_REVISION ? DRAFT_REVISION : 0,
   };
 }
@@ -77,7 +84,7 @@ export function readLocalCompanies(raw: string | null): Company[] {
     const parsed = JSON.parse(raw) as { state?: { companies?: unknown } };
     const companies = parsed?.state?.companies;
     if (!Array.isArray(companies)) return [];
-    return companies.filter(isCompany);
+    return liveCompanies(companies.filter(isCompany));
   } catch {
     return [];
   }
@@ -140,7 +147,7 @@ export async function saveBook(book: LeadsBook): Promise<void> {
   const redis = await getRedisClient();
   if (!redis) throw new Error("Redis is not configured");
   const today = edmontonToday();
-  const companies = book.companies.filter((company) => !isTestCompany(company.org, company.domain));
+  const companies = liveCompanies(book.companies);
   const kept = new Set(companies.map((company) => company.id));
   const next: LeadsBook = {
     companies: companies.map((company) => withTimingCache(company, today)),
