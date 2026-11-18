@@ -6,7 +6,7 @@ Where each fact comes from:
 
 - Groups of six to twenty-four: live site and `07_WS_SALES_MARKETING.md` (set 18th November, Chris approved).
 - Multi-day expedition in the Alberta badlands: live site (`/bootcamp`, `/for/teams`: two to five days).
-- Basecamp, our place in town for heat and cold: live site (`/spring`, Basecamp pages).
+- Basecamp, our refurbished spa in downtown Drumheller, with infrared sauna, salt stone steam room, cold plunge and treatment table: live site (`/basecamp`, `src/data/basecampCopy.ts`).
 - Spring 2027 as the first season: `23_FINANCIAL_MODEL.md` ("First groups March 2027"). A planning figure, not a booked date.
 - About ninety minutes from Calgary: live site (`/find-us`: about 138 km, 1 hr 30 min). Not yet written into this folder.
 - "Some of the most beautiful in Canada" and "the dinosaurs got there first": Chris's own voice, written as his view.
@@ -19,10 +19,10 @@ Hi [First name],
 
 You lead [people and culture at Company], so I imagine you've planned more offsites than you'd care to count. I'd love to show you a new one.
 
-At Unearth Self, a team of six to twenty-four heads out into the Alberta badlands for a multi-day expedition. The days are spent out on rugged ground in the land of the dinosaurs, working out the route together. The evenings end at Basecamp, our place in town for heat and cold.
+At Unearth Self, a team of six to twenty-four heads out into the Alberta badlands for a multi-day expedition. The days are spent out on rugged ground in the land of the dinosaurs, working out the route together. The evenings end at Basecamp, our refurbished spa in downtown Drumheller, where an infrared sauna, a salt stone steam room and a cold plunge lead to a slow finish on the treatment table.
 
 It's wild country, some of the most beautiful in Canada. Spring 2027 is our first season.
 
-All of it sits about ninety minutes from Calgary. Would a short call in January suit you?
+All of it sits about ninety minutes from Calgary. Would a short call suit you?
 
 Chris
