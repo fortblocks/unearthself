@@ -17,6 +17,7 @@ import {
   type MorningBatch,
 } from "@/lib/leads-book";
 import { getLeadsBook, importLeadsCompanies, replaceLeadsCompanies, setLeadsMorningCount } from "@/lib/leads-api";
+import { cardSource } from "@/lib/leads-hunter";
 import {
   bandLabel,
   daysBetween,
@@ -43,7 +44,8 @@ const SEND_ERR: Record<string, string> = {
   copy: "Draft fails house voice.",
 };
 
-const CITIES: Array<LeadCity | "all"> = ["all", "Calgary", "Edmonton", "Red Deer", "Alberta"];
+const CITIES: Array<LeadCity | "all"> = ["all", "Calgary", "Edmonton", "Red Deer", "Alberta", "Elsewhere"];
+const ORIGINS = ["all", "scout", "hunter", "hand"] as const;
 const BANDS: Array<ScoreBand | "all"> = ["all", "pursue", "sequence", "watch", "hold"];
 const INDUSTRIES: Array<Industry | "all"> = [
   "all",
@@ -95,6 +97,7 @@ function LeadsPage() {
   const [city, setCity] = useState<LeadCity | "all">("all");
   const [industry, setIndustry] = useState<Industry | "all">("all");
   const [band, setBand] = useState<ScoreBand | "all">("all");
+  const [origin, setOrigin] = useState<(typeof ORIGINS)[number]>("all");
   const [openId, setOpenId] = useState("");
   const rowsRef = useRef<Company[]>([]);
   rowsRef.current = rows ?? [];
@@ -161,13 +164,14 @@ function LeadsPage() {
       if (city !== "all" && company.city !== city) return false;
       if (industry !== "all" && company.industry !== industry) return false;
       if (band !== "all" && score.band !== band) return false;
+      if (origin !== "all" && cardSource(company) !== origin) return false;
       if (!q) return true;
       return [company.org, company.city, company.domain, company.buyerName, company.email]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [scored, query, city, industry, band]);
+  }, [scored, query, city, industry, band, origin]);
 
   const morningRows = useMemo(() => {
     if (!rows || !morning) return [];
@@ -215,7 +219,7 @@ function LeadsPage() {
   return (
     <div className="grid gap-10">
       <Section kicker="Leads">
-        <div className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <Label htmlFor="lead-search">Search</Label>
             <Input id="lead-search" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -251,6 +255,21 @@ function LeadsPage() {
               {BANDS.map((item) => (
                 <option key={item} value={item}>
                   {item === "all" ? "All bands" : bandLabel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="lead-source">Source</Label>
+            <select
+              id="lead-source"
+              className={fieldClass}
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value as (typeof ORIGINS)[number])}
+            >
+              {ORIGINS.map((item) => (
+                <option key={item} value={item}>
+                  {item === "all" ? "All" : item === "scout" ? "Scout" : item === "hunter" ? "Hunter" : "Hand"}
                 </option>
               ))}
             </select>
@@ -332,9 +351,22 @@ function CompanyList({
 }) {
   return (
     <ul className="divide-y divide-line border-y border-line">
+      <li className="hidden items-center gap-4 py-2 text-xs tracking-widest text-sandstone uppercase md:flex">
+        <span className="size-2.5 shrink-0" />
+        <span className="min-w-0 flex-1">Company</span>
+        <span className="w-28 shrink-0">Place</span>
+        <span className="hidden w-24 shrink-0 lg:block">Size</span>
+        <span className="w-14 shrink-0 text-right">Score</span>
+        <span className="w-16 shrink-0 text-right">Hunter</span>
+        <span className="w-16 shrink-0 text-right">Partner</span>
+      </li>
       {rows.map(({ company, score }) => {
         const open = openId === company.id;
-        const sendable = isSendable(company, score);
+        const sendable =
+          company.source === "hunter"
+            ? company.status !== "stopped" && hasAccess(company)
+            : isSendable(company, score);
+        const place = company.place?.trim() || company.city;
         return (
           <li key={company.id}>
             <button
@@ -347,10 +379,23 @@ function CompanyList({
                 className={`size-2.5 shrink-0 rounded-full ${sendable ? "bg-ember" : "bg-line"}`}
                 aria-label={sendable ? "Sendable" : "Not sendable"}
               />
-              <span className="min-w-0 flex-1 font-semibold">{company.org}</span>
-              <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{company.city}</span>
-              <span className="hidden w-24 shrink-0 text-sm text-shale md:block">{company.sizeBand}</span>
-              <span className="w-12 shrink-0 text-right text-sm tabular-nums">{score.total}</span>
+              <span className="min-w-0 flex-1 font-semibold">
+                {company.org}
+                <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
+                  {cardSource(company)}
+                </span>
+              </span>
+              <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>
+              <span className="hidden w-24 shrink-0 text-sm text-shale lg:block">
+                {company.sizeBand === "unknown" ? "not stated" : company.sizeBand}
+              </span>
+              <span className="w-14 shrink-0 text-right text-sm tabular-nums">{score.total}</span>
+              <span className="w-16 shrink-0 text-right text-sm tabular-nums">
+                {typeof company.hunterScore === "number" ? company.hunterScore : ""}
+              </span>
+              <span className="w-16 shrink-0 text-right text-sm">
+                {company.partnerFlag?.flagged ? "Yes" : typeof company.hunterScore === "number" ? "No" : ""}
+              </span>
             </button>
             {open ? (
               <CompanyPanel
@@ -408,7 +453,8 @@ function CompanyPanel({
         <div>
           <p className="text-xs tracking-widest text-sandstone uppercase">Company</p>
           <p className="mt-2 text-sm text-coal">
-            {company.org} · {company.city} · {company.industry} · {company.sizeBand}
+            {company.org} · {company.place?.trim() || company.city} · {company.industry} ·{" "}
+            {company.sizeBand === "unknown" ? "size not stated" : company.sizeBand}
           </p>
           <p className="mt-1 text-sm text-shale">{company.domain}</p>
           {company.sourceUrl ? (
@@ -494,6 +540,41 @@ function CompanyPanel({
             : `Last touch ${company.lastTouch}. ${since} day${since === 1 ? "" : "s"} ago.`}
         </p>
       </div>
+
+      {company.source === "hunter" || typeof company.hunterScore === "number" ? (
+        <div>
+          <p className="text-xs tracking-widest text-sandstone uppercase">Hunter fit</p>
+          <p className="mt-2 text-sm text-coal">
+            Hunter fit {company.hunterScore ?? 0} / 100. Profile {company.hunterBreak?.profile ?? 0} / 50. Access{" "}
+            {company.hunterBreak?.access ?? 0} / 25. Timing {company.hunterBreak?.timing ?? 0} / 15. Travel{" "}
+            {company.hunterBreak?.travel ?? 0} / 10.
+          </p>
+          {company.profileHits && company.profileHits.length > 0 ? (
+            <ul className="mt-3 space-y-1">
+              {company.profileHits.map((hit) => (
+                <li key={`${hit.id}-${hit.sourceUrl}`}>
+                  <a className="text-sm font-semibold text-ember hover:underline" href={hit.sourceUrl}>
+                    {hit.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-shale">No verified profile signal on this card.</p>
+          )}
+          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Partnership flag</p>
+          {company.partnerFlag?.flagged && company.partnerFlag.sourceUrl ? (
+            <p className="mt-2 text-sm text-coal">
+              {company.partnerFlag.reason}{" "}
+              <a className="font-semibold text-ember hover:underline" href={company.partnerFlag.sourceUrl}>
+                Source
+              </a>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-shale">No partnership flag.</p>
+          )}
+        </div>
+      ) : null}
 
       <form
         className="grid gap-3 md:grid-cols-2"

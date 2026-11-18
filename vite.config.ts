@@ -15,7 +15,11 @@ export default defineConfig(({ command, isPreview }) => ({
             preset: "vercel",
             vercel: {
               config: {
-                crons: [{ path: "/api/cron/leads-scout", schedule: "0 11 * * *" }],
+                crons: [
+                  { path: "/api/cron/leads-scout", schedule: "0 11 * * *" },
+                  // Pro allows once a minute. The hunter stops itself after its daily call cap.
+                  { path: "/api/cron/leads-hunter", schedule: "* * * * *" },
+                ],
               },
             },
           }),

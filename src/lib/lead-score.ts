@@ -1,7 +1,7 @@
 /** Score 100 = Fit 60 + Access 25 + Timing 15. Computed, never guessed. */
 
-export type LeadCity = "Calgary" | "Edmonton" | "Red Deer" | "Alberta";
-export type SizeBand = "1-49" | "50-79" | "80-800" | "801-1500" | "1500+";
+export type LeadCity = "Calgary" | "Edmonton" | "Red Deer" | "Alberta" | "Elsewhere";
+export type SizeBand = "1-49" | "50-79" | "80-800" | "801-1500" | "1500+" | "unknown";
 export type Industry =
   | "energy"
   | "construction"
@@ -62,6 +62,16 @@ export type Company = {
   draftBody: string;
   lastTouch: string;
   scoutBatch: string;
+  /** Who filed the card. Missing on older scout and hand cards. */
+  source?: "scout" | "hunter" | "hand";
+  /** City and country as printed on the source page. */
+  place?: string;
+  /** Search region used when the Hunter filed or updated the card. */
+  hunterRegion?: string;
+  hunterScore?: number;
+  hunterBreak?: { profile: number; access: number; timing: number; travel: number };
+  profileHits?: { id: string; label: string; sourceUrl: string }[];
+  partnerFlag?: { flagged: boolean; reason: string; sourceUrl: string };
 };
 
 export type ScoutIngest = {

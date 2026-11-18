@@ -487,7 +487,8 @@ export const useDesk = create<DeskState>()(
         const problems = draftProblems(c.draftBody);
         if (problems.length) return problems[0] ?? "copy";
         const score = scoreCompany(c);
-        if (score.band === "hold") return "band";
+        const hunter = c.source === "hunter";
+        if (!hunter && score.band === "hold") return "band";
         set((s) => {
           const already = s.threads.find(
             (m) => m.companyId === id && m.dir === "draft" && m.subject === c.draftSubject,
@@ -515,7 +516,12 @@ export const useDesk = create<DeskState>()(
             threads,
             companies: s.companies.map((x) =>
               x.id === id
-                ? { ...x, status: x.status === "watch" && score.band !== "watch" ? "sequence" : x.status, lastTouch: today() }
+                ? {
+                    ...x,
+                    status:
+                      x.status === "watch" && (hunter || score.band !== "watch") ? "sequence" : x.status,
+                    lastTouch: today(),
+                  }
                 : x,
             ),
           };
@@ -527,9 +533,10 @@ export const useDesk = create<DeskState>()(
         if (!c) return "missing";
         if (c.status === "stopped") return "closed";
         const score = scoreCompany(c);
-        if (score.band === "hold") return "band";
+        const hunter = c.source === "hunter";
+        if (!hunter && score.band === "hold") return "band";
         if (!hasAccess(c)) return "access";
-        if (!isSendable(c, score)) return "band";
+        if (!hunter && !isSendable(c, score)) return "band";
         const problems = draftProblems(c.draftBody);
         if (problems.length) return problems[0] ?? "copy";
         if (get().paused.corporate) return "paused";

@@ -7,10 +7,13 @@ import { Stat } from "@/components/desk/Stat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BOTS, type BotId } from "@/data/bots";
+import { HUNTER_ROSTER } from "@/data/hunter-profile";
 import { partnerFirst, useDesk } from "@/lib/desk-store";
 import { botForLead } from "@/lib/bot-copy";
+import { getHunterDesk, setHunterPaused } from "@/lib/leads-hunter-api";
 
 export const Route = createFileRoute("/admin/bots")({
+  loader: () => getHunterDesk(),
   component: BotsPage,
   validateSearch: (s: Record<string, unknown>): { lead?: string } => {
     const lead = typeof s.lead === "string" && s.lead ? s.lead : undefined;
@@ -28,7 +31,21 @@ const SEND_ERR: Record<string, string> = {
   access: "Send blocked. Named person, published email, and source URL.",
 };
 
+function formatRun(iso: string) {
+  if (!iso) return "No run yet.";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "No run yet.";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Edmonton",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function BotsPage() {
+  const initialHunter = Route.useLoaderData();
+  const [hunter, setHunter] = useState(initialHunter);
+  const [savingHunter, setSavingHunter] = useState(false);
   const search = Route.useSearch();
   const leads = useDesk((s) => s.leads);
   const threads = useDesk((s) => s.threads);
@@ -53,6 +70,22 @@ function BotsPage() {
     (l) => !l.stopped && l.status !== "lost" && l.status !== "won" && l.nudges > 0 && l.nudges < 3,
   ).length;
   const watch = scout.filter((t) => t.status === "watch");
+
+  async function toggleHunter() {
+    if (hunter.storage !== "redis") {
+      toast("Redis is not connected. Pause cannot be saved.");
+      return;
+    }
+    setSavingHunter(true);
+    try {
+      const next = await setHunterPaused({ data: { paused: !hunter.paused } });
+      setHunter(next);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not update the hunter");
+    } finally {
+      setSavingHunter(false);
+    }
+  }
 
   function run(bot: BotId, send: boolean) {
     if (!lead) return;
@@ -89,6 +122,40 @@ function BotsPage() {
 
       {tab === "roster" ? (
         <ul className="grid gap-3">
+          <li className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[1fr_auto] md:items-start">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-display text-3xl font-black uppercase leading-none">{HUNTER_ROSTER.name}</h2>
+                <Badge tone={hunter.paused ? "lost" : "won"}>{hunter.paused ? "paused" : "running"}</Badge>
+              </div>
+              <p className="mt-2 text-sm text-pretty">{HUNTER_ROSTER.job}</p>
+              <p className="mt-2 text-sm text-muted">
+                {HUNTER_ROSTER.trigger} · {partnerFirst(HUNTER_ROSTER.owner)}
+              </p>
+              <p className="mt-2 text-sm text-sandstone">{HUNTER_ROSTER.escalate}</p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-muted">
+                {HUNTER_ROSTER.limits.map((limit) => (
+                  <li key={limit}>{limit}</li>
+                ))}
+              </ul>
+              <p className="mt-3 text-sm text-coal">Last run {formatRun(hunter.lastRunAt)}.</p>
+              {hunter.lastRunResult ? <p className="mt-1 text-sm text-shale">{hunter.lastRunResult}</p> : null}
+              <p className="mt-1 text-sm text-coal">
+                Cards filed today: {hunter.filedToday}. Model calls today: {hunter.callsToday} of {hunter.cap}.
+              </p>
+              {hunter.storage === "browser" ? (
+                <p className="mt-2 text-sm text-shale">Redis is not connected. Pause cannot be saved.</p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={savingHunter || hunter.storage !== "redis"}
+              onClick={() => void toggleHunter()}
+            >
+              {hunter.paused ? "Resume" : "Pause"}
+            </Button>
+          </li>
           {BOTS.map((b) => (
             <li key={b.id} className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[1fr_auto] md:items-start">
               <div>

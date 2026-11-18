@@ -139,3 +139,19 @@ The run method is a build decision for later: a frequent Vercel cron, or a durab
 ## Changelog
 
 - 18th November 2026. Spec opened from Chris's call. Not built.
+
+## Build notes
+
+Built 18th November 2026 on main, after Chris asked for it on the call.
+
+- The profile is data in `src/data/hunter-profile.ts`. Signals, regions, travel weights, and partnership terms can change without editing the prompt.
+- `src/lib/leads-hunter.ts` searches with xAI, the same model the scout uses. It verifies a name, title, and email with the scout's `contactIfPresent` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`, a separate fit score, and a partnership flag. A known domain is updated. The scout's nightly run and `lead-score.ts` are unchanged.
+- The cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 model calls in an Edmonton day. It ships running. Pause and resume on `/admin/bots` write the paused flag in Upstash. `/admin/leads` can filter by All, Scout, Hunter, or Hand, and shows the Hunter score and the partnership flag.
+
+Left:
+
+- The partners have not ranked the signals. The points in the profile file are the draft weights from this spec.
+- There is no monthly spend cap beyond the daily call cap.
+- The Morning Brief does not yet count new Hunter cards.
+- Enrichment, the rewrite layer, and the humanizer from `26` are not built. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves.
+- Europe mail, lodging for a team that flies in, and who reviews partnership flags are still open in this spec.
