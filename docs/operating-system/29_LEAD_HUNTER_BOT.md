@@ -14,8 +14,8 @@ The job has two phases. Phase one is finding and filing. Phase two is enrichment
 
 - Human approval before any publish, contact, or spend. The Hunter never emails anyone. Every send still goes through Approve and goes from chris@badlandsbootcamp.com.
 - Unearth Self is completely separate from GeoLab and Geolab Studio. No shared data, tools, or copy.
-- Never invent a name, title, email, company fact, land, building, programme, pricing, partner, or date fact. A field is kept only when its exact text is on the cited public page.
-- Do not buy Apollo. Do not use Clay or any paid data vendor. The partners have not lifted this.
+- Never invent a name, title, email, company fact, land, building, programme, pricing, partner, or date fact. A field is kept only when its exact text is on the cited public page or comes from a licensed database row, as below.
+- Licensed, published directories such as Apollo, ZoomInfo, and similar are allowed as sources for names, titles, and email addresses, per Chris, 18th November. Hunter logs on the card which database each name and address came from. The no-guessing rule still applies to anything not from a licensed database or a cited public page: Hunter never builds an address from a pattern or infers one. Unverified or stale database rows are flagged on the card, never silently used. Chris accepts the subscription costs, the staleness risk, and the Canadian anti-spam (CASL) obligations that come with these databases. Rex keeps oversight of this as part of ongoing performance review. Buying or connecting a subscription is still spend and needs approval first.
 - The access gate in `07` stays, and it controls sending, not filing. A card needs a named person, a published email and Approve before it can send, but any well-fitting company gets filed.
 - Partners by first name only. Basecamp is one word. Canadian spelling. No em dashes.
 
@@ -62,12 +62,12 @@ Same card requirements as the nightly run:
 
 - named contact (two real name tokens, never "HR" or "People team")
 - title as printed on the page
-- published email, only when the exact address is on the cited page
-- a source URL for every filled field
+- published email, only when the exact address is on the cited page or in a licensed database row
+- a source URL, or the licensed database name, for every filled field
 
 Target roles: people and culture leads, leaders of distributed or high-performing teams, offsite or events owners, founders at smaller fits. Enrichment follows `26` section 1. A card with no named person is still filed as research, and Send stays blocked.
 
-A missing public email never stops a company being filed. If no email is published, Hunter still researches and files the company, with its profile signals, the likely team and the role to approach, each with a source URL. The email field stays blank. Hunter never guesses or builds an address.
+A missing public email never stops a company being filed. If no email is published or licensed, Hunter still researches and files the company, with its profile signals, the likely team and the role to approach, each with a source URL. The email field stays blank. Hunter never guesses or builds an address.
 
 ## 4. Score against the ideal profile
 
@@ -137,17 +137,19 @@ Once a company is filed, the Hunter goes back and gathers the facts that make th
 - **One true thing.** The single citable fact worth mentioning in a first email, such as a public offsite, a new people leader, a growth announcement, a B Corp or sustainability commitment, or an outdoor or adventure link. One fact, or none. Never a guess.
 - **Profile signals.** Which ideal-customer signals from section 1 the company shows.
 - **Likely team.** The team of six to twenty-four inside the company that fits best.
-- **Role to approach.** The person or role who would own the decision, with a name and title only when they are printed on the page.
+- **Right person and verified contact.** The person who would own the decision, such as a marketing director, sales director, HR director, or people and culture lead, with their name, title, and email. Each comes from a cited public page or a licensed database such as Apollo or ZoomInfo, with the database logged on the card. Unverified or stale database rows are flagged. Finding the right person and their contact details is part of enrichment, not a separate step.
 
-Every item carries the source URL of the page it came from. Anything not on a cited page stays blank.
+Every item carries the source URL of the page it came from, or the licensed database it came from. Anything from neither stays blank.
+
+The goal is that every card presented to Chris has a name, title, and email on file before it reaches the approval queue. A card without all three stays a research card and does not enter the queue.
 
 ### Ready for Coco
 
 A card has one enrichment state:
 
 - **Not enriched.** Filed in phase one only. Not ready for Coco.
-- **Enriched.** At least the one true thing or a profile signal is filled, each with a source URL. Ready for Coco.
-- **No-signal.** The Hunter looked and found nothing citable. It is marked explicitly, with the date it looked. Ready for Coco, which then writes the honest general version of the `27` letter and does not fake a personal line.
+- **Enriched.** A name, title, and email are on file, and at least the one true thing or a profile signal is filled, each with its source. Ready for Coco.
+- **No-signal.** The Hunter looked and found nothing citable about the company, but a name, title, and email are on file. It is marked explicitly, with the date it looked. Ready for Coco, which then writes the honest general version of the `27` letter and does not fake a personal line.
 
 ### Enrichment feeds Coco
 
@@ -156,8 +158,8 @@ The enrichment output is the input Coco uses. Coco, the writer, drafts from the 
 ### Guardrails
 
 - Enrichment never contacts anyone and never sends.
-- No Apollo, Clay, or paid data vendor.
-- Never invent a name, title, email, or company fact. Never guess or build an address.
+- Licensed databases are allowed for names, titles, and emails, with the database logged on the card and stale or unverified rows flagged. No other paid data source without approval.
+- Never invent a name, title, email, or company fact. Never guess, infer, or build an address from a pattern.
 - A partnership flag found during enrichment goes to the partners as a suggestion, as in section 5.
 
 ## 10. Strategy
@@ -218,15 +220,16 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 ### Guardrails
 
 - No contact, publish, or spend without human approval. The strategy ranks and files. It never sends.
-- No Apollo, Clay, or paid data vendor.
+- Licensed databases only as set out in the hard rules, with the source logged on the card.
 - Never invent a company fact, budget, or spend figure. A budget is only noted when a public page shows it.
 
 ## Acceptance criteria
 
 - The Hunter never sends mail, and Send for its cards is blocked by the same gate as every other card.
-- Every filled field on a Hunter card shows the URL of the page it came from.
+- Every filled field on a Hunter card shows the URL of the page it came from, or the licensed database it came from.
+- No card enters the approval queue without a name, title, and email on file, and no email on a card was built from a pattern.
 - A company in Europe or the United States is filed and scored, not dropped.
-- No call is made to Apollo, Clay, or any paid data vendor.
+- Stale or unverified database rows are flagged on the card, not used silently.
 - Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
 - A partnership flag carries a reason and a source URL, and creates no contact.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
@@ -240,7 +243,7 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - How a team flying in is hosted: travel, transfers, and Haven or other lodging. Not in this folder, so the Hunter cannot promise any of it.
 - Who reviews partnership flags, and how often.
 - Whether the nightly run's 80 to 800 headcount band stays for the local list.
-- Whether paid data is ever on the table. Today the answer is no.
+- Which licensed database to subscribe to, and at what cost. Chris approved the use on 18th November; the subscription itself is still spend that needs approval.
 
 ## Changelog
 
@@ -250,6 +253,7 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - 18th November 2026. Strategy section added (section 10), per Chris: all industries, existing budgets first, visible spend signals, daily ranking within the 48-call cap, and a monthly review against sent, replied, and booked, with revisions approved by Chris.
 - 18th November 2026. Monthly strategy revisions made self-executing, per Chris. Rex keeps oversight and flags anything that needs human attention. All other rules unchanged.
 - 18th November 2026. Scout folded into Hunter per Chris. Hunter owns the nightly local sweep and the always-on hunt. Scout is not a separate bot.
+- 18th November 2026. Licensed databases (Apollo, ZoomInfo, and similar) allowed for names, titles, and emails, per Chris, with the source logged on the card and stale rows flagged. No guessed or pattern-built addresses. Chris accepts the costs, staleness risk, and CASL obligations; Rex keeps oversight. Finding the right person and verified contact details is now part of enrichment, and every card needs a name, title, and email before the approval queue.
 
 ## Build notes
 
