@@ -41,7 +41,8 @@ Pricing is still an open decision (`17` + `14`). Until locked, the site collects
 - Enquiry forms write to the house book. `/spring` files a live lead; a matching research-card domain promotes the company.
 - `/admin/leads` — long list of Alberta first-wave companies. Not the pipeline. Score 100 = Fit 60 + Access 25 + Timing 15 (Calgary / Edmonton / Red Deer, headcount 80–800, first-wave industries, named buyer, published email).
 - Bands: 90+ pursue · 70–89 sequence if sendable · 50–69 watch · <50 do not email.
-- Access gate: no named person + published email + source URL = draft allowed, send blocked. Do not invent emails. Do not buy Apollo.
+- Access gate: no named person + published email + source URL = draft allowed, send blocked. Do not invent emails.
+- Licensed, published directories such as Apollo, ZoomInfo, and similar are allowed as sources for names, titles, and email addresses (Chris, 18th November; see `29`). The database each name and address came from is logged on the card, and unverified or stale rows are flagged, never silently used. Anything not from a licensed database or a cited public page is never guessed: no address built from a pattern or inferred. Chris accepts the subscription costs, the staleness risk, and the Canadian anti-spam (CASL) obligations. Rex keeps oversight as part of ongoing performance review. Buying or connecting a subscription is still spend and needs approval first.
 - Grok Bot: qualify, answer FAQs, propose three dates, book a call
 - One-pager PDF for corporate
 - Seed list of ~30 Calgary / Edmonton / Red Deer target accounts on `/admin/leads`. Hunter files the nightly local sweep and the always-on hunt onto that page. Pipeline stays live files only.
@@ -91,6 +92,7 @@ Working lines:
 
 ## Changelog
 
+- 18 November 2026. Apollo ban lifted in line with `29`: licensed directories such as Apollo and ZoomInfo allowed for names, titles, and emails, with the source logged per card and unverified rows flagged. No guessed addresses. Buying or connecting a subscription still needs approval. Chris approved this on a call.
 - 18 November 2026. Enquiry group size is 6 to 24. Chris approved this on a call. Day counts are unchanged.
 - 2026-09-17 — `/admin/leads` is the research list. Pipeline is live files only. Score and Access gate as specified. Scout ingest on the page. D04 not closed. No Apollo. No invented emails.
 - 2026-09-08 — Sales workstream opened. Booking before brand theatre.
