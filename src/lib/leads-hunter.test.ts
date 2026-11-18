@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { HUNTER_DAILY_CALL_CAP, HUNTER_SIGNALS } from "../data/hunter-profile.ts";
+import { HUNTER_DAILY_CALL_BUDGET_DEFAULT, HUNTER_DAILY_CARD_TARGET, HUNTER_SIGNALS } from "../data/hunter-profile.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
+import {
+  applyHunterWork,
+  assignEnrichment,
+  hasBuyerContact,
+  hunterCallBudget,
+  hunterStop,
+  isContactReady,
+} from "./hunter-cap.ts";
 import {
   advanceCursor,
   cardSource,
@@ -221,6 +229,9 @@ test("a known domain is updated and a new domain is filed once", () => {
   assert.equal(again.companies.length, 1);
   assert.equal(again.filed, 0);
   assert.equal(again.updated, 1);
+  assert.equal(second.contactReady, 1);
+  assert.equal(second.companies[0]?.enrichment, "enriched");
+  assert.equal(again.contactReady, 0);
 });
 
 test("the batch cursor walks signal and region, then wraps", () => {
@@ -232,14 +243,84 @@ test("the batch cursor walks signal and region, then wraps", () => {
   assert.notEqual(slotAt(1).slot.regionId, slotAt(0).slot.regionId);
 });
 
-test("the daily cap and the pause flag stop a call", () => {
+test("the daily stop is contact-ready cards, and the call budget is separate", () => {
   const state = freshHunterState();
+  const today = "2026-11-18";
+  assert.equal(HUNTER_DAILY_CARD_TARGET, 48);
+  assert.equal(HUNTER_DAILY_CALL_BUDGET_DEFAULT, 48);
+  assert.equal(hunterCallBudget(""), 48);
+  assert.equal(hunterCallBudget(null), 48);
+  assert.equal(hunterCallBudget("60"), 60);
+  assert.equal(hunterCallBudget("0"), 48);
+  assert.equal(hunterCallBudget("nope"), 48);
   assert.equal(state.paused, false);
-  assert.equal(hunterMayCall(state, "2026-11-18"), true);
-  assert.equal(hunterMayCall({ ...state, paused: true }, "2026-11-18"), false);
-  assert.equal(hunterMayCall({ ...state, callsOn: "2026-11-18", callsToday: HUNTER_DAILY_CALL_CAP }, "2026-11-18"), false);
-  assert.equal(hunterMayCall({ ...state, callsOn: "2026-11-17", callsToday: HUNTER_DAILY_CALL_CAP }, "2026-11-18"), true);
-  assert.equal(HUNTER_DAILY_CALL_CAP, 48);
+  assert.equal(hunterMayCall(state, today, 48), true);
+  assert.equal(hunterMayCall({ ...state, paused: true }, today, 60), false);
+  assert.equal(
+    hunterMayCall({ ...state, filedOn: today, filedToday: HUNTER_DAILY_CARD_TARGET, callsToday: 3, callsOn: today }, today, 60),
+    false,
+  );
+  assert.equal(hunterStop({ ...state, filedOn: today, filedToday: 48 }, today, 60), "cards");
+  assert.equal(hunterMayCall({ ...state, callsOn: today, callsToday: 48 }, today, 48), false);
+  assert.equal(hunterMayCall({ ...state, callsOn: today, callsToday: 48, filedToday: 10, filedOn: today }, today, 60), true);
+  assert.equal(hunterMayCall({ ...state, callsOn: "2026-11-17", callsToday: 48, filedOn: "2026-11-17", filedToday: 48 }, today, 48), true);
+  assert.equal(hunterStop({ ...state, callsOn: today, callsToday: 48, filedOn: today, filedToday: 10 }, today, 48), "budget");
+});
+
+test("a spent call budget before 48 cards records a capacity problem", () => {
+  const today = "2026-11-18";
+  const state = freshHunterState();
+  const short = applyHunterWork(
+    { ...state, filedOn: today, filedToday: 10, callsOn: today, callsToday: 47 },
+    today,
+    { calls: 1, contactReady: 0 },
+    48,
+  );
+  assert.equal(short.callsToday, 48);
+  assert.equal(short.filedToday, 10);
+  assert.deepEqual(short.capacity, { date: today, cardsFiled: 10, callsUsed: 48 });
+  const again = applyHunterWork(short, today, { calls: 0, contactReady: 0 }, 48);
+  assert.deepEqual(again.capacity, short.capacity);
+
+  const filled = applyHunterWork(
+    { ...state, filedOn: today, filedToday: 47, callsOn: today, callsToday: 47 },
+    today,
+    { calls: 1, contactReady: 1 },
+    48,
+  );
+  assert.equal(filled.filedToday, 48);
+  assert.equal(filled.capacity, null);
+  assert.equal(hunterStop(filled, today, 48), "cards");
+});
+
+test("only an Enriched or No-signal card with a name, title, and email is contact-ready", () => {
+  const contact = {
+    buyerName: "Laura Starchuk",
+    buyerTitle: "Head of People",
+    email: "laura@acmealpine.example",
+    emailSource: url,
+  };
+  assert.equal(hasBuyerContact(contact), true);
+  assert.equal(hasBuyerContact({ ...contact, buyerName: "People team" }), false);
+  assert.equal(hasBuyerContact({ ...contact, buyerName: "Laura" }), false);
+  assert.equal(hasBuyerContact({ ...contact, buyerTitle: "" }), false);
+  assert.equal(hasBuyerContact({ ...contact, email: "" }), false);
+
+  const base = company({ ...contact, profileHits: [{ id: "distributed", label: "Distributed", sourceUrl: url }] });
+  const enriched = assignEnrichment(base, "2026-11-18");
+  assert.equal(enriched.enrichment, "enriched");
+  assert.equal(isContactReady(enriched), true);
+
+  const quiet = assignEnrichment(company({ ...contact, profileHits: [], signals: [], whySources: [] }), "2026-11-18");
+  assert.equal(quiet.enrichment, "no-signal");
+  assert.equal(quiet.enrichmentOn, "2026-11-18");
+  assert.equal(isContactReady(quiet), true);
+
+  const research = assignEnrichment(company({ ...contact, email: "" }), "2026-11-18");
+  assert.equal(research.enrichment, "not-enriched");
+  assert.equal(isContactReady(research), false);
+  assert.equal(isContactReady({ ...enriched, enrichment: "not-enriched" }), false);
+  assert.equal(isContactReady({ ...enriched, profileHits: [], signals: [], whySources: [] }), false);
 });
 
 test("card source distinguishes hunter, scout, and hand", () => {

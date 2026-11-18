@@ -39,6 +39,9 @@ export type WhySource = {
   label: string;
 };
 
+/** Section 9 of the Hunter spec. Only Enriched and No-signal can count as contact-ready. */
+export type EnrichmentState = "not-enriched" | "enriched" | "no-signal";
+
 export type Company = {
   id: string;
   org: string;
@@ -72,6 +75,10 @@ export type Company = {
   hunterBreak?: { profile: number; access: number; timing: number; travel: number };
   profileHits?: { id: string; label: string; sourceUrl: string }[];
   partnerFlag?: { flagged: boolean; reason: string; sourceUrl: string };
+  /** Set when a Hunter run evaluates the card. Absent on older cards. */
+  enrichment?: EnrichmentState;
+  /** Edmonton date the card was marked Enriched or No-signal. */
+  enrichmentOn?: string;
 };
 
 export type ScoutIngest = {

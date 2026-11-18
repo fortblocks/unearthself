@@ -145,8 +145,22 @@ function BotsPage() {
               <p className="mt-3 text-sm text-coal">Last run {formatRun(hunter.lastRunAt)}.</p>
               {hunter.lastRunResult ? <p className="mt-1 text-sm text-shale">{hunter.lastRunResult}</p> : null}
               <p className="mt-1 text-sm text-coal">
-                Cards filed today: {hunter.filedToday}. Model calls today: {hunter.callsToday} of {hunter.cap}.
+                Cards filed today: {hunter.filedToday} of {hunter.cardTarget}.
               </p>
+              <p className="mt-1 text-sm text-muted">
+                Model calls today: {hunter.callsToday} of {hunter.callBudget}.
+              </p>
+              {hunter.capacityActive && hunter.capacity ? (
+                <p className="mt-2 border border-ember bg-paper p-3 text-sm text-coal" role="status">
+                  Capacity problem. The model-call budget ran out before 48 contact-ready cards were filed.
+                  Filed {hunter.capacity.cardsFiled} of {hunter.cardTarget}. Calls used {hunter.capacity.callsUsed}.
+                </p>
+              ) : hunter.capacity ? (
+                <p className="mt-2 text-sm text-muted">
+                  Last capacity problem, {hunter.capacity.date}: filed {hunter.capacity.cardsFiled} of {hunter.cardTarget},
+                  calls used {hunter.capacity.callsUsed}.
+                </p>
+              ) : null}
               {hunter.storage === "browser" ? (
                 <p className="mt-2 text-sm text-shale">Redis is not connected. Pause cannot be saved.</p>
               ) : null}

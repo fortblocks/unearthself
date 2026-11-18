@@ -4,6 +4,7 @@
  * Does not call Apollo or Clay. A name or email is kept only when that exact text is on the page at emailSource.
  */
 
+import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
 import {
   FIRST_WAVE,
@@ -238,23 +239,35 @@ export async function verifyRows(rows: ScoutIngest[]): Promise<ScoutIngest[]> {
 }
 
 export async function runNightlyScout(): Promise<
-  { ok: true; date: string; stored: number; considered: number } | { ok: false; error: string }
+  | { ok: true; date: string; stored: number; considered: number; called: true; contactReady: number }
+  | { ok: false; error: string; called: boolean }
 > {
   const loaded = await loadBook();
-  if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured" };
+  if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured", called: false };
   const today = edmontonToday();
-  const research = await researchCompanies(loaded.book.companies.map((company) => company.domain));
-  if ("error" in research) return { ok: false, error: research.error };
+  let research: { companies: unknown } | { error: string };
+  try {
+    research = await researchCompanies(loaded.book.companies.map((company) => company.domain));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nightly search failed";
+    return { ok: false, error: message, called: true };
+  }
+  if ("error" in research) return { ok: false, error: research.error, called: true };
   const selected = selectScoutRows(research);
   const verified = await verifyRows(selected);
   const batch = buildMorningBatch(loaded.book.companies, verified, {
     today,
     limit: loaded.book.morningCount,
   });
+  const priorIds = new Set(loaded.book.companies.map((company) => company.id));
+  const companies = batch.companies.map((company) =>
+    priorIds.has(company.id) ? company : assignEnrichment(company, today),
+  );
+  const contactReady = countContactReadyGain(loaded.book.companies, companies);
   await saveBook({
     ...loaded.book,
-    companies: batch.companies,
+    companies,
     morning: { date: today, ids: batch.morningIds },
   });
-  return { ok: true, date: today, stored: batch.morningIds.length, considered: batch.added };
+  return { ok: true, date: today, stored: batch.morningIds.length, considered: batch.added, called: true, contactReady };
 }

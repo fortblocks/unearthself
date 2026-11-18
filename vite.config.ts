@@ -18,7 +18,7 @@ export default defineConfig(({ command, isPreview }) => ({
                 crons: [
                   // Hunter nightly local sweep. Path kept so this cron is not registered twice.
                   { path: "/api/cron/leads-scout", schedule: "0 11 * * *" },
-                  // Hunter always-on hunt. Pro allows once a minute. It stops after its daily call cap.
+                  // Hunter always-on hunt. Pro allows once a minute. It stops at 48 contact-ready cards, or when the model-call budget runs out.
                   { path: "/api/cron/leads-hunter", schedule: "* * * * *" },
                 ],
               },

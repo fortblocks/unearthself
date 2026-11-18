@@ -25,7 +25,9 @@ Hunter is one bot with two runs. There is no separate local bot.
 
 (a) Nightly local sweep, formerly its own bot. Cron `0 11 * * *`, which is 4am Mountain. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. The score is the existing one in `lead-score.ts`. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`, so the schedule is not registered twice. Behaviour of the sweep is unchanged.
 
-(b) Always-on ideal-customer hunt. Cron every minute. It stops after 48 model calls in an Edmonton day. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to.
+(b) Always-on ideal-customer hunt. Cron every minute. It keeps searching, evaluating, and enriching until it has filed 48 contact-ready cards in an Edmonton day, then stops. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched or No-signal (section 9). Both runs count toward the same 48. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to.
+
+Model calls are a separate daily budget, an internal resource aimed at that 48. The budget is an adjustable setting, currently 48 calls, until Chris sets a new number. Raising it is spend and needs Chris's approval. The setting name is `HUNTER_DAILY_CALL_BUDGET`. If the budget runs out before 48 contact-ready cards are filed, that is a capacity problem, not a normal day. Hunter records the date, the cards filed, and the calls used. Rex is notified on the Bots page and in the stored Hunter state.
 
 Pause on `/admin/bots` stops both runs. The same paused flag is read by the nightly route and by the every-minute route.
 
@@ -118,13 +120,13 @@ In the code, the first four write drafts from fixed templates in `bot-copy.ts` w
 
 ### Hunter on the roster
 
-Hunter's roster entry shows the job (both runs), the trigger, owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no paid data, pause stops both runs). It shows the last always-on run, cards filed today, model calls today, and the pause switch.
+Hunter's roster entry shows the job (both runs), the trigger, owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no paid data, pause stops both runs). It shows the last always-on run, cards filed today against the 48 target, model calls used against the daily budget, a capacity warning when the budget runs out first, and the pause switch.
 
 ## 8. Always on
 
 The Hunter runs in short batches, back to back, so it is always working without one long job. Each batch: pick the next profile signal and region, search public pages, verify every field against its page, score, de-duplicate, file. It keeps a queue of where it has looked so it does not repeat itself.
 
-The run method is a build decision for later: a frequent Vercel cron, or a durable workflow or queue. Either way, every model call costs money, so the run rate and a monthly cap need approval before it is switched on.
+The run method is a build decision for later: a frequent Vercel cron, or a durable workflow or queue. Either way, every model call costs money, so the run rate and a monthly cap need approval before it is switched on. The daily model-call budget is the current spend control. It is 48 calls until Chris sets a new number, and raising it needs his approval.
 
 ## 9. Enrichment, phase two
 
@@ -201,9 +203,9 @@ Every signal carries its source URL. A signal not on a cited page is not used.
 
 ### 4. Ranking and daily sequence
 
-Each day, the highest-converting cards surface first, within the 48 model calls a day:
+Each day, the highest-converting cards surface first, until 48 contact-ready cards are filed. Model calls are spent against a separate budget, currently 48, and are not themselves the cap:
 
-1. Spend the day's calls where they are most likely to pay off. Enrich the strongest filed cards before searching for new ones, until today's top cards are ready for Coco.
+1. Spend the day's model calls where they are most likely to pay off. Enrich the strongest filed cards before searching for new ones, until today's top cards are ready for Coco.
 2. Rank ready cards by the section 4 fit score, then by visible existing spend, then by timing. A dated signal from the last ninety days ranks above an older one.
 3. Put cards with a named person and a published email above cards that still need a contact. A no-email card stays on the list and keeps its fit rank.
 4. Rotate across industries and regions so one sector cannot fill the day.
@@ -211,17 +213,18 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 
 ### Learning from results
 
-- The strategy is a living document. The Hunter reviews it once a month against real outcomes: emails sent, replies, and calls booked, by industry, signal, region, and company size.
+- The strategy is a living document. The Hunter reviews it once a month against real outcomes: cards filed against the 48 target, emails sent, replies, and calls booked, by industry, signal, region, and company size.
 - From that review the Hunter applies its own dated revision: which signals, industries, and regions to weight up or down, and why, with the numbers behind it. The revision updates this section and `src/data/hunter-profile.ts` and gets a changelog line. It does not wait for sign-off.
-- A revision can only change weights, signals, industries, regions, and sequencing. It cannot change the hard rules, the guardrails below, the 48-a-day cap, or the two-phase job of finding and filing, then enrichment.
+- A revision can only change weights, signals, industries, regions, and sequencing. It cannot change the hard rules, the guardrails below, the 48 contact-ready card target, the model-call budget, or the two-phase job of finding and filing, then enrichment.
 - Rex, the Chief of Staff, keeps ongoing oversight of the Hunter's performance and strategy outcomes as part of running Unearth Self. Rex reviews the results and each revision and flags anything that needs human attention. The Hunter's monthly self-adjustments do not wait for that review.
-- Opens are not an outcome. Only sent, replied, and booked count. With too few sends to read, the Hunter says so and changes nothing.
+- Opens are not an outcome. Cards filed against the 48 target, sent, replied, and booked count. With too few sends to read, the Hunter says so and changes nothing.
 
 ### Guardrails
 
 - No contact, publish, or spend without human approval. The strategy ranks and files. It never sends.
 - Licensed databases only as set out in the hard rules, with the source logged on the card.
 - Never invent a company fact, budget, or spend figure. A budget is only noted when a public page shows it.
+- If the model-call budget runs out before 48 contact-ready cards are filed, Hunter stops for that Edmonton day and records a capacity problem (the date, the cards filed, and the calls used) for Rex. That record does not change the 48 target or the budget.
 
 ## Acceptance criteria
 
@@ -233,6 +236,8 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
 - A partnership flag carries a reason and a source URL, and creates no contact.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
+- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
+- If the model-call budget runs out first, Hunter stops and records the date, cards filed, and calls used for Rex. The budget defaults to 48. The setting is `HUNTER_DAILY_CALL_BUDGET`. Raising it is spend and needs Chris's approval.
 - No card reaches Coco until its enrichment state is Enriched or No-signal, and every enriched fact shows its source URL.
 
 ## Open questions for partners
@@ -254,6 +259,7 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - 18th November 2026. Monthly strategy revisions made self-executing, per Chris. Rex keeps oversight and flags anything that needs human attention. All other rules unchanged.
 - 18th November 2026. Scout folded into Hunter per Chris. Hunter owns the nightly local sweep and the always-on hunt. Scout is not a separate bot.
 - 18th November 2026. Licensed databases (Apollo, ZoomInfo, and similar) allowed for names, titles, and emails, per Chris, with the source logged on the card and stale rows flagged. No guessed or pattern-built addresses. Chris accepts the costs, staleness risk, and CASL obligations; Rex keeps oversight. Finding the right person and verified contact details is now part of enrichment, and every card needs a name, title, and email before the approval queue.
+- 18th November 2026. The daily cap is 48 contact-ready cards filed per Edmonton day, per Chris, counted across both runs. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal. The model-call budget is a separate setting, currently 48, and raising it is spend that needs Chris's approval. If that budget runs out first, Hunter records a capacity problem for Rex. Monthly review counts cards filed against the 48 target, beside sent, replied, and booked. A revision still cannot change the card target or the budget.
 
 ## Build notes
 
@@ -261,12 +267,12 @@ Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, travel weights, and partnership terms can change without editing the prompt.
 - `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`, a separate fit score, and a partnership flag. A known domain is updated. The nightly sweep and `lead-score.ts` are unchanged.
-- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 model calls in an Edmonton day. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. `/admin/leads` filters by All, Hunter nightly, Hunter, or Hand, and shows the Hunter score and the partnership flag. The stored source value for a nightly card stays `scout`.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 contact-ready cards in an Edmonton day, or sooner when the model-call budget runs out. That budget defaults to 48 and is `HUNTER_DAILY_CALL_BUDGET`. A budget stop is stored as a capacity problem for Rex and shown on the Hunter card. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. Both runs also stop when the card target or the call budget is spent. `/admin/leads` filters by All, Hunter nightly, Hunter, or Hand, and shows the Hunter score and the partnership flag. The stored source value for a nightly card stays `scout`.
 
 Left:
 
 - The partners have not ranked the signals. The points in the profile file are the draft weights from this spec.
-- There is no monthly spend cap beyond the daily call cap.
+- There is no monthly spend cap. The daily model-call budget defaults to 48 and is the spend control until Chris raises it. The 48 card target is separate.
 - The Morning Brief does not yet count new Hunter cards.
 - Enrichment, the rewrite layer, and the humanizer from `26` are not built. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves.
 - Europe mail, lodging for a team that flies in, and who reviews partnership flags are still open in this spec.

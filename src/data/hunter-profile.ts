@@ -169,12 +169,18 @@ export const PARTNER_KINDS: PartnerKind[] = [
   },
 ];
 
-/** One model call per cron tick. Stops for the rest of the Edmonton day at this count. */
-export const HUNTER_DAILY_CALL_CAP = 48;
+/** Contact-ready cards filed per Edmonton day. Both runs count together. */
+export const HUNTER_DAILY_CARD_TARGET = 48;
+
+/**
+ * Default daily model-call budget. Override with HUNTER_DAILY_CALL_BUDGET.
+ * Raising it is spend and needs Chris's approval. Do not raise it in code.
+ */
+export const HUNTER_DAILY_CALL_BUDGET_DEFAULT = 48;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",
-  job: "Two runs, one bot. Nightly local sweep at 4am Mountain: Calgary, Edmonton, and Red Deer, headcount 80 to 800, first-wave industries. Always-on hunt for ideal customers anywhere, 48 model calls an Edmonton day. Never sends.",
+  job: "Two runs, one bot. Nightly local sweep at 4am Mountain: Calgary, Edmonton, and Red Deer, headcount 80 to 800, first-wave industries. Always-on hunt for ideal customers anywhere, until 48 contact-ready cards are filed in an Edmonton day. Never sends.",
   trigger: "Nightly at 4am Mountain, and always on",
   owner: "christopher" as const,
   escalate: "A partnership flag, or a company outside this profile.",
