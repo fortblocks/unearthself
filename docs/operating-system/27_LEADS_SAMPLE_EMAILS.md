@@ -27,3 +27,10 @@ It's wild country, some of the most beautiful in Canada. Spring 2027 is our firs
 All of it sits about ninety minutes from Calgary. If you'd like your team to be amongst the first to experience Badlands Bootcamp, please get in touch and we can arrange a time for a quick call.
 
 Chris
+
+## How this template is used
+
+Added 18th November from Chris's call. Full detail is in `26_LEADS_PRODUCT_EVOLUTION.md`, sections 5 and 6.
+
+- Per-email customization: this email is the starting template. Each real send is customized for its one recipient, from their name, title, company, industry and any other enriched field that has a source URL. The storytelling prose and the humanizer stay in force, so every letter reads as Christopher writing, with humility and confidence, never bullet points.
+- A/B testing: approved sends are split between two versions, open and reply rates are tracked, the winner is fed back into the generator and the loser is discarded. Default threshold is 20 sends per version before a winner counts, pending Chris setting the real number.
