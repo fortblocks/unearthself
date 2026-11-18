@@ -17,6 +17,7 @@ The website in this repository (`src/`) is the public test site. These files do 
 4. `03_BRAND_SYSTEM.md`
 5. The workstream you are reviewing
 6. `17_OPEN_DECISIONS.md`
+7. `26_LEADS_PRODUCT_EVOLUTION.md` when the work is outbound leads
 
 ## Pull locally
 

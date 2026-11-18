@@ -50,6 +50,7 @@ This folder is the single source of truth for every Grok chat, Grok Bot and huma
 | OPEN | `17_OPEN_DECISIONS.md` | Named owner per row | P0 |
 | ROAD | `18_MASTER_ROADMAP.md` | Christopher | P0 |
 | VOICE | `25_WS_VOICE.md` | Christopher (Tess on product language) | P0 |
+| LEADS | `26_LEADS_PRODUCT_EVOLUTION.md` | Christopher | Spec on top of SALES |
 
 ## Human-facing pack
 
