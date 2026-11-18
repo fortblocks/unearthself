@@ -206,8 +206,9 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 ### Learning from results
 
 - The strategy is a living document. The Hunter reviews it once a month against real outcomes: emails sent, replies, and calls booked, by industry, signal, region, and company size.
-- From that review the Hunter writes a dated proposed revision: which signals, industries, and regions to weight up or down, and why, with the numbers behind it.
-- Chris approves a revision before it changes this section or `src/data/hunter-profile.ts`. Each approved revision gets a changelog line.
+- From that review the Hunter applies its own dated revision: which signals, industries, and regions to weight up or down, and why, with the numbers behind it. The revision updates this section and `src/data/hunter-profile.ts` and gets a changelog line. It does not wait for sign-off.
+- A revision can only change weights, signals, industries, regions, and sequencing. It cannot change the hard rules, the guardrails below, the 48-a-day cap, or the two-phase job of finding and filing, then enrichment.
+- Rex, the Chief of Staff, keeps ongoing oversight of the Hunter's performance and strategy outcomes as part of running Unearth Self. Rex reviews the results and each revision and flags anything that needs human attention. The Hunter's monthly self-adjustments do not wait for that review.
 - Opens are not an outcome. Only sent, replied, and booked count. With too few sends to read, the Hunter says so and changes nothing.
 
 ### Guardrails
@@ -243,6 +244,7 @@ Each day, the highest-converting cards surface first, within the 48 model calls 
 - 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.
 - 18th November 2026. Enrichment added as phase two of the Hunter's job (section 9), per Chris. Enrichment output is the input for Coco, the writer. Coco and Nova are not built.
 - 18th November 2026. Strategy section added (section 10), per Chris: all industries, existing budgets first, visible spend signals, daily ranking within the 48-call cap, and a monthly review against sent, replied, and booked, with revisions approved by Chris.
+- 18th November 2026. Monthly strategy revisions made self-executing, per Chris. Rex keeps oversight and flags anything that needs human attention. All other rules unchanged.
 
 ## Build notes
 
