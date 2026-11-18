@@ -23,6 +23,6 @@ At Unearth Self, a team of six to twenty-four heads out into the Alberta badland
 
 It's wild country, some of the most beautiful in Canada. Spring 2027 is our first season.
 
-All of it sits about ninety minutes from Calgary. If you'd like your team to be amongst the first to experience Badlands Bootcamp, get in touch.
+All of it sits about ninety minutes from Calgary. If you'd like your team to be amongst the first to experience Badlands Bootcamp, please get in touch and we can arrange a time for a quick call.
 
 Chris
