@@ -423,8 +423,8 @@ export function verifyHunterDrafts(
       regionId: opts.regionId,
     });
     const why = hits.length
-      ? `Research card from the Lead Hunter. Public pages show: ${hits.map((hit) => hit.label).join("; ")}.`
-      : "Research card from the Lead Hunter. No profile signal was verified on a fetched page.";
+      ? `Research card from Hunter. Public pages show: ${hits.map((hit) => hit.label).join("; ")}.`
+      : "Research card from Hunter. No profile signal was verified on a fetched page.";
     cards.push({
       domain: draft.domain,
       org: draft.org,

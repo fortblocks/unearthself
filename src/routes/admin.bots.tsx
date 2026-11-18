@@ -129,6 +129,9 @@ function BotsPage() {
                 <Badge tone={hunter.paused ? "lost" : "won"}>{hunter.paused ? "paused" : "running"}</Badge>
               </div>
               <p className="mt-2 text-sm text-pretty">{HUNTER_ROSTER.job}</p>
+              <p className="mt-2 text-sm text-pretty">
+                Also in Chris&apos;s Grok Bot dashboard as Hunter. Same job, same lead book. It finds and files. It never sends.
+              </p>
               <p className="mt-2 text-sm text-muted">
                 {HUNTER_ROSTER.trigger} · {partnerFirst(HUNTER_ROSTER.owner)}
               </p>

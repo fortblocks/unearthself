@@ -173,7 +173,7 @@ export const PARTNER_KINDS: PartnerKind[] = [
 export const HUNTER_DAILY_CALL_CAP = 48;
 
 export const HUNTER_ROSTER = {
-  name: "Lead Hunter",
+  name: "Hunter",
   job: "Find ideal customers worldwide. Never sends.",
   trigger: "Always on",
   owner: "christopher" as const,
