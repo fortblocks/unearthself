@@ -6,7 +6,7 @@
 **Builds on:** `07_WS_SALES_MARKETING.md`, `26_LEADS_PRODUCT_EVOLUTION.md`, `27_LEADS_SAMPLE_EMAILS.md`, `28_LEADS_OPEN_ITEMS.md`  
 **Code this spec describes, and does not change:** `src/lib/leads-scout.ts`, `src/lib/lead-score.ts`, `src/lib/leads-book.ts`, `src/routes/admin.leads.tsx`, `src/routes/admin.bots.tsx`, `src/data/bots.ts`
 
-Per Chris, 18th November: one bot whose only job is finding ideal customers for Unearth Self and Badlands Bootcamp, around the clock. It finds and files. It never sends.
+Hunter's sole job is to feed Chris, on an ongoing basis, companies with a high chance of converting to a team of six to twenty-four for the Unearth Self experience in Drumheller. It finds, researches and files. It never sends.
 
 ## Hard rules
 
@@ -14,7 +14,7 @@ Per Chris, 18th November: one bot whose only job is finding ideal customers for 
 - Unearth Self is completely separate from GeoLab and Geolab Studio. No shared data, tools, or copy.
 - Never invent a name, title, email, company fact, land, building, programme, pricing, partner, or date fact. A field is kept only when its exact text is on the cited public page.
 - Do not buy Apollo. Do not use Clay or any paid data vendor. The partners have not lifted this.
-- The access gate in `07` stays: named person, published email, source URL.
+- The access gate in `07` stays, and it controls sending, not filing. A card needs a named person, a published email and Approve before it can send, but any well-fitting company gets filed.
 - Partners by first name only. Basecamp is one word. Canadian spelling. No em dashes.
 
 ## Why a second bot
@@ -61,6 +61,8 @@ Same card requirements as the scout:
 
 Target roles: people and culture leads, leaders of distributed or high-performing teams, offsite or events owners, founders at smaller fits. Enrichment follows `26` section 1. A card with no named person is still filed as research, and Send stays blocked.
 
+A missing public email never stops a company being filed. If no email is published, Hunter still researches and files the company, with its profile signals, the likely team and the role to approach, each with a source URL. The email field stays blank. Hunter never guesses or builds an address.
+
 ## 4. Score against the ideal profile
 
 A separate fit score, out of 100, beside the existing one. Draft weights for the partners to set:
@@ -71,6 +73,8 @@ A separate fit score, out of 100, beside the existing one. Draft weights for the
 | Access | 25 | same rules as the scout: named person, published email, source |
 | Timing | 15 | dated public signals, same as the scout |
 | Travel likelihood | 10 | Canada and US higher, Europe lower, never zero |
+
+The 25 access points no longer decide whether a company is kept, only how ready it is to contact. A no-email company can still rank high on fit, timing and travel.
 
 The existing scorer in `lead-score.ts` is not changed. Hunter cards carry their own score and a label saying which score they use.
 
@@ -139,6 +143,7 @@ The run method is a build decision for later: a frequent Vercel cron, or a durab
 ## Changelog
 
 - 18th November 2026. Spec opened from Chris's call. Not built.
+- 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.
 
 ## Build notes
 
