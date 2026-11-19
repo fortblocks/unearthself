@@ -27,15 +27,30 @@ The existing approval rule still stands. Every send needs Chris's approval, a na
 
 ### 3. Book
 
-The meeting is booked through Calendly or Google Calendar. The event lands on Chris's real schedule, and the card's status updates automatically, with no manual tap.
+Meetings go through Calendly or Google Calendar. The event lands on Chris's real schedule, and the card updates automatically when a meeting is booked, with no manual tap.
 
-Which tool to use, and connecting it, are still open decisions for Chris. Any new service needs his yes.
+The choice of tool is still open. The new service needs Chris's yes before it is connected.
 
 ## Governing rule
 
 Do not build individual tasks without a clear strategy. Execution must follow from strategy.
 
 Every piece of leads work, including files 26 to 29 and the Hunter branch `cursor/hunter-phase-one-hardening-1ff2`, must trace back to the purpose above and to one of the three steps. Where a lower file differs, this frame governs. The difference is logged in `28_LEADS_OPEN_ITEMS.md` for alignment, rather than silently resolved.
+
+## Decisions, 19th November 2026
+
+Chris stated these on the call.
+
+1. **Booking.** Meetings go through Calendly or Google Calendar. The choice is still open, and the new service needs Chris's yes before it is connected. The card updates automatically when a meeting is booked.
+2. **Second finding method.** Skip X for now. When a second method is added, the preferred one is LinkedIn public posts found through web search. The existing rule against logged-in LinkedIn scraping still stands.
+3. **Monthly dollar cap.** $60.
+4. **Fixed test set.** There is no seed list. The set builds from outcomes: companies that replied or booked become known-goods, and unsubscribes become known-bads.
+5. **CASL basis for Apollo emails.** Log Apollo itself as the basis (data from public sources, per Apollo's terms) plus the date the data was pulled. Never invent a source page.
+6. **Alarms.** Rex receives them first, with Bo and Derek copied.
+7. **Call budget.** Raised from 48 to 55.
+8. **Quality floor.** A card needs at least one verified fit signal. A named person, an email and a source alone (a score of 25) are not enough. Exclude contacts who have moved on, and cap the total cards per day.
+
+Execution follows strategy. No task is built without a clear strategy, and the purpose is retreat bookings.
 
 ## How the leads files map to the steps
 
@@ -59,7 +74,7 @@ This file covers the enrich and write step. It does not run the hunt, and it doe
 
 ### 29, Hunter
 
-`29_LEAD_HUNTER_BOT.md` is the Find spec. Hunter files the leads. The count in that file is 48 contact-ready cards in an Edmonton day. A contact-ready card has a name, a title, and an email.
+`29_LEAD_HUNTER_BOT.md` is the Find spec. Hunter files the leads. The count in that file is 48 contact-ready cards in an Edmonton day. A contact-ready card has a name, a title, and an email. The call budget written in that file is 48. Decision 7 sets the call budget at 55.
 
 Section 9 of `29` makes enrichment phase two of Hunter's own job, including the one true thing, the profile signals, and the right person. This frame keeps that research as its own step. Section 9 names Coco as the writer and Nova as the sender. This frame has Coco writing and sending. Both differences are logged in `28`.
 
@@ -67,10 +82,18 @@ Section 10 of `29` is Hunter's search strategy for the Find step. It sits under 
 
 ### Hunter branch
 
-`cursor/hunter-phase-one-hardening-1ff2` is in progress on the Find step. That branch hardens phase one and does not change the search. On that branch, 48 is a ceiling, a quality floor drops a weak card, and the day is not padded to reach 48.
+`cursor/hunter-phase-one-hardening-1ff2` is in progress on the Find step. That branch hardens phase one and does not change the search. On that branch, 48 contact-ready cards is a ceiling, and the day is not padded to reach 48. The branch does not connect a booking-link service. Booked is still a desk tap. The tool choice and the connection stay open, as logged in `28`.
 
-The same branch records booked, replied, sent, won, and lost with a tap on the desk. It does not connect a booking-link service. The booking direction in step 3 governs. The tool and the connection stay open for Chris, as logged in `28`.
+These decisions are not yet applied on the branch:
+
+- The call budget on the branch is still 48.
+- `HUNTER_MONTHLY_DOLLAR_CAP` is unset.
+- The quality floor on the branch is 20. A stale Apollo contact, including one whose employer no longer matches, is flagged and still kept on the card.
+- Alarms are written to the Redis run log (`unearth:hunter:runs:v1`) and shown on the Bots page. The branch sends no email and no Slack.
+- The branch stores Apollo as the source and the date retrieved. It does not log the CASL basis as data from public sources, per Apollo's terms.
+- A booked meeting is still a desk tap. No booking service is connected.
 
 ## Changelog
 
 - 19th November 2026. Frame opened from Chris's call. Purpose, three steps, and the governing rule recorded. Files 26 to 29 and the Hunter branch mapped to the steps. Differences logged in `28`, not resolved.
+- 19th November 2026. Eight decisions recorded from Chris's call.

@@ -6,13 +6,13 @@ As of 17th November 2026. A running log of discrepancies and items to align befo
 
 ## To align with the leads strategy
 
-Logged 19th November 2026. Still open. File 30 governs until each one is aligned.
+Logged 19th November 2026. Items (a), (b), and (d) are still open. Item (c) has its direction recorded. The tool choice and the connection stay open.
 
 (a) **Enrichment.** `29` makes enrichment phase two of Hunter's own job. File 30 treats enrichment and research as its own step and specialist. The owner is to be aligned.
 
 (b) **Writer and sender.** `29` names Coco as the writer and Nova as the sender. File 30 has Coco writing and sending.
 
-(c) **Booking link.** A booking-link service was an open decision. File 30 sets the direction: Calendly or Google Calendar, with the event on Chris's real schedule and the card status updating automatically, with no manual tap. Which tool to use, and connecting it, stay open for Chris, since any new service needs his yes. On the Hunter branch `cursor/hunter-phase-one-hardening-1ff2`, booked is still a desk tap, and no booking-link service is connected.
+(c) **Booking link.** Direction recorded in `30_LEADS_STRATEGY.md`, Decisions, 19th November 2026. Meetings go through Calendly or Google Calendar, and the card updates automatically when a meeting is booked. The tool choice and the connection stay open. The new service needs Chris's yes before it is connected. On the Hunter branch `cursor/hunter-phase-one-hardening-1ff2`, booked is still a desk tap, and no booking-link service is connected.
 
 (d) **Revenue Swarm.** "Revenue Swarm" is not defined in the Source of Truth.
 
@@ -40,3 +40,4 @@ Logged 19th November 2026. Still open. File 30 governs until each one is aligned
 ## Changelog
 
 - 19th November 2026. File 30 named as the governing frame. Four differences logged above and left open: the enrichment owner, Coco and Nova, the booking link, and Revenue Swarm.
+- 19th November 2026. Decisions in `30_LEADS_STRATEGY.md`, Decisions, 19th November 2026. No numbered open item was closed. Items (a), (b), and (d) stay open. Item (c) stays open: the direction is recorded, and the tool choice and the connection stay open.
