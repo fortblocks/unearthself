@@ -306,7 +306,7 @@ test("a spent call budget before 48 cards records a capacity problem", () => {
   assert.equal(hunterStop(filled, today, 48), "cards");
 });
 
-test("only an Enriched or No-signal card with a name, title, and email is contact-ready", () => {
+test("only an Enriched card with a sourced fact, a name, a title, and an email is contact-ready", () => {
   const contact = {
     buyerName: "Laura Starchuk",
     buyerTitle: "Head of People",
@@ -327,7 +327,7 @@ test("only an Enriched or No-signal card with a name, title, and email is contac
   const quiet = assignEnrichment(company({ ...contact, profileHits: [], signals: [], whySources: [] }), "2026-11-18");
   assert.equal(quiet.enrichment, "no-signal");
   assert.equal(quiet.enrichmentOn, "2026-11-18");
-  assert.equal(isContactReady(quiet), true);
+  assert.equal(isContactReady(quiet), false);
 
   const research = assignEnrichment(company({ ...contact, email: "" }), "2026-11-18");
   assert.equal(research.enrichment, "not-enriched");

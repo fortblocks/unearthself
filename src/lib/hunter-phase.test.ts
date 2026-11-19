@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { classifyApolloReveal, classifyApolloSearch } from "./apollo.ts";
+import { dryRunFixtures } from "./hunter-dry-run.ts";
 import {
   HUNTER_CALLS_PER_RUN_DEFAULT,
   HUNTER_LOCK_TTL_SECONDS,
@@ -25,8 +26,8 @@ import {
   caslBasis,
   classifyPageResponse,
   dncBlocks,
+  checkEmailMx,
   doNotContactKey,
-  dryRunFixtures,
   emailDomainHasMx,
   emptyFunnel,
   heartbeatLate,
@@ -134,11 +135,13 @@ test("an xAI error, a deprecation, or a missing search is not zero results", () 
 });
 
 test("dollars are recorded only when the response names them", () => {
-  const named = readModelUsage({ usage: { input_tokens: 10, output_tokens: 4, cost_in_usd: 0.02, cost_in_usd_ticks: 999 } });
+  const ticks = readModelUsage({ usage: { input_tokens: 10, output_tokens: 4, cost_in_usd: 0.02, cost_in_usd_ticks: 37756000 } });
+  assert.equal(ticks.dollars, 37756000 / 10_000_000_000);
+  assert.equal(ticks.inputTokens, 10);
+  assert.equal(ticks.outputTokens, 4);
+  const named = readModelUsage({ usage: { cost_in_usd: 0.02 } });
   assert.equal(named.dollars, 0.02);
-  assert.equal(named.inputTokens, 10);
-  assert.equal(named.outputTokens, 4);
-  const unnamed = readModelUsage({ usage: { prompt_tokens: 3, completion_tokens: 1, cost_in_usd_ticks: 50 } });
+  const unnamed = readModelUsage({ usage: { prompt_tokens: 3, completion_tokens: 1 } });
   assert.equal(unnamed.dollars, null);
   assert.equal(unnamed.inputTokens, 3);
   assert.equal(monthlyCapLabel(monthlyCapState(null, null)), "no cap set");
@@ -194,6 +197,23 @@ test("retries back off and then abandon the run", async () => {
     });
     assert.equal(calls, 0);
     if ("error" in blocked) assert.match(blocked.error, /budget/);
+    calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return new Response("no", { status: 401 });
+    };
+    const denied = await searchWithRetries({
+      system: "s",
+      prompt: "p",
+      timeoutMs: 1000,
+      maxRetries: 2,
+      beforeAttempt: async () => ({ allowed: true }),
+      sleep: async () => {
+        throw new Error("should not sleep");
+      },
+    });
+    assert.equal(calls, 1);
+    if ("error" in denied) assert.equal(denied.abandoned, true);
   } finally {
     globalThis.fetch = original;
     if (previousKey == null) delete process.env.XAI_API_KEY;
@@ -252,6 +272,11 @@ test("dedupe, do-not-contact, and a book reset stay apart", () => {
   const entry = makeDncEntry({ domain: "lost.example", reason: "lost", today: "2026-11-19", cooldownDays: 90 });
   assert.equal(dncBlocks([entry], "lost.example", "a@lost.example", "2026-11-19"), true);
   assert.equal(dncBlocks([entry], "lost.example", "a@lost.example", "2027-03-01"), false);
+  const unsub = makeDncEntry({ domain: "stop.example", email: "a@stop.example", reason: "unsubscribe", today: "2026-11-19" });
+  assert.equal(unsub.until, "never");
+  assert.equal(dncBlocks([unsub], "stop.example", "a@stop.example", "2099-01-01"), true);
+  const asked = makeDncEntry({ domain: "stop.example", reason: "dont-contact", today: "2026-11-19" });
+  assert.equal(dncBlocks([asked], "stop.example", "", "2099-01-01"), true);
   assert.equal(dncBlocks([entry], "other.example", "", "2026-11-19"), false);
   assert.equal(resetMayTouch(doNotContactKey()), false);
   assert.equal(HUNTER_RESET_KEYS.includes("unearth:hunter:dnc:v1" as "unearth:leads:v1"), false);
@@ -298,7 +323,13 @@ test("drop reasons, the quality floor, and the fixture dry run", () => {
   assert.equal(dropped.filed, 0);
   assert.equal(dropped.drops["below-quality-floor"], 1);
   const kept = fileHunterCards([], cards, { today: "2026-11-19", floor: 0 });
-  assert.equal(kept.filed, 1);
+  assert.equal(kept.filed, 0);
+  const withHit = cards.map((card) => ({
+    ...card,
+    profileHits: [{ id: "outdoor", label: "Outdoor", sourceUrl: card.sourceUrl }],
+  }));
+  const filedThin = fileHunterCards([], withHit, { today: "2026-11-19", floor: 0 });
+  assert.equal(filedThin.filed, 1);
 
   const blocked = fileHunterCards(kept.companies, cards, {
     today: "2026-11-19",
@@ -339,6 +370,12 @@ test("facts, CASL, and MX stay on the card without probing a mailbox", async () 
   assert.equal(looked, 0);
   const live = await emailDomainHasMx("ada@northwind.test", async () => [{ exchange: "mail.northwind.test" }]);
   assert.equal(live, true);
+  const unknown = await checkEmailMx("ada@northwind.test", async () => {
+    const error = new Error("timed out");
+    (error as { code?: string }).code = "ETIMEOUT";
+    throw error;
+  });
+  assert.equal(unknown, "unknown");
 });
 
 test("unreviewed cards expire, and method rates wait for enough reviews", () => {
@@ -355,6 +392,14 @@ test("unreviewed cards expire, and method rates wait for enough reviews", () => 
   assert.equal(rows.companies[0]?.review, "expired-unreviewed");
   assert.equal(rows.companies[1]?.review, "unreviewed");
   assert.equal(rows.companies[2]?.review, "approved");
+  const migrated = applyReviewExpiry(
+    [{ review: "unreviewed" as const, filedOn: "2026-11-01", scoutBatch: "2026-11-01" }],
+    "2026-11-19",
+    5,
+    "2026-11-19",
+  );
+  assert.equal(migrated.expired, 0);
+  assert.equal(migrated.companies[0]?.review, "unreviewed");
   const stats = methodStats(
     [{ lineage: { method: "xai-web-search" }, review: "approved", pipeline: "booked", source: "hunter" }],
     10,

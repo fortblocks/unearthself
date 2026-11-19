@@ -6,6 +6,7 @@
  */
 
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
+import { retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
 
 export const APOLLO_DAILY_CREDIT_CAP_DEFAULT = 48;
@@ -260,10 +261,13 @@ export function applyApolloContact(company: Company, person: ApolloReveal | null
   if (!person) {
     return { ...company, apolloCheckedOn: today };
   }
-  const flags = new Set<string>();
-  if ((person.updatedOn && apolloDateIsStale(person.updatedOn, today)) || !apolloEmployerMatches(company, person)) {
+  if (!apolloEmployerMatches(company, person)) {
+    const flags = new Set(company.cardFlags ?? []);
     flags.add(APOLLO_STALE);
+    return { ...company, apolloCheckedOn: today, cardFlags: [...flags] };
   }
+  const flags = new Set<string>();
+  if (person.updatedOn && apolloDateIsStale(person.updatedOn, today)) flags.add(APOLLO_STALE);
   const verified = apolloEmailIsVerified(person.emailStatus);
   const email = verified ? person.email.trim().toLowerCase() : "";
   if (!verified || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) flags.add(APOLLO_EMAIL_NOT_VERIFIED);
@@ -308,6 +312,8 @@ export async function enrichHunterContacts(input: {
   fetchImpl?: ApolloFetch;
   reserveReveal?: () => Promise<boolean>;
   maxRetries?: number;
+  skip?: (company: Company) => boolean;
+  sleep?: (ms: number) => Promise<void>;
 }): Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed: boolean }> {
   const companies = input.companies.map((company) => markPublicContact(company, input.today));
   if (!input.apiKey) {
@@ -330,15 +336,17 @@ export async function enrichHunterContacts(input: {
   let failed = false;
   const retries = input.maxRetries ?? 2;
   let serviceFailures = 0;
+  const sleep = input.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
 
   for (const company of queue) {
+    if (input.skip?.(company)) continue;
     if (serviceFailures > retries) break;
     if (revealsUsed >= input.cap) {
       hitCeiling = true;
       break;
     }
     const searchUrl = apolloRequestUrl("mixed_people/api_search", apolloSearchParams(company));
-    const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries);
+    const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries, sleep);
     if ("failure" in searchedAttempt) {
       note = searchedAttempt.failure;
       failed = true;
@@ -373,7 +381,7 @@ export async function enrichHunterContacts(input: {
     revealsUsed += 1;
     reveals += 1;
     const revealUrl = apolloRequestUrl("people/match", apolloRevealParams(chosen.id));
-    const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries);
+    const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries, sleep);
     if ("failure" in revealAttempt) {
       note = revealAttempt.failure;
       failed = true;
@@ -403,11 +411,16 @@ export async function enrichHunterContacts(input: {
   };
 }
 
+function apolloRetryable(status: number) {
+  return status === 429 || status >= 500;
+}
+
 async function apolloCall(
   fetchImpl: ApolloFetch,
   url: string,
   key: string,
   maxRetries: number,
+  sleep: (ms: number) => Promise<void>,
 ): Promise<{ response: Response } | { failure: string }> {
   let last = "Apollo request failed";
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -422,15 +435,15 @@ async function apolloCall(
         body: "{}",
         signal: AbortSignal.timeout(20000),
       });
-      if (response.status >= 500 && attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      if (apolloRetryable(response.status) && attempt < maxRetries) {
+        await sleep(retryDelayMs(attempt + 1));
         continue;
       }
       return { response };
     } catch (error) {
       last = error instanceof Error ? redactSecrets(error.message, [key]) : "Apollo request failed";
       if (attempt >= maxRetries) return { failure: last };
-      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      await sleep(retryDelayMs(attempt + 1));
     }
   }
   return { failure: last };

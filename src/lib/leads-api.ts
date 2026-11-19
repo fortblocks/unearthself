@@ -60,12 +60,13 @@ export const replaceLeadsCompanies = createServerFn({ method: "POST" })
   });
 
 export const saveLeadsCompany = createServerFn({ method: "POST" })
-  .validator((data: { company: Company }) => data)
+  .validator((data: { company: Company; draftRevision?: number }) => data)
   .handler(async ({ data }): Promise<LeadsBook> => {
     await requireStaffSession();
     const loaded = await loadBook();
     if (loaded.storage !== "redis") throw new Error("Redis is not configured");
     const next = upsertCompany(loaded.book, data.company);
+    if (data.draftRevision === DRAFT_REVISION) next.draftRevision = DRAFT_REVISION;
     await saveBook(next);
     return next;
   });

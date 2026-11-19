@@ -8,7 +8,7 @@
 
 Hunter's sole job is to feed Chris, on an ongoing basis, companies with a high chance of converting to a team of six to twenty-four for the Unearth Self experience in Drumheller. It finds, researches and files. It never sends.
 
-The job has two phases. Phase one is finding and filing. Phase two is enrichment (section 9). A card is not ready for Coco, the writer, until enrichment is done or the card is explicitly marked no-signal.
+The job has two phases. Phase one is finding and filing. Phase two is enrichment (section 9). A card is not ready for Coco, the writer, until enrichment is done and a sourced fact is on the card. A no-signal card is not contact-ready.
 
 ## Hard rules
 
@@ -25,7 +25,7 @@ Hunter is one bot with two runs. There is no separate local bot.
 
 (a) Nightly local sweep, formerly its own bot. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`. Two UTC hours are scheduled, `0 10 * * *` and `0 11 * * *`, because 4am Edmonton is 10:00 UTC in daylight time and 11:00 UTC in standard time. The route runs only when America/Edmonton local time is 4am, and only once per Edmonton date. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. The score is the existing one in `lead-score.ts`.
 
-(b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards is a ceiling, not a target. Hunter stops at the ceiling. It does not pad the day with weak cards. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched or No-signal (section 9). Both runs count toward the same ceiling. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
+(b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards is a ceiling, not a target. Hunter stops at the ceiling. It does not pad the day with weak cards. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched with a sourced fact (section 9). No-signal is not contact-ready. Both runs count toward the same ceiling. A separate daily file cap, default 48 (`HUNTER_DAILY_FILED_CAP`), counts every card filed that day, research cards included. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
 
 Model calls are a separate daily budget, an internal resource aimed at that 48. The budget is an adjustable setting, currently 48 calls, until Chris sets a new number. Raising it is spend and needs Chris's approval. The setting name is `HUNTER_DAILY_CALL_BUDGET`. If the budget runs out before 48 contact-ready cards are filed, that is a capacity problem, not a normal day. Hunter records the date, the cards filed, and the calls used. Rex is notified on the Bots page and in the stored Hunter state.
 
@@ -83,7 +83,7 @@ The Leads page shows one score. It is the score in `lead-score.ts`, out of 100.
 
 The companies table is Company, Place, Size, and Score. There is no second Hunter score on the card.
 
-Hunter still uses the weights below while it searches and checks a candidate. Those weights are not stored on the lead and are not a column. The morning list ranks by the single score above. Contact-ready still depends on a name, a title, an email, and an Enriched or No-signal mark.
+Hunter still uses the weights below while it searches and checks a candidate. Those weights are not stored on the lead and are not a column. The morning list ranks by the single score above. Contact-ready still depends on a name, a title, an email, and an Enriched mark with a sourced fact. No-signal is not contact-ready.
 
 | Part | Points | Reads |
 |---|---|---|
@@ -175,7 +175,7 @@ A card has one enrichment state:
 
 - **Not enriched.** Filed in phase one only. Not ready for Coco.
 - **Enriched.** A name, title, and email are on file, and at least the one true thing or a profile signal is filled, each with its source. Ready for Coco.
-- **No-signal.** The Hunter looked and found nothing citable about the company, but a name, title, and email are on file. It is marked explicitly, with the date it looked. Ready for Coco, which then writes the honest general version of the `27` letter and does not fake a personal line.
+- **No-signal.** The Hunter looked and found nothing citable about the company, but a name, title, and email are on file. It is marked explicitly, with the date it looked. It is not contact-ready and it does not go to Coco.
 
 ### Enrichment feeds Coco
 
@@ -260,9 +260,9 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
 - The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead stores the Hunter score and the card lineage. It does not store a Partner value, and the Partner column stays off the table.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
-- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. That 48 is a ceiling. Hunter does not fill up to it with cards under the quality floor. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
+- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. That 48 is a ceiling. Hunter does not fill up to it with cards under the quality floor. A contact-ready card has a name, a title, and an email, and is Enriched with a sourced fact. No-signal is not contact-ready. Every card filed that day, research cards included, also stops at the daily file cap, default 48.
 - If the model-call budget runs out first, Hunter stops and records the date, cards filed, and calls used for Rex. The budget defaults to 48. The setting is `HUNTER_DAILY_CALL_BUDGET`. Raising it is spend and needs Chris's approval.
-- No card reaches Coco until its enrichment state is Enriched or No-signal, and every enriched fact shows its source URL.
+- No card reaches Coco until its enrichment state is Enriched and a sourced fact is on the card. Every fact shows a source URL, the date it was fetched, and a quote. An Apollo email with no public page is marked awaiting Chris for its CASL basis.
 
 ## Open questions for partners
 
@@ -284,9 +284,9 @@ Chris approved a robustness pass. Search behaviour is unchanged. The following i
 - One run at a time. The lock is an Upstash set-if-absent with a token, a 360 second expiry (longer than the 300 second function limit), and a delete that only the holder can perform. The old lock was a read then a write and expired at 120 seconds, so a slow run could overlap the next one.
 - Throughput. Working hours default to 12 hours. Every 30 minutes is 24 runs. `HUNTER_CALLS_PER_RUN` defaults to 2, so the day can still make 48 model calls, which is the whole daily call budget. Each call can return up to 8 companies, so the 48-card ceiling is reachable. Two 90 second searches fit under the 300 second limit.
 - Every new card gets a dedupe key of normalised domain plus contact email, checked before filing.
-- Do-not-contact lives at `unearth:hunter:dnc:v1`. A book reset replaces `unearth:leads:v1` and `unearth:hunter:v1` only. The list holds unsubscribes, don't-contact replies, lost companies, and skipped companies. The cooldown defaults to 90 days (`HUNTER_DNC_COOLDOWN_DAYS`). Lost and skipped on the desk write the list. The desk can also add unsubscribe and don't-contact.
+- Do-not-contact lives at `unearth:hunter:dnc:v1` as a hash, so two adds at once cannot drop one. A book reset replaces `unearth:leads:v1` and `unearth:hunter:v1` only. Unsubscribe and don't-contact never expire. Lost and skipped keep the 90-day cooldown (`HUNTER_DNC_COOLDOWN_DAYS`). The nightly sweep and Apollo enrichment both check the list. The desk writes the list.
 - Call and Apollo credit counters increment in Redis before the call and stop at the cap. They reset by the Edmonton date in the key. A retry counts as another call. After the allowed retries the run stops. `HUNTER_MAX_RETRIES` defaults to 2, so three tries, with backoff and jitter.
-- Dollars come from the xAI response field `cost_in_usd` or `cost` when that field is a number. Token counts are always stored. If the response does not name a dollar amount, dollars stay unknown. Tick fields are not converted. Apollo stays in credits. `HUNTER_MONTHLY_DOLLAR_CAP` is unset until Chris sets it. When unset, the desk says "no cap set". When set, 80 percent warns and 100 percent stops, and only when the dollars are known.
+- Dollars come from xAI `usage.cost_in_usd_ticks` at 10,000,000,000 ticks to one dollar, then `cost_in_usd`, then `cost`. Token counts are always stored. If none of those fields is present, dollars stay unknown. Apollo stays in credits. `HUNTER_MONTHLY_DOLLAR_CAP` is unset until Chris sets it. When unset, the desk says "no cap set". When set, 80 percent warns and 100 percent stops, and only when the dollars are known.
 - A dropped company gets a reason: page empty, fetch failed, blocked, timed out, name missing, domain mismatch, place mismatch, do-not-contact, duplicate, below the quality floor, no MX, or unverified. A failed page fetch is tried once more. If it still fails, the company is held as unverified, logged, and not filed.
 - Each run logs a funnel: searched, candidates, verified, contact found, filed, and drops by reason. The Bots page shows the latest one.
 - A fact keeps its source URL, the fetch date, and a quoted snippet. An email keeps a CASL note: the page it was published on, whether the title fits a role, and whether that page shows a notice against unsolicited email. If the notice is there, the email is left off the card. The email domain is checked for MX records with DNS only. A mailbox is never probed and SMTP is never opened. The date the contact was last seen is stored.
@@ -294,7 +294,7 @@ Chris approved a robustness pass. Search behaviour is unchanged. The following i
 - The desk can approve a card, or skip it with one tap: wrong size, wrong sector, no retreat signal, bad contact, duplicate, or other. Further taps record sent, replied, booked, won, and lost. A card still unreviewed after `HUNTER_REVIEW_DAYS` (default 5) becomes expired unreviewed. That is not a rejection. It is a capacity signal.
 - No booking-link service is connected. The desk shows the note that this needs Chris's yes first.
 - The Bots headline is booked calls this month. The method table shows filed, approval rate, reply rate, booked, and cost per card, and says "not enough data" until a method has 30 reviewed cards. The only method is xAI web search. It is on. `HUNTER_TRIAL_SHARE` defaults to 20 percent and is clamped between 20 and 30. That share is unassigned because no trial method exists.
-- The quality floor default is 20. A card with no verified profile signal lands near travel plus a bare source, about 5. 20 asks for about two profile signals, or one signal plus a named contact, so the ceiling is not filled with empty research cards. This default is for Chris to confirm.
+- The quality floor default is 20, and a new card also needs at least one verified profile signal. A contact, an email, and a source alone do not pass. A failed MX check removes the email and keeps the company. A temporary DNS error is not a failed MX check. This default is for Chris to confirm.
 - `npm run hunter:dry` runs the fictional fixture set and prints the funnel. It does not file and does not spend. `--live` may search once and still does not file. The live company list in code is empty.
 
 Settings Chris has not set, with the defaults in code:
@@ -316,7 +316,7 @@ Settings Chris has not set, with the defaults in code:
 
 ## Changelog
 
-- 19th November 2026. Phase one hardening, per Chris. 48 is a ceiling. Working hours, the kill switch, the atomic lock, the do-not-contact list, response checks, alarms, the funnel, CASL and MX notes, card lineage, desk outcomes, and the fixture dry run are described above. The Hunter score is stored again. The Partner column stays off. No booking-link service. Monthly strategy stays self-executing, with Rex overseeing. Not deployed.
+- 19th November 2026. Phase one hardening, per Chris. 48 is a ceiling. Working hours, the kill switch, the atomic lock, the do-not-contact list, response checks, alarms, the funnel, CASL and MX notes, card lineage, desk outcomes, and the fixture dry run are described above. The Hunter score is stored again. The Partner column stays off. No booking-link service. Monthly strategy stays self-executing, with Rex overseeing. Not deployed. The same day, after review: every fetched page is checked, permanent do-not-contact entries do not expire, the desk saves one card at a time, a run saves after each pass and keeps a pause, xAI ticks are read at the published rate, and alarms from the last 24 hours are kept for Rex. `HUNTER_ALARM_WEBHOOK_URL` is unset.
 
 - 18th November 2026. Spec opened from Chris's call. Not built.
 - 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.

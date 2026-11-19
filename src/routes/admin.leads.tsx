@@ -16,7 +16,7 @@ import {
   readLocalCompanies,
   type MorningBatch,
 } from "@/lib/leads-book";
-import { getLeadsBook, importLeadsCompanies, replaceLeadsCompanies, setLeadsMorningCount } from "@/lib/leads-api";
+import { getLeadsBook, importLeadsCompanies, saveLeadsCompany, setLeadsMorningCount } from "@/lib/leads-api";
 import { addDoNotContact } from "@/lib/leads-hunter-api";
 import { cardSource } from "@/lib/leads-hunter";
 import { DEFAULT_LEAD_SORT, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
@@ -141,7 +141,9 @@ function LeadsPage() {
             const refreshed = refreshUnsentDrafts(companies, useDesk.getState().threads);
             companies = refreshed.companies;
             useDesk.setState({ threads: refreshed.threads });
-            book = await replaceLeadsCompanies({ data: { companies, draftRevision: DRAFT_REVISION } });
+            for (const company of companies) {
+              book = await saveLeadsCompany({ data: { company, draftRevision: DRAFT_REVISION } });
+            }
             if (gone) return;
             companies = book.companies;
           }
@@ -195,19 +197,23 @@ function LeadsPage() {
     return filtered.filter(({ company }) => ids.has(company.id));
   }, [rows, morning, morningCount, today, filtered]);
 
-  async function persist(next: Company[]) {
-    setRows(next);
-    useDesk.setState({ companies: next });
-    if (storage !== "redis") return;
-    await replaceLeadsCompanies({ data: { companies: next } });
+  async function persistCard(id: string) {
+    const company = useDesk.getState().companies.find((item) => item.id === id);
+    if (!company) return;
+    if (storage !== "redis") {
+      setRows(useDesk.getState().companies);
+      return;
+    }
+    const book = await saveLeadsCompany({ data: { company } });
+    setRows(book.companies);
+    useDesk.setState({ companies: book.companies });
   }
 
   async function mutate(id: string, act: () => string | null) {
     useDesk.setState({ companies: rowsRef.current });
     const err = act();
-    const next = useDesk.getState().companies;
     try {
-      await persist(next);
+      await persistCard(id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save");
     }

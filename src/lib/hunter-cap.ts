@@ -157,7 +157,7 @@ export function assignEnrichment<T extends Company>(company: T, today: string): 
   return { ...company, enrichment: "no-signal" satisfies EnrichmentState, enrichmentOn: keepDate };
 }
 
-/** Enriched needs a sourced fact. No-signal is the explicit mark after a look that found none. */
+/** Enriched needs a sourced fact. No-signal is not contact-ready. */
 export function isContactReady(company: {
   buyerName: string;
   buyerTitle: string;
@@ -172,7 +172,7 @@ export function isContactReady(company: {
   whySources?: { url: string }[];
 }) {
   if (!hasBuyerContact(company)) return false;
-  if (company.enrichment === "no-signal") return true;
+  if (company.enrichment === "no-signal") return false;
   if (company.enrichment === "enriched") return hasSourcedFact(company);
   return false;
 }

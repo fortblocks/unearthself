@@ -1,19 +1,70 @@
 /**
- * Dry run. The default uses fictional fixtures and files nothing.
- * `--live` may spend one model call when XAI_API_KEY is set. It never files and never sends.
+ * Dry run. The default uses fictional fixtures and the real verify and file code.
+ * It files nothing to the book. `--live` may spend one model call when XAI_API_KEY is set.
+ * Live mode verifies and scores. It never files and never sends.
  */
 
 import { hunterQualityFloor } from "./hunter-config.ts";
-import { HUNTER_LIVE_LIST, dryRunFixtures } from "./hunter-phase.ts";
+import { addDrop, emptyFunnel, HUNTER_KNOWN_BAD, HUNTER_KNOWN_GOOD, HUNTER_LIVE_LIST, type DryCompany, type DncEntry } from "./hunter-phase.ts";
+import { fileHunterCards, readPages, selectHunterRows, urlsForDrafts, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
+
+export function fixtureDraft(row: DryCompany): HunterDraft {
+  const claimed = row.page.toLowerCase().includes("outdoor") ? [{ id: "outdoor", sourceUrl: row.sourceUrl }] : [];
+  return {
+    domain: row.domain,
+    org: row.org,
+    place: "",
+    industry: "other",
+    sizeBand: "unknown",
+    sourceUrl: row.sourceUrl,
+    signals: [],
+    profileSignals: claimed,
+    buyer: {
+      name: row.email ? "Ada North" : "",
+      title: row.email ? "Head of People" : "",
+      email: row.email,
+      emailSource: row.email ? row.sourceUrl : "",
+    },
+  };
+}
+
+export function dryRunFixtures(floor: number, dnc: DncEntry[] = [], today = "2026-11-19") {
+  const funnel = emptyFunnel();
+  const held: string[] = [];
+  const rows = [...HUNTER_KNOWN_GOOD, ...HUNTER_KNOWN_BAD];
+  const drafts: HunterDraft[] = [];
+  const pages: Record<string, string> = {};
+  funnel.searched = rows.length;
+  for (const row of rows) {
+    funnel.candidates += 1;
+    if (!row.page.trim()) {
+      addDrop(funnel, "page-empty");
+      held.push(row.domain);
+      continue;
+    }
+    drafts.push(fixtureDraft(row));
+    pages[row.sourceUrl] = row.page;
+  }
+  const cards = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today });
+  funnel.verified = cards.length;
+  const filed = fileHunterCards([], cards, { today, floor, dnc });
+  funnel.contactFound = filed.companies.filter((company) => company.email).length;
+  funnel.filed = filed.filed;
+  for (const [reason, count] of Object.entries(filed.drops)) {
+    for (let n = 0; n < count; n += 1) addDrop(funnel, reason as "duplicate");
+  }
+  return { ...funnel, held, companies: filed.companies };
+}
 
 const live = process.argv.includes("--live");
+const invoked = process.argv[1]?.includes("hunter-dry-run");
 
-if (!live) {
+if (invoked && !live) {
   const funnel = dryRunFixtures(hunterQualityFloor());
   console.log(JSON.stringify({ mode: "fixtures", liveList: HUNTER_LIVE_LIST.length, filed: false, funnel }, null, 2));
-} else if (!process.env.XAI_API_KEY?.trim()) {
+} else if (invoked && !process.env.XAI_API_KEY?.trim()) {
   console.log(JSON.stringify({ mode: "live", filed: false, searched: false, note: "XAI_API_KEY is not set. No search was made." }));
-} else {
+} else if (invoked) {
   const { callXaiWebSearch } = await import("./xai-search.ts");
   const { hunterPrompt, slotAt } = await import("./leads-hunter.ts");
   const { slot } = slotAt(0);
@@ -22,18 +73,28 @@ if (!live) {
     hunterPrompt(slot, []),
     90_000,
   );
-  const companies = "error" in result ? 0 : Array.isArray(result.companies) ? result.companies.length : 0;
-  console.log(
-    JSON.stringify(
-      {
-        mode: "live",
-        filed: false,
-        searched: !("error" in result),
-        companies,
-        error: "error" in result ? result.error : "",
-      },
-      null,
-      2,
-    ),
-  );
+  if ("error" in result) {
+    console.log(JSON.stringify({ mode: "live", filed: false, searched: false, companies: 0, error: result.error }, null, 2));
+  } else {
+    const drafts = selectHunterRows(result);
+    const fetched = await readPages(urlsForDrafts(drafts));
+    const pages: Record<string, string> = {};
+    for (const [url, page] of Object.entries(fetched)) pages[url] = page.text;
+    const cards = verifyHunterDrafts(drafts, pages, { regionId: slot.regionId, today: new Date().toISOString().slice(0, 10) });
+    console.log(
+      JSON.stringify(
+        {
+          mode: "live",
+          filed: false,
+          searched: true,
+          companies: drafts.length,
+          verified: cards.length,
+          scores: cards.map((card) => ({ org: card.org, score: card.hunterScore, hits: card.profileHits.length })),
+          error: "",
+        },
+        null,
+        2,
+      ),
+    );
+  }
 }

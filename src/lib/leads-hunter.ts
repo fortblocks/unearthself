@@ -38,18 +38,29 @@ import {
 import { contactIfPresent } from "./leads-scout.ts";
 import {
   HUNTER_CARD_CEILING,
+  HUNTER_ALARM_KEY,
   HUNTER_MODEL_ID,
   hunterCallsPerRun,
   hunterKilled,
   hunterMaxRetries,
   hunterMonthlyDollarCap,
+  HUNTER_PASS_BUDGET_MS,
+  HUNTER_PROMPT_DOMAIN_CHARS,
+  hunterDailyFiledCap,
   hunterQualityFloor,
   hunterReviewDays,
+  hunterTrialShare,
 } from "./hunter-config.ts";
 import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
 import {
   addDays,
   addDrop,
+  alarmsWithin,
+  checkEmailMx,
+  chooseSlotIndex,
+  dncField,
+  explorationTurn,
+  filedThroughHour,
   addSpendCents,
   apolloCounterKey,
   applyReviewExpiry,
@@ -61,7 +72,8 @@ import {
   caslBasis,
   dncBlocks,
   doNotContactKey,
-  emailDomainHasMx,
+  mergeHunterCompanies,
+  parseDncValue,
   emptyFunnel,
   findingMethods,
   heartbeatLate,
@@ -74,6 +86,8 @@ import {
   passesQualityFloor,
   quoteSnippet,
   reserveCounter,
+  slotUsage,
+  slotWeights,
   spendCounterKey,
   spendUnknownKey,
   zeroCandidateAlarm,
@@ -81,7 +95,7 @@ import {
   type DncReason,
   type HunterFunnel,
 } from "./hunter-phase.ts";
-import { nightlySkip, withinWorkingHours } from "./hunter-time.ts";
+import { edmontonClock, nightlySkip, withinWorkingHours } from "./hunter-time.ts";
 import { searchWithRetries } from "./xai-search.ts";
 
 export const HUNTER_KEY = "unearth:hunter:v1";
@@ -114,9 +128,11 @@ export type HunterState = {
   apolloReveals: number;
   /** Edmonton date the nightly sweep last ran. */
   nightlyOn: string;
+  /** Cards filed before this Edmonton date are not auto-expired. Set on the first run of this code. */
+  reviewEpoch: string;
 };
 
-export type ProfileHit = { id: string; label: string; sourceUrl: string };
+export type ProfileHit = { id: string; label: string; sourceUrl: string; snippet?: string; fetchedOn?: string };
 
 export type PartnerFlag = { flagged: boolean; reason: string; sourceUrl: string };
 
@@ -154,6 +170,8 @@ export type HunterCard = {
   hunterRegion: string;
   hunterBreak: HunterBreak;
   hunterScore: number;
+  query?: string;
+  exploration?: boolean;
 };
 
 export function freshHunterState(): HunterState {
@@ -171,6 +189,7 @@ export function freshHunterState(): HunterState {
     apolloOn: "",
     apolloReveals: 0,
     nightlyOn: "",
+    reviewEpoch: "",
   };
 }
 
@@ -192,6 +211,7 @@ export function parseHunterState(raw: unknown): HunterState {
     apolloOn: typeof row.apolloOn === "string" ? row.apolloOn : "",
     apolloReveals: numberOrZero(row.apolloReveals),
     nightlyOn: typeof row.nightlyOn === "string" ? row.nightlyOn : "",
+    reviewEpoch: typeof row.reviewEpoch === "string" ? row.reviewEpoch : "",
   };
 }
 
@@ -453,7 +473,7 @@ function verifiedSignals(raw: unknown, pages: Record<string, string>, idPrefix: 
   });
 }
 
-function verifiedHits(draft: HunterDraft, pages: Record<string, string>): ProfileHit[] {
+function verifiedHits(draft: HunterDraft, pages: Record<string, string>, today: string): ProfileHit[] {
   const hits: ProfileHit[] = [];
   const seen = new Set<string>();
   for (const claimed of draft.profileSignals) {
@@ -462,9 +482,16 @@ function verifiedHits(draft: HunterDraft, pages: Record<string, string>): Profil
     if (!signal) continue;
     const page = pages[claimed.sourceUrl] ?? "";
     if (!page) continue;
-    if (!signal.terms.some((term) => pageHas(page, term))) continue;
+    const term = signal.terms.find((item) => pageHas(page, item));
+    if (!term) continue;
     seen.add(signal.id);
-    hits.push({ id: signal.id, label: signal.label, sourceUrl: claimed.sourceUrl });
+    hits.push({
+      id: signal.id,
+      label: signal.label,
+      sourceUrl: claimed.sourceUrl,
+      snippet: quoteSnippet(page, term),
+      fetchedOn: today,
+    });
   }
   return hits;
 }
@@ -523,7 +550,7 @@ export function verifyHunterDrafts(
       : { name: "", title: "", email: "", emailSource: "" };
     const buyerName = usableName(contact.name);
     const buyerTitle = titleOnPage(contactPage, draft.buyer.title, Boolean(buyerName));
-    const hits = verifiedHits(draft, pages);
+    const hits = verifiedHits(draft, pages, opts.today);
     const signals = verifiedSignals(draft.signals, pages, `H-${cards.length + 1}`);
     const partnerFlag = partnerFromPages(pages);
     const hunterBreak = scoreHunter({
@@ -626,19 +653,30 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     dedupeKey: cardDedupeKey(card.domain, card.email),
     contactLastSeenOn: card.email ? today : "",
     lineage: makeLineage({
-      query: card.hunterRegion,
+      query: card.query || card.hunterRegion,
       signals: card.profileHits.map((hit) => hit.id),
       sourceUrl: card.sourceUrl,
       cardId: id,
+      exploration: card.exploration,
     }),
-    facts: [
-      {
-        sourceUrl: card.sourceUrl,
-        fetchedOn: today,
-        snippet: card.why.slice(0, 180),
-      },
-    ],
+    facts: cardFacts(card, today),
   });
+}
+
+function cardFacts(card: HunterCard, today: string) {
+  const facts = [
+    ...card.profileHits
+      .filter((hit) => hit.snippet)
+      .map((hit) => ({ sourceUrl: hit.sourceUrl, fetchedOn: hit.fetchedOn || today, snippet: hit.snippet ?? "" })),
+    ...card.signals
+      .filter((signal) => signal.note.trim() || signal.date)
+      .map((signal) => ({
+        sourceUrl: signal.sourceUrl,
+        fetchedOn: today,
+        snippet: signal.note.trim() || `${signal.kind} ${signal.date}`,
+      })),
+  ];
+  return facts.length ? facts : [{ sourceUrl: card.sourceUrl, fetchedOn: today, snippet: card.why.slice(0, 180) }];
 }
 
 /**
@@ -670,7 +708,7 @@ export function fileHunterCards(
       noteDrop("duplicate");
       continue;
     }
-    if (index === -1 && !passesQualityFloor(card.hunterScore, floor)) {
+    if (index === -1 && (card.profileHits.length === 0 || !passesQualityFloor(card.hunterScore, floor))) {
       noteDrop("below-quality-floor");
       continue;
     }
@@ -690,6 +728,15 @@ export function fileHunterCards(
         profileHits,
         hunterRegion: existing.hunterRegion || card.hunterRegion,
         place: existing.place || card.place,
+        contactLastSeenOn:
+          card.email && existing.email.trim().toLowerCase() === card.email.trim().toLowerCase() ? opts.today : existing.contactLastSeenOn,
+        lineage: existing.lineage ?? makeLineage({
+          query: card.query || card.hunterRegion,
+          signals: profileHits.map((hit) => hit.id),
+          sourceUrl: existing.sourceUrl || card.sourceUrl,
+          cardId: existing.id,
+          exploration: card.exploration,
+        }),
       }),
       opts.today,
     );
@@ -698,9 +745,22 @@ export function fileHunterCards(
   return { companies: next, filed, updated, contactReady: countContactReadyGain(companies, next), drops };
 }
 
+export function domainsForPrompt(knownDomains: string[], maxChars = HUNTER_PROMPT_DOMAIN_CHARS) {
+  const unique = [...new Set(knownDomains.map((domain) => normalizeDomain(domain)).filter(Boolean))];
+  const listed: string[] = [];
+  let size = 0;
+  for (const domain of unique) {
+    const next = size + domain.length + 2;
+    if (listed.length > 0 && next > maxChars) break;
+    listed.push(domain);
+    size = next;
+  }
+  return listed.join(", ");
+}
+
 export function hunterPrompt(slot: HunterSlot, knownDomains: string[]) {
   const signal = HUNTER_SIGNALS.find((item) => item.id === slot.signalId);
-  const skip = knownDomains.slice(0, 200).join(", ");
+  const skip = domainsForPrompt(knownDomains);
   const signalList = HUNTER_SIGNALS.map((item) => `${item.id}: ${item.search}`).join("\n");
   return `Find companies for Badlands Bootcamp at Unearth Self. One team of 6 to 24 people inside a company of any size. Return JSON only.
 
@@ -771,7 +831,7 @@ export function urlsForDrafts(drafts: HunterDraft[]) {
   return [...urls].slice(0, 40);
 }
 
-async function readPages(urls: string[]) {
+export async function readPages(urls: string[]) {
   const pages: Record<string, import("./hunter-phase.ts").PageRead> = {};
   let cursor = 0;
   async function worker() {
@@ -816,6 +876,28 @@ async function saveHunterState(state: HunterState) {
   await redis.set(HUNTER_KEY, state);
 }
 
+let mxLookupOverride: ((host: string) => Promise<{ exchange?: string }[]>) | null = null;
+
+export function useMxLookupForTests(lookup: ((host: string) => Promise<{ exchange?: string }[]>) | null) {
+  mxLookupOverride = lookup;
+}
+
+async function lookupMx(host: string) {
+  if (mxLookupOverride) return mxLookupOverride(host);
+  const { promises } = await import("node:dns");
+  return promises.resolveMx(host);
+}
+
+async function settleApolloCompany(company: Company, dnc: DncEntry[], today: string): Promise<Company> {
+  if (company.contactSource !== "Apollo" || !company.email) return company;
+  if (dncBlocks(dnc, company.domain, company.email, today)) {
+    return { ...company, email: "", emailSource: "", cardFlags: [...(company.cardFlags ?? []), "Do not contact"] };
+  }
+  const mx = await checkEmailMx(company.email, lookupMx);
+  if (mx === "no") return { ...company, email: "", emailSource: "", emailMx: false, caslStatus: "awaiting-chris" };
+  return { ...company, emailMx: mx === "yes", caslStatus: "awaiting-chris" };
+}
+
 function revealsOn(state: HunterState, today: string) {
   return state.apolloOn === today ? state.apolloReveals : 0;
 }
@@ -832,25 +914,38 @@ async function rememberRun(input: Parameters<typeof hunterRunEntry>[0]) {
 type HunterRedis = {
   get: <T>(key: string) => Promise<T | null>;
   set: (key: string, value: unknown, opts?: { nx?: true; ex?: number }) => Promise<string | null>;
+  del?: (key: string) => Promise<unknown>;
   incr: (key: string) => Promise<number>;
   decr: (key: string) => Promise<number>;
   incrby: (key: string, amount: number) => Promise<number>;
   expire: (key: string, seconds: number) => Promise<unknown>;
   eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
+  hset?: (key: string, field: string, value: string) => Promise<unknown>;
+  hgetall?: (key: string) => Promise<Record<string, unknown> | null>;
+  lpush?: (key: string, value: string) => Promise<unknown>;
+  ltrim?: (key: string, start: number, stop: number) => Promise<unknown>;
+  lrange?: (key: string, start: number, stop: number) => Promise<unknown[]>;
 };
 
-async function loadDoNotContact(redis: { get: <T>(key: string) => Promise<T | null> }): Promise<DncEntry[]> {
+export async function loadDoNotContact(redis: HunterRedis): Promise<DncEntry[]> {
+  if (redis.hgetall) {
+    try {
+      const hash = await redis.hgetall(doNotContactKey());
+      if (hash && typeof hash === "object" && !Array.isArray(hash) && Object.keys(hash).length > 0) {
+        return Object.values(hash).flatMap((value) => {
+          const entry = parseDncValue(value);
+          return entry ? [entry] : [];
+        });
+      }
+    } catch {
+      // An older list is a string key. Fall through and read it.
+    }
+  }
   const raw = await redis.get<unknown>(doNotContactKey());
-  const list = Array.isArray(raw)
-    ? raw
-    : raw && typeof raw === "object" && Array.isArray((raw as { entries?: unknown }).entries)
-      ? (raw as { entries: unknown[] }).entries
-      : [];
+  const list = Array.isArray(raw) ? raw : [];
   return list.flatMap((row) => {
-    if (!row || typeof row !== "object") return [];
-    const entry = row as DncEntry;
-    if (!entry.domain || !entry.reason || !entry.addedOn || !entry.until) return [];
-    return [entry];
+    const entry = parseDncValue(row);
+    return entry?.until ? [entry] : [];
   });
 }
 
@@ -869,9 +964,18 @@ export async function appendDoNotContact(input: {
   const redis = await getRedisClient();
   if (!redis) throw new Error("Redis is not configured");
   const client = redis as HunterRedis;
-  const entries = await loadDoNotContact(client);
   const next = makeDncEntry(input);
+  const entries = await loadDoNotContact(client);
   if (dncBlocks(entries, next.domain, next.email, input.today)) return entries;
+  if (client.hset) {
+    const legacy = await client.get<unknown>(doNotContactKey());
+    if (Array.isArray(legacy)) {
+      await client.del?.(doNotContactKey());
+      for (const row of entries) await client.hset(doNotContactKey(), dncField(row), JSON.stringify(row));
+    }
+    await client.hset(doNotContactKey(), dncField(next), JSON.stringify(next));
+    return loadDoNotContact(client);
+  }
   const saved = [...entries, next];
   await client.set(doNotContactKey(), saved);
   return saved;
@@ -887,6 +991,7 @@ export async function enrichUnderApolloCap(input: {
   const redis = await getRedisClient();
   const client = redis as HunterRedis | null;
   const cap = apolloCreditCap();
+  const dnc = client ? await loadDoNotContact(client) : [];
   const seeded = client ? await seedCounter(client, apolloCounterKey(input.today), revealsOn(state, input.today)) : revealsOn(state, input.today);
   const result = await enrichHunterContacts({
     companies: input.companies,
@@ -899,7 +1004,9 @@ export async function enrichUnderApolloCap(input: {
     reserveReveal: client
       ? async () => (await reserveCounter(client, apolloCounterKey(input.today), cap)).allowed
       : undefined,
+    skip: (company) => dncBlocks(dnc, company.domain, company.email, input.today),
   });
+  result.companies = await Promise.all(result.companies.map((company) => settleApolloCompany(company, dnc, input.today)));
   if (result.reveals > 0) {
     const fresh = await loadHunterState();
     await saveHunterState({
@@ -911,13 +1018,52 @@ export async function enrichUnderApolloCap(input: {
   return result;
 }
 
+function huntQuery(slot: HunterSlot, explore: boolean) {
+  const signal = HUNTER_SIGNALS.find((item) => item.id === slot.signalId);
+  return `${slot.signalId}|${slot.regionId}|${signal?.search ?? slot.signalLabel}${explore ? "|explore" : ""}`;
+}
+
+async function persistCompanies(start: Company[], hunter: Company[]) {
+  const fresh = await loadBook();
+  const merged = mergeHunterCompanies(start, hunter, fresh.book.companies);
+  if (fresh.storage === "redis") await saveBook({ ...fresh.book, companies: merged });
+  return merged;
+}
+
+async function keepRunFlags(state: HunterState) {
+  const fresh = await loadHunterState();
+  return {
+    ...state,
+    paused: fresh.paused,
+    nightlyOn: fresh.nightlyOn || state.nightlyOn,
+    reviewEpoch: state.reviewEpoch || fresh.reviewEpoch,
+  };
+}
+
+async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, run: string) {
+  if (!alarms.length || !redis.lpush) return;
+  for (const text of alarms) await redis.lpush(HUNTER_ALARM_KEY, JSON.stringify({ at, text, run }));
+  await redis.ltrim?.(HUNTER_ALARM_KEY, 0, 400);
+  const url = process.env.HUNTER_ALARM_WEBHOOK_URL?.trim();
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ at, run, alarms }),
+    });
+  } catch {
+    // A missed webhook must not fail the hunt.
+  }
+}
+
 function dayStopCopy(stop: "cards" | "budget", state: HunterState, today: string, budget: number) {
   const counts = countsForToday(state, today);
   if (stop === "cards") return `Daily ceiling of ${HUNTER_CARD_CEILING} contact-ready cards filed.`;
   return `Capacity problem. Model-call budget of ${budget} ran out. Filed ${counts.filedToday} of ${HUNTER_CARD_CEILING} contact-ready cards.`;
 }
 
-export async function runHunterBatch(now = new Date()): Promise<
+export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => number }): Promise<
   | { ok: true; skipped: "paused" | "cards" | "budget" | "busy" | "killed" | "hours"; callsToday: number; filedToday: number }
   | { ok: true; filed: number; contactReady: number; updated: number; callsToday: number; filedToday: number; slot: string }
   | { ok: false; error: string }
@@ -992,9 +1138,12 @@ export async function runHunterBatch(now = new Date()): Promise<
       return { ok: false, error: "Redis is not configured" };
     }
 
-    const expired = applyReviewExpiry(loaded.book.companies, today, hunterReviewDays());
+    if (!state.reviewEpoch) state = { ...state, reviewEpoch: today };
+    const expired = applyReviewExpiry(loaded.book.companies, today, hunterReviewDays(), state.reviewEpoch);
     let companies = expired.companies;
-    const known = new Set(companies.map((company) => company.domain));
+    const known = new Set(companies.map((company) => normalizeDomain(company.domain)));
+    const clock = hooks?.clock ?? Date.now;
+    const started = clock();
     const funnel = emptyFunnel();
     const held: string[] = [];
     let cursor = state.cursor;
@@ -1013,7 +1162,14 @@ export async function runHunterBatch(now = new Date()): Promise<
     const month = today.slice(0, 7);
 
     for (let pass = 0; pass < passes; pass += 1) {
+      if (pass > 0 && clock() - started >= HUNTER_PASS_BUDGET_MS) break;
+      const live = await loadHunterState();
+      if (live.paused) {
+        state = { ...state, paused: true };
+        break;
+      }
       if (hunterStop(state, today, budget)) break;
+      if (companies.filter((company) => company.filedOn === today).length >= hunterDailyFiledCap()) break;
       const spendUnknown = await redis.get<string>(spendUnknownKey(month));
       const spentRaw = Number(await redis.get<string>(spendCounterKey(month)));
       const spent = spendUnknown || !Number.isFinite(spentRaw) ? null : spentRaw / 100;
@@ -1022,8 +1178,17 @@ export async function runHunterBatch(now = new Date()): Promise<
         lastError = "Monthly dollar cap reached.";
         break;
       }
-      const picked = slotAt(cursor);
-      slotLabel = `${picked.slot.signalLabel} / ${picked.slot.regionLabel}`;
+      const explore = explorationTurn(cursor, hunterTrialShare());
+      const slotIndex = chooseSlotIndex({
+        cursor,
+        slots: hunterSlots(),
+        usage: slotUsage(companies),
+        weights: slotWeights(companies),
+        explore,
+      });
+      const picked = slotAt(slotIndex);
+      const query = huntQuery(picked.slot, explore);
+      slotLabel = `${picked.slot.signalLabel} / ${picked.slot.regionLabel}${explore ? " / explore" : ""}`;
       const research = await searchWithRetries({
         system:
           "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
@@ -1059,14 +1224,18 @@ export async function runHunterBatch(now = new Date()): Promise<
         dollars += research.usage.dollars;
         await addSpendCents(redis, month, research.usage.dollars);
       }
-      const drafts = selectHunterRows(research);
+      const drafts = selectHunterRows(research).filter((draft) => {
+        if (!known.has(normalizeDomain(draft.domain))) return true;
+        addDrop(funnel, "duplicate");
+        return false;
+      });
       funnel.searched += 1;
       funnel.candidates += drafts.length;
       const fetched = await readPages(urlsForDrafts(drafts));
       const pages: Record<string, string> = {};
+      for (const [url, page] of Object.entries(fetched)) pages[url] = page.text;
       const kept = drafts.filter((draft) => {
         const page = fetched[draft.sourceUrl] ?? { text: "", reason: "fetch-failed" as const };
-        pages[draft.sourceUrl] = page.text;
         const reason = draftDropReason(draft, page.text, picked.slot.regionId, page.reason);
         if (!reason) return true;
         addDrop(funnel, reason);
@@ -1075,31 +1244,39 @@ export async function runHunterBatch(now = new Date()): Promise<
       });
       const verified = verifyHunterDrafts(kept, pages, { regionId: picked.slot.regionId, today });
       const ready: HunterCard[] = [];
+      const mxYes = new Set<string>();
       for (const card of verified) {
-        if (card.email) {
-          const mx = await emailDomainHasMx(card.email, async (host) => {
-            const { promises } = await import("node:dns");
-            return promises.resolveMx(host);
-          });
-          if (!mx) {
+        const stamped = { ...card, query, exploration: explore };
+        if (stamped.email) {
+          const mx = await checkEmailMx(stamped.email, lookupMx);
+          if (mx === "yes") mxYes.add(normalizeDomain(stamped.domain));
+          if (mx === "no") {
             addDrop(funnel, "no-mx");
-            held.push(`${card.org} (no-mx)`);
+            ready.push({ ...stamped, email: "", emailSource: "" });
             continue;
           }
         }
-        ready.push(card);
+        ready.push(stamped);
       }
-      funnel.verified += ready.length;
-      funnel.contactFound += ready.filter((card) => card.email).length;
-      const filed = fileHunterCards(companies, ready, { today, dnc });
-      companies = filed.companies.map((company) => stampCard(company, ready, pages, today));
+      const room = hunterDailyFiledCap() - companies.filter((company) => company.filedOn === today).length;
+      const limited = ready.slice(0, Math.max(0, room));
+      funnel.verified += limited.length;
+      funnel.contactFound += limited.filter((card) => card.email).length;
+      const filed = fileHunterCards(companies, limited, { today, dnc });
+      companies = filed.companies.map((company) => {
+        const stamped = stampCard(company, limited, pages, today);
+        return mxYes.has(company.domain) ? { ...stamped, emailMx: true } : stamped;
+      });
       for (const [reason, count] of Object.entries(filed.drops)) {
         for (let n = 0; n < count; n += 1) addDrop(funnel, reason as "duplicate");
       }
       funnel.filed += filed.filed;
-      for (const card of ready) known.add(normalizeDomain(card.domain));
+      for (const card of limited) known.add(normalizeDomain(card.domain));
       const gain = countContactReadyGain(loaded.book.companies, companies);
       state = { ...state, cursor, filedOn: today, filedToday: counts.filedToday + gain, lockedUntil: 0 };
+      companies = await persistCompanies(loaded.book.companies, companies);
+      state = await keepRunFlags(state);
+      await saveHunterState(state);
     }
 
     const apollo = await enrichUnderApolloCap({
@@ -1110,7 +1287,7 @@ export async function runHunterBatch(now = new Date()): Promise<
     });
     companies = apollo.companies;
     const contactReady = countContactReadyGain(loaded.book.companies, companies);
-    await saveBook({ ...loaded.book, companies });
+    companies = await persistCompanies(loaded.book.companies, companies);
     const settled = applyHunterWork(
       { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday },
       today,
@@ -1118,12 +1295,19 @@ export async function runHunterBatch(now = new Date()): Promise<
       budget,
     );
     const history = await readHunterRuns(400);
-    const previous = filedOnPreviousDays(history, today);
+    const hour = edmontonClock(now).hour;
+    const previous: number[] = [];
+    for (let offset = 1; offset <= 7; offset += 1) {
+      const day = addDays(today, -offset);
+      const value = filedThroughHour(history, day, hour, (at) => edmontonClock(new Date(at)));
+      if (value != null) previous.push(value);
+    }
+    const todaySoFar = (filedThroughHour(history, today, hour, (at) => edmontonClock(new Date(at))) ?? 0) + funnel.filed;
     const alarms: string[] = [];
     const quietStop = stopReason !== "" && funnel.searched === 0;
     if (zeroCandidateAlarm(funnel.candidates, abandoned || quietStop)) alarms.push("Zero candidates this run.");
-    if (belowMedianAlarm((filedOnDay(history, today) ?? 0) + funnel.filed, previous)) {
-      alarms.push("Filed cards are under half the 7-day median.");
+    if (belowMedianAlarm(todaySoFar, previous)) {
+      alarms.push("Filed cards are under half the 7-day median at this time of day.");
     }
     if (expired.expired > 0) alarms.push(`${expired.expired} cards expired unreviewed.`);
     const note = [
@@ -1135,7 +1319,7 @@ export async function runHunterBatch(now = new Date()): Promise<
     ]
       .filter(Boolean)
       .join(" ");
-    await saveHunterState({
+    await saveHunterState(await keepRunFlags({
       ...settled,
       cursor,
       lockedUntil: 0,
@@ -1143,7 +1327,9 @@ export async function runHunterBatch(now = new Date()): Promise<
       lastRunResult: note,
       apolloOn: today,
       apolloReveals: revealsOn(state, today) + apollo.reveals,
-    });
+      reviewEpoch: state.reviewEpoch,
+    }));
+    await publishAlarms(redis, alarms, now.toISOString(), "always-on");
     await rememberRun({
       run: "always-on",
       outcome: abandoned ? "error" : stopReason === "spend" ? "capped-spend" : stopReason === "budget" && funnel.searched === 0 ? "capped-budget" : "fired",
@@ -1179,12 +1365,13 @@ export async function runHunterBatch(now = new Date()): Promise<
       { calls: Math.max(0, state.callsToday - callsUsed), contactReady: 0 },
       budget,
     );
-    await saveHunterState({
+    await saveHunterState(await keepRunFlags({
       ...settled,
       lockedUntil: 0,
       lastRunAt: now.toISOString(),
       lastRunResult: message,
-    });
+      reviewEpoch: state.reviewEpoch,
+    }));
     await rememberRun({ ...blank, outcome: "error", modelCalls: Math.max(0, state.callsToday - callsUsed), error: runNote(message) });
     return { ok: false, error: message };
   } finally {
@@ -1195,21 +1382,24 @@ export async function runHunterBatch(now = new Date()): Promise<
 function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
   const card = ready.find((row) => normalizeDomain(row.domain) === company.domain && company.filedOn === today);
   if (!card || company.casl) return company;
-  const page = pages[card.sourceUrl] ?? "";
+  const page = pages[card.emailSource] || pages[card.sourceUrl] || "";
   const basis = caslBasis(page, card.email, card.buyerTitle, card.emailSource || card.sourceUrl);
   const blocked = Boolean(card.email) && basis != null && !basis.noUnsolicitedNotice;
   const snippet = quoteSnippet(page, card.org) || company.facts?.[0]?.snippet || "";
   return {
     ...company,
     email: blocked ? "" : company.email,
-    emailMx: Boolean(card.email) && !blocked,
+    emailMx: company.emailMx,
+    caslStatus: basis ? "recorded" : company.caslStatus,
     cardFlags: blocked ? [...(company.cardFlags ?? []), "No unsolicited email"] : company.cardFlags,
     casl: basis
       ? { publishedOn: basis.publishedOn, roleFit: basis.roleFit, noUnsolicitedNotice: basis.noUnsolicitedNotice }
       : company.casl,
-    facts: snippet
-      ? [{ sourceUrl: card.sourceUrl, fetchedOn: today, snippet }]
-      : company.facts,
+    facts: company.facts?.length
+      ? company.facts
+      : snippet
+        ? [{ sourceUrl: card.emailSource || card.sourceUrl, fetchedOn: today, snippet }]
+        : company.facts,
   };
 }
 
@@ -1324,10 +1514,24 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
   const cap = monthlyCapState(Number.isFinite(spent) ? spent : null);
   const lastLine = recentRuns[0]?.at || state.lastRunAt;
   const beat = heartbeatLate(lastLine, now, withinWorkingHours(now));
-  const alarms = [...(recentRuns[0]?.alarms ?? [])];
+  const stored = redis?.lrange ? await redis.lrange(HUNTER_ALARM_KEY, 0, 400) : [];
+  const recentAlarms = alarmsWithin(
+    stored.flatMap((row) => {
+      try {
+        const item = (typeof row === "string" ? JSON.parse(row) : row) as { at?: string; text?: string; run?: string };
+        if (!item?.text || !item.at) return [];
+        return [{ at: item.at, text: item.text, run: item.run ?? "" }];
+      } catch {
+        return [];
+      }
+    }),
+    now,
+  );
+  const alarms = recentAlarms.map((item) => item.text);
   if (beat.late) alarms.push("Heartbeat is late.");
   const expired = companies.filter((company) => company.review === "expired-unreviewed").length;
   if (expired > 0) alarms.push(`${expired} cards expired unreviewed.`);
+  const cardsFiledToday = companies.filter((company) => company.filedOn === today || company.scoutBatch === today).length;
   return {
     storage: redis ? ("redis" as const) : ("browser" as const),
     paused: state.paused,
@@ -1335,6 +1539,8 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
     lastRunAt: state.lastRunAt,
     lastRunResult: state.lastRunResult,
     filedToday: counts.filedToday,
+    cardsFiledToday,
+    fileCap: hunterDailyFiledCap(),
     cardTarget: HUNTER_CARD_CEILING,
     callsToday: counts.callsToday,
     callBudget: hunterCallBudget(),

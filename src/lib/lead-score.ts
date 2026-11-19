@@ -109,7 +109,9 @@ export type Company = {
     variants?: { id: string; text: string; status: "live" | "winner" | "retired" }[];
     assignments?: { cardId: string; variantId: string; approvedAt: string; sentAt: string; fromAddress: string }[];
     sampleFloor: number;
+    exploration?: boolean;
   };
+  caslStatus?: "recorded" | "awaiting-chris";
   review?: "unreviewed" | "approved" | "skipped" | "expired-unreviewed";
   skipReason?: "wrong-size" | "wrong-sector" | "no-retreat-signal" | "bad-contact" | "duplicate" | "other";
   pipeline?: "" | "sent" | "replied" | "booked" | "won" | "lost";

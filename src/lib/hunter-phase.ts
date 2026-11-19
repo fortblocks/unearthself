@@ -19,6 +19,7 @@ import {
   HUNTER_SAMPLE_FLOOR,
   HUNTER_SCORE_VERSION,
   HUNTER_SPEND_KEY_PREFIX,
+  HUNTER_ALARM_KEY,
   HUNTER_SPEND_UNKNOWN_PREFIX,
   hunterDncCooldownDays,
   hunterMonthlyDollarCap,
@@ -89,6 +90,7 @@ export type CardLineage = {
   variants: { id: string; text: string; status: "live" | "winner" | "retired" }[];
   assignments: { cardId: string; variantId: string; approvedAt: string; sentAt: string; fromAddress: string }[];
   sampleFloor: number;
+  exploration?: boolean;
 };
 
 export type SourcedFact = {
@@ -119,6 +121,10 @@ export function addDays(isoDate: string, days: number) {
   return new Date(stamp + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+export function dncNeverExpires(reason: DncReason) {
+  return reason === "unsubscribe" || reason === "dont-contact";
+}
+
 export function makeDncEntry(input: {
   domain: string;
   email?: string;
@@ -132,7 +138,7 @@ export function makeDncEntry(input: {
     email: (input.email ?? "").trim().toLowerCase(),
     reason: input.reason,
     addedOn,
-    until: addDays(addedOn, input.cooldownDays ?? hunterDncCooldownDays()),
+    until: dncNeverExpires(input.reason) ? "never" : addDays(addedOn, input.cooldownDays ?? hunterDncCooldownDays()),
   };
 }
 
@@ -140,12 +146,32 @@ export function dncBlocks(entries: DncEntry[], domain: string, email: string, to
   const host = normalizeDomain(domain);
   const address = email.trim().toLowerCase();
   return entries.some((entry) => {
-    if (entry.until < today) return false;
+    if (!dncNeverExpires(entry.reason) && entry.until !== "never" && entry.until < today) return false;
     const sameDomain = entry.domain === host;
     if (!sameDomain) return false;
     if (!entry.email) return true;
     return entry.email === address;
   });
+}
+
+export function dncField(entry: { domain: string; email?: string }) {
+  return `${normalizeDomain(entry.domain)}|${(entry.email ?? "").trim().toLowerCase()}`;
+}
+
+export function parseDncValue(raw: unknown): DncEntry | null {
+  const row = typeof raw === "string" ? safeJson(raw) : raw;
+  if (!row || typeof row !== "object") return null;
+  const entry = row as DncEntry;
+  if (!entry.domain || !entry.reason || !entry.addedOn) return null;
+  return entry;
+}
+
+function safeJson(raw: string) {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /** A book reset may replace the lead book and the hunter state. It must not touch this key. */
@@ -284,10 +310,12 @@ export function applyReviewExpiry<T extends { review?: ReviewState; filedOn?: st
   companies: T[],
   today: string,
   days: number,
+  epoch = "",
 ): { companies: T[]; expired: number } {
   let expired = 0;
   const next = companies.map((company) => {
     const filedOn = company.filedOn || (/^\d{4}-\d{2}-\d{2}$/.test(company.scoutBatch ?? "") ? company.scoutBatch ?? "" : "");
+    if (epoch && filedOn && filedOn < epoch) return company;
     const review = company.review ?? "unreviewed";
     if (!reviewExpired(filedOn, today, review, days)) return company;
     expired += 1;
@@ -332,13 +360,34 @@ export async function domainHasMx(domain: string, lookup: (host: string) => Prom
 
 /** example.com domains are fixtures. They are not probed. */
 export async function emailDomainHasMx(email: string, lookup: (host: string) => Promise<{ exchange?: string }[]>) {
-  const host = email.trim().toLowerCase().split("@")[1] ?? "";
-  if (!host) return false;
-  if (host.endsWith(".example") || host === "example.com") return false;
-  return domainHasMx(host, lookup);
+  return (await checkEmailMx(email, lookup)) === "yes";
 }
 
-export function makeLineage(input: { query: string; signals: string[]; sourceUrl: string; cardId?: string }): CardLineage {
+export type MxStatus = "yes" | "no" | "unknown";
+
+/** A timeout or a temporary DNS failure is unknown, not a missing mailbox. */
+export function mxFailureStatus(error: unknown): "no" | "unknown" {
+  const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  const message = error instanceof Error ? `${error.name} ${error.message}` : "";
+  if (/ETIMEOUT|ESERVFAIL|EAI_AGAIN|EAGAIN|ENETUNREACH|ECONNRESET|SERVFAIL|Timeout|timed out/i.test(`${code} ${message}`)) {
+    return "unknown";
+  }
+  return "no";
+}
+
+export async function checkEmailMx(email: string, lookup: (host: string) => Promise<{ exchange?: string }[]>): Promise<MxStatus> {
+  const host = email.trim().toLowerCase().split("@")[1] ?? "";
+  if (!host) return "no";
+  if (host.endsWith(".example") || host === "example.com") return "no";
+  try {
+    const records = await lookup(host);
+    return records.some((record) => Boolean(record.exchange?.trim())) ? "yes" : "no";
+  } catch (error) {
+    return mxFailureStatus(error);
+  }
+}
+
+export function makeLineage(input: { query: string; signals: string[]; sourceUrl: string; cardId?: string; exploration?: boolean }): CardLineage {
   return {
     method: HUNTER_METHOD_ID,
     query: input.query,
@@ -354,7 +403,163 @@ export function makeLineage(input: { query: string; signals: string[]; sourceUrl
       ? [{ cardId: input.cardId, variantId: "", approvedAt: "", sentAt: "", fromAddress: "" }]
       : [],
     sampleFloor: HUNTER_SAMPLE_FLOOR,
+    exploration: input.exploration === true,
   };
+}
+
+const DESK_FIELDS = [
+  "review",
+  "skipReason",
+  "pipeline",
+  "pipelineOn",
+  "reviewedOn",
+  "draftSubject",
+  "draftBody",
+  "status",
+  "lastTouch",
+  "buyerName",
+  "buyerTitle",
+  "email",
+  "emailSource",
+  "sourceUrl",
+] as const;
+
+/** Keep a desk edit made while Hunter was running, and keep cards Hunter filed. */
+export function mergeHunterCompanies<T extends { id: string }>(start: T[], hunter: T[], fresh: T[]): T[] {
+  const startBy = new Map(start.map((company) => [company.id, company]));
+  const hunterBy = new Map(hunter.map((company) => [company.id, company]));
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const current of fresh) {
+    seen.add(current.id);
+    const hunted = hunterBy.get(current.id);
+    const started = startBy.get(current.id);
+    if (!hunted) {
+      merged.push(current);
+      continue;
+    }
+    if (!started) {
+      const created = { ...hunted };
+      for (const key of DESK_FIELDS) {
+        const field = key as keyof T;
+        if (current[field] !== hunted[field]) created[field] = current[field];
+      }
+      merged.push(created);
+      continue;
+    }
+    const next = { ...current };
+    for (const key of Object.keys(hunted) as (keyof T)[]) {
+      if (DESK_FIELDS.includes(key as (typeof DESK_FIELDS)[number])) continue;
+      if (hunted[key] !== started[key]) next[key] = hunted[key];
+    }
+    for (const key of DESK_FIELDS) {
+      const field = key as keyof T;
+      if (current[field] !== started[field]) next[field] = current[field];
+    }
+    merged.push(next);
+  }
+  for (const hunted of hunter) {
+    if (!seen.has(hunted.id)) merged.unshift(hunted);
+  }
+  return merged;
+}
+
+export function explorationTurn(cursor: number, trialShare = hunterTrialShare()) {
+  const every = Math.max(2, Math.round(1 / trialShare));
+  return ((cursor % every) + every) % every === every - 1;
+}
+
+export function slotKey(signalId: string, regionId: string) {
+  return `${signalId}|${regionId}`;
+}
+
+export function slotFromQuery(query: string) {
+  const [signalId, regionId] = query.split("|");
+  if (!signalId || !regionId) return "";
+  return slotKey(signalId, regionId);
+}
+
+export function slotUsage(rows: { lineage?: { query?: string } | null }[]) {
+  const usage: Record<string, number> = {};
+  for (const row of rows) {
+    const key = slotFromQuery(row.lineage?.query ?? "");
+    if (!key) continue;
+    usage[key] = (usage[key] ?? 0) + 1;
+  }
+  return usage;
+}
+
+/** Booked counts more than replied, and replied more than approved. Thin samples stay at zero. */
+export function slotWeights(
+  rows: { lineage?: { query?: string } | null; review?: ReviewState; pipeline?: PipelineMark }[],
+  sampleFloor = HUNTER_SAMPLE_FLOOR,
+) {
+  const buckets = new Map<string, { reviewed: number; score: number }>();
+  for (const row of rows) {
+    const key = slotFromQuery(row.lineage?.query ?? "");
+    if (!key) continue;
+    const bucket = buckets.get(key) ?? { reviewed: 0, score: 0 };
+    if (row.review === "approved" || row.review === "skipped") bucket.reviewed += 1;
+    if (row.pipeline === "booked" || row.pipeline === "won") bucket.score += 3;
+    else if (row.pipeline === "replied") bucket.score += 2;
+    else if (row.review === "approved") bucket.score += 1;
+    buckets.set(key, bucket);
+  }
+  const weights: Record<string, number> = {};
+  for (const [key, bucket] of buckets) {
+    if (bucket.reviewed >= sampleFloor && bucket.score > 0) weights[key] = bucket.score;
+  }
+  return weights;
+}
+
+export function chooseSlotIndex(input: {
+  cursor: number;
+  slots: { signalId: string; regionId: string }[];
+  usage: Record<string, number>;
+  weights: Record<string, number>;
+  explore: boolean;
+}) {
+  const count = input.slots.length || 1;
+  if (input.explore) {
+    let best = 0;
+    let least = Number.POSITIVE_INFINITY;
+    input.slots.forEach((slot, index) => {
+      const used = input.usage[slotKey(slot.signalId, slot.regionId)] ?? 0;
+      if (used < least) {
+        least = used;
+        best = index;
+      }
+    });
+    return best;
+  }
+  const ranked = input.slots
+    .map((slot, index) => ({ index, weight: input.weights[slotKey(slot.signalId, slot.regionId)] ?? 0 }))
+    .filter((slot) => slot.weight > 0)
+    .sort((a, b) => b.weight - a.weight || a.index - b.index);
+  if (ranked.length === 0) return ((input.cursor % count) + count) % count;
+  return ranked[0]?.index ?? 0;
+}
+
+export type AlarmItem = { at: string; text: string; run: string };
+
+export function alarmsWithin(items: AlarmItem[], now: Date, hours = 24) {
+  const cutoff = now.getTime() - hours * 60 * 60 * 1000;
+  return items.filter((item) => {
+    const stamp = Date.parse(item.at);
+    return Number.isFinite(stamp) && stamp >= cutoff;
+  });
+}
+
+export function filedThroughHour(runs: { at: string; cardsFiled: number }[], day: string, hour: number, clock: (at: string) => { date: string; hour: number }) {
+  let total = 0;
+  let seen = false;
+  for (const run of runs) {
+    const when = clock(run.at);
+    if (when.date !== day || when.hour > hour) continue;
+    seen = true;
+    total += run.cardsFiled;
+  }
+  return seen ? total : null;
 }
 
 export type FindingMethod = {
@@ -497,39 +702,4 @@ export const HUNTER_KNOWN_BAD: DryCompany[] = [
 /** Real companies Chris may add later. Leave this empty. */
 export const HUNTER_LIVE_LIST: DryCompany[] = [];
 
-export function dryRunFixtures(floor: number, dnc: DncEntry[] = [], today = "2026-11-19"): HunterFunnel & { held: string[] } {
-  const funnel = emptyFunnel();
-  const held: string[] = [];
-  const filed: { domain: string; email: string }[] = [];
-  const rows = [...HUNTER_KNOWN_GOOD, ...HUNTER_KNOWN_BAD];
-  funnel.searched = rows.length;
-  for (const row of rows) {
-    funnel.candidates += 1;
-    if (!row.page.trim()) {
-      addDrop(funnel, "page-empty");
-      held.push(row.domain);
-      continue;
-    }
-    if (!row.page.toLowerCase().includes(row.org.toLowerCase())) {
-      addDrop(funnel, "name-missing");
-      continue;
-    }
-    if (dncBlocks(dnc, row.domain, row.email, today)) {
-      addDrop(funnel, "do-not-contact");
-      continue;
-    }
-    if (isDuplicateCard(filed, row.domain, row.email)) {
-      addDrop(funnel, "duplicate");
-      continue;
-    }
-    if (!passesQualityFloor(row.score, floor)) {
-      addDrop(funnel, "below-quality-floor");
-      continue;
-    }
-    funnel.verified += 1;
-    if (row.email) funnel.contactFound += 1;
-    funnel.filed += 1;
-    filed.push({ domain: row.domain, email: row.email });
-  }
-  return { ...funnel, held };
-}
+/** The dry run lives in hunter-dry-run.ts so it can call the real verify and file path. */

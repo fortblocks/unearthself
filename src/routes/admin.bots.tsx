@@ -170,7 +170,10 @@ function BotsPage() {
               </p>
               {hunter.lastRunResult ? <p className="mt-1 text-sm text-shale">{hunter.lastRunResult}</p> : null}
               <p className="mt-1 text-sm text-coal">
-                Cards filed today: {hunter.filedToday} of {hunter.cardTarget} ceiling.
+                Cards filed today: {hunter.cardsFiledToday} of {hunter.fileCap}.
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Contact-ready today: {hunter.filedToday} of {hunter.cardTarget} ceiling.
               </p>
               <p className="mt-1 text-sm text-muted">
                 Model calls today: {hunter.callsToday} of {hunter.callBudget}. Model {hunter.model}.

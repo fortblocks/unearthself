@@ -104,6 +104,9 @@ function extractJsonObject(text: string): unknown | null {
 
 export type XaiUsage = { inputTokens: number; outputTokens: number; dollars: number | null };
 
+/** xAI documents 1 USD as 10^10 ticks. https://docs.x.ai/developers/cost-tracking */
+export const XAI_USD_TICKS = 10_000_000_000;
+
 export function readXaiUsage(payload: unknown): XaiUsage {
   const usage = payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null;
   const record = usage && typeof usage === "object" ? (usage as Record<string, unknown>) : {};
@@ -111,11 +114,15 @@ export function readXaiUsage(payload: unknown): XaiUsage {
     const n = typeof value === "number" ? value : Number(value);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
   };
-  const dollars = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
+  const dollars = (value: unknown) => {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const ticks = dollars(record.cost_in_usd_ticks);
   return {
     inputTokens: asCount(record.input_tokens ?? record.prompt_tokens),
     outputTokens: asCount(record.output_tokens ?? record.completion_tokens),
-    dollars: dollars(record.cost_in_usd) ?? dollars(record.cost),
+    dollars: ticks == null ? dollars(record.cost_in_usd) ?? dollars(record.cost) : ticks / XAI_USD_TICKS,
   };
 }
 
@@ -162,30 +169,46 @@ function usedWebSearch(payload: Record<string, unknown>) {
   });
 }
 
-export async function callXaiWebSearch(
-  system: string,
-  prompt: string,
-  timeoutMs: number,
-): Promise<{ companies: unknown; citations: string[]; excerpt: string; searched: boolean; usage: XaiUsage } | { error: string }> {
+export type XaiCallResult =
+  | { companies: unknown; citations: string[]; excerpt: string; searched: boolean; usage: XaiUsage }
+  | { error: string; retryable: boolean };
+
+/** Timeouts, network failures, 429, 5xx, and a body we could not parse are worth another try. */
+export function xaiRetryable(status: number | null, message: string) {
+  if (status == null) return /timeout|timed out|network|fetch|aborted|econnreset|etimedout|enotfound/i.test(message);
+  if (status === 429 || status >= 500) return true;
+  return false;
+}
+
+export async function callXaiWebSearch(system: string, prompt: string, timeoutMs: number): Promise<XaiCallResult> {
   const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) return { error: "XAI_API_KEY not configured" };
-  const response = await fetch(XAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(xaiWebSearchRequest(system, prompt)),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  if (!apiKey) return { error: "XAI_API_KEY not configured", retryable: false };
+  let response: Response;
+  try {
+    response = await fetch(XAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(xaiWebSearchRequest(system, prompt)),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    const message = timedOut ? "xAI search timed out" : error instanceof Error ? error.message : "xAI search failed";
+    return { error: message, retryable: true };
+  }
   const detail = await response.text();
   if (!response.ok || xaiDeprecationSignal(response.status, response.headers, detail)) {
-    return { error: formatXaiHttpError(response.status, detail, apiKey) };
+    return { error: formatXaiHttpError(response.status, detail, apiKey), retryable: xaiRetryable(response.status, detail) && !xaiDeprecationSignal(response.status, response.headers, detail) };
   }
   try {
-    return parseXaiSearchResponse(JSON.parse(detail));
+    const parsed = parseXaiSearchResponse(JSON.parse(detail));
+    if ("error" in parsed) return { error: parsed.error, retryable: true };
+    return parsed;
   } catch {
-    return { error: "xAI returned an unexpected shape" };
+    return { error: "xAI returned an unexpected shape", retryable: true };
   }
 }
 
@@ -219,6 +242,7 @@ export async function searchWithRetries(input: {
     }
     failures += 1;
     lastError = result.error;
+    if (!result.retryable) return { error: lastError, attempts: attempt + 1, abandoned: true };
     if (failures > input.maxRetries) return { error: lastError, attempts: attempt + 1, abandoned: true };
     await sleep(retryDelay(attempt + 1));
   }

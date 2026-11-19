@@ -183,6 +183,8 @@ test("stale when Apollo's date is more than 12 months old or the employer does n
     organizationDomain: "other.example",
   }, "2026-11-18");
   assert.equal(moved.cardFlags?.includes(APOLLO_STALE), true);
+  assert.equal(moved.email, "");
+  assert.equal(moved.buyerName, "");
 });
 
 test("the reveal ceiling stops a second reveal and the key never enters the URL", async () => {

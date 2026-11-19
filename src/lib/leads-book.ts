@@ -124,13 +124,37 @@ export function upsertCompany(book: LeadsBook, company: Company, today = edmonto
   };
 }
 
-export async function getRedisClient() {
+export type LeadsRedis = {
+  get: <T>(key: string) => Promise<T | null>;
+  set: (key: string, value: unknown, opts?: { nx?: true; ex?: number }) => Promise<string | null>;
+  del?: (key: string) => Promise<unknown>;
+  incr: (key: string) => Promise<number>;
+  decr: (key: string) => Promise<number>;
+  incrby: (key: string, amount: number) => Promise<number>;
+  expire: (key: string, seconds: number) => Promise<unknown>;
+  eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
+  hset?: (key: string, field: string, value: string) => Promise<unknown>;
+  hgetall?: (key: string) => Promise<Record<string, unknown> | null>;
+  lpush: (key: string, value: unknown) => Promise<unknown>;
+  ltrim: (key: string, start: number, stop: number) => Promise<unknown>;
+  lrange: (key: string, start: number, stop: number) => Promise<unknown[]>;
+};
+
+let testRedis: LeadsRedis | null = null;
+
+/** Tests pass a fake client. Production never sets this. */
+export function useRedisClientForTests(client: LeadsRedis | null) {
+  testRedis = client;
+}
+
+export async function getRedisClient(): Promise<LeadsRedis | null> {
+  if (testRedis) return testRedis;
   const hasKv = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
   const hasUpstash = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!hasKv && !hasUpstash) return null;
   try {
     const { Redis } = await import("@upstash/redis");
-    return Redis.fromEnv();
+    return Redis.fromEnv() as unknown as LeadsRedis;
   } catch (error) {
     console.error("[leads] Redis client failed:", error);
     return null;

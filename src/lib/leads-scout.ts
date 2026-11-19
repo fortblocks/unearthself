@@ -233,7 +233,11 @@ export type NightlyEnrichment = (
   today: string,
 ) => Promise<{ companies: Company[]; searches: number; reveals: number; note: string }>;
 
-export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Promise<
+export async function runNightlyScout(opts?: {
+  enrich?: NightlyEnrichment;
+  now?: Date;
+  skip?: (row: { domain: string; email?: string }) => boolean;
+}): Promise<
   | {
       ok: true;
       date: string;
@@ -251,7 +255,7 @@ export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Pr
 > {
   const loaded = await loadBook();
   if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured", called: false, attempts: 0 };
-  const today = edmontonToday();
+  const today = edmontonToday(opts?.now);
   let research: { companies: unknown; attempts: number } | { error: string; attempts: number };
   try {
     research = await researchCompanies(loaded.book.companies.map((company) => company.domain));
@@ -262,7 +266,8 @@ export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Pr
   if ("error" in research) return { ok: false, error: research.error, called: research.attempts > 0, attempts: research.attempts };
   const selected = selectScoutRows(research);
   const verified = await verifyRows(selected);
-  const batch = buildMorningBatch(loaded.book.companies, verified, {
+  const open = opts?.skip ? verified.filter((row) => !opts.skip?.({ domain: row.domain, email: row.buyer?.email })) : verified;
+  const batch = buildMorningBatch(loaded.book.companies, open, {
     today,
     limit: loaded.book.morningCount,
   });

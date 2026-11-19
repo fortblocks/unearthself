@@ -16,6 +16,19 @@ export const HUNTER_METHOD_ID = "xai-web-search";
 /** 48 is a ceiling. Hunter does not pad the day up to this number. */
 export const HUNTER_CARD_CEILING = HUNTER_DAILY_CARD_TARGET;
 
+/**
+ * Every card filed in an Edmonton day, research cards included.
+ * 48 matches the contact-ready ceiling so a day never asks for more reviews than that number.
+ * Env HUNTER_DAILY_FILED_CAP.
+ */
+export const HUNTER_DAILY_FILED_CAP_DEFAULT = 48;
+
+/** Stop before a second search once a run has used about this much of the 300 second limit. */
+export const HUNTER_PASS_BUDGET_MS = 150_000;
+
+/** Skip-list in the prompt. Domains past this are still filtered after the search. */
+export const HUNTER_PROMPT_DOMAIN_CHARS = 12_000;
+
 /** Default daily model-call budget. Env HUNTER_DAILY_CALL_BUDGET overrides it. */
 export const HUNTER_CALL_BUDGET_DEFAULT = HUNTER_DAILY_CALL_BUDGET_DEFAULT;
 
@@ -79,6 +92,7 @@ export const HUNTER_CALLS_KEY_PREFIX = "unearth:hunter:calls:v1:";
 export const HUNTER_APOLLO_KEY_PREFIX = "unearth:hunter:apollo:v1:";
 export const HUNTER_SPEND_KEY_PREFIX = "unearth:hunter:spend-cents:v1:";
 export const HUNTER_SPEND_UNKNOWN_PREFIX = "unearth:hunter:spend-unknown:v1:";
+export const HUNTER_ALARM_KEY = "unearth:hunter:alarms:v1";
 
 /** Keys a book reset is allowed to replace. The do-not-contact list is not one of them. */
 export const HUNTER_RESET_KEYS = ["unearth:leads:v1", "unearth:hunter:v1"] as const;
@@ -122,6 +136,12 @@ export function hunterDncCooldownDays(raw?: string | null) {
 
 export function hunterReviewDays(raw?: string | null) {
   return raw == null ? intEnv("HUNTER_REVIEW_DAYS", HUNTER_REVIEW_DAYS_DEFAULT, 1, 90) : bounded(raw, HUNTER_REVIEW_DAYS_DEFAULT, 1, 90);
+}
+
+export function hunterDailyFiledCap(raw?: string | null) {
+  return raw == null
+    ? intEnv("HUNTER_DAILY_FILED_CAP", HUNTER_DAILY_FILED_CAP_DEFAULT, 1, 500)
+    : bounded(raw, HUNTER_DAILY_FILED_CAP_DEFAULT, 1, 500);
 }
 
 export function hunterQualityFloor(raw?: string | null) {
