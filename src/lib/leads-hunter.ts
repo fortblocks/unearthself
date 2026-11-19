@@ -277,6 +277,29 @@ function asRecord(row: unknown): Record<string, unknown> | null {
   return row as Record<string, unknown>;
 }
 
+function citationsFrom(record: Record<string, unknown> | null) {
+  if (!record || !Array.isArray(record.citations)) return [];
+  return record.citations.filter((item): item is string => typeof item === "string");
+}
+
+function sourceUrlForRow(row: Record<string, unknown>, citations: string[]) {
+  for (const key of ["sourceUrl", "url", "website"]) {
+    const value = String(row[key] ?? "").trim();
+    if (/^https?:\/\//i.test(value)) return value;
+  }
+  const domain = normalizeDomain(String(row.domain ?? ""));
+  if (!domain) return "";
+  return (
+    citations.find((url) => {
+      try {
+        return normalizeDomain(new URL(url).hostname) === domain;
+      } catch {
+        return false;
+      }
+    }) ?? ""
+  );
+}
+
 /** Keep every sourced company. Geography and headcount are not filters. */
 export function selectHunterRows(raw: unknown): HunterDraft[] {
   const record = asRecord(raw);
@@ -288,8 +311,8 @@ export function selectHunterRows(raw: unknown): HunterDraft[] {
     if (!row) continue;
     const domain = normalizeDomain(String(row.domain ?? ""));
     if (!domain || seen.has(domain)) continue;
-    const sourceUrl = String(row.sourceUrl ?? "").trim();
-    if (!/^https?:\/\//i.test(sourceUrl)) continue;
+    const sourceUrl = sourceUrlForRow(row, citationsFrom(record));
+    if (!sourceUrl) continue;
     const buyer = asRecord(row.buyer);
     const profileSignals = Array.isArray(row.profileSignals)
       ? row.profileSignals.flatMap((entry) => {
@@ -618,7 +641,7 @@ Return at most 8 companies:
 export async function researchHunterSlot(
   slot: HunterSlot,
   knownDomains: string[],
-): Promise<{ companies: unknown } | { error: string }> {
+): Promise<{ companies: unknown; citations?: string[]; excerpt?: string } | { error: string }> {
   const { callXaiWebSearch } = await import("./xai-search.ts");
   return callXaiWebSearch(
     "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
@@ -831,6 +854,9 @@ export async function runHunterBatch(): Promise<
     }
 
     const drafts = selectHunterRows(research);
+    const parsed = Array.isArray(research.companies) ? research.companies.length : 0;
+    const excerpt = "excerpt" in research && typeof research.excerpt === "string" ? research.excerpt : "";
+    const parseNote = excerpt ? `Parsed ${parsed} companies. ${excerpt}` : `Parsed ${parsed} companies.`;
     const pages = await readPages(urlsForDrafts(drafts));
     const verified = verifyHunterDrafts(drafts, pages, { regionId: slot.regionId, today });
     const filed = fileHunterCards(loaded.book.companies, verified, { today });
@@ -862,7 +888,7 @@ export async function runHunterBatch(): Promise<
       contactReady,
       apolloSearches: apollo.searches,
       apolloReveals: apollo.reveals,
-      error: apollo.note,
+      error: [parseNote, apollo.note].filter(Boolean).join(" "),
     });
     return {
       ok: true,

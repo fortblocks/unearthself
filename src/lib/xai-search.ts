@@ -103,7 +103,7 @@ function extractJsonObject(text: string): unknown | null {
 
 export function parseXaiSearchResponse(
   payload: unknown,
-): { companies: unknown; citations: string[] } | { error: string } {
+): { companies: unknown; citations: string[]; excerpt: string } | { error: string } {
   if (!payload || typeof payload !== "object") return { error: "xAI returned no content" };
   const record = payload as Record<string, unknown>;
   const text = outputText(record).trim();
@@ -120,14 +120,21 @@ export function parseXaiSearchResponse(
   const parsed = extractJsonObject(text);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { error: "xAI did not return JSON" };
   const companies = (parsed as { companies?: unknown }).companies;
-  return { companies: Array.isArray(companies) ? companies : [], citations: collectCitations(record) };
+  if (!Array.isArray(companies)) {
+    return { error: `xAI JSON had no companies array: ${text.replace(/\s+/g, " ").slice(0, 180)}` };
+  }
+  return {
+    companies,
+    citations: collectCitations(record),
+    excerpt: companies.length === 0 ? text.replace(/\s+/g, " ").slice(0, 180) : "",
+  };
 }
 
 export async function callXaiWebSearch(
   system: string,
   prompt: string,
   timeoutMs: number,
-): Promise<{ companies: unknown; citations: string[] } | { error: string }> {
+): Promise<{ companies: unknown; citations: string[]; excerpt: string } | { error: string }> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { error: "XAI_API_KEY not configured" };
   const response = await fetch(XAI_RESPONSES_URL, {

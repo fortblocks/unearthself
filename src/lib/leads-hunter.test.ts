@@ -115,6 +115,15 @@ test("selectHunterRows keeps a small European company and a United States compan
   assert.equal(rows[1]?.sizeBand, "12");
 });
 
+test("a cited page supplies the source URL when the company row has none", () => {
+  const rows = selectHunterRows({
+    citations: ["https://cited.example/about"],
+    companies: [draft({ domain: "cited.example", org: "Cited Co", sourceUrl: "" })],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.sourceUrl, "https://cited.example/about");
+});
+
 test("verifyHunterDrafts keeps only text that is on the page", () => {
   const [card] = verifyHunterDrafts([draft({ buyer: { ...draft().buyer, email: "guessed@acmealpine.example", title: "Invented Title" } })], { [url]: page }, {
     regionId: "europe",

@@ -79,6 +79,16 @@ test("a response with no output text is an error, not an empty card list", () =>
   assert.deepEqual(parsed, { error: "model rejected the tool call" });
 });
 
+test("JSON without a companies array is an error", () => {
+  const parsed = parseXaiSearchResponse({
+    output: [{ type: "message", content: [{ type: "output_text", text: '{ "note": "nothing indexed" }' }] }],
+  });
+  assert.equal("error" in parsed, true);
+  if (!("error" in parsed)) return;
+  assert.match(parsed.error, /no companies array/);
+  assert.match(parsed.error, /nothing indexed/);
+});
+
 test("output that is not a company object is not treated as a find", () => {
   const parsed = parseXaiSearchResponse({
     output_text: "I could not search.",
