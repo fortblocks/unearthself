@@ -158,11 +158,11 @@ For each company include org, domain, city, industry, sizeBand ("80-800"), sourc
 
 Signals are public dated events only: hiring, office, expansion, win, year-end. Each signal needs kind, date as YYYY-MM-DD, sourceUrl, and a short note. Omit a signal when you do not have both a date and a page URL.
 
-buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. Never guess an email. Never use a pattern such as first.last@.
+buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@.
 
 why is two or three sentences on why the company fits, and whySources lists the pages you used.
 
-Return at most 15 companies:
+Return at most 15 companies. Return a company when you have its name, domain, and a page URL, even if the buyer or a signal is blank. Use an empty companies array only when the search found no organisation.
 { "companies": [] }`;
 }
 

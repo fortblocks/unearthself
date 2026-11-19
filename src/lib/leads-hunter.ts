@@ -630,11 +630,11 @@ signals are public dated events only: hiring, office, expansion, win, year-end. 
 
 profileSignals is a list of { id, sourceUrl }. Use only the ids above. Include one only when that page shows the signal.
 
-buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name, title, or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. Never guess an email. Never use a pattern such as first.last@. Never use a department name as a person.
+buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name, title, or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@. Never use a department name as a person.
 
 Do not invent a price, a date, a partner, a building, or a programme. Do not mention any company other than the one on the page.
 
-Return at most 8 companies:
+Return at most 8 companies. Return a company when you have its name, domain, and a page URL, even if the buyer, the headcount, or a signal is blank. Use an empty companies array only when the search found no organisation.
 { "companies": [] }`;
 }
 
