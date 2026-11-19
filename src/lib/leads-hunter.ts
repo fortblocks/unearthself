@@ -641,7 +641,7 @@ Return at most 8 companies. Return a company when you have its name, domain, and
 export async function researchHunterSlot(
   slot: HunterSlot,
   knownDomains: string[],
-): Promise<{ companies: unknown; citations?: string[]; excerpt?: string } | { error: string }> {
+): Promise<{ companies: unknown; citations?: string[]; excerpt?: string; searched?: boolean } | { error: string }> {
   const { callXaiWebSearch } = await import("./xai-search.ts");
   return callXaiWebSearch(
     "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
@@ -856,7 +856,8 @@ export async function runHunterBatch(): Promise<
     const drafts = selectHunterRows(research);
     const parsed = Array.isArray(research.companies) ? research.companies.length : 0;
     const excerpt = "excerpt" in research && typeof research.excerpt === "string" ? research.excerpt : "";
-    const parseNote = excerpt ? `Parsed ${parsed} companies. ${excerpt}` : `Parsed ${parsed} companies.`;
+    const searched = research.searched === true ? "Search tool used." : "Search tool not used.";
+    const parseNote = excerpt ? `Parsed ${parsed} companies. ${searched} ${excerpt}` : `Parsed ${parsed} companies. ${searched}`;
     const pages = await readPages(urlsForDrafts(drafts));
     const verified = verifyHunterDrafts(drafts, pages, { regionId: slot.regionId, today });
     const filed = fileHunterCards(loaded.book.companies, verified, { today });

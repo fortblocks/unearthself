@@ -18,6 +18,7 @@ export function xaiWebSearchRequest(system: string, prompt: string) {
       { role: "user", content: prompt },
     ],
     tools: [{ type: "web_search" }],
+    tool_choice: "required",
   };
 }
 
@@ -103,7 +104,7 @@ function extractJsonObject(text: string): unknown | null {
 
 export function parseXaiSearchResponse(
   payload: unknown,
-): { companies: unknown; citations: string[]; excerpt: string } | { error: string } {
+): { companies: unknown; citations: string[]; excerpt: string; searched: boolean } | { error: string } {
   if (!payload || typeof payload !== "object") return { error: "xAI returned no content" };
   const record = payload as Record<string, unknown>;
   const text = outputText(record).trim();
@@ -126,15 +127,25 @@ export function parseXaiSearchResponse(
   return {
     companies,
     citations: collectCitations(record),
+    searched: usedWebSearch(record),
     excerpt: companies.length === 0 ? text.replace(/\s+/g, " ").slice(0, 180) : "",
   };
+}
+
+function usedWebSearch(payload: Record<string, unknown>) {
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  return output.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const type = (item as { type?: unknown }).type;
+    return type === "web_search_call" || type === "tool_call";
+  });
 }
 
 export async function callXaiWebSearch(
   system: string,
   prompt: string,
   timeoutMs: number,
-): Promise<{ companies: unknown; citations: string[]; excerpt: string } | { error: string }> {
+): Promise<{ companies: unknown; citations: string[]; excerpt: string; searched: boolean } | { error: string }> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { error: "XAI_API_KEY not configured" };
   const response = await fetch(XAI_RESPONSES_URL, {
