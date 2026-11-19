@@ -1,6 +1,7 @@
 /**
  * Hunter's daily output is contact-ready cards. Model calls are a separate budget.
- * A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
+ * A contact-ready card has a name, a title, an email, and an Enriched mark with a sourced fact.
+ * A no-signal card, and a contact flagged Stale, are not contact-ready.
  */
 
 import { HUNTER_DAILY_CALL_BUDGET_DEFAULT, HUNTER_DAILY_CARD_TARGET } from "../data/hunter-profile.ts";
@@ -170,8 +171,10 @@ export function isContactReady(company: {
   profileHits?: { sourceUrl: string }[];
   signals?: { sourceUrl: string }[];
   whySources?: { url: string }[];
+  cardFlags?: string[];
 }) {
   if (!hasBuyerContact(company)) return false;
+  if (company.cardFlags?.includes("Stale")) return false;
   if (company.enrichment === "no-signal") return false;
   if (company.enrichment === "enriched") return hasSourcedFact(company);
   return false;

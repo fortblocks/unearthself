@@ -9,6 +9,7 @@ import {
   HUNTER_QUALITY_FLOOR_DEFAULT,
   HUNTER_RESET_KEYS,
   callsAvailablePerDay,
+  hunterDailyFiledCap,
   hunterKilled,
   hunterMonthlyDollarCap,
   runsPerWorkingDay,
@@ -19,12 +20,15 @@ import {
   HUNTER_KNOWN_GOOD,
   HUNTER_LIVE_LIST,
   addDrop,
+  alarmWebhookTargets,
   applyReviewExpiry,
   belowMedianAlarm,
   bookedThisMonth,
   cardDedupeKey,
   caslBasis,
   classifyPageResponse,
+  dailyFileRoom,
+  deliverAlarmWebhooks,
   dncBlocks,
   checkEmailMx,
   doNotContactKey,
@@ -33,6 +37,7 @@ import {
   heartbeatLate,
   isDuplicateCard,
   makeDncEntry,
+  pageShowsMovedOn,
   methodStats,
   monthlyCapLabel,
   monthlyCapState,
@@ -44,6 +49,7 @@ import {
   shouldAbandon,
   zeroCandidateAlarm,
 } from "./hunter-phase.ts";
+import { isContactReady } from "./hunter-cap.ts";
 import { draftDropReason, fileHunterCards, verifyHunterDrafts } from "./leads-hunter.ts";
 import { edmontonClock, nightlyDue, nightlySkip, withinWorkingHours } from "./hunter-time.ts";
 import { HUNTER_SEARCH_MODEL, parseXaiSearchResponse, searchWithRetries, xaiDeprecationSignal } from "./xai-search.ts";
@@ -109,9 +115,11 @@ test("the nightly sweep runs at 4am Edmonton once, in both standard time and day
   assert.equal(nightlyDue(winterDue, "2026-01-15"), false);
 });
 
-test("a 30 minute working day can still reach the 48 call budget", () => {
+test("a 30 minute working day can reach the 55 call budget", () => {
   assert.equal(runsPerWorkingDay(7, 19), 24);
-  assert.equal(callsAvailablePerDay(HUNTER_CALLS_PER_RUN_DEFAULT, 7, 19), 48);
+  assert.equal(HUNTER_CALLS_PER_RUN_DEFAULT, 3);
+  assert.equal(callsAvailablePerDay(HUNTER_CALLS_PER_RUN_DEFAULT, 7, 19), 72);
+  assert.ok(callsAvailablePerDay(HUNTER_CALLS_PER_RUN_DEFAULT, 7, 19) >= 55);
 });
 
 test("an xAI error, a deprecation, or a missing search is not zero results", () => {
@@ -145,7 +153,10 @@ test("dollars are recorded only when the response names them", () => {
   assert.equal(unnamed.dollars, null);
   assert.equal(unnamed.inputTokens, 3);
   assert.equal(monthlyCapLabel(monthlyCapState(null, null)), "no cap set");
-  assert.equal(hunterMonthlyDollarCap(""), null);
+  assert.equal(hunterMonthlyDollarCap(""), 60);
+  assert.equal(monthlyCapState(60), "stop");
+  assert.equal(monthlyCapState(47), "ok");
+  assert.equal(monthlyCapState(48), "warn");
   assert.equal(monthlyCapState(8, 10), "warn");
   assert.equal(monthlyCapState(10, 10), "stop");
   assert.equal(monthlyCapState(null, 10), "unknown");
@@ -408,4 +419,96 @@ test("unreviewed cards expire, and method rates wait for enough reviews", () => 
   assert.equal(stats[0]?.approvalRate, null);
   assert.equal(bookedThisMonth([{ pipeline: "booked", pipelineOn: "2026-11-02" }], "2026-11"), 1);
   assert.equal(bookedThisMonth([{ pipeline: "sent", pipelineOn: "2026-11-02" }], "2026-11"), 0);
+});
+
+test("a 25-point card with no fit signal is rejected, and the daily file cap stays 48", () => {
+  const source = "https://paper.example/about";
+  const cards = verifyHunterDrafts(
+    [
+      {
+        domain: "paper.example",
+        org: "Paper Example",
+        place: "",
+        industry: "other",
+        sizeBand: "",
+        sourceUrl: source,
+        signals: [],
+        profileSignals: [],
+        buyer: {
+          name: "Ada North",
+          title: "Head of People",
+          email: "ada@paper.example",
+          emailSource: source,
+        },
+      },
+    ],
+    { [source]: "Paper Example. Ada North, Head of People, ada@paper.example." },
+    { regionId: "anywhere", today: "2026-11-19" },
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.profileHits.length, 0);
+  const accessOnly = cards.map((card) => ({ ...card, hunterScore: 25, profileHits: [] }));
+  const dropped = fileHunterCards([], accessOnly, { today: "2026-11-19", floor: 20 });
+  assert.equal(dropped.filed, 0);
+  assert.equal(dropped.drops["below-quality-floor"], 1);
+  assert.equal(hunterDailyFiledCap(""), 48);
+  assert.equal(dailyFileRoom(48, 48), 0);
+  assert.equal(dailyFileRoom(47, 48), 1);
+});
+
+test("a public page that shows a new employer is not filed as contact-ready", () => {
+  assert.equal(pageShowsMovedOn("Ada North is now at Other Co."), true);
+  const about = "https://northwind.example/about";
+  const team = "https://northwind.example/team";
+  const cards = verifyHunterDrafts(
+    [
+      {
+        domain: "northwind.example",
+        org: "Northwind Example",
+        place: "Calgary, Canada",
+        industry: "other",
+        sizeBand: "",
+        sourceUrl: about,
+        signals: [],
+        profileSignals: [{ id: "distributed", sourceUrl: about }],
+        buyer: {
+          name: "Ada North",
+          title: "Head of People",
+          email: "ada@northwind.test",
+          emailSource: team,
+        },
+      },
+    ],
+    {
+      [about]: "Northwind Example in Calgary, Canada runs a distributed team.",
+      [team]: "Ada North, formerly Head of People, now at Other Co. ada@northwind.test",
+    },
+    { regionId: "canada", today: "2026-11-19" },
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.email, "");
+  assert.equal(cards[0]?.buyerName, "");
+  const filed = fileHunterCards([], cards, { today: "2026-11-19", floor: 0 });
+  assert.equal(filed.companies[0]?.email ?? "", "");
+  assert.equal(isContactReady(filed.companies[0] ?? { buyerName: "", buyerTitle: "", email: "", emailSource: "" }), false);
+});
+
+test("alarms go to Rex first, then Bo and Derek, and a failed webhook does not stop the rest", async () => {
+  const targets = alarmWebhookTargets({
+    HUNTER_ALARM_WEBHOOK_URL: "https://rex.example/hook",
+    HUNTER_ALARM_CC_WEBHOOK_URLS: "https://bo.example/hook, https://derek.example/hook",
+  });
+  assert.deepEqual(targets.map((target) => target.name), ["Rex", "Bo", "Derek"]);
+  const calls: string[] = [];
+  const sent = await deliverAlarmWebhooks({
+    targets,
+    body: JSON.stringify({ alarms: ["Zero candidates this run."] }),
+    fetchImpl: async (url) => {
+      calls.push(url);
+      if (url.includes("bo.example")) throw new Error("webhook down");
+      return new Response("ok");
+    },
+  });
+  assert.deepEqual(sent, ["Rex", "Bo", "Derek"]);
+  assert.deepEqual(calls, ["https://rex.example/hook", "https://bo.example/hook", "https://derek.example/hook"]);
 });

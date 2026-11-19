@@ -55,9 +55,12 @@ import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
 import {
   addDays,
   addDrop,
+  alarmWebhookTargets,
   alarmsWithin,
   checkEmailMx,
   chooseSlotIndex,
+  dailyFileRoom,
+  deliverAlarmWebhooks,
   dncField,
   explorationTurn,
   filedThroughHour,
@@ -73,6 +76,7 @@ import {
   dncBlocks,
   doNotContactKey,
   mergeHunterCompanies,
+  pageShowsMovedOn,
   parseDncValue,
   emptyFunnel,
   findingMethods,
@@ -545,7 +549,8 @@ export function verifyHunterDrafts(
     if (!placeMatchesRegion(place || city, city, opts.regionId)) continue;
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
-    const contact = contactPage
+    const movedOn = pageShowsMovedOn(contactPage) || pageShowsMovedOn(page);
+    const contact = contactPage && !movedOn
       ? contactIfPresent(contactPage, draft.buyer.name, draft.buyer.email, contactPageUrl)
       : { name: "", title: "", email: "", emailSource: "" };
     const buyerName = usableName(contact.name);
@@ -1044,17 +1049,18 @@ async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, r
   if (!alarms.length || !redis.lpush) return;
   for (const text of alarms) await redis.lpush(HUNTER_ALARM_KEY, JSON.stringify({ at, text, run }));
   await redis.ltrim?.(HUNTER_ALARM_KEY, 0, 400);
-  const url = process.env.HUNTER_ALARM_WEBHOOK_URL?.trim();
-  if (!url) return;
-  try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ at, run, alarms }),
-    });
-  } catch {
-    // A missed webhook must not fail the hunt.
-  }
+  const targets = alarmWebhookTargets();
+  if (!targets.length) return;
+  await deliverAlarmWebhooks({
+    targets,
+    body: JSON.stringify({ at, run, alarms, to: targets.map((target) => target.name) }),
+  });
+}
+
+export async function publishHunterAlarms(alarms: string[], at: string, run: string) {
+  const redis = (await getRedisClient()) as HunterRedis | null;
+  if (!redis) return;
+  await publishAlarms(redis, alarms, at, run);
 }
 
 function dayStopCopy(stop: "cards" | "budget", state: HunterState, today: string, budget: number) {
@@ -1258,8 +1264,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         }
         ready.push(stamped);
       }
-      const room = hunterDailyFiledCap() - companies.filter((company) => company.filedOn === today).length;
-      const limited = ready.slice(0, Math.max(0, room));
+      const limited = ready.slice(0, dailyFileRoom(companies.filter((company) => company.filedOn === today).length));
       funnel.verified += limited.length;
       funnel.contactFound += limited.filter((card) => card.email).length;
       const filed = fileHunterCards(companies, limited, { today, dnc });
@@ -1310,6 +1315,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       alarms.push("Filed cards are under half the 7-day median at this time of day.");
     }
     if (expired.expired > 0) alarms.push(`${expired.expired} cards expired unreviewed.`);
+    if (stopReason === "spend") alarms.push("Monthly dollar cap reached. Calling resumes next month.");
     const note = [
       slotLabel,
       `Contact-ready cards today ${settled.filedToday} of ${HUNTER_CARD_CEILING}.`,

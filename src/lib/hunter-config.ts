@@ -23,8 +23,12 @@ export const HUNTER_CARD_CEILING = HUNTER_DAILY_CARD_TARGET;
  */
 export const HUNTER_DAILY_FILED_CAP_DEFAULT = 48;
 
-/** Stop before a second search once a run has used about this much of the 300 second limit. */
-export const HUNTER_PASS_BUDGET_MS = 150_000;
+/**
+ * Do not start another search once this much of the 300 second function limit is gone.
+ * Three 90 second searches are 270 seconds, so a third call can still start.
+ * A search that has already used 200 seconds does not start another one.
+ */
+export const HUNTER_PASS_BUDGET_MS = 200_000;
 
 /** Skip-list in the prompt. Domains past this are still filtered after the search. */
 export const HUNTER_PROMPT_DOMAIN_CHARS = 12_000;
@@ -41,12 +45,11 @@ export const HUNTER_WORK_END_HOUR_DEFAULT = 19;
 
 /**
  * Calls inside one always-on run.
- * 12 hours, every 30 minutes, is 24 runs. 2 calls a run is 48 calls, the whole daily budget.
- * Each call can file up to 8 companies, so the 48-card ceiling is reachable well inside that.
- * Two 90 second searches fit under the 300 second function limit.
+ * 12 hours, every 30 minutes, is 24 runs. 3 calls a run is 72 calls, so the 55-call budget can be reached.
+ * The budget counter is still the hard stop. The cron schedule is unchanged.
  * Env HUNTER_CALLS_PER_RUN.
  */
-export const HUNTER_CALLS_PER_RUN_DEFAULT = 2;
+export const HUNTER_CALLS_PER_RUN_DEFAULT = 3;
 
 /** Longer than the 300 second function limit, so a slow run cannot overlap the next one. */
 export const HUNTER_LOCK_TTL_SECONDS = 360;
@@ -93,6 +96,13 @@ export const HUNTER_APOLLO_KEY_PREFIX = "unearth:hunter:apollo:v1:";
 export const HUNTER_SPEND_KEY_PREFIX = "unearth:hunter:spend-cents:v1:";
 export const HUNTER_SPEND_UNKNOWN_PREFIX = "unearth:hunter:spend-unknown:v1:";
 export const HUNTER_ALARM_KEY = "unearth:hunter:alarms:v1";
+
+/** Alarm delivery order. Webhook URLs stay unset until deploy. */
+export const HUNTER_ALARM_PRIMARY = "Rex";
+export const HUNTER_ALARM_COPIES = ["Bo", "Derek"] as const;
+
+/** Known xAI dollars in a calendar month. Apollo credits are not included. Env HUNTER_MONTHLY_DOLLAR_CAP. */
+export const HUNTER_MONTHLY_DOLLAR_CAP_DEFAULT = 60;
 
 /** Keys a book reset is allowed to replace. The do-not-contact list is not one of them. */
 export const HUNTER_RESET_KEYS = ["unearth:leads:v1", "unearth:hunter:v1"] as const;
@@ -157,12 +167,12 @@ export function hunterTrialShare(raw?: string | null) {
   return Math.min(0.3, Math.max(0.2, n));
 }
 
-/** Unset until Chris names a monthly dollar amount. */
+/** US dollars. Chris set 60 on 19th November 2026. An env value replaces the default. */
 export function hunterMonthlyDollarCap(raw?: string | null): number | null {
   const text = (raw ?? process.env.HUNTER_MONTHLY_DOLLAR_CAP ?? "").trim();
-  if (!text) return null;
+  if (!text) return HUNTER_MONTHLY_DOLLAR_CAP_DEFAULT;
   const n = Number(text);
-  if (!Number.isFinite(n) || n <= 0) return null;
+  if (!Number.isFinite(n) || n <= 0) return HUNTER_MONTHLY_DOLLAR_CAP_DEFAULT;
   return n;
 }
 

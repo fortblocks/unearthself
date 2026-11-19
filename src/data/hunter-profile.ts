@@ -174,9 +174,9 @@ export const HUNTER_DAILY_CARD_TARGET = 48;
 
 /**
  * Default daily model-call budget. Override with HUNTER_DAILY_CALL_BUDGET.
- * Raising it is spend and needs Chris's approval. Do not raise it in code.
+ * Chris set 55 on 19th November 2026. The budget is the hard stop.
  */
-export const HUNTER_DAILY_CALL_BUDGET_DEFAULT = 48;
+export const HUNTER_DAILY_CALL_BUDGET_DEFAULT = 55;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",

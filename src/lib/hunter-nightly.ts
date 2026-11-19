@@ -2,7 +2,7 @@ import { apolloApiKey } from "./apollo.ts";
 import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
 import { HUNTER_MODEL_ID } from "./hunter-config.ts";
 import { appendHunterRun, hunterRunEntry, type HunterRunOutcome } from "./hunter-runs.ts";
-import { enrichUnderApolloCap, gateNightly, loadDoNotContact, markNightlySwept, recordHunterEffort } from "./leads-hunter.ts";
+import { enrichUnderApolloCap, gateNightly, loadDoNotContact, markNightlySwept, publishHunterAlarms, recordHunterEffort } from "./leads-hunter.ts";
 import { dncBlocks } from "./hunter-phase.ts";
 import { getRedisClient } from "./leads-book.ts";
 import { edmontonToday } from "./lead-score.ts";
@@ -99,6 +99,9 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       note: result.ok ? `Nightly sweep. Contact-ready cards this run: ${result.contactReady}.` : result.error,
     });
     if (result.ok) await markNightlySwept(result.date);
+    if (!result.ok && result.error.includes("Monthly dollar cap")) {
+      await publishHunterAlarms(["Monthly dollar cap reached. Calling resumes next month."], now.toISOString(), "nightly");
+    }
     await appendHunterRun(
       hunterRunEntry({
         run: "nightly",

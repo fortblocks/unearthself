@@ -170,7 +170,7 @@ export async function researchCompanies(
   knownDomains: string[],
 ): Promise<{ companies: unknown; attempts: number } | { error: string; attempts: number }> {
   const { searchWithRetries } = await import("./xai-search.ts");
-  const { reserveCounter, callCounterKey } = await import("./hunter-phase.ts");
+  const { monthlyCapState, reserveCounter, callCounterKey, spendCounterKey, spendUnknownKey } = await import("./hunter-phase.ts");
   const { hunterCallBudget } = await import("./hunter-cap.ts");
   const { hunterMaxRetries } = await import("./hunter-config.ts");
   const { getRedisClient } = await import("./leads-book.ts");
@@ -178,6 +178,11 @@ export async function researchCompanies(
   const redis = await getRedisClient();
   if (!redis) return { error: "Redis is not configured", attempts: 0 };
   const today = edmontonToday();
+  const month = today.slice(0, 7);
+  const spendUnknown = await redis.get<string>(spendUnknownKey(month));
+  const spentRaw = Number(await redis.get<string>(spendCounterKey(month)));
+  const spent = spendUnknown || !Number.isFinite(spentRaw) ? null : spentRaw / 100;
+  if (monthlyCapState(spent) === "stop") return { error: "Monthly dollar cap reached.", attempts: 0 };
   const budget = hunterCallBudget();
   return searchWithRetries({
     system: "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",

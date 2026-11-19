@@ -170,7 +170,7 @@ test("stale when Apollo's date is more than 12 months old or the employer does n
   }, "2026-11-18");
   assert.equal(old.cardFlags?.includes(APOLLO_STALE), true);
   assert.equal(old.apolloUpdatedOn, "2024-11-01");
-  assert.equal(isContactReady(old), true);
+  assert.equal(isContactReady(old), false);
 
   const moved = applyApolloContact(company(), {
     id: "person-1",
@@ -185,6 +185,7 @@ test("stale when Apollo's date is more than 12 months old or the employer does n
   assert.equal(moved.cardFlags?.includes(APOLLO_STALE), true);
   assert.equal(moved.email, "");
   assert.equal(moved.buyerName, "");
+  assert.equal(isContactReady(moved), false);
 });
 
 test("the reveal ceiling stops a second reveal and the key never enters the URL", async () => {

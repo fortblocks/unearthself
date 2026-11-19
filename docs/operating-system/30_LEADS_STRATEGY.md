@@ -84,14 +84,19 @@ Section 10 of `29` is Hunter's search strategy for the Find step. It sits under 
 
 `cursor/hunter-phase-one-hardening-1ff2` is in progress on the Find step. That branch hardens phase one and does not change the search. On that branch, 48 contact-ready cards is a ceiling, and the day is not padded to reach 48. The branch does not connect a booking-link service. Booked is still a desk tap. The tool choice and the connection stay open, as logged in `28`.
 
-These decisions are not yet applied on the branch:
+Applied on the branch, and not live:
 
-- The call budget on the branch is still 48.
-- `HUNTER_MONTHLY_DOLLAR_CAP` is unset.
-- The quality floor on the branch is 20. A stale Apollo contact, including one whose employer no longer matches, is flagged and still kept on the card.
-- Alarms are written to the Redis run log (`unearth:hunter:runs:v1`) and shown on the Bots page. The branch sends no email and no Slack.
+- The call budget default is 55. Three calls a run make 72 calls available in the working day, and 55 is the hard stop. The cron is unchanged.
+- `HUNTER_MONTHLY_DOLLAR_CAP` defaults to 60. It counts known xAI cost for the calendar month. Apollo credits are separate. At 60 dollars Hunter stops calling until the next month.
+- A new card needs a verified fit signal. A score of 25 with no fit signal is rejected. A stale Apollo row, or a public page that shows a new employer, is not contact-ready. Total cards filed in a day stop at 48.
+- Alarms are stored in Redis. Delivery order is Rex, then Bo, then Derek, through `HUNTER_ALARM_WEBHOOK_URL` and `HUNTER_ALARM_CC_WEBHOOK_URLS`. Both are unset.
+
+Not applied. Still open:
+
 - The branch stores Apollo as the source and the date retrieved. It does not log the CASL basis as data from public sources, per Apollo's terms.
 - A booked meeting is still a desk tap. No booking service is connected.
+- There is no second finding method, and no live known-good or known-bad company list.
+- Items (a), (b), and (d) in `28` stay open.
 
 ## Changelog
 

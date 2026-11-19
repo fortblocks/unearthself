@@ -19,10 +19,13 @@ import {
   HUNTER_SAMPLE_FLOOR,
   HUNTER_SCORE_VERSION,
   HUNTER_SPEND_KEY_PREFIX,
+  HUNTER_ALARM_COPIES,
   HUNTER_ALARM_KEY,
+  HUNTER_ALARM_PRIMARY,
   HUNTER_SPEND_UNKNOWN_PREFIX,
   hunterDncCooldownDays,
   hunterMonthlyDollarCap,
+  hunterDailyFiledCap,
   hunterQualityFloor,
   hunterTrialShare,
 } from "./hunter-config.ts";
@@ -297,6 +300,54 @@ export async function addSpendCents(client: CounterClient, month: string, dollar
 
 export function passesQualityFloor(score: number, floor = hunterQualityFloor()) {
   return score >= floor;
+}
+
+export function dailyFileRoom(filedToday: number, cap = hunterDailyFiledCap()) {
+  return Math.max(0, cap - Math.max(0, filedToday));
+}
+
+/** A public page that says this person has left, or now works somewhere else. */
+export function pageShowsMovedOn(page: string) {
+  return /formerly|previously at|no longer at|no longer with|left the company|now at|moved on to|moved to/i.test(page);
+}
+
+export type AlarmTarget = { name: string; url: string };
+
+export function alarmWebhookTargets(env: { HUNTER_ALARM_WEBHOOK_URL?: string; HUNTER_ALARM_CC_WEBHOOK_URLS?: string } = process.env): AlarmTarget[] {
+  const targets: AlarmTarget[] = [];
+  const primary = env.HUNTER_ALARM_WEBHOOK_URL?.trim() ?? "";
+  if (primary) targets.push({ name: HUNTER_ALARM_PRIMARY, url: primary });
+  const copies = (env.HUNTER_ALARM_CC_WEBHOOK_URLS ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  copies.forEach((url, index) => {
+    targets.push({ name: HUNTER_ALARM_COPIES[index] ?? `copy ${index + 1}`, url });
+  });
+  return targets;
+}
+
+/** Posts to Rex first, then each copy. A failed post does not stop the rest. */
+export async function deliverAlarmWebhooks(input: {
+  targets: AlarmTarget[];
+  body: string;
+  fetchImpl?: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<unknown>;
+}) {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const sent: string[] = [];
+  for (const target of input.targets) {
+    sent.push(target.name);
+    try {
+      await fetchImpl(target.url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: input.body,
+      });
+    } catch {
+      // A missed webhook must not stop the hunt or the copies after it.
+    }
+  }
+  return sent;
 }
 
 export function reviewExpired(filedOn: string, today: string, review: ReviewState, days: number) {

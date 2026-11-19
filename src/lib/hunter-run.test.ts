@@ -180,7 +180,7 @@ test("a contact on a contact page is filed, a pause and a desk edit survive, and
     const result = await runHunterBatch(HUNT_AT, {
       clock: () => {
         ticks += 1;
-        return ticks === 1 ? start : start + 160_000;
+        return ticks === 1 ? start : start + 210_000;
       },
     });
     assert.equal(result.ok, true);
@@ -358,7 +358,7 @@ test("an empty search records an alarm for the last day and posts it when the we
     await runHunterBatch(HUNT_AT, {
       clock: () => {
         ticks += 1;
-        return ticks === 1 ? start : start + 160_000;
+        return ticks === 1 ? start : start + 210_000;
       },
     });
     assert.equal(posted.length, 1);

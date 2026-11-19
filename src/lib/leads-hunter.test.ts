@@ -260,12 +260,12 @@ test("the daily stop is contact-ready cards, and the call budget is separate", (
   const state = freshHunterState();
   const today = "2026-11-18";
   assert.equal(HUNTER_DAILY_CARD_TARGET, 48);
-  assert.equal(HUNTER_DAILY_CALL_BUDGET_DEFAULT, 48);
-  assert.equal(hunterCallBudget(""), 48);
-  assert.equal(hunterCallBudget(null), 48);
+  assert.equal(HUNTER_DAILY_CALL_BUDGET_DEFAULT, 55);
+  assert.equal(hunterCallBudget(""), 55);
+  assert.equal(hunterCallBudget(null), 55);
   assert.equal(hunterCallBudget("60"), 60);
-  assert.equal(hunterCallBudget("0"), 48);
-  assert.equal(hunterCallBudget("nope"), 48);
+  assert.equal(hunterCallBudget("0"), 55);
+  assert.equal(hunterCallBudget("nope"), 55);
   assert.equal(state.paused, false);
   assert.equal(hunterMayCall(state, today, 48), true);
   assert.equal(hunterMayCall({ ...state, paused: true }, today, 60), false);
