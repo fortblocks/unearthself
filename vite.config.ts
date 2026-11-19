@@ -14,6 +14,10 @@ export default defineConfig(({ command, isPreview }) => ({
           nitro({
             preset: "vercel",
             vercel: {
+              functionRules: {
+                "/api/cron/leads-hunter": { maxDuration: 120 },
+                "/api/cron/leads-scout": { maxDuration: 120 },
+              },
               config: {
                 crons: [
                   // Hunter nightly local sweep. Path kept so this cron is not registered twice.

@@ -619,49 +619,12 @@ export async function researchHunterSlot(
   slot: HunterSlot,
   knownDomains: string[],
 ): Promise<{ companies: unknown } | { error: string }> {
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) return { error: "XAI_API_KEY not configured" };
-  const { XAI_MODEL } = await import("./structured-minutes.ts");
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: XAI_MODEL,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
-        },
-        { role: "user", content: hunterPrompt(slot, knownDomains) },
-      ],
-      temperature: 0,
-      response_format: { type: "json_object" },
-      // Legacy live search. Left unchanged: xAI's current docs say this field fails
-      // and that web search belongs on the Responses API. The run log keeps the HTTP error.
-      search_parameters: {
-        mode: "on",
-        return_citations: true,
-        sources: [{ type: "web" }],
-      },
-    }),
-    signal: AbortSignal.timeout(55000),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    return { error: `xAI HTTP ${response.status}: ${detail.slice(0, 400)}` };
-  }
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) return { error: "xAI returned no content" };
-  try {
-    return JSON.parse(content) as { companies: unknown };
-  } catch {
-    return { error: "xAI did not return JSON" };
-  }
+  const { callXaiWebSearch } = await import("./xai-search.ts");
+  return callXaiWebSearch(
+    "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
+    hunterPrompt(slot, knownDomains),
+    100000,
+  );
 }
 
 async function readPublishedPage(url: string): Promise<string> {
@@ -828,7 +791,7 @@ export async function runHunterBatch(): Promise<
   const counts = countsForToday(state, today);
   state = {
     ...state,
-    lockedUntil: now + 90_000,
+    lockedUntil: now + 130_000,
     callsOn: today,
     callsToday: counts.callsToday + 1,
     filedOn: today,
