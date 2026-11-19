@@ -93,6 +93,34 @@ export type Company = {
   apolloCheckedOn?: string;
   /** Visible flags such as Stale or Apollo email not verified. */
   cardFlags?: string[];
+  /** Hunter profile score, kept with the card. The leads table still shows the 100-point score. */
+  hunterScore?: number;
+  hunterBreak?: { profile: number; access: number; timing: number; travel: number; total: number };
+  lineage?: {
+    method: string;
+    query: string;
+    promptVersion: string;
+    model: string;
+    scoreVersion: string;
+    signals: string[];
+    sourceUrl: string;
+    experimentId: string;
+    axis: "" | "subject" | "opener" | "angle";
+    variants?: { id: string; text: string; status: "live" | "winner" | "retired" }[];
+    assignments?: { cardId: string; variantId: string; approvedAt: string; sentAt: string; fromAddress: string }[];
+    sampleFloor: number;
+  };
+  review?: "unreviewed" | "approved" | "skipped" | "expired-unreviewed";
+  skipReason?: "wrong-size" | "wrong-sector" | "no-retreat-signal" | "bad-contact" | "duplicate" | "other";
+  pipeline?: "" | "sent" | "replied" | "booked" | "won" | "lost";
+  pipelineOn?: string;
+  reviewedOn?: string;
+  filedOn?: string;
+  dedupeKey?: string;
+  casl?: { publishedOn: string; roleFit: boolean; noUnsolicitedNotice: boolean };
+  emailMx?: boolean;
+  contactLastSeenOn?: string;
+  facts?: { sourceUrl: string; fetchedOn: string; snippet: string }[];
 };
 
 export type ScoutIngest = {
@@ -113,15 +141,9 @@ export type ScoutIngest = {
   whySources?: unknown;
 };
 
-/** Drop a stored Hunter score or Partner flag so the leads table cannot grow those columns back. */
+/** Drop a Partner flag so the leads table cannot grow that column back. The Hunter score and lineage stay. */
 export function asLeadCompany(company: Company): Company {
-  const next = { ...company } as Company & {
-    hunterScore?: unknown;
-    hunterBreak?: unknown;
-    partnerFlag?: unknown;
-  };
-  delete next.hunterScore;
-  delete next.hunterBreak;
+  const next = { ...company } as Company & { partnerFlag?: unknown };
   delete next.partnerFlag;
   return next;
 }

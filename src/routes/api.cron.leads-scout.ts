@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { apolloApiKey } from "@/lib/apollo";
+import { acquireHunterLock, releaseHunterLock } from "@/lib/hunter-lock";
+import { HUNTER_MODEL_ID } from "@/lib/hunter-config";
 import { appendHunterRun, hunterRunEntry, type HunterRunOutcome } from "@/lib/hunter-runs";
-import { enrichUnderApolloCap, holdHunterForDay, recordHunterEffort } from "@/lib/leads-hunter";
+import { enrichUnderApolloCap, gateNightly, markNightlySwept, recordHunterEffort } from "@/lib/leads-hunter";
+import { getRedisClient } from "@/lib/leads-book";
 import { runNightlyScout } from "@/lib/leads-scout";
 
 /**
@@ -17,7 +20,7 @@ export const Route = createFileRoute("/api/cron/leads-scout")({
         if (!secret || auth !== `Bearer ${secret}`) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const gate = await holdHunterForDay();
+        const gate = await gateNightly();
         if (!gate.ok) {
           await appendHunterRun(
             hunterRunEntry({
@@ -30,13 +33,24 @@ export const Route = createFileRoute("/api/cron/leads-scout")({
               apolloSearches: 0,
               apolloReveals: 0,
               error: nightlyNote(gate.error),
+              model: HUNTER_MODEL_ID,
             }),
           );
           return Response.json({ error: gate.error }, { status: 500 });
         }
         if (!gate.proceed) {
           const outcome: HunterRunOutcome =
-            gate.skipped === "paused" ? "skipped-paused" : gate.skipped === "cards" ? "skipped-target-met" : "capped-budget";
+            gate.skipped === "paused"
+              ? "skipped-paused"
+              : gate.skipped === "cards"
+                ? "skipped-target-met"
+                : gate.skipped === "killed"
+                  ? "skipped-killed"
+                  : gate.skipped === "not-4am"
+                    ? "skipped-not-4am"
+                    : gate.skipped === "already-swept"
+                      ? "skipped-already-swept"
+                      : "capped-budget";
           await appendHunterRun(
             hunterRunEntry({
               run: "nightly",
@@ -48,35 +62,63 @@ export const Route = createFileRoute("/api/cron/leads-scout")({
               apolloSearches: 0,
               apolloReveals: 0,
               error: nightlyNote(),
+              model: HUNTER_MODEL_ID,
             }),
           );
           return Response.json({ ok: true, skipped: gate.skipped });
         }
-        const result = await runNightlyScout({
-          enrich: (companies, domains, today) =>
-            enrichUnderApolloCap({ companies, domains, today, limit: 15 }),
-        });
-        await recordHunterEffort({
-          calls: result.called ? 1 : 0,
-          contactReady: result.ok ? result.contactReady : 0,
-          note: result.ok
-            ? `Nightly sweep. Contact-ready cards this run: ${result.contactReady}.`
-            : result.error,
-        });
-        await appendHunterRun(
-          hunterRunEntry({
-            run: "nightly",
-            outcome: result.ok ? "fired" : "error",
-            modelCalls: result.called ? 1 : 0,
-            candidates: result.ok ? result.candidates : 0,
-            cardsFiled: result.ok ? result.stored : 0,
+        const redis = await getRedisClient();
+        if (!redis) return Response.json({ error: "Redis is not configured" }, { status: 500 });
+        const token = crypto.randomUUID();
+        const gotLock = await acquireHunterLock(redis, token);
+        if (!gotLock) {
+          await appendHunterRun(
+            hunterRunEntry({
+              run: "nightly",
+              outcome: "skipped-busy",
+              modelCalls: 0,
+              candidates: 0,
+              cardsFiled: 0,
+              contactReady: 0,
+              apolloSearches: 0,
+              apolloReveals: 0,
+              error: nightlyNote(),
+              model: HUNTER_MODEL_ID,
+            }),
+          );
+          return Response.json({ ok: true, skipped: "busy" });
+        }
+        try {
+          const result = await runNightlyScout({
+            enrich: (companies, domains, today) =>
+              enrichUnderApolloCap({ companies, domains, today, limit: 15 }),
+          });
+          await recordHunterEffort({
+            calls: 0,
             contactReady: result.ok ? result.contactReady : 0,
-            apolloSearches: result.ok ? result.apolloSearches : 0,
-            apolloReveals: result.ok ? result.apolloReveals : 0,
-            error: result.ok ? result.apolloNote : nightlyNote(result.error),
-          }),
-        );
-        return Response.json(result, { status: result.ok ? 200 : 500 });
+            note: result.ok
+              ? `Nightly sweep. Contact-ready cards this run: ${result.contactReady}.`
+              : result.error,
+          });
+          if (result.ok) await markNightlySwept(result.date);
+          await appendHunterRun(
+            hunterRunEntry({
+              run: "nightly",
+              outcome: result.ok ? "fired" : "error",
+              modelCalls: result.attempts,
+              candidates: result.ok ? result.candidates : 0,
+              cardsFiled: result.ok ? result.stored : 0,
+              contactReady: result.ok ? result.contactReady : 0,
+              apolloSearches: result.ok ? result.apolloSearches : 0,
+              apolloReveals: result.ok ? result.apolloReveals : 0,
+              error: result.ok ? result.apolloNote : nightlyNote(result.error),
+              model: HUNTER_MODEL_ID,
+            }),
+          );
+          return Response.json(result, { status: result.ok ? 200 : 500 });
+        } finally {
+          await releaseHunterLock(redis, token);
+        }
       },
     },
   },

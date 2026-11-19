@@ -3,10 +3,11 @@
  * Read only on the Bots page. Nothing here stores a secret.
  */
 
+import type { HunterFunnel } from "./hunter-phase.ts";
 import { getRedisClient } from "./leads-book.ts";
 
 export const HUNTER_RUNS_KEY = "unearth:hunter:runs:v1";
-/** 90 days of one always-on run per minute. */
+/** Kept at the old one-a-minute size, so the 30 minute cadence still has a long window. */
 export const HUNTER_RUN_KEEP = 90 * 24 * 60;
 
 export type HunterRunName = "always-on" | "nightly";
@@ -14,8 +15,13 @@ export type HunterRunName = "always-on" | "nightly";
 export type HunterRunOutcome =
   | "fired"
   | "skipped-paused"
+  | "skipped-killed"
+  | "skipped-hours"
+  | "skipped-not-4am"
+  | "skipped-already-swept"
   | "skipped-target-met"
   | "capped-budget"
+  | "capped-spend"
   | "skipped-busy"
   | "error";
 
@@ -30,13 +36,24 @@ export type HunterRunEntry = {
   apolloSearches: number;
   apolloReveals: number;
   error: string;
+  model: string;
+  alarms: string[];
+  inputTokens: number;
+  outputTokens: number;
+  dollars: number | null;
+  funnel: HunterFunnel | null;
 };
 
 const OUTCOMES = new Set<HunterRunOutcome>([
   "fired",
   "skipped-paused",
+  "skipped-killed",
+  "skipped-hours",
+  "skipped-not-4am",
+  "skipped-already-swept",
   "skipped-target-met",
   "capped-budget",
+  "capped-spend",
   "skipped-busy",
   "error",
 ]);
@@ -46,7 +63,7 @@ function count(value: number) {
   return Math.round(value);
 }
 
-export function hunterRunEntry(input: Omit<HunterRunEntry, "at"> & { at?: string }): HunterRunEntry {
+export function hunterRunEntry(input: Omit<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "funnel"> & Partial<Pick<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "funnel">>): HunterRunEntry {
   return {
     at: input.at?.trim() || new Date().toISOString(),
     run: input.run,
@@ -58,6 +75,12 @@ export function hunterRunEntry(input: Omit<HunterRunEntry, "at"> & { at?: string
     apolloSearches: count(input.apolloSearches),
     apolloReveals: count(input.apolloReveals),
     error: input.error.trim(),
+    model: input.model?.trim() || "",
+    alarms: Array.isArray(input.alarms) ? input.alarms.filter((item) => item.trim()).map((item) => item.trim()) : [],
+    inputTokens: count(input.inputTokens ?? 0),
+    outputTokens: count(input.outputTokens ?? 0),
+    dollars: typeof input.dollars === "number" && Number.isFinite(input.dollars) ? input.dollars : null,
+    funnel: input.funnel ?? null,
   };
 }
 
@@ -78,6 +101,12 @@ export function parseHunterRun(raw: unknown): HunterRunEntry | null {
     apolloSearches: Number(record.apolloSearches ?? 0),
     apolloReveals: Number(record.apolloReveals ?? 0),
     error: typeof record.error === "string" ? record.error : "",
+    model: typeof record.model === "string" ? record.model : "",
+    alarms: Array.isArray(record.alarms) ? record.alarms.filter((item) => typeof item === "string") : [],
+    inputTokens: Number(record.inputTokens ?? 0),
+    outputTokens: Number(record.outputTokens ?? 0),
+    dollars: typeof record.dollars === "number" ? record.dollars : null,
+    funnel: record.funnel ?? null,
   });
 }
 

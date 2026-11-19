@@ -186,7 +186,7 @@ test("readLocalCompanies reads the desk persist blob and ignores junk", () => {
   assert.equal(readLocalCompanies(null).length, 0);
 });
 
-test("a saved lead drops a separate Hunter score and a Partner flag", () => {
+test("a saved lead keeps the Hunter score and drops a Partner flag", () => {
   const book = parseBook({
     companies: [
       {
@@ -205,7 +205,7 @@ test("a saved lead drops a separate Hunter score and a Partner flag", () => {
   assert.ok(company);
   assert.equal(company.source, "hunter");
   assert.equal(company.profileHits?.[0]?.id, "distributed");
-  assert.equal("hunterScore" in company, false);
-  assert.equal("hunterBreak" in company, false);
+  assert.equal(company.hunterScore, 80);
+  assert.equal(company.hunterBreak?.profile, 40);
   assert.equal("partnerFlag" in company, false);
 });

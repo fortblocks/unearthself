@@ -31,7 +31,7 @@ test("both hunts call the shared web search client and not live search", () => {
   for (const source of [hunter, scout]) {
     assert.equal(source.includes("search_parameters"), false);
     assert.equal(source.includes("chat/completions"), false);
-    assert.match(source, /callXaiWebSearch/);
+    assert.match(source, /searchWithRetries|callXaiWebSearch/);
   }
 });
 

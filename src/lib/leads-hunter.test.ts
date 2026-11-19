@@ -225,15 +225,15 @@ test("a known domain is updated and a new domain is filed once", () => {
   assert.equal(first.companies[0]?.source, undefined);
   assert.equal(first.companies[0]?.scoutBatch, "2026-11-01");
   assert.ok((first.companies[0]?.signals?.length ?? 0) >= 1);
-  assert.equal("hunterScore" in (first.companies[0] ?? {}), false);
-  assert.equal("hunterBreak" in (first.companies[0] ?? {}), false);
   assert.equal("partnerFlag" in (first.companies[0] ?? {}), false);
 
   const second = fileHunterCards([], [card], { today: "2026-11-18" });
   assert.equal(second.filed, 1);
   assert.equal(second.companies.length, 1);
   assert.equal(second.companies[0]?.source, "hunter");
-  assert.equal("hunterScore" in (second.companies[0] ?? {}), false);
+  assert.ok((second.companies[0]?.hunterScore ?? 0) > 0);
+  assert.equal(second.companies[0]?.lineage?.method, "xai-web-search");
+  assert.equal(second.companies[0]?.review, "unreviewed");
   assert.equal("partnerFlag" in (second.companies[0] ?? {}), false);
   assert.equal(second.companies[0]?.status, "watch");
   assert.equal(second.companies[0]?.draftBody, "");

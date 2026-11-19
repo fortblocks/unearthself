@@ -180,9 +180,9 @@ export const HUNTER_DAILY_CALL_BUDGET_DEFAULT = 48;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",
-  job: "Two runs, one bot. Nightly local sweep at 4am Mountain: Calgary, Edmonton, and Red Deer, headcount 80 to 800, first-wave industries. Always-on hunt for ideal customers anywhere, until 48 contact-ready cards are filed in an Edmonton day. Never sends.",
-  trigger: "Nightly at 4am Mountain, and always on",
+  job: "Two runs, one bot. Nightly local sweep at 4am Edmonton: Calgary, Edmonton, and Red Deer, headcount 80 to 800, first-wave industries. Always-on hunt every 30 minutes in working hours for ideal customers anywhere. 48 contact-ready cards is a ceiling, not a target. Never sends.",
+  trigger: "Nightly at 4am Edmonton, and every 30 minutes from 7am to 7pm Edmonton",
   owner: "christopher" as const,
   escalate: "A partnership flag, or a company outside this profile.",
-  limits: ["Never sends", "Never invents a fact", "No paid data", "Pause stops both runs"],
+  limits: ["Never sends", "Never invents a fact", "No new paid source without approval", "Pause and the kill switch stop both runs"],
 };

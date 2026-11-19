@@ -23,13 +23,13 @@ The job has two phases. Phase one is finding and filing. Phase two is enrichment
 
 Hunter is one bot with two runs. There is no separate local bot.
 
-(a) Nightly local sweep, formerly its own bot. Cron `0 11 * * *`, which is 4am Mountain. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. The score is the existing one in `lead-score.ts`. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`, so the schedule is not registered twice. Behaviour of the sweep is unchanged.
+(a) Nightly local sweep, formerly its own bot. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`. Two UTC hours are scheduled, `0 10 * * *` and `0 11 * * *`, because 4am Edmonton is 10:00 UTC in daylight time and 11:00 UTC in standard time. The route runs only when America/Edmonton local time is 4am, and only once per Edmonton date. It keeps only Calgary, Edmonton, and Red Deer, headcount 80 to 800, and the first-wave industries in `lead-score.ts`, and drops every other row before scoring. The score is the existing one in `lead-score.ts`.
 
-(b) Always-on ideal-customer hunt. Cron every minute. It keeps searching, evaluating, and enriching until it has filed 48 contact-ready cards in an Edmonton day, then stops. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched or No-signal (section 9). Both runs count toward the same 48. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to.
+(b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards is a ceiling, not a target. Hunter stops at the ceiling. It does not pad the day with weak cards. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched or No-signal (section 9). Both runs count toward the same ceiling. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
 
 Model calls are a separate daily budget, an internal resource aimed at that 48. The budget is an adjustable setting, currently 48 calls, until Chris sets a new number. Raising it is spend and needs Chris's approval. The setting name is `HUNTER_DAILY_CALL_BUDGET`. If the budget runs out before 48 contact-ready cards are filed, that is a capacity problem, not a normal day. Hunter records the date, the cards filed, and the calls used. Rex is notified on the Bots page and in the stored Hunter state.
 
-Pause on `/admin/bots` stops both runs. The same paused flag is read by the nightly route and by the every-minute route.
+Pause on `/admin/bots` stops both runs. The same paused flag is read by the nightly route and by the always-on route. `HUNTER_KILL_SWITCH` stops both as well, including the nightly sweep. Unset means the switch is off.
 
 ## 1. Ideal-customer profile first
 
@@ -130,7 +130,7 @@ In the code, the first four write drafts from fixed templates in `bot-copy.ts` w
 
 ### Hunter on the roster
 
-Hunter's roster entry shows the job (both runs), the trigger, owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no paid data, pause stops both runs). It shows the last always-on run, cards filed today against the 48 target, model calls used against the daily budget, a capacity warning when the budget runs out first, and the pause switch.
+Hunter's roster entry shows the job (both runs), the trigger, owner Christopher, escalation (a partnership flag, or any company outside the profile's limits), and limits (never sends, never invents, no new paid source without approval, pause and the kill switch stop both runs). It shows booked calls this month, the last run, whether the heartbeat is late, cards filed today against the 48 ceiling, model calls used against the daily budget, the monthly dollar cap (or "no cap set"), alarms, the latest funnel, a results table by method, a capacity warning when the budget runs out first, and the pause switch.
 
 ## 8. Always on
 
@@ -165,7 +165,7 @@ Each Apollo card stores the source (`Apollo` or `Public page`), the Apollo perso
 
 ### Run log
 
-Every always-on run and every 4am nightly run appends one entry to `unearth:hunter:runs:v1`. The list keeps about 90 days. Each entry has the timestamp, which run, the outcome (fired, skipped-paused, skipped-target-met, capped-budget, or error), model calls, candidates returned, cards filed, contact-ready cards, Apollo searches, Apollo reveals, and error text. When a model call fails, the error text includes the xAI HTTP status and message. The Bots page shows the last 20 entries, read only.
+Every always-on run and every 4am nightly run appends one entry to `unearth:hunter:runs:v1`. The list keeps the old one-a-minute window, so the 30 minute cadence still has a long history. Each entry has the timestamp, which run, the outcome (fired, skipped-paused, skipped-killed, skipped-hours, skipped-not-4am, skipped-already-swept, skipped-target-met, capped-budget, capped-spend, skipped-busy, or error), the model id, model calls, candidates returned, cards filed, contact-ready cards, Apollo searches, Apollo reveals, token counts, dollars when the model reports them, alarms, the funnel, and error text. A failed call, an unexpected body, or a deprecation signal is an error, not zero candidates. When a model call fails, the error text includes the xAI HTTP status and message. The Bots page shows the last 20 entries, read only, including alarms.
 
 The goal is that every card presented to Chris has a name, title, and email on file before it reaches the approval queue. A card without all three stays a research card and does not enter the queue.
 
@@ -258,9 +258,9 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - A company in Europe or the United States is filed and scored, not dropped.
 - Stale or unverified database rows are flagged on the card, not used silently.
 - Hunter's nightly local sweep and the score in `lead-score.ts` are unchanged.
-- The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead does not store a separate Hunter score or a Partner value.
+- The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead stores the Hunter score and the card lineage. It does not store a Partner value, and the Partner column stays off the table.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
-- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
+- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. That 48 is a ceiling. Hunter does not fill up to it with cards under the quality floor. A contact-ready card has a name, a title, and an email, and is Enriched or No-signal.
 - If the model-call budget runs out first, Hunter stops and records the date, cards filed, and calls used for Rex. The budget defaults to 48. The setting is `HUNTER_DAILY_CALL_BUDGET`. Raising it is spend and needs Chris's approval.
 - No card reaches Coco until its enrichment state is Enriched or No-signal, and every enriched fact shows its source URL.
 
@@ -273,7 +273,50 @@ Each day, the highest-converting cards surface first, until 48 contact-ready car
 - Whether the nightly run's 80 to 800 headcount band stays for the local list.
 - Apollo is the chosen licensed database. The integration is in progress and gated on `APOLLO_API_KEY`. The reveal ceiling defaults to 48 (`APOLLO_DAILY_CREDIT_CAP`). Phone numbers are not requested.
 
+## Phase one hardening, 19th November 2026
+
+Chris approved a robustness pass. Search behaviour is unchanged. The following is what the code does now.
+
+- A model or Apollo response is checked before it is treated as "nothing found". HTTP errors, an unexpected body, a 410, a deprecation header, or a warning that the endpoint is deprecated are logged as failures. An empty company list after a real web search is zero results, and it raises a zero-candidate alarm. A day whose filed cards are under half the trailing 7-day median raises a second alarm. No history, or a median of zero, does not alarm. Alarms show on the Bots page and in the run log. There is no email and no Slack.
+- The heartbeat is the time of the latest run-log line. It is late when that line is older than 45 minutes during working hours, or older than 13 hours outside them.
+- The Hunter model id is pinned as `grok-4.20-0309-non-reasoning` and stored on each call and each card. Minutes keep their own model.
+- `HUNTER_KILL_SWITCH` stops every run, nightly included. Unset is off. Values that turn it on are `1`, `true`, and `on`. Pause remains a separate flag.
+- One run at a time. The lock is an Upstash set-if-absent with a token, a 360 second expiry (longer than the 300 second function limit), and a delete that only the holder can perform. The old lock was a read then a write and expired at 120 seconds, so a slow run could overlap the next one.
+- Throughput. Working hours default to 12 hours. Every 30 minutes is 24 runs. `HUNTER_CALLS_PER_RUN` defaults to 2, so the day can still make 48 model calls, which is the whole daily call budget. Each call can return up to 8 companies, so the 48-card ceiling is reachable. Two 90 second searches fit under the 300 second limit.
+- Every new card gets a dedupe key of normalised domain plus contact email, checked before filing.
+- Do-not-contact lives at `unearth:hunter:dnc:v1`. A book reset replaces `unearth:leads:v1` and `unearth:hunter:v1` only. The list holds unsubscribes, don't-contact replies, lost companies, and skipped companies. The cooldown defaults to 90 days (`HUNTER_DNC_COOLDOWN_DAYS`). Lost and skipped on the desk write the list. The desk can also add unsubscribe and don't-contact.
+- Call and Apollo credit counters increment in Redis before the call and stop at the cap. They reset by the Edmonton date in the key. A retry counts as another call. After the allowed retries the run stops. `HUNTER_MAX_RETRIES` defaults to 2, so three tries, with backoff and jitter.
+- Dollars come from the xAI response field `cost_in_usd` or `cost` when that field is a number. Token counts are always stored. If the response does not name a dollar amount, dollars stay unknown. Tick fields are not converted. Apollo stays in credits. `HUNTER_MONTHLY_DOLLAR_CAP` is unset until Chris sets it. When unset, the desk says "no cap set". When set, 80 percent warns and 100 percent stops, and only when the dollars are known.
+- A dropped company gets a reason: page empty, fetch failed, blocked, timed out, name missing, domain mismatch, place mismatch, do-not-contact, duplicate, below the quality floor, no MX, or unverified. A failed page fetch is tried once more. If it still fails, the company is held as unverified, logged, and not filed.
+- Each run logs a funnel: searched, candidates, verified, contact found, filed, and drops by reason. The Bots page shows the latest one.
+- A fact keeps its source URL, the fetch date, and a quoted snippet. An email keeps a CASL note: the page it was published on, whether the title fits a role, and whether that page shows a notice against unsolicited email. If the notice is there, the email is left off the card. The email domain is checked for MX records with DNS only. A mailbox is never probed and SMTP is never opened. The date the contact was last seen is stored.
+- A filed card keeps its Hunter score, the query, the prompt version `2026-11-19.1`, the model, the score version, the signals, and the source. The lineage uses the experiment fields from spec 26 section 3 (`experimentId`, `axis`, `variants`, `assignments`, `sampleFloor`). No experiment is running. `sampleFloor` on the card is 30 reviewed cards, which is the method-results floor, not the unset experiment-winner proposal in spec 26.
+- The desk can approve a card, or skip it with one tap: wrong size, wrong sector, no retreat signal, bad contact, duplicate, or other. Further taps record sent, replied, booked, won, and lost. A card still unreviewed after `HUNTER_REVIEW_DAYS` (default 5) becomes expired unreviewed. That is not a rejection. It is a capacity signal.
+- No booking-link service is connected. The desk shows the note that this needs Chris's yes first.
+- The Bots headline is booked calls this month. The method table shows filed, approval rate, reply rate, booked, and cost per card, and says "not enough data" until a method has 30 reviewed cards. The only method is xAI web search. It is on. `HUNTER_TRIAL_SHARE` defaults to 20 percent and is clamped between 20 and 30. That share is unassigned because no trial method exists.
+- The quality floor default is 20. A card with no verified profile signal lands near travel plus a bare source, about 5. 20 asks for about two profile signals, or one signal plus a named contact, so the ceiling is not filled with empty research cards. This default is for Chris to confirm.
+- `npm run hunter:dry` runs the fictional fixture set and prints the funnel. It does not file and does not spend. `--live` may search once and still does not file. The live company list in code is empty.
+
+Settings Chris has not set, with the defaults in code:
+
+| Setting | Default |
+| --- | --- |
+| `HUNTER_KILL_SWITCH` | unset, off |
+| `HUNTER_WORK_START_HOUR` | 7 |
+| `HUNTER_WORK_END_HOUR` | 19 |
+| `HUNTER_CALLS_PER_RUN` | 2 |
+| `HUNTER_MAX_RETRIES` | 2 |
+| `HUNTER_DNC_COOLDOWN_DAYS` | 90 |
+| `HUNTER_REVIEW_DAYS` | 5 |
+| `HUNTER_TRIAL_SHARE` | 0.2 |
+| `HUNTER_QUALITY_FLOOR` | 20 |
+| `HUNTER_MONTHLY_DOLLAR_CAP` | unset |
+| `HUNTER_DAILY_CALL_BUDGET` | 48, already in use |
+| `APOLLO_DAILY_CREDIT_CAP` | 48, already in use |
+
 ## Changelog
+
+- 19th November 2026. Phase one hardening, per Chris. 48 is a ceiling. Working hours, the kill switch, the atomic lock, the do-not-contact list, response checks, alarms, the funnel, CASL and MX notes, card lineage, desk outcomes, and the fixture dry run are described above. The Hunter score is stored again. The Partner column stays off. No booking-link service. Monthly strategy stays self-executing, with Rex overseeing. Not deployed.
 
 - 18th November 2026. Spec opened from Chris's call. Not built.
 - 18th November 2026. Brief broadened by Chris: Hunter's sole job is feeding Chris high-conversion companies for a team of six to twenty-four in Drumheller, ongoing. A missing public email no longer stops a company being filed. The access gate controls sending, not filing, and access points measure contact readiness, not whether a company is kept.
@@ -292,7 +335,7 @@ Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, travel weights, and partnership terms can change without editing the prompt.
 - `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`. A known domain is updated. The nightly sweep and `lead-score.ts` are unchanged. The lead stores no separate Hunter score and no Partner value.
-- The always-on cron is `/api/cron/leads-hunter`, scheduled every minute in the Nitro config. This Vercel team is on Pro, which allows a one-minute cron. A Hobby plan would only allow a daily cron. The run stops after 48 contact-ready cards in an Edmonton day, or sooner when the model-call budget runs out. That budget defaults to 48 and is `HUNTER_DAILY_CALL_BUDGET`. A budget stop is stored as a capacity problem for Rex and shown on the Hunter card. It ships running. The nightly cron stays `/api/cron/leads-scout` at `0 11 * * *`. Pause and resume on `/admin/bots` write one paused flag in Upstash, and both routes read it. Both runs also stop when the card target or the call budget is spent. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every 30 minutes in the Nitro config, and gated to working hours in America/Edmonton. The run stops at the 48 contact-ready ceiling, or sooner when the model-call budget runs out, or when the quality floor drops a weak card. That budget defaults to 48 and is `HUNTER_DAILY_CALL_BUDGET`. A budget stop is stored as a capacity problem for Rex and shown on the Hunter card. The nightly route stays `/api/cron/leads-scout`, scheduled at `0 10 * * *` and `0 11 * * *`, and runs only at 4am Edmonton, once per Edmonton day. Pause and the kill switch stop both. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`. The Hunter score and lineage are stored on the card. The Partner column stays off.
 
 Left:
 

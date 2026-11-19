@@ -166,27 +166,49 @@ Return at most 15 companies. Return a company when you have its name, domain, an
 { "companies": [] }`;
 }
 
-export async function researchCompanies(knownDomains: string[]): Promise<{ companies: unknown } | { error: string }> {
-  const { callXaiWebSearch } = await import("./xai-search.ts");
-  return callXaiWebSearch(
-    "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
-    scoutPrompt(knownDomains),
-    90000,
-  );
+export async function researchCompanies(
+  knownDomains: string[],
+): Promise<{ companies: unknown; attempts: number } | { error: string; attempts: number }> {
+  const { searchWithRetries } = await import("./xai-search.ts");
+  const { reserveCounter, callCounterKey } = await import("./hunter-phase.ts");
+  const { hunterCallBudget } = await import("./hunter-cap.ts");
+  const { hunterMaxRetries } = await import("./hunter-config.ts");
+  const { getRedisClient } = await import("./leads-book.ts");
+  const { edmontonToday } = await import("./lead-score.ts");
+  const redis = await getRedisClient();
+  if (!redis) return { error: "Redis is not configured", attempts: 0 };
+  const today = edmontonToday();
+  const budget = hunterCallBudget();
+  return searchWithRetries({
+    system: "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
+    prompt: scoutPrompt(knownDomains),
+    timeoutMs: 90000,
+    maxRetries: hunterMaxRetries(),
+    beforeAttempt: async () => {
+      const reserved = await reserveCounter(redis, callCounterKey(today), budget);
+      return { allowed: reserved.allowed };
+    },
+  });
 }
 
 async function readPublishedPage(url: string): Promise<string> {
   if (!/^https?:\/\//i.test(url)) return "";
-  try {
-    const response = await fetch(url, {
-      headers: { "user-agent": "UnearthSelfLeadScout/1.0" },
-      signal: AbortSignal.timeout(6000),
-      redirect: "follow",
-    });
-    return response.ok ? await response.text() : "";
-  } catch {
-    return "";
+  let last = "";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { "user-agent": "UnearthSelfLeadScout/1.0" },
+        signal: AbortSignal.timeout(6000),
+        redirect: "follow",
+      });
+      if (response.ok) return await response.text();
+      if (response.status === 401 || response.status === 403 || response.status === 429) return "";
+      last = "";
+    } catch {
+      last = "";
+    }
   }
+  return last;
 }
 
 export async function verifyRows(rows: ScoutIngest[]): Promise<ScoutIngest[]> {
@@ -223,20 +245,21 @@ export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Pr
       apolloSearches: number;
       apolloReveals: number;
       apolloNote: string;
+      attempts: number;
     }
-  | { ok: false; error: string; called: boolean }
+  | { ok: false; error: string; called: boolean; attempts: number }
 > {
   const loaded = await loadBook();
-  if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured", called: false };
+  if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured", called: false, attempts: 0 };
   const today = edmontonToday();
-  let research: { companies: unknown } | { error: string };
+  let research: { companies: unknown; attempts: number } | { error: string; attempts: number };
   try {
     research = await researchCompanies(loaded.book.companies.map((company) => company.domain));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Nightly search failed";
-    return { ok: false, error: message, called: true };
+    return { ok: false, error: message, called: true, attempts: 1 };
   }
-  if ("error" in research) return { ok: false, error: research.error, called: true };
+  if ("error" in research) return { ok: false, error: research.error, called: research.attempts > 0, attempts: research.attempts };
   const selected = selectScoutRows(research);
   const verified = await verifyRows(selected);
   const batch = buildMorningBatch(loaded.book.companies, verified, {
@@ -265,6 +288,7 @@ export async function runNightlyScout(opts?: { enrich?: NightlyEnrichment }): Pr
     considered: batch.added,
     candidates: selected.length,
     called: true,
+    attempts: research.attempts,
     contactReady,
     apolloSearches: enriched.searches,
     apolloReveals: enriched.reveals,

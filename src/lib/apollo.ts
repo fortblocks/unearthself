@@ -182,6 +182,35 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** A 410, a deprecation header, or a body that is not the documented object is a failure, not an empty search. */
+export function classifyApolloSearch(
+  status: number,
+  body: unknown,
+  headers?: { get(name: string): string | null },
+): { failure: string } | { empty: boolean } {
+  const warning = `${headers?.get("deprecation") ?? ""} ${headers?.get("warning") ?? ""}`;
+  if (status === 410 || /deprecat/i.test(warning)) return { failure: `Apollo HTTP ${status}: deprecated` };
+  if (!Number.isInteger(status) || status < 200 || status >= 300) return { failure: `Apollo HTTP ${status}` };
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { failure: "Apollo returned an unexpected shape" };
+  const record = body as Record<string, unknown>;
+  if (!Array.isArray(record.people)) return { failure: "Apollo returned an unexpected shape" };
+  return { empty: record.people.length === 0 };
+}
+
+export function classifyApolloReveal(
+  status: number,
+  body: unknown,
+  headers?: { get(name: string): string | null },
+): { failure: string } | { empty: boolean } {
+  const warning = `${headers?.get("deprecation") ?? ""} ${headers?.get("warning") ?? ""}`;
+  if (status === 410 || /deprecat/i.test(warning)) return { failure: `Apollo HTTP ${status}: deprecated` };
+  if (!Number.isInteger(status) || status < 200 || status >= 300) return { failure: `Apollo HTTP ${status}` };
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { failure: "Apollo returned an unexpected shape" };
+  const record = body as Record<string, unknown>;
+  if (!("person" in record)) return { failure: "Apollo returned an unexpected shape" };
+  return { empty: record.person == null };
+}
+
 export function pickSearchPerson(body: unknown): { id: string } | null {
   const record = asRecord(body);
   const people = Array.isArray(record?.people) ? record.people : [];
@@ -277,15 +306,17 @@ export async function enrichHunterContacts(input: {
   apiKey: string | null;
   limit: number;
   fetchImpl?: ApolloFetch;
-}): Promise<{ companies: Company[]; searches: number; reveals: number; note: string }> {
+  reserveReveal?: () => Promise<boolean>;
+  maxRetries?: number;
+}): Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed: boolean }> {
   const companies = input.companies.map((company) => markPublicContact(company, input.today));
   if (!input.apiKey) {
-    return { companies, searches: 0, reveals: 0, note: APOLLO_OFF };
+    return { companies, searches: 0, reveals: 0, note: APOLLO_OFF, failed: false };
   }
   const queue = apolloQueue(companies, input.domains, input.limit);
-  if (queue.length === 0) return { companies, searches: 0, reveals: 0, note: "" };
+  if (queue.length === 0) return { companies, searches: 0, reveals: 0, note: "", failed: false };
   if (input.revealsUsed >= input.cap) {
-    return { companies, searches: 0, reveals: 0, note: APOLLO_CEILING };
+    return { companies, searches: 0, reveals: 0, note: APOLLO_CEILING, failed: false };
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -296,70 +327,68 @@ export async function enrichHunterContacts(input: {
   let reveals = 0;
   let note = "";
   let hitCeiling = false;
+  let failed = false;
+  const retries = input.maxRetries ?? 2;
+  let serviceFailures = 0;
 
   for (const company of queue) {
+    if (serviceFailures > retries) break;
     if (revealsUsed >= input.cap) {
       hitCeiling = true;
       break;
     }
     const searchUrl = apolloRequestUrl("mixed_people/api_search", apolloSearchParams(company));
-    let searchResponse: Response;
-    try {
-      searchResponse = await fetchImpl(searchUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "x-api-key": key,
-        },
-        body: "{}",
-        signal: AbortSignal.timeout(20000),
-      });
-    } catch (error) {
-      note = error instanceof Error ? redactSecrets(error.message, [key]) : "Apollo search failed";
+    const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries);
+    if ("failure" in searchedAttempt) {
+      note = searchedAttempt.failure;
+      failed = true;
+      serviceFailures += 1;
       break;
     }
     searches += 1;
-    const searched = await readJson(searchResponse, key);
-    if (!searchResponse.ok) {
-      note = `Apollo HTTP ${searchResponse.status}: ${searched.snippet}`;
+    const searched = await readJson(searchedAttempt.response, key);
+    const searchClass = classifyApolloSearch(searchedAttempt.response.status, searched.body, searchedAttempt.response.headers);
+    if ("failure" in searchClass) {
+      note = `${searchClass.failure}: ${searched.snippet}`;
+      failed = true;
+      serviceFailures += 1;
       break;
     }
-    const chosen = pickSearchPerson(searched.body);
+    const chosen = searchClass.empty ? null : pickSearchPerson(searched.body);
     if (!chosen) {
       const checked = byDomain.get(company.domain);
       if (checked) byDomain.set(company.domain, { ...checked, apolloCheckedOn: input.today });
       continue;
     }
-    if (revealsUsed >= input.cap) {
+    if (input.reserveReveal) {
+      const allowed = await input.reserveReveal();
+      if (!allowed) {
+        hitCeiling = true;
+        break;
+      }
+    } else if (revealsUsed >= input.cap) {
       hitCeiling = true;
       break;
     }
     revealsUsed += 1;
     reveals += 1;
     const revealUrl = apolloRequestUrl("people/match", apolloRevealParams(chosen.id));
-    let revealResponse: Response;
-    try {
-      revealResponse = await fetchImpl(revealUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "x-api-key": key,
-        },
-        body: "{}",
-        signal: AbortSignal.timeout(20000),
-      });
-    } catch (error) {
-      note = error instanceof Error ? redactSecrets(error.message, [key]) : "Apollo reveal failed";
+    const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries);
+    if ("failure" in revealAttempt) {
+      note = revealAttempt.failure;
+      failed = true;
+      serviceFailures += 1;
       break;
     }
-    const revealed = await readJson(revealResponse, key);
-    if (!revealResponse.ok) {
-      note = `Apollo HTTP ${revealResponse.status}: ${revealed.snippet}`;
+    const revealed = await readJson(revealAttempt.response, key);
+    const revealClass = classifyApolloReveal(revealAttempt.response.status, revealed.body, revealAttempt.response.headers);
+    if ("failure" in revealClass) {
+      note = `${revealClass.failure}: ${revealed.snippet}`;
+      failed = true;
+      serviceFailures += 1;
       break;
     }
-    const person = readApolloReveal(revealed.body);
+    const person = revealClass.empty ? null : readApolloReveal(revealed.body);
     const current = byDomain.get(company.domain) ?? company;
     byDomain.set(company.domain, applyApolloContact(current, person, input.today));
   }
@@ -370,5 +399,39 @@ export async function enrichHunterContacts(input: {
     searches,
     reveals,
     note,
+    failed,
   };
+}
+
+async function apolloCall(
+  fetchImpl: ApolloFetch,
+  url: string,
+  key: string,
+  maxRetries: number,
+): Promise<{ response: Response } | { failure: string }> {
+  let last = "Apollo request failed";
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          "x-api-key": key,
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(20000),
+      });
+      if (response.status >= 500 && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+        continue;
+      }
+      return { response };
+    } catch (error) {
+      last = error instanceof Error ? redactSecrets(error.message, [key]) : "Apollo request failed";
+      if (attempt >= maxRetries) return { failure: last };
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
+  return { failure: last };
 }

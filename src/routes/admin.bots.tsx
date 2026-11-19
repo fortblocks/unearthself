@@ -39,8 +39,13 @@ function runLabel(run: "always-on" | "nightly") {
 function outcomeLabel(outcome: string) {
   if (outcome === "fired") return "Fired";
   if (outcome === "skipped-paused") return "Skipped, paused";
-  if (outcome === "skipped-target-met") return "Skipped, target met";
+  if (outcome === "skipped-killed") return "Skipped, kill switch";
+  if (outcome === "skipped-hours") return "Skipped, outside working hours";
+  if (outcome === "skipped-not-4am") return "Skipped, not 4am Edmonton";
+  if (outcome === "skipped-already-swept") return "Skipped, already swept today";
+  if (outcome === "skipped-target-met") return "Skipped, ceiling met";
   if (outcome === "capped-budget") return "Capped, model-call budget";
+  if (outcome === "capped-spend") return "Capped, monthly dollar cap";
   if (outcome === "skipped-busy") return "Skipped, already running";
   if (outcome === "error") return "Error";
   return outcome;
@@ -118,9 +123,9 @@ function BotsPage() {
       </p>
 
       <section className="grid gap-6 sm:grid-cols-3">
+        <Stat label="Booked calls this month" value={String(hunter.bookedThisMonth)} hint="Hunter cards marked booked or won" />
         <Stat label="Drafts waiting" value={String(queued)} hint="Human still sends" />
-        <Stat label="Follow-up live" value={String(dueFollow)} hint="Nudge 1 or 2" />
-        <Stat label="Hunter" value={hunter.paused ? "Paused" : "Running"} hint="Nightly and always on" />
+        <Stat label="Hunter" value={hunter.killed ? "Killed" : hunter.paused ? "Paused" : "Running"} hint="Nightly and working hours" />
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -138,7 +143,9 @@ function BotsPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-display text-3xl font-black uppercase leading-none">{HUNTER_ROSTER.name}</h2>
-                <Badge tone={hunter.paused ? "lost" : "won"}>{hunter.paused ? "paused" : "running"}</Badge>
+                <Badge tone={hunter.killed || hunter.paused ? "lost" : "won"}>
+                  {hunter.killed ? "kill switch" : hunter.paused ? "paused" : "running"}
+                </Badge>
               </div>
               <p className="mt-2 text-sm text-pretty">{HUNTER_ROSTER.job}</p>
               <p className="mt-2 text-sm text-pretty">
@@ -157,16 +164,75 @@ function BotsPage() {
                 ))}
               </ul>
               <p className="mt-3 text-sm text-coal">Last run {formatRun(hunter.lastRunAt)}.</p>
+              <p className="mt-1 text-sm text-coal">
+                Heartbeat {hunter.heartbeatAt ? formatRun(hunter.heartbeatAt) : "none"}
+                {hunter.heartbeatLate ? ". Late." : "."}
+              </p>
               {hunter.lastRunResult ? <p className="mt-1 text-sm text-shale">{hunter.lastRunResult}</p> : null}
               <p className="mt-1 text-sm text-coal">
-                Cards filed today: {hunter.filedToday} of {hunter.cardTarget}.
+                Cards filed today: {hunter.filedToday} of {hunter.cardTarget} ceiling.
               </p>
               <p className="mt-1 text-sm text-muted">
-                Model calls today: {hunter.callsToday} of {hunter.callBudget}.
+                Model calls today: {hunter.callsToday} of {hunter.callBudget}. Model {hunter.model}.
               </p>
               <p className="mt-1 text-sm text-muted">
                 Apollo reveals today: {hunter.apolloRevealsToday} of {hunter.apolloCreditCap}. Search is not counted.
               </p>
+              <p className="mt-1 text-sm text-muted">Monthly spend: {hunter.monthlyCap}.</p>
+              <p className="mt-1 text-sm text-shale">{hunter.bookingLink.note}</p>
+              {hunter.alarms.length > 0 ? (
+                <ul className="mt-2 list-disc pl-5 text-sm text-coal" role="status">
+                  {hunter.alarms.map((alarm) => (
+                    <li key={alarm}>{alarm}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {hunter.funnel ? (
+                <p className="mt-2 text-sm text-muted">
+                  Latest funnel: searched {hunter.funnel.searched}, candidates {hunter.funnel.candidates}, verified{" "}
+                  {hunter.funnel.verified}, contact found {hunter.funnel.contactFound}, filed {hunter.funnel.filed}.
+                  {Object.entries(hunter.funnel.drops).length
+                    ? ` Drops: ${Object.entries(hunter.funnel.drops)
+                        .map(([reason, count]) => `${reason} ${count}`)
+                        .join(", ")}.`
+                    : ""}
+                </p>
+              ) : null}
+              <div className="mt-4">
+                <p className="text-xs tracking-widest text-sandstone uppercase">Methods</p>
+                <ul className="mt-2 grid gap-1 text-sm text-muted">
+                  {hunter.methodRegistry.map((method) => (
+                    <li key={method.id}>
+                      {method.label}: {method.enabled ? "on" : "off"}
+                      {method.trial ? ", trial" : ""}. Share {Math.round(method.share * 100)}%.
+                    </li>
+                  ))}
+                </ul>
+                <table className="mt-3 w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-xs tracking-widest text-sandstone uppercase">
+                      <th className="py-1 pr-3">Method</th>
+                      <th className="py-1 pr-3">Filed</th>
+                      <th className="py-1 pr-3">Approval</th>
+                      <th className="py-1 pr-3">Reply</th>
+                      <th className="py-1 pr-3">Booked</th>
+                      <th className="py-1">Cost per card</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hunter.methods.map((row) => (
+                      <tr key={row.method} className="border-t border-line">
+                        <td className="py-2 pr-3">{row.method}</td>
+                        <td className="py-2 pr-3">{row.filed}</td>
+                        <td className="py-2 pr-3">{row.enough && row.approvalRate != null ? `${Math.round(row.approvalRate * 100)}%` : "not enough data"}</td>
+                        <td className="py-2 pr-3">{row.enough && row.replyRate != null ? `${Math.round(row.replyRate * 100)}%` : "not enough data"}</td>
+                        <td className="py-2 pr-3">{row.enough ? row.booked : "not enough data"}</td>
+                        <td className="py-2">{row.enough && row.costPerCard != null ? row.costPerCard.toFixed(2) : "not enough data"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <div className="mt-4">
                 <p className="text-xs tracking-widest text-sandstone uppercase">Run log</p>
                 <p className="mt-1 text-sm text-muted">Last 20 runs. Read only.</p>
@@ -184,6 +250,13 @@ function BotsPage() {
                           Contact-ready {run.contactReady}. Apollo searches {run.apolloSearches}. Apollo reveals{" "}
                           {run.apolloReveals}.
                         </p>
+                        {run.alarms.length > 0 ? <p className="mt-1 text-coal">Alarms: {run.alarms.join(" ")}</p> : null}
+                        {run.funnel ? (
+                          <p className="mt-1 text-muted">
+                            Funnel: searched {run.funnel.searched}, candidates {run.funnel.candidates}, verified {run.funnel.verified},
+                            contact found {run.funnel.contactFound}, filed {run.funnel.filed}.
+                          </p>
+                        ) : null}
                         {run.error ? <p className="mt-1 text-shale">{run.error}</p> : null}
                       </li>
                     ))}

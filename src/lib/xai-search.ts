@@ -102,9 +102,26 @@ function extractJsonObject(text: string): unknown | null {
   return null;
 }
 
+export type XaiUsage = { inputTokens: number; outputTokens: number; dollars: number | null };
+
+export function readXaiUsage(payload: unknown): XaiUsage {
+  const usage = payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null;
+  const record = usage && typeof usage === "object" ? (usage as Record<string, unknown>) : {};
+  const asCount = (value: unknown) => {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  };
+  const dollars = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
+  return {
+    inputTokens: asCount(record.input_tokens ?? record.prompt_tokens),
+    outputTokens: asCount(record.output_tokens ?? record.completion_tokens),
+    dollars: dollars(record.cost_in_usd) ?? dollars(record.cost),
+  };
+}
+
 export function parseXaiSearchResponse(
   payload: unknown,
-): { companies: unknown; citations: string[]; excerpt: string; searched: boolean } | { error: string } {
+): { companies: unknown; citations: string[]; excerpt: string; searched: boolean; usage: XaiUsage } | { error: string } {
   if (!payload || typeof payload !== "object") return { error: "xAI returned no content" };
   const record = payload as Record<string, unknown>;
   const text = outputText(record).trim();
@@ -124,11 +141,15 @@ export function parseXaiSearchResponse(
   if (!Array.isArray(companies)) {
     return { error: `xAI JSON had no companies array: ${text.replace(/\s+/g, " ").slice(0, 180)}` };
   }
+  if (companies.length === 0 && !usedWebSearch(record)) {
+    return { error: "xAI did not run web search" };
+  }
   return {
     companies,
     citations: collectCitations(record),
     searched: usedWebSearch(record),
     excerpt: companies.length === 0 ? text.replace(/\s+/g, " ").slice(0, 180) : "",
+    usage: readXaiUsage(record),
   };
 }
 
@@ -145,7 +166,7 @@ export async function callXaiWebSearch(
   system: string,
   prompt: string,
   timeoutMs: number,
-): Promise<{ companies: unknown; citations: string[]; excerpt: string; searched: boolean } | { error: string }> {
+): Promise<{ companies: unknown; citations: string[]; excerpt: string; searched: boolean; usage: XaiUsage } | { error: string }> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { error: "XAI_API_KEY not configured" };
   const response = await fetch(XAI_RESPONSES_URL, {
@@ -157,9 +178,54 @@ export async function callXaiWebSearch(
     body: JSON.stringify(xaiWebSearchRequest(system, prompt)),
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!response.ok) {
-    const detail = await response.text();
+  const detail = await response.text();
+  if (!response.ok || xaiDeprecationSignal(response.status, response.headers, detail)) {
     return { error: formatXaiHttpError(response.status, detail, apiKey) };
   }
-  return parseXaiSearchResponse(await response.json());
+  try {
+    return parseXaiSearchResponse(JSON.parse(detail));
+  } catch {
+    return { error: "xAI returned an unexpected shape" };
+  }
+}
+
+export function xaiDeprecationSignal(status: number, headers: Headers, body: string) {
+  if (status === 410) return true;
+  const deprecation = headers.get("deprecation");
+  if (deprecation != null && deprecation.trim() !== "") return true;
+  const warning = headers.get("warning") ?? "";
+  if (/deprecat/i.test(warning)) return true;
+  if (status >= 400 && /deprecated/i.test(body)) return true;
+  return false;
+}
+
+export async function searchWithRetries(input: {
+  system: string;
+  prompt: string;
+  timeoutMs: number;
+  maxRetries: number;
+  beforeAttempt: () => Promise<{ allowed: boolean }>;
+  sleep?: (ms: number) => Promise<void>;
+}): Promise<{ companies: unknown; citations: string[]; excerpt: string; searched: boolean; attempts: number; usage: XaiUsage } | { error: string; attempts: number; abandoned?: boolean }> {
+  const sleep = input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  let failures = 0;
+  let lastError = "xAI search failed";
+  for (let attempt = 0; attempt <= input.maxRetries; attempt += 1) {
+    const gate = await input.beforeAttempt();
+    if (!gate.allowed) return { error: "Model-call budget reached", attempts: attempt, abandoned: true };
+    const result = await callXaiWebSearch(input.system, input.prompt, input.timeoutMs);
+    if (!("error" in result)) {
+      return { ...result, attempts: attempt + 1 };
+    }
+    failures += 1;
+    lastError = result.error;
+    if (failures > input.maxRetries) return { error: lastError, attempts: attempt + 1, abandoned: true };
+    await sleep(retryDelay(attempt + 1));
+  }
+  return { error: lastError, attempts: failures, abandoned: true };
+}
+
+function retryDelay(attempt: number) {
+  const base = 400 * 2 ** Math.max(0, attempt - 1);
+  return base + Math.floor(Math.random() * base);
 }

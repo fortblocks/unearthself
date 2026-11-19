@@ -17,6 +17,7 @@ import {
   type MorningBatch,
 } from "@/lib/leads-book";
 import { getLeadsBook, importLeadsCompanies, replaceLeadsCompanies, setLeadsMorningCount } from "@/lib/leads-api";
+import { addDoNotContact } from "@/lib/leads-hunter-api";
 import { cardSource } from "@/lib/leads-hunter";
 import { DEFAULT_LEAD_SORT, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
 import {
@@ -510,6 +511,134 @@ function CompanyPanel({
             {company.status} · {bandLabel(score.band)}
             {hasAccess(company) ? "" : " · access incomplete"}
           </p>
+          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Review</p>
+          <p className="mt-1 text-sm text-coal">
+            {company.review ?? "unreviewed"}
+            {company.skipReason ? ` · ${company.skipReason}` : ""}
+            {company.pipeline ? ` · ${company.pipeline}` : ""}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void onMutate(company.id, () => {
+                  useDesk.setState({
+                    companies: useDesk.getState().companies.map((row) =>
+                      row.id === company.id ? { ...row, review: "approved", reviewedOn: today } : row,
+                    ),
+                  });
+                  return null;
+                })
+              }
+            >
+              Approve
+            </Button>
+            {(
+              [
+                ["wrong-size", "Wrong size"],
+                ["wrong-sector", "Wrong sector"],
+                ["no-retreat-signal", "No retreat signal"],
+                ["bad-contact", "Bad contact"],
+                ["duplicate", "Duplicate"],
+                ["other", "Other"],
+              ] as const
+            ).map(([reason, label]) => (
+              <Button
+                key={reason}
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  void (async () => {
+                    await onMutate(company.id, () => {
+                      useDesk.setState({
+                        companies: useDesk.getState().companies.map((row) =>
+                          row.id === company.id
+                            ? { ...row, review: "skipped", skipReason: reason, reviewedOn: today }
+                            : row,
+                        ),
+                      });
+                      return null;
+                    });
+                    try {
+                      await addDoNotContact({
+                        data: { domain: company.domain, email: company.email, reason: "skipped", today },
+                      });
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
+                    }
+                  })()
+                }
+              >
+                Skip, {label}
+              </Button>
+            ))}
+            {(
+              [
+                ["sent", "Sent"],
+                ["replied", "Replied"],
+                ["booked", "Booked"],
+                ["won", "Won"],
+                ["lost", "Lost"],
+              ] as const
+            ).map(([mark, label]) => (
+              <Button
+                key={mark}
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  void (async () => {
+                    await onMutate(company.id, () => {
+                      useDesk.setState({
+                        companies: useDesk.getState().companies.map((row) =>
+                          row.id === company.id ? { ...row, pipeline: mark, pipelineOn: today } : row,
+                        ),
+                      });
+                      return null;
+                    });
+                    if (mark !== "lost") return;
+                    try {
+                      await addDoNotContact({
+                        data: { domain: company.domain, email: company.email, reason: "lost", today },
+                      });
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
+                    }
+                  })()
+                }
+              >
+                {label}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void addDoNotContact({
+                  data: { domain: company.domain, email: company.email, reason: "dont-contact", today },
+                }).then(
+                  () => toast("Added to do-not-contact"),
+                  (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
+                )
+              }
+            >
+              Do not contact
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void addDoNotContact({
+                  data: { domain: company.domain, email: "", reason: "unsubscribe", today },
+                }).then(
+                  () => toast("Unsubscribe saved for this domain"),
+                  (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
+                )
+              }
+            >
+              Unsubscribe
+            </Button>
+          </div>
         </div>
         <div>
           <p className="text-xs tracking-widest text-sandstone uppercase">Named contact</p>

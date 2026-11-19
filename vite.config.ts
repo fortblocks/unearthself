@@ -20,10 +20,11 @@ export default defineConfig(({ command, isPreview }) => ({
               },
               config: {
                 crons: [
-                  // Hunter nightly local sweep. Path kept so this cron is not registered twice.
+                  // 4am Edmonton. Both UTC hours are scheduled. The route runs only when local time is 4am, once per Edmonton day.
+                  { path: "/api/cron/leads-scout", schedule: "0 10 * * *" },
                   { path: "/api/cron/leads-scout", schedule: "0 11 * * *" },
-                  // Hunter always-on hunt. Pro allows once a minute. It stops at 48 contact-ready cards, or when the model-call budget runs out.
-                  { path: "/api/cron/leads-hunter", schedule: "* * * * *" },
+                  // Every 30 minutes. Working hours are gated in code, America/Edmonton, so daylight saving does not move them.
+                  { path: "/api/cron/leads-hunter", schedule: "*/30 * * * *" },
                 ],
               },
             },

@@ -36,6 +36,53 @@ import {
   type WhySource,
 } from "./lead-score.ts";
 import { contactIfPresent } from "./leads-scout.ts";
+import {
+  HUNTER_CARD_CEILING,
+  HUNTER_MODEL_ID,
+  hunterCallsPerRun,
+  hunterKilled,
+  hunterMaxRetries,
+  hunterMonthlyDollarCap,
+  hunterQualityFloor,
+  hunterReviewDays,
+} from "./hunter-config.ts";
+import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
+import {
+  addDays,
+  addDrop,
+  addSpendCents,
+  apolloCounterKey,
+  applyReviewExpiry,
+  belowMedianAlarm,
+  bookedThisMonth,
+  BOOKING_LINK_HOOK,
+  callCounterKey,
+  cardDedupeKey,
+  caslBasis,
+  dncBlocks,
+  doNotContactKey,
+  emailDomainHasMx,
+  emptyFunnel,
+  findingMethods,
+  heartbeatLate,
+  isDuplicateCard,
+  makeDncEntry,
+  makeLineage,
+  methodStats,
+  monthlyCapLabel,
+  monthlyCapState,
+  passesQualityFloor,
+  quoteSnippet,
+  reserveCounter,
+  spendCounterKey,
+  spendUnknownKey,
+  zeroCandidateAlarm,
+  type DncEntry,
+  type DncReason,
+  type HunterFunnel,
+} from "./hunter-phase.ts";
+import { nightlySkip, withinWorkingHours } from "./hunter-time.ts";
+import { searchWithRetries } from "./xai-search.ts";
 
 export const HUNTER_KEY = "unearth:hunter:v1";
 
@@ -65,6 +112,8 @@ export type HunterState = {
   apolloOn: string;
   /** People-match calls sent today. Search does not count. */
   apolloReveals: number;
+  /** Edmonton date the nightly sweep last ran. */
+  nightlyOn: string;
 };
 
 export type ProfileHit = { id: string; label: string; sourceUrl: string };
@@ -121,6 +170,7 @@ export function freshHunterState(): HunterState {
     lockedUntil: 0,
     apolloOn: "",
     apolloReveals: 0,
+    nightlyOn: "",
   };
 }
 
@@ -141,6 +191,7 @@ export function parseHunterState(raw: unknown): HunterState {
     lockedUntil: numberOrZero(row.lockedUntil),
     apolloOn: typeof row.apolloOn === "string" ? row.apolloOn : "",
     apolloReveals: numberOrZero(row.apolloReveals),
+    nightlyOn: typeof row.nightlyOn === "string" ? row.nightlyOn : "",
   };
 }
 
@@ -567,6 +618,26 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     source: "hunter",
     hunterRegion: card.hunterRegion,
     profileHits: card.profileHits,
+    hunterScore: card.hunterScore,
+    hunterBreak: card.hunterBreak,
+    review: "unreviewed",
+    pipeline: "",
+    filedOn: today,
+    dedupeKey: cardDedupeKey(card.domain, card.email),
+    contactLastSeenOn: card.email ? today : "",
+    lineage: makeLineage({
+      query: card.hunterRegion,
+      signals: card.profileHits.map((hit) => hit.id),
+      sourceUrl: card.sourceUrl,
+      cardId: id,
+    }),
+    facts: [
+      {
+        sourceUrl: card.sourceUrl,
+        fetchedOn: today,
+        snippet: card.why.slice(0, 180),
+      },
+    ],
   });
 }
 
@@ -577,15 +648,32 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
 export function fileHunterCards(
   companies: Company[],
   cards: HunterCard[],
-  opts: { today: string },
-): { companies: Company[]; filed: number; updated: number; contactReady: number } {
+  opts: { today: string; dnc?: DncEntry[]; floor?: number },
+): { companies: Company[]; filed: number; updated: number; contactReady: number; drops: HunterFunnel["drops"] } {
   const next = [...companies];
   let filed = 0;
   let updated = 0;
+  const drops: HunterFunnel["drops"] = {};
+  const floor = opts.floor ?? hunterQualityFloor();
+  const noteDrop = (reason: keyof HunterFunnel["drops"] & string) => {
+    drops[reason] = (drops[reason] ?? 0) + 1;
+  };
   for (const card of cards) {
     const domain = normalizeDomain(card.domain);
     if (!domain) continue;
+    if (dncBlocks(opts.dnc ?? [], domain, card.email, opts.today)) {
+      noteDrop("do-not-contact");
+      continue;
+    }
     const index = next.findIndex((company) => company.domain === domain);
+    if (index === -1 && isDuplicateCard(next, domain, card.email)) {
+      noteDrop("duplicate");
+      continue;
+    }
+    if (index === -1 && !passesQualityFloor(card.hunterScore, floor)) {
+      noteDrop("below-quality-floor");
+      continue;
+    }
     if (index === -1) {
       next.unshift(assignEnrichment(blankCompany({ ...card, domain }, nextCompanyId(next), opts.today), opts.today));
       filed += 1;
@@ -607,7 +695,7 @@ export function fileHunterCards(
     );
     updated += 1;
   }
-  return { companies: next, filed, updated, contactReady: countContactReadyGain(companies, next) };
+  return { companies: next, filed, updated, contactReady: countContactReadyGain(companies, next), drops };
 }
 
 export function hunterPrompt(slot: HunterSlot, knownDomains: string[]) {
@@ -650,18 +738,26 @@ export async function researchHunterSlot(
   );
 }
 
-async function readPublishedPage(url: string): Promise<string> {
-  if (!/^https?:\/\//i.test(url)) return "";
-  try {
-    const response = await fetch(url, {
-      headers: { "user-agent": "UnearthSelfLeadHunter/1.0" },
-      signal: AbortSignal.timeout(6000),
-      redirect: "follow",
-    });
-    return response.ok ? await response.text() : "";
-  } catch {
-    return "";
+async function readPublishedPage(url: string): Promise<import("./hunter-phase.ts").PageRead> {
+  if (!/^https?:\/\//i.test(url)) return { text: "", reason: "fetch-failed" };
+  let last: import("./hunter-phase.ts").PageRead = { text: "", reason: "fetch-failed" };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { "user-agent": "UnearthSelfLeadHunter/1.0" },
+        signal: AbortSignal.timeout(6000),
+        redirect: "follow",
+      });
+      const body = response.ok || response.status === 200 ? await response.text() : "";
+      const { classifyPageResponse } = await import("./hunter-phase.ts");
+      last = classifyPageResponse(response.status, body, false);
+      if (last.reason === "ok" || last.reason === "blocked" || last.reason === "page-empty") return last;
+    } catch (error) {
+      const timedOut = error instanceof Error && (error.name === "TimeoutError" || /timeout/i.test(error.message));
+      last = { text: "", reason: timedOut ? "timed-out" : "fetch-failed" };
+    }
   }
+  return last;
 }
 
 export function urlsForDrafts(drafts: HunterDraft[]) {
@@ -676,7 +772,7 @@ export function urlsForDrafts(drafts: HunterDraft[]) {
 }
 
 async function readPages(urls: string[]) {
-  const pages: Record<string, string> = {};
+  const pages: Record<string, import("./hunter-phase.ts").PageRead> = {};
   let cursor = 0;
   async function worker() {
     while (cursor < urls.length) {
@@ -688,6 +784,24 @@ async function readPages(urls: string[]) {
   }
   await Promise.all(Array.from({ length: Math.min(5, urls.length) }, () => worker()));
   return pages;
+}
+
+export function draftDropReason(
+  draft: HunterDraft,
+  page: string,
+  regionId: string,
+  fetchReason?: import("./hunter-phase.ts").PageRead["reason"],
+): import("./hunter-phase.ts").DropReason | null {
+  if (!page) {
+    if (fetchReason === "blocked" || fetchReason === "timed-out" || fetchReason === "fetch-failed") return fetchReason;
+    return "page-empty";
+  }
+  if (!pageHas(page, draft.org)) return "name-missing";
+  if (!domainOnSource(draft.domain, draft.sourceUrl, page)) return "domain-mismatch";
+  const place = draft.place && pageHas(page, draft.place) ? draft.place : "";
+  const city = place ? cityFromPlace(place) : "Elsewhere";
+  if (!placeMatchesRegion(place || city, city, regionId)) return "place-mismatch";
+  return null;
 }
 
 async function loadHunterState(): Promise<HunterState> {
@@ -711,30 +825,56 @@ function runNote(extra = "") {
   return [extra.trim(), off].filter(Boolean).join(" ");
 }
 
-async function rememberRun(input: {
-  run: "always-on" | "nightly";
-  outcome: HunterRunOutcome;
-  modelCalls?: number;
-  candidates?: number;
-  cardsFiled?: number;
-  contactReady?: number;
-  apolloSearches?: number;
-  apolloReveals?: number;
-  error?: string;
+async function rememberRun(input: Parameters<typeof hunterRunEntry>[0]) {
+  await appendHunterRun(hunterRunEntry(input));
+}
+
+type HunterRedis = {
+  get: <T>(key: string) => Promise<T | null>;
+  set: (key: string, value: unknown, opts?: { nx?: true; ex?: number }) => Promise<string | null>;
+  incr: (key: string) => Promise<number>;
+  decr: (key: string) => Promise<number>;
+  incrby: (key: string, amount: number) => Promise<number>;
+  expire: (key: string, seconds: number) => Promise<unknown>;
+  eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
+};
+
+async function loadDoNotContact(redis: { get: <T>(key: string) => Promise<T | null> }): Promise<DncEntry[]> {
+  const raw = await redis.get<unknown>(doNotContactKey());
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { entries?: unknown }).entries)
+      ? (raw as { entries: unknown[] }).entries
+      : [];
+  return list.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const entry = row as DncEntry;
+    if (!entry.domain || !entry.reason || !entry.addedOn || !entry.until) return [];
+    return [entry];
+  });
+}
+
+async function seedCounter(redis: HunterRedis, key: string, atLeast: number) {
+  await redis.set(key, String(Math.max(0, atLeast)), { nx: true, ex: 864000 });
+  const current = Number(await redis.get<string>(key));
+  return Number.isFinite(current) ? current : atLeast;
+}
+
+export async function appendDoNotContact(input: {
+  domain: string;
+  email?: string;
+  reason: DncReason;
+  today: string;
 }) {
-  await appendHunterRun(
-    hunterRunEntry({
-      run: input.run,
-      outcome: input.outcome,
-      modelCalls: input.modelCalls ?? 0,
-      candidates: input.candidates ?? 0,
-      cardsFiled: input.cardsFiled ?? 0,
-      contactReady: input.contactReady ?? 0,
-      apolloSearches: input.apolloSearches ?? 0,
-      apolloReveals: input.apolloReveals ?? 0,
-      error: input.error ?? "",
-    }),
-  );
+  const redis = await getRedisClient();
+  if (!redis) throw new Error("Redis is not configured");
+  const client = redis as HunterRedis;
+  const entries = await loadDoNotContact(client);
+  const next = makeDncEntry(input);
+  if (dncBlocks(entries, next.domain, next.email, input.today)) return entries;
+  const saved = [...entries, next];
+  await client.set(doNotContactKey(), saved);
+  return saved;
 }
 
 export async function enrichUnderApolloCap(input: {
@@ -744,14 +884,21 @@ export async function enrichUnderApolloCap(input: {
   limit: number;
 }) {
   const state = await loadHunterState();
+  const redis = await getRedisClient();
+  const client = redis as HunterRedis | null;
+  const cap = apolloCreditCap();
+  const seeded = client ? await seedCounter(client, apolloCounterKey(input.today), revealsOn(state, input.today)) : revealsOn(state, input.today);
   const result = await enrichHunterContacts({
     companies: input.companies,
     domains: input.domains,
     today: input.today,
-    revealsUsed: revealsOn(state, input.today),
-    cap: apolloCreditCap(),
+    revealsUsed: seeded,
+    cap,
     apiKey: apolloApiKey(),
     limit: input.limit,
+    reserveReveal: client
+      ? async () => (await reserveCounter(client, apolloCounterKey(input.today), cap)).allowed
+      : undefined,
   });
   if (result.reveals > 0) {
     const fresh = await loadHunterState();
@@ -766,162 +913,341 @@ export async function enrichUnderApolloCap(input: {
 
 function dayStopCopy(stop: "cards" | "budget", state: HunterState, today: string, budget: number) {
   const counts = countsForToday(state, today);
-  if (stop === "cards") return `Daily target of ${HUNTER_DAILY_CARD_TARGET} contact-ready cards filed.`;
-  return `Capacity problem. Model-call budget of ${budget} ran out. Filed ${counts.filedToday} of ${HUNTER_DAILY_CARD_TARGET} contact-ready cards.`;
+  if (stop === "cards") return `Daily ceiling of ${HUNTER_CARD_CEILING} contact-ready cards filed.`;
+  return `Capacity problem. Model-call budget of ${budget} ran out. Filed ${counts.filedToday} of ${HUNTER_CARD_CEILING} contact-ready cards.`;
 }
 
-export async function runHunterBatch(): Promise<
-  | { ok: true; skipped: "paused" | "cards" | "budget" | "busy"; callsToday: number; filedToday: number }
+export async function runHunterBatch(now = new Date()): Promise<
+  | { ok: true; skipped: "paused" | "cards" | "budget" | "busy" | "killed" | "hours"; callsToday: number; filedToday: number }
   | { ok: true; filed: number; contactReady: number; updated: number; callsToday: number; filedToday: number; slot: string }
   | { ok: false; error: string }
 > {
-  const redis = await getRedisClient();
+  const redis = (await getRedisClient()) as HunterRedis | null;
   if (!redis) return { ok: false, error: "Redis is not configured" };
-  const today = edmontonToday();
-  const now = Date.now();
+  const today = edmontonToday(now);
   const budget = hunterCallBudget();
   let state = await loadHunterState();
-  if (state.lockedUntil > now) {
-    const counts = countsForToday(state, today);
-    await rememberRun({ run: "always-on", outcome: "skipped-busy", error: runNote() });
-    return { ok: true, skipped: "busy", callsToday: counts.callsToday, filedToday: counts.filedToday };
+  const counts = countsForToday(state, today);
+  const blank = {
+    run: "always-on" as const,
+    modelCalls: 0,
+    candidates: 0,
+    cardsFiled: 0,
+    contactReady: 0,
+    apolloSearches: 0,
+    apolloReveals: 0,
+    error: "",
+    model: HUNTER_MODEL_ID,
+  };
+  if (hunterKilled()) {
+    await rememberRun({ ...blank, outcome: "skipped-killed", error: runNote("Kill switch is on.") });
+    return { ok: true, skipped: "killed", callsToday: counts.callsToday, filedToday: counts.filedToday };
+  }
+  if (!withinWorkingHours(now)) {
+    await rememberRun({ ...blank, outcome: "skipped-hours", error: runNote() });
+    return { ok: true, skipped: "hours", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   if (state.paused) {
-    state = { ...state, lastRunAt: new Date(now).toISOString(), lastRunResult: "Paused. No search." };
+    state = { ...state, lastRunAt: now.toISOString(), lastRunResult: "Paused. No search." };
     await saveHunterState(state);
-    const counts = countsForToday(state, today);
-    await rememberRun({ run: "always-on", outcome: "skipped-paused", error: runNote() });
+    await rememberRun({ ...blank, outcome: "skipped-paused", error: runNote() });
     return { ok: true, skipped: "paused", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
+  const callsUsed = await seedCounter(redis, callCounterKey(today), counts.callsToday);
+  state = { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday };
   const stop = hunterStop(state, today, budget);
   if (stop) {
-    const counts = countsForToday(state, today);
     state = {
       ...state,
       capacity: stop === "budget" ? capacityOnBudgetStop(state, today, budget) : state.capacity,
-      lastRunAt: new Date(now).toISOString(),
+      lastRunAt: now.toISOString(),
       lastRunResult: dayStopCopy(stop, state, today, budget),
     };
     await saveHunterState(state);
     await rememberRun({
-      run: "always-on",
+      ...blank,
       outcome: stop === "cards" ? "skipped-target-met" : "capped-budget",
       error: runNote(),
     });
-    return { ok: true, skipped: stop, callsToday: counts.callsToday, filedToday: counts.filedToday };
+    return { ok: true, skipped: stop, callsToday: callsUsed, filedToday: counts.filedToday };
   }
 
-  const counts = countsForToday(state, today);
-  state = {
-    ...state,
-    lockedUntil: now + 120_000,
-    callsOn: today,
-    callsToday: counts.callsToday + 1,
-    filedOn: today,
-    filedToday: counts.filedToday,
-  };
-  await saveHunterState(state);
+  const token = crypto.randomUUID();
+  const gotLock = await acquireHunterLock(redis, token);
+  if (!gotLock) {
+    await rememberRun({ ...blank, outcome: "skipped-busy", error: runNote() });
+    return { ok: true, skipped: "busy", callsToday: callsUsed, filedToday: counts.filedToday };
+  }
 
-  const { slot } = slotAt(state.cursor);
   try {
     const loaded = await loadBook();
     if (loaded.storage !== "redis") {
-      const settled = applyHunterWork(state, today, { calls: 0, contactReady: 0 }, budget);
       await saveHunterState({
-        ...settled,
+        ...state,
         lockedUntil: 0,
-        lastRunAt: new Date().toISOString(),
+        lastRunAt: now.toISOString(),
         lastRunResult: "Redis is not configured.",
       });
-      await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote("Redis is not configured.") });
+      await rememberRun({ ...blank, outcome: "error", error: runNote("Redis is not configured.") });
       return { ok: false, error: "Redis is not configured" };
     }
 
-    const research = await researchHunterSlot(
-      slot,
-      loaded.book.companies.map((company) => company.domain),
-    );
-    if ("error" in research) {
-      const settled = applyHunterWork(state, today, { calls: 0, contactReady: 0 }, budget);
-      await saveHunterState({
-        ...settled,
-        lockedUntil: 0,
-        lastRunAt: new Date().toISOString(),
-        lastRunResult: research.error,
+    const expired = applyReviewExpiry(loaded.book.companies, today, hunterReviewDays());
+    let companies = expired.companies;
+    const known = new Set(companies.map((company) => company.domain));
+    const funnel = emptyFunnel();
+    const held: string[] = [];
+    let cursor = state.cursor;
+    let slotLabel = "";
+    let lastError = "";
+    let abandoned = false;
+    let stopReason: "" | "budget" | "spend" = "";
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let dollars = 0;
+    let sawDollars = false;
+    let missedDollars = false;
+    const dnc = await loadDoNotContact(redis);
+    const passes = hunterCallsPerRun();
+    const retries = hunterMaxRetries();
+    const month = today.slice(0, 7);
+
+    for (let pass = 0; pass < passes; pass += 1) {
+      if (hunterStop(state, today, budget)) break;
+      const spendUnknown = await redis.get<string>(spendUnknownKey(month));
+      const spentRaw = Number(await redis.get<string>(spendCounterKey(month)));
+      const spent = spendUnknown || !Number.isFinite(spentRaw) ? null : spentRaw / 100;
+      if (monthlyCapState(spent) === "stop") {
+        stopReason = "spend";
+        lastError = "Monthly dollar cap reached.";
+        break;
+      }
+      const picked = slotAt(cursor);
+      slotLabel = `${picked.slot.signalLabel} / ${picked.slot.regionLabel}`;
+      const research = await searchWithRetries({
+        system:
+          "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
+        prompt: hunterPrompt(picked.slot, [...known]),
+        timeoutMs: 90_000,
+        maxRetries: retries,
+        beforeAttempt: async () => {
+          const reserved = await reserveCounter(redis, callCounterKey(today), budget);
+          if (!reserved.allowed) return { allowed: false };
+          state = { ...state, callsOn: today, callsToday: reserved.used };
+          return { allowed: true };
+        },
       });
-      await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote(research.error) });
-      return { ok: false, error: research.error };
+      if ("error" in research) {
+        if (research.error === "Model-call budget reached") {
+          stopReason = "budget";
+          lastError = research.error;
+          break;
+        }
+        lastError = research.error;
+        abandoned = Boolean(research.abandoned);
+        if (abandoned) break;
+        continue;
+      }
+      cursor = advanceCursor(cursor);
+      inputTokens += research.usage.inputTokens;
+      outputTokens += research.usage.outputTokens;
+      if (research.usage.dollars == null) {
+        missedDollars = true;
+        await redis.set(spendUnknownKey(month), "1", { ex: 120 * 24 * 60 * 60 });
+      } else {
+        sawDollars = true;
+        dollars += research.usage.dollars;
+        await addSpendCents(redis, month, research.usage.dollars);
+      }
+      const drafts = selectHunterRows(research);
+      funnel.searched += 1;
+      funnel.candidates += drafts.length;
+      const fetched = await readPages(urlsForDrafts(drafts));
+      const pages: Record<string, string> = {};
+      const kept = drafts.filter((draft) => {
+        const page = fetched[draft.sourceUrl] ?? { text: "", reason: "fetch-failed" as const };
+        pages[draft.sourceUrl] = page.text;
+        const reason = draftDropReason(draft, page.text, picked.slot.regionId, page.reason);
+        if (!reason) return true;
+        addDrop(funnel, reason);
+        if (reason === "fetch-failed" || reason === "blocked" || reason === "timed-out") held.push(`${draft.org} (${reason})`);
+        return false;
+      });
+      const verified = verifyHunterDrafts(kept, pages, { regionId: picked.slot.regionId, today });
+      const ready: HunterCard[] = [];
+      for (const card of verified) {
+        if (card.email) {
+          const mx = await emailDomainHasMx(card.email, async (host) => {
+            const { promises } = await import("node:dns");
+            return promises.resolveMx(host);
+          });
+          if (!mx) {
+            addDrop(funnel, "no-mx");
+            held.push(`${card.org} (no-mx)`);
+            continue;
+          }
+        }
+        ready.push(card);
+      }
+      funnel.verified += ready.length;
+      funnel.contactFound += ready.filter((card) => card.email).length;
+      const filed = fileHunterCards(companies, ready, { today, dnc });
+      companies = filed.companies.map((company) => stampCard(company, ready, pages, today));
+      for (const [reason, count] of Object.entries(filed.drops)) {
+        for (let n = 0; n < count; n += 1) addDrop(funnel, reason as "duplicate");
+      }
+      funnel.filed += filed.filed;
+      for (const card of ready) known.add(normalizeDomain(card.domain));
+      const gain = countContactReadyGain(loaded.book.companies, companies);
+      state = { ...state, cursor, filedOn: today, filedToday: counts.filedToday + gain, lockedUntil: 0 };
     }
 
-    const drafts = selectHunterRows(research);
-    const parsed = Array.isArray(research.companies) ? research.companies.length : 0;
-    const excerpt = "excerpt" in research && typeof research.excerpt === "string" ? research.excerpt : "";
-    const searched = research.searched === true ? "Search tool used." : "Search tool not used.";
-    const parseNote = excerpt ? `Parsed ${parsed} companies. ${searched} ${excerpt}` : `Parsed ${parsed} companies. ${searched}`;
-    const pages = await readPages(urlsForDrafts(drafts));
-    const verified = verifyHunterDrafts(drafts, pages, { regionId: slot.regionId, today });
-    const filed = fileHunterCards(loaded.book.companies, verified, { today });
     const apollo = await enrichUnderApolloCap({
-      companies: filed.companies,
-      domains: verified.map((card) => card.domain),
+      companies,
+      domains: companies.filter((company) => company.filedOn === today).map((company) => company.domain),
       today,
       limit: 8,
     });
-    const contactReady = countContactReadyGain(loaded.book.companies, apollo.companies);
-    await saveBook({ ...loaded.book, companies: apollo.companies });
-    const settled = applyHunterWork(state, today, { calls: 0, contactReady }, budget);
-    const fresh = await loadHunterState();
+    companies = apollo.companies;
+    const contactReady = countContactReadyGain(loaded.book.companies, companies);
+    await saveBook({ ...loaded.book, companies });
+    const settled = applyHunterWork(
+      { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday },
+      today,
+      { calls: Math.max(0, state.callsToday - callsUsed), contactReady },
+      budget,
+    );
+    const history = await readHunterRuns(400);
+    const previous = filedOnPreviousDays(history, today);
+    const alarms: string[] = [];
+    const quietStop = stopReason !== "" && funnel.searched === 0;
+    if (zeroCandidateAlarm(funnel.candidates, abandoned || quietStop)) alarms.push("Zero candidates this run.");
+    if (belowMedianAlarm((filedOnDay(history, today) ?? 0) + funnel.filed, previous)) {
+      alarms.push("Filed cards are under half the 7-day median.");
+    }
+    if (expired.expired > 0) alarms.push(`${expired.expired} cards expired unreviewed.`);
+    const note = [
+      slotLabel,
+      `Contact-ready cards today ${settled.filedToday} of ${HUNTER_CARD_CEILING}.`,
+      held.length ? `Held unverified: ${held.slice(0, 8).join(", ")}.` : "",
+      apollo.note,
+      lastError,
+    ]
+      .filter(Boolean)
+      .join(" ");
     await saveHunterState({
       ...settled,
-      apolloOn: fresh.apolloOn,
-      apolloReveals: fresh.apolloReveals,
+      cursor,
       lockedUntil: 0,
-      cursor: advanceCursor(state.cursor),
-      lastRunAt: new Date().toISOString(),
-      lastRunResult: `Contact-ready cards today ${settled.filedToday} of ${HUNTER_DAILY_CARD_TARGET}. This batch ${contactReady}. Updated ${filed.updated}. Slot: ${slot.signalLabel} in ${slot.regionLabel}. Model calls ${settled.callsToday} of ${budget}.`,
+      lastRunAt: now.toISOString(),
+      lastRunResult: note,
+      apolloOn: today,
+      apolloReveals: revealsOn(state, today) + apollo.reveals,
     });
     await rememberRun({
       run: "always-on",
-      outcome: "fired",
-      modelCalls: 1,
-      candidates: drafts.length,
-      cardsFiled: filed.filed,
+      outcome: abandoned ? "error" : stopReason === "spend" ? "capped-spend" : stopReason === "budget" && funnel.searched === 0 ? "capped-budget" : "fired",
+      modelCalls: Math.max(0, state.callsToday - callsUsed),
+      candidates: funnel.candidates,
+      cardsFiled: funnel.filed,
       contactReady,
       apolloSearches: apollo.searches,
       apolloReveals: apollo.reveals,
-      error: [parseNote, apollo.note].filter(Boolean).join(" "),
+      error: runNote([lastError, alarms.join(" ")].filter(Boolean).join(" ")),
+      model: HUNTER_MODEL_ID,
+      alarms,
+      inputTokens,
+      outputTokens,
+      dollars: sawDollars && !missedDollars ? dollars : null,
+      funnel,
     });
+    if (abandoned && lastError) return { ok: false, error: lastError };
     return {
       ok: true,
-      filed: filed.filed,
+      filed: funnel.filed,
       contactReady,
-      updated: filed.updated,
+      updated: 0,
       callsToday: settled.callsToday,
       filedToday: settled.filedToday,
-      slot: `${slot.signalLabel} / ${slot.regionLabel}`,
+      slot: slotLabel,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Hunter batch failed";
-    const settled = applyHunterWork(state, today, { calls: 0, contactReady: 0 }, budget);
+    const settled = applyHunterWork(
+      { ...state, callsOn: today, callsToday: callsUsed, filedToday: counts.filedToday, filedOn: today },
+      today,
+      { calls: Math.max(0, state.callsToday - callsUsed), contactReady: 0 },
+      budget,
+    );
     await saveHunterState({
       ...settled,
       lockedUntil: 0,
-      lastRunAt: new Date().toISOString(),
+      lastRunAt: now.toISOString(),
       lastRunResult: message,
     });
-    await rememberRun({ run: "always-on", outcome: "error", modelCalls: 1, error: runNote(message) });
+    await rememberRun({ ...blank, outcome: "error", modelCalls: Math.max(0, state.callsToday - callsUsed), error: runNote(message) });
     return { ok: false, error: message };
+  } finally {
+    await releaseHunterLock(redis, token);
   }
+}
+
+function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
+  const card = ready.find((row) => normalizeDomain(row.domain) === company.domain && company.filedOn === today);
+  if (!card || company.casl) return company;
+  const page = pages[card.sourceUrl] ?? "";
+  const basis = caslBasis(page, card.email, card.buyerTitle, card.emailSource || card.sourceUrl);
+  const blocked = Boolean(card.email) && basis != null && !basis.noUnsolicitedNotice;
+  const snippet = quoteSnippet(page, card.org) || company.facts?.[0]?.snippet || "";
+  return {
+    ...company,
+    email: blocked ? "" : company.email,
+    emailMx: Boolean(card.email) && !blocked,
+    cardFlags: blocked ? [...(company.cardFlags ?? []), "No unsolicited email"] : company.cardFlags,
+    casl: basis
+      ? { publishedOn: basis.publishedOn, roleFit: basis.roleFit, noUnsolicitedNotice: basis.noUnsolicitedNotice }
+      : company.casl,
+    facts: snippet
+      ? [{ sourceUrl: card.sourceUrl, fetchedOn: today, snippet }]
+      : company.facts,
+  };
+}
+
+function filedOnDay(runs: { at: string; cardsFiled: number }[], today: string) {
+  let total = 0;
+  let seen = false;
+  for (const run of runs) {
+    const day = edmontonToday(new Date(run.at));
+    if (day !== today) continue;
+    seen = true;
+    total += run.cardsFiled;
+  }
+  return seen ? total : null;
+}
+
+function filedOnPreviousDays(runs: { at: string; cardsFiled: number }[], today: string) {
+  const totals = new Map<string, number>();
+  for (const run of runs) {
+    const day = edmontonToday(new Date(run.at));
+    totals.set(day, (totals.get(day) ?? 0) + run.cardsFiled);
+  }
+  const previous: number[] = [];
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const day = addDays(today, -offset);
+    if (totals.has(day)) previous.push(totals.get(day) ?? 0);
+  }
+  return previous;
 }
 
 /** Shared by both runs. A stop here means no model call. A budget stop is stored for Rex. */
 export async function holdHunterForDay(): Promise<
   | { ok: true; proceed: true }
-  | { ok: true; proceed: false; skipped: "paused" | "cards" | "budget" }
+  | { ok: true; proceed: false; skipped: "paused" | "cards" | "budget" | "killed" }
   | { ok: false; error: string }
 > {
   const redis = await getRedisClient();
   if (!redis) return { ok: false, error: "Redis is not configured" };
+  if (hunterKilled()) return { ok: true, proceed: false, skipped: "killed" };
   const today = edmontonToday();
   const budget = hunterCallBudget();
   let state = await loadHunterState();
@@ -942,32 +1268,74 @@ export async function holdHunterForDay(): Promise<
   return { ok: true, proceed: false, skipped: stop };
 }
 
-/** Count a model call and any contact-ready cards it filed. Both runs use this. */
+/** Nightly only. Working hours do not apply. The kill switch does. */
+export async function gateNightly(now = new Date()): Promise<
+  | { ok: true; proceed: true }
+  | { ok: true; proceed: false; skipped: "paused" | "cards" | "budget" | "killed" | "not-4am" | "already-swept" }
+  | { ok: false; error: string }
+> {
+  if (hunterKilled()) return { ok: true, proceed: false, skipped: "killed" };
+  const state = await loadHunterState();
+  const skip = nightlySkip(now, state.nightlyOn);
+  if (skip) return { ok: true, proceed: false, skipped: skip };
+  return holdHunterForDay();
+}
+
+export async function markNightlySwept(date: string) {
+  const state = await loadHunterState();
+  await saveHunterState({ ...state, nightlyOn: date });
+}
+
+/** Count contact-ready cards. Model calls are counted by the atomic counter, not here. */
 export async function recordHunterEffort(input: { calls: number; contactReady: number; note: string }) {
-  const redis = await getRedisClient();
+  const redis = (await getRedisClient()) as HunterRedis | null;
   if (!redis) return;
   const today = edmontonToday();
   const state = await loadHunterState();
-  const settled = applyHunterWork(state, today, input, hunterCallBudget());
+  const usedRaw = await redis.get<string>(callCounterKey(today));
+  const base = countsForToday(state, today);
+  const used = usedRaw == null || usedRaw === "" ? base.callsToday + Math.max(0, input.calls) : Number(usedRaw);
+  const settled = applyHunterWork(
+    { ...state, callsOn: today, callsToday: Number.isFinite(used) ? used : base.callsToday },
+    today,
+    { calls: 0, contactReady: input.contactReady },
+    hunterCallBudget(),
+  );
   await saveHunterState({
     ...settled,
+    callsOn: today,
+    callsToday: Number.isFinite(used) ? used : settled.callsToday,
     lastRunAt: new Date().toISOString(),
     lastRunResult: input.note,
   });
 }
 
-export async function readHunterDesk(today = edmontonToday()) {
-  const redis = await getRedisClient();
+export async function readHunterDesk(today = edmontonToday(), now = new Date()) {
+  const redis = (await getRedisClient()) as HunterRedis | null;
   const state = redis ? parseHunterState(await redis.get<unknown>(HUNTER_KEY)) : freshHunterState();
   const counts = countsForToday(state, today);
   const recentRuns = redis ? await readHunterRuns(20) : [];
+  const book = redis ? await loadBook() : null;
+  const companies = book?.book.companies ?? [];
+  const month = today.slice(0, 7);
+  const spendUnknown = redis ? await redis.get<string>(spendUnknownKey(month)) : null;
+  const spentRaw = redis ? await redis.get<string>(spendCounterKey(month)) : null;
+  const spent = spendUnknown || spentRaw == null || spentRaw === "" ? null : Number(spentRaw) / 100;
+  const cap = monthlyCapState(Number.isFinite(spent) ? spent : null);
+  const lastLine = recentRuns[0]?.at || state.lastRunAt;
+  const beat = heartbeatLate(lastLine, now, withinWorkingHours(now));
+  const alarms = [...(recentRuns[0]?.alarms ?? [])];
+  if (beat.late) alarms.push("Heartbeat is late.");
+  const expired = companies.filter((company) => company.review === "expired-unreviewed").length;
+  if (expired > 0) alarms.push(`${expired} cards expired unreviewed.`);
   return {
     storage: redis ? ("redis" as const) : ("browser" as const),
     paused: state.paused,
+    killed: hunterKilled(),
     lastRunAt: state.lastRunAt,
     lastRunResult: state.lastRunResult,
     filedToday: counts.filedToday,
-    cardTarget: HUNTER_DAILY_CARD_TARGET,
+    cardTarget: HUNTER_CARD_CEILING,
     callsToday: counts.callsToday,
     callBudget: hunterCallBudget(),
     apolloRevealsToday: revealsOn(state, today),
@@ -976,6 +1344,16 @@ export async function readHunterDesk(today = edmontonToday()) {
     capacityActive: state.capacity?.date === today,
     recentRuns,
     today,
+    heartbeatLate: beat.late,
+    heartbeatAt: lastLine,
+    monthlyCap: monthlyCapLabel(cap),
+    bookedThisMonth: bookedThisMonth(companies, month),
+    methods: methodStats(companies, Number.isFinite(spent) ? spent : null),
+    methodRegistry: findingMethods(),
+    bookingLink: BOOKING_LINK_HOOK,
+    alarms,
+    funnel: recentRuns[0]?.funnel ?? null,
+    model: HUNTER_MODEL_ID,
   };
 }
 

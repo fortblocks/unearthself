@@ -18,6 +18,7 @@ As of 17th November 2026. A running log of discrepancies and items to align befo
 12. **Analytics.** Vercel Web Analytics is live on the site but does not track email opens or replies.
 13. **Recipients and Bootcamp details.** An approved recipient list and approved Bootcamp details are still needed.
 14. **Send rule.** Every send needs Chris's approval and goes from chris@badlandsbootcamp.com. Standing rule, kept here as a reminder.
+15. **Hunter phase-one defaults, 19th November 2026.** Confirm with Chris before production: working hours 7am to 7pm Edmonton, 2 model calls per 30 minute run, quality floor 20 on the Hunter score, do-not-contact cooldown 90 days, unreviewed expiry 5 days, trial-method share 20 percent (unassigned, because only xAI web search exists), method results hidden until 30 reviewed cards, heartbeat 45 minutes in hours and 13 hours overnight, lock expiry 360 seconds, and retries 2. `HUNTER_MONTHLY_DOLLAR_CAP` is unset on purpose. `HUNTER_KILL_SWITCH` is unset, which means off. No booking-link service until Chris says yes. The live dry-run company list is empty.
 
 ## Closed
 
