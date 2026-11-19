@@ -11,6 +11,7 @@ import { leadSourceLabel } from "@/data/desk";
 import { HUNTER_ROSTER } from "@/data/hunter-profile";
 import { partnerFirst, useDesk } from "@/lib/desk-store";
 import { botForLead } from "@/lib/bot-copy";
+import { formatFunnelDrops } from "@/lib/hunter-drops";
 import { getHunterDesk, setHunterPaused } from "@/lib/leads-hunter-api";
 
 export const Route = createFileRoute("/admin/bots")({
@@ -193,12 +194,8 @@ function BotsPage() {
               {hunter.funnel ? (
                 <p className="mt-2 text-sm text-muted">
                   Latest funnel: searched {hunter.funnel.searched}, candidates {hunter.funnel.candidates}, verified{" "}
-                  {hunter.funnel.verified}, contact found {hunter.funnel.contactFound}, filed {hunter.funnel.filed}.
-                  {Object.entries(hunter.funnel.drops).length
-                    ? ` Drops: ${Object.entries(hunter.funnel.drops)
-                        .map(([reason, count]) => `${reason} ${count}`)
-                        .join(", ")}.`
-                    : ""}
+                  {hunter.funnel.verified}, contact found {hunter.funnel.contactFound}, filed {hunter.funnel.filed}.{" "}
+                  {formatFunnelDrops(hunter.funnel)}
                 </p>
               ) : null}
               <div className="mt-4">
@@ -257,7 +254,7 @@ function BotsPage() {
                         {run.funnel ? (
                           <p className="mt-1 text-muted">
                             Funnel: searched {run.funnel.searched}, candidates {run.funnel.candidates}, verified {run.funnel.verified},
-                            contact found {run.funnel.contactFound}, filed {run.funnel.filed}.
+                            contact found {run.funnel.contactFound}, filed {run.funnel.filed}. {formatFunnelDrops(run.funnel)}
                           </p>
                         ) : null}
                         {run.error ? <p className="mt-1 text-shale">{run.error}</p> : null}
