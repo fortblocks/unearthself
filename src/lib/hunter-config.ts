@@ -39,7 +39,22 @@ export const HUNTER_RUN_RESERVE_MS = 40_000;
 export const HUNTER_ALARM_TIMEOUT_MS = 8_000;
 
 /**
- * Stand-in US dollars for one model call whose response has no cost field.
+ * Published rates for grok-4.20-0309-non-reasoning.
+ * Source: https://docs.x.ai/docs/pricing, read 19th November 2026.
+ * Below XAI_LONG_PROMPT_TOKENS, input is XAI_INPUT_USD_PER_MILLION and output is XAI_OUTPUT_USD_PER_MILLION.
+ * At that prompt size or above, both rates double for every token in the request, not only the tokens past the line.
+ * Each web_search tool call is XAI_WEB_SEARCH_USD, which is 5 US dollars per 1,000 calls.
+ * Cached prompt tokens are billed at the input rate, not the lower published cache rate, so the estimate stays high.
+ */
+export const XAI_LONG_PROMPT_TOKENS = 200_000;
+export const XAI_INPUT_USD_PER_MILLION = 1.25;
+export const XAI_OUTPUT_USD_PER_MILLION = 2.5;
+export const XAI_LONG_INPUT_USD_PER_MILLION = 2.5;
+export const XAI_LONG_OUTPUT_USD_PER_MILLION = 5;
+export const XAI_WEB_SEARCH_USD = 0.005;
+
+/**
+ * Last-resort US dollars for one model call that has no cost field and no token or search counts to price.
  * This is not an xAI price and is never stored as an actual cost.
  * It is counted toward the monthly cap so one missing cost cannot leave the cap open.
  * The run log marks these dollars as estimated.

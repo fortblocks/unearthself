@@ -12,6 +12,12 @@ import {
   HUNTER_CALLS_KEY_PREFIX,
   HUNTER_DNC_KEY,
   HUNTER_ESTIMATED_CALL_DOLLARS,
+  XAI_INPUT_USD_PER_MILLION,
+  XAI_LONG_INPUT_USD_PER_MILLION,
+  XAI_LONG_OUTPUT_USD_PER_MILLION,
+  XAI_LONG_PROMPT_TOKENS,
+  XAI_OUTPUT_USD_PER_MILLION,
+  XAI_WEB_SEARCH_USD,
   HUNTER_HEARTBEAT_GAP_MS,
   HUNTER_HEARTBEAT_OFF_HOURS_MS,
   HUNTER_METHOD_ID,
@@ -277,6 +283,7 @@ export function heartbeatLate(lastAt: string, now: Date, withinHours: boolean) {
 export type ModelUsage = {
   inputTokens: number;
   outputTokens: number;
+  webSearches: number;
   dollars: number | null;
 };
 
@@ -363,19 +370,52 @@ export async function addSpendTicks(client: CounterClient, key: string, ticks: n
   return total;
 }
 
+function wholeCount(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value);
+}
+
+/**
+ * Price a response that named no dollar amount.
+ * Token counts and web_search_call items come first, at the published grok-4.20 rates.
+ * Cached prompt tokens use the input rate. The fixed 0.25 stand-in is only for a response with none of those counts.
+ */
+export function estimateModelCallDollars(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  webSearches?: number;
+}) {
+  const input = wholeCount(usage.inputTokens);
+  const output = wholeCount(usage.outputTokens);
+  const searches = wholeCount(usage.webSearches);
+  if (input === 0 && output === 0 && searches === 0) return HUNTER_ESTIMATED_CALL_DOLLARS;
+  const long = input >= XAI_LONG_PROMPT_TOKENS;
+  const inputRate = long ? XAI_LONG_INPUT_USD_PER_MILLION : XAI_INPUT_USD_PER_MILLION;
+  const outputRate = long ? XAI_LONG_OUTPUT_USD_PER_MILLION : XAI_OUTPUT_USD_PER_MILLION;
+  return (input / 1_000_000) * inputRate + (output / 1_000_000) * outputRate + searches * XAI_WEB_SEARCH_USD;
+}
+
+export type ModelSpendInput =
+  | number
+  | null
+  | { dollars: number | null; inputTokens?: number; outputTokens?: number; webSearches?: number };
+
 /**
  * Records a model call toward the monthly cap.
- * A missing cost adds the documented estimate, on its own key, and is not actual spend.
+ * A named cost is actual spend. A missing cost is an estimate on its own key, never stored as actual.
+ * Both still count toward the cap. The run log marks the estimate.
  */
-export async function noteModelSpend(client: CounterClient, month: string, dollars: number | null) {
-  if (dollars == null) {
-    const ticks = dollarsToTicks(HUNTER_ESTIMATED_CALL_DOLLARS);
-    await addSpendTicks(client, spendEstimateKey(month), ticks);
-    return { actualTicks: 0, estimatedTicks: ticks };
+export async function noteModelSpend(client: CounterClient, month: string, usage: ModelSpendInput) {
+  const dollars = typeof usage === "number" || usage == null ? usage : usage.dollars;
+  if (dollars != null) {
+    const ticks = dollarsToTicks(dollars);
+    await addSpendTicks(client, spendTicksKey(month), ticks);
+    return { actualTicks: ticks, estimatedTicks: 0 };
   }
-  const ticks = dollarsToTicks(dollars);
-  await addSpendTicks(client, spendTicksKey(month), ticks);
-  return { actualTicks: ticks, estimatedTicks: 0 };
+  const estimate = typeof usage === "number" || usage == null ? HUNTER_ESTIMATED_CALL_DOLLARS : estimateModelCallDollars(usage);
+  const ticks = dollarsToTicks(estimate);
+  await addSpendTicks(client, spendEstimateKey(month), ticks);
+  return { actualTicks: 0, estimatedTicks: ticks };
 }
 
 export type MonthSpend = { actual: number; estimated: number };

@@ -202,7 +202,7 @@ export async function researchCompanies(
     timeoutForAttempt: () => (timeLeft ? timeLeft() : 90_000),
   });
   if ("error" in research) return research;
-  const noted = await noteModelSpend(redis, month, research.usage.dollars);
+  const noted = await noteModelSpend(redis, month, research.usage);
   return {
     companies: research.companies,
     attempts: research.attempts,

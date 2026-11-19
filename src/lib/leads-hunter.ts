@@ -1347,7 +1347,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       cursor = advanceCursor(cursor);
       inputTokens += research.usage.inputTokens;
       outputTokens += research.usage.outputTokens;
-      const noted = await noteModelSpend(redis, month, research.usage.dollars);
+      const noted = await noteModelSpend(redis, month, research.usage);
       if (research.usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
       else actualDollars += research.usage.dollars;
       const drafts = selectHunterRows(research).filter((draft) => {

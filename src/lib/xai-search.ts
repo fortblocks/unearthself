@@ -102,11 +102,26 @@ function extractJsonObject(text: string): unknown | null {
   return null;
 }
 
-export type XaiUsage = { inputTokens: number; outputTokens: number; dollars: number | null };
+export type XaiUsage = { inputTokens: number; outputTokens: number; webSearches: number; dollars: number | null };
 
 /** xAI documents 1 USD as 10^10 ticks. https://docs.x.ai/developers/cost-tracking */
 export const XAI_USD_TICKS = 10_000_000_000;
 
+function countWebSearches(payload: unknown) {
+  if (!payload || typeof payload !== "object") return 0;
+  const output = (payload as { output?: unknown }).output;
+  if (!Array.isArray(output)) return 0;
+  return output.filter((item) => {
+    if (!item || typeof item !== "object") return false;
+    return (item as { type?: unknown }).type === "web_search_call";
+  }).length;
+}
+
+/**
+ * Token counts stay filled when the cost field is absent.
+ * Cached prompt tokens, when reported on their own, are kept as the prompt size and later billed at the input rate.
+ * When input_tokens is present it already includes any cached tokens, so they are not added again.
+ */
 export function readXaiUsage(payload: unknown): XaiUsage {
   const usage = payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null;
   const record = usage && typeof usage === "object" ? (usage as Record<string, unknown>) : {};
@@ -118,10 +133,17 @@ export function readXaiUsage(payload: unknown): XaiUsage {
     const n = typeof value === "number" ? value : Number(value);
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
+  const details = record.input_tokens_details ?? record.prompt_tokens_details;
+  const cached =
+    details && typeof details === "object"
+      ? asCount((details as { cached_tokens?: unknown }).cached_tokens)
+      : asCount(record.cached_tokens);
+  const inputTokens = asCount(record.input_tokens ?? record.prompt_tokens);
   const ticks = dollars(record.cost_in_usd_ticks);
   return {
-    inputTokens: asCount(record.input_tokens ?? record.prompt_tokens),
+    inputTokens: inputTokens > 0 ? inputTokens : cached,
     outputTokens: asCount(record.output_tokens ?? record.completion_tokens),
+    webSearches: countWebSearches(payload),
     dollars: ticks == null ? dollars(record.cost_in_usd) ?? dollars(record.cost) : ticks / XAI_USD_TICKS,
   };
 }

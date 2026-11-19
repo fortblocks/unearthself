@@ -43,6 +43,7 @@ import {
   makeDncEntry,
   makeRunClock,
   monthSpendFromCounts,
+  estimateModelCallDollars,
   noteModelSpend,
   pageShowsMovedOn,
   methodStats,
@@ -621,6 +622,64 @@ test("a permanent do-not-contact replaces a temporary entry for the same domain 
   const domainWide = dncUpsertPlan([lost], noEmail, "2026-11-19");
   assert.equal(domainWide.some((entry) => entry.email === "" && entry.until === "never"), true);
   assert.equal(domainWide.some((entry) => entry.email === "ada@acme.example" && entry.until === "never"), true);
+});
+
+test("a missing cost is priced from tokens and searches, and 0.25 is only the last resort", async () => {
+  const near = (value: number, expected: number) => Math.abs(value - expected) < 1e-9;
+  const worked = estimateModelCallDollars({ inputTokens: 30_000, outputTokens: 2_000, webSearches: 4 });
+  assert.equal(near(worked, 0.0625), true);
+  const below = estimateModelCallDollars({ inputTokens: 199_999, outputTokens: 1_000, webSearches: 0 });
+  assert.equal(near(below, (199_999 / 1_000_000) * 1.25 + (1_000 / 1_000_000) * 2.5), true);
+  const atTier = estimateModelCallDollars({ inputTokens: 200_000, outputTokens: 1_000, webSearches: 0 });
+  assert.equal(near(atTier, (200_000 / 1_000_000) * 2.5 + (1_000 / 1_000_000) * 5), true);
+  const above = estimateModelCallDollars({ inputTokens: 250_000, outputTokens: 0, webSearches: 0 });
+  assert.equal(near(above, 0.625), true);
+  assert.equal(near(above, 0.375), false);
+  assert.equal(near(estimateModelCallDollars({ inputTokens: 0, outputTokens: 0, webSearches: 4 }), 0.02), true);
+  assert.equal(estimateModelCallDollars({ inputTokens: 0, outputTokens: 0, webSearches: 0 }), 0.25);
+
+  const keys = new Map<string, number>();
+  const client = {
+    async incr() {
+      return 0;
+    },
+    async decr() {
+      return 0;
+    },
+    async incrby(key: string, amount: number) {
+      const next = (keys.get(key) ?? 0) + amount;
+      keys.set(key, next);
+      return next;
+    },
+  };
+  const priced = await noteModelSpend(client, "2026-11", {
+    dollars: null,
+    inputTokens: 30_000,
+    outputTokens: 2_000,
+    webSearches: 4,
+  });
+  assert.equal(priced.actualTicks, 0);
+  assert.equal(priced.estimatedTicks, dollarsToTicks(0.0625));
+  const searchesOnly = await noteModelSpend(client, "2026-11", { dollars: null, webSearches: 4 });
+  assert.equal(searchesOnly.estimatedTicks, dollarsToTicks(0.02));
+  const fallback = await noteModelSpend(client, "2026-11", { dollars: null });
+  assert.equal(fallback.estimatedTicks, dollarsToTicks(0.25));
+  const named = await noteModelSpend(client, "2026-11", {
+    dollars: 1.5,
+    inputTokens: 30_000,
+    outputTokens: 2_000,
+    webSearches: 4,
+  });
+  assert.equal(named.actualTicks, dollarsToTicks(1.5));
+  assert.equal(named.estimatedTicks, 0);
+  const spend = monthSpendFromCounts(
+    0,
+    keys.get("unearth:hunter:spend-ticks:v1:2026-11") ?? 0,
+    keys.get("unearth:hunter:spend-estimate-ticks:v1:2026-11") ?? 0,
+  );
+  assert.equal(near(spend.actual, 1.5), true);
+  assert.equal(near(spend.estimated, 0.0625 + 0.02 + 0.25), true);
+  assert.equal(spend.actual + spend.estimated, capSpend(spend));
 });
 
 test("a missing model cost still moves the monthly cap, and ticks are not whole cents", async () => {

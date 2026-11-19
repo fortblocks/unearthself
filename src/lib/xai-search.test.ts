@@ -6,6 +6,7 @@ import {
   XAI_RESPONSES_URL,
   formatXaiHttpError,
   parseXaiSearchResponse,
+  readXaiUsage,
   xaiWebSearchRequest,
 } from "./xai-search.ts";
 
@@ -33,6 +34,29 @@ test("both hunts call the shared web search client and not live search", () => {
     assert.equal(source.includes("chat/completions"), false);
     assert.match(source, /searchWithRetries|callXaiWebSearch/);
   }
+});
+
+test("usage keeps token counts when the cost is missing and counts web_search_call items", () => {
+  const usage = readXaiUsage({
+    usage: {
+      input_tokens: 30_000,
+      output_tokens: 2_000,
+      input_tokens_details: { cached_tokens: 4_000 },
+    },
+    output: [
+      { type: "web_search_call", status: "completed" },
+      { type: "web_search_call", status: "completed" },
+      { type: "tool_call" },
+      { type: "message", content: [] },
+    ],
+  });
+  assert.equal(usage.dollars, null);
+  assert.equal(usage.inputTokens, 30_000);
+  assert.equal(usage.outputTokens, 2_000);
+  assert.equal(usage.webSearches, 2);
+  const cachedOnly = readXaiUsage({ usage: { input_tokens_details: { cached_tokens: 800 } } });
+  assert.equal(cachedOnly.inputTokens, 800);
+  assert.equal(cachedOnly.dollars, null);
 });
 
 test("an HTTP failure keeps the status and drops a secret echoed in the body", () => {
