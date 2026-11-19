@@ -1,5 +1,7 @@
 # Leads: product evolution spec
 
+`30_LEADS_STRATEGY.md` is the governing frame for leads work, and it governs where this file differs.
+
 **Status:** Spec. Not built.  
 **Date:** 18 November 2026  
 **Owner:** Christopher  
@@ -446,3 +448,4 @@ Do not quietly change the weights. A wider map needs a partner decision: which c
 - 18 November 2026. Spec opened from the live leads desk. Humanizer marked as the most important element. 90 minutes from Calgary, and a boardroom or resort claim, left as pending partner confirmation.
 - 18 November 2026. The companies table is Company, Place, Size, and Score. A separate Hunter score and a Partner value are not stored on a lead. Chris asked for this.
 - 18 November 2026. Added section 5, per-email customization from the `27` template, and section 6, A/B testing with a default threshold of 20 sends per version, pending Chris setting the real number.
+- 19th November 2026. File 30 named as the governing frame for leads work. Where this file differs, file 30 governs.

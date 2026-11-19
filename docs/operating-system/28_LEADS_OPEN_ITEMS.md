@@ -1,6 +1,20 @@
 # 28 Leads: open items and discrepancies
 
+`30_LEADS_STRATEGY.md` is the governing frame for leads work, and it governs where this file differs.
+
 As of 17th November 2026. A running log of discrepancies and items to align before the lead system sends real email. Add items as and when they become pertinent, and mark them closed with the date and who closed them. Companion to `26_LEADS_PRODUCT_EVOLUTION.md` and `27_LEADS_SAMPLE_EMAILS.md`.
+
+## To align with the leads strategy
+
+Logged 19th November 2026. Still open. File 30 governs until each one is aligned.
+
+(a) **Enrichment.** `29` makes enrichment phase two of Hunter's own job. File 30 treats enrichment and research as its own step and specialist. The owner is to be aligned.
+
+(b) **Writer and sender.** `29` names Coco as the writer and Nova as the sender. File 30 has Coco writing and sending.
+
+(c) **Booking link.** A booking-link service was an open decision. File 30 sets the direction: Calendly or Google Calendar, with the event on Chris's real schedule and the card status updating automatically, with no manual tap. Which tool to use, and connecting it, stay open for Chris, since any new service needs his yes. On the Hunter branch `cursor/hunter-phase-one-hardening-1ff2`, booked is still a desk tap, and no booking-link service is connected.
+
+(d) **Revenue Swarm.** "Revenue Swarm" is not defined in the Source of Truth.
 
 ## Open
 
@@ -22,3 +36,7 @@ As of 17th November 2026. A running log of discrepancies and items to align befo
 ## Closed
 
 - **Group size.** Settled at six to twenty-four, on the site and in `07` (18th November, Chris approved).
+
+## Changelog
+
+- 19th November 2026. File 30 named as the governing frame. Four differences logged above and left open: the enrichment owner, Coco and Nova, the booking link, and Revenue Swarm.

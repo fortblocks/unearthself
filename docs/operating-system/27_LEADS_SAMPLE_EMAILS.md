@@ -1,5 +1,7 @@
 # 27 Leads: sample outbound email
 
+`30_LEADS_STRATEGY.md` is the governing frame for leads work, and it governs where this file differs.
+
 Revised 18th November from Chris's live feedback. The three earlier samples are replaced by one email that joins sample two (team experience on the land) and sample three (industry angle). Draft only. Nothing here goes to a real lead without Chris's approval, and any send goes from chris@badlandsbootcamp.com. Text in [brackets] is an example slot; the live version fills it from that lead's real, sourced detail. Companion to `26_LEADS_PRODUCT_EVOLUTION.md`.
 
 Where each fact comes from:
@@ -34,3 +36,7 @@ Added 18th November from Chris's call. Full detail is in `26_LEADS_PRODUCT_EVOLU
 
 - Per-email customization: this email is the starting template. Each real send is customized for its one recipient, from their name, title, company, industry and any other enriched field that has a source URL. The storytelling prose and the humanizer stay in force, so every letter reads as Christopher writing, with humility and confidence, never bullet points.
 - A/B testing: approved sends are split between two versions, open and reply rates are tracked, the winner is fed back into the generator and the loser is discarded. Default threshold is 20 sends per version before a winner counts, pending Chris setting the real number.
+
+## Changelog
+
+- 19th November 2026. File 30 named as the governing frame for leads work. Where this file differs, file 30 governs.

@@ -18,6 +18,7 @@ The website in this repository (`src/`) is the public test site. These files do 
 5. The workstream you are reviewing
 6. `17_OPEN_DECISIONS.md`
 7. `26_LEADS_PRODUCT_EVOLUTION.md` when the work is outbound leads
+8. `30_LEADS_STRATEGY.md` when the work is outbound leads. It is the governing frame for files 26 to 29
 
 ## Pull locally
 
