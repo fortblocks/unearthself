@@ -4,9 +4,11 @@
 
 export const XAI_RESPONSES_URL = "https://api.x.ai/v1/responses";
 
-// grok-4.7 is the model the web search docs call with server-side tools.
-// Minutes keep their own non-reasoning model in structured-minutes.ts.
-export const HUNTER_SEARCH_MODEL = "grok-4.7";
+// Server-side web search is called on the Responses API. grok-4.7 is the model in
+// the web search examples, and a live hunt with it did not return within 240 seconds.
+// This non-reasoning model is the one already used for fast xAI calls in this app.
+// Minutes keep their own copy of the id in structured-minutes.ts.
+export const HUNTER_SEARCH_MODEL = "grok-4.20-0309-non-reasoning";
 
 export function xaiWebSearchRequest(system: string, prompt: string) {
   return {

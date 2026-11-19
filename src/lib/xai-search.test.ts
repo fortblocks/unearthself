@@ -13,7 +13,7 @@ test("web search uses the Responses API and the server-side web_search tool", ()
   const body = xaiWebSearchRequest("Stay on public pages.", "Find one company.");
   assert.equal(XAI_RESPONSES_URL, "https://api.x.ai/v1/responses");
   assert.equal(body.model, HUNTER_SEARCH_MODEL);
-  assert.equal(HUNTER_SEARCH_MODEL, "grok-4.7");
+  assert.equal(HUNTER_SEARCH_MODEL, "grok-4.20-0309-non-reasoning");
   assert.deepEqual(body.tools, [{ type: "web_search" }]);
   assert.deepEqual(body.input, [
     { role: "system", content: "Stay on public pages." },

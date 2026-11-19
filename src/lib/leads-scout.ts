@@ -171,7 +171,7 @@ export async function researchCompanies(knownDomains: string[]): Promise<{ compa
   return callXaiWebSearch(
     "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
     scoutPrompt(knownDomains),
-    270000,
+    90000,
   );
 }
 
