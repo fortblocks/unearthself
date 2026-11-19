@@ -6,7 +6,7 @@
  */
 
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
-import { retryDelayMs } from "./hunter-phase.ts";
+import { apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
 
 export const APOLLO_DAILY_CREDIT_CAP_DEFAULT = 48;
@@ -285,6 +285,8 @@ export function applyApolloContact(company: Company, person: ApolloReveal | null
     apolloUpdatedOn: person.updatedOn,
     apolloCheckedOn: today,
     cardFlags: [...flags],
+    caslStatus: usableEmail ? "recorded" : company.caslStatus,
+    casl: usableEmail ? apolloCaslBasis(today) : company.casl,
   };
   return assignEnrichment(next, today);
 }

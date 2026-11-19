@@ -57,6 +57,7 @@ import {
   addDrop,
   alarmWebhookTargets,
   alarmsWithin,
+  apolloCaslBasis,
   checkEmailMx,
   chooseSlotIndex,
   dailyFileRoom,
@@ -899,8 +900,17 @@ async function settleApolloCompany(company: Company, dnc: DncEntry[], today: str
     return { ...company, email: "", emailSource: "", cardFlags: [...(company.cardFlags ?? []), "Do not contact"] };
   }
   const mx = await checkEmailMx(company.email, lookupMx);
-  if (mx === "no") return { ...company, email: "", emailSource: "", emailMx: false, caslStatus: "awaiting-chris" };
-  return { ...company, emailMx: mx === "yes", caslStatus: "awaiting-chris" };
+  if (mx === "no") {
+    return { ...company, email: "", emailSource: "", emailMx: false, caslStatus: undefined, casl: undefined };
+  }
+  const pulledOn = company.contactRetrievedOn || today;
+  return {
+    ...company,
+    emailSource: "Apollo",
+    emailMx: mx === "yes",
+    caslStatus: "recorded",
+    casl: apolloCaslBasis(pulledOn),
+  };
 }
 
 function revealsOn(state: HunterState, today: string) {
@@ -1387,7 +1397,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
 
 function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
   const card = ready.find((row) => normalizeDomain(row.domain) === company.domain && company.filedOn === today);
-  if (!card || company.casl) return company;
+  if (!card || company.casl || company.contactSource === "Apollo" || company.emailSource === "Apollo") return company;
   const page = pages[card.emailSource] || pages[card.sourceUrl] || "";
   const basis = caslBasis(page, card.email, card.buyerTitle, card.emailSource || card.sourceUrl);
   const blocked = Boolean(card.email) && basis != null && !basis.noUnsolicitedNotice;

@@ -119,7 +119,14 @@ export type Company = {
   reviewedOn?: string;
   filedOn?: string;
   dedupeKey?: string;
-  casl?: { publishedOn: string; roleFit: boolean; noUnsolicitedNotice: boolean };
+  casl?: {
+    publishedOn: string;
+    roleFit: boolean;
+    noUnsolicitedNotice: boolean;
+    provider?: "Apollo";
+    pulledOn?: string;
+    statement?: string;
+  };
   emailMx?: boolean;
   contactLastSeenOn?: string;
   facts?: { sourceUrl: string; fetchedOn: string; snippet: string }[];

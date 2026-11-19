@@ -106,7 +106,26 @@ export type CaslBasis = {
   publishedOn: string;
   roleFit: boolean;
   noUnsolicitedNotice: boolean;
+  /** Set when the email came from Apollo. Never a page URL. */
+  provider?: "Apollo";
+  /** Edmonton date the Apollo row was pulled. */
+  pulledOn?: string;
+  statement?: string;
 };
+
+export const APOLLO_CASL_STATEMENT = "Under Apollo's terms its data comes from public sources.";
+
+/** Apollo is the basis. The pull date is the day the row was retrieved. No page URL is created. */
+export function apolloCaslBasis(pulledOn: string): CaslBasis {
+  return {
+    publishedOn: "Apollo",
+    roleFit: false,
+    noUnsolicitedNotice: true,
+    provider: "Apollo",
+    pulledOn,
+    statement: APOLLO_CASL_STATEMENT,
+  };
+}
 
 export function cardDedupeKey(domain: string, email: string) {
   return `${normalizeDomain(domain)}|${email.trim().toLowerCase()}`;

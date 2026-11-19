@@ -658,7 +658,12 @@ function CompanyPanel({
           )}
           {company.email ? <p className="mt-1 text-sm text-coal">{company.email}</p> : null}
           {company.contactSource === "Apollo" ? (
-            <p className="mt-2 text-sm text-coal">Source: Apollo</p>
+            <p className="mt-2 text-sm text-coal">
+              CASL basis: Apollo. {company.casl?.statement || "Under Apollo's terms its data comes from public sources."}
+              {company.casl?.pulledOn || company.contactRetrievedOn
+                ? ` Pulled ${company.casl?.pulledOn || company.contactRetrievedOn}.`
+                : ""}
+            </p>
           ) : company.emailSource ? (
             <a className="mt-2 inline-block text-sm font-semibold text-ember hover:underline" href={company.emailSource}>
               Page where this contact was published

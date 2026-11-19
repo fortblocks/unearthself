@@ -248,6 +248,7 @@ test("the nightly route and Apollo both honour do-not-contact", async () => {
   process.env.APOLLO_API_KEY = "apollo-test-key";
   process.env.CRON_SECRET = "cron-test-secret";
   install(redis);
+  useMxLookupForTests(async (host) => (host === "northwind.test" ? [{ exchange: "mail.northwind.test" }] : []));
   await appendDoNotContact({ domain: "blocked.example", reason: "dont-contact", today: "2026-11-19" });
   const urls: string[] = [];
   globalThis.fetch = async (input) => {
@@ -324,8 +325,15 @@ test("the nightly route and Apollo both honour do-not-contact", async () => {
     assert.equal(apolloUrls.some((url) => url.includes("blocked.example")), false);
     const open = enriched.companies.find((company) => company.domain === "open.example");
     assert.equal(open?.email, "ada@northwind.test");
-    assert.equal(open?.caslStatus, "awaiting-chris");
+    assert.equal(open?.caslStatus, "recorded");
+    assert.equal(open?.casl?.provider, "Apollo");
+    assert.equal(open?.casl?.publishedOn, "Apollo");
+    assert.equal(open?.casl?.pulledOn, "2026-11-19");
+    assert.equal(open?.emailSource, "Apollo");
+    assert.equal(/^https?:\/\//i.test(open?.emailSource ?? ""), false);
+    assert.equal(/^https?:\/\//i.test(open?.casl?.publishedOn ?? ""), false);
   } finally {
+    useMxLookupForTests(null);
     await restore(previousFetch, env);
   }
 });

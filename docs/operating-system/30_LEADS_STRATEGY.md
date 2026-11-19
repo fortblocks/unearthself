@@ -90,10 +90,10 @@ Applied on the branch, and not live:
 - `HUNTER_MONTHLY_DOLLAR_CAP` defaults to 60. It counts known xAI cost for the calendar month. Apollo credits are separate. At 60 dollars Hunter stops calling until the next month.
 - A new card needs a verified fit signal. A score of 25 with no fit signal is rejected. A stale Apollo row, or a public page that shows a new employer, is not contact-ready. Total cards filed in a day stop at 48.
 - Alarms are stored in Redis. Delivery order is Rex, then Bo, then Derek, through `HUNTER_ALARM_WEBHOOK_URL` and `HUNTER_ALARM_CC_WEBHOOK_URLS`. Both are unset.
+- An Apollo email logs Apollo as the CASL basis, with the statement that under Apollo's terms the data comes from public sources, and the date the row was pulled. The desk shows that basis and date. No source page is invented. A public-page email keeps that page.
 
 Not applied. Still open:
 
-- The branch stores Apollo as the source and the date retrieved. It does not log the CASL basis as data from public sources, per Apollo's terms.
 - A booked meeting is still a desk tap. No booking service is connected.
 - There is no second finding method, and no live known-good or known-bad company list.
 - Items (a), (b), and (d) in `28` stay open.
@@ -102,3 +102,4 @@ Not applied. Still open:
 
 - 19th November 2026. Frame opened from Chris's call. Purpose, three steps, and the governing rule recorded. Files 26 to 29 and the Hunter branch mapped to the steps. Differences logged in `28`, not resolved.
 - 19th November 2026. Eight decisions recorded from Chris's call.
+- 19th November 2026. On the Hunter branch only, and not live: decision 5, the Apollo CASL basis, is applied in code. Decisions 1, 2, and 4 are not.

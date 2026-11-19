@@ -4,6 +4,7 @@ import {
   APOLLO_CEILING,
   APOLLO_EMAIL_NOT_VERIFIED,
   APOLLO_OFF,
+  APOLLO_SOURCE,
   APOLLO_STALE,
   apolloApiKey,
   apolloCreditCap,
@@ -16,6 +17,7 @@ import {
   enrichHunterContacts,
 } from "./apollo.ts";
 import { hasBuyerContact, isContactReady } from "./hunter-cap.ts";
+import { APOLLO_CASL_STATEMENT } from "./hunter-phase.ts";
 import type { Company } from "./lead-score.ts";
 
 const KEY = "test-key-should-not-leak";
@@ -114,6 +116,14 @@ test("a verified Apollo email can count, and an unverified one cannot", () => {
   assert.equal(verified.email, "jordan.blake@acme.example");
   assert.equal(verified.emailSource, "Apollo");
   assert.equal(verified.contactSource, "Apollo");
+  assert.equal(verified.caslStatus, "recorded");
+  assert.equal(verified.casl?.provider, "Apollo");
+  assert.equal(verified.casl?.publishedOn, "Apollo");
+  assert.equal(verified.casl?.statement, APOLLO_CASL_STATEMENT);
+  assert.equal(verified.casl?.pulledOn, "2026-11-18");
+  assert.equal(/^https?:\/\//i.test(verified.emailSource), false);
+  assert.equal(/^https?:\/\//i.test(verified.casl?.publishedOn ?? ""), false);
+  assert.equal(verified.emailSource, APOLLO_SOURCE);
   assert.equal(verified.apolloPersonId, "person-1");
   assert.equal(verified.apolloEmailStatus, "verified");
   assert.equal(verified.contactRetrievedOn, "2026-11-18");
@@ -153,6 +163,8 @@ test("a public-page contact still counts without an Apollo person id", () => {
   });
   assert.equal(hasBuyerContact(card), true);
   assert.equal(isContactReady(card), true);
+  assert.equal(card.emailSource, "https://acme.example/team");
+  assert.equal(card.casl?.provider, undefined);
 });
 
 test("stale when Apollo's date is more than 12 months old or the employer does not match", () => {
