@@ -316,7 +316,8 @@ Settings Chris has not set, with the defaults in code:
 | `HUNTER_DAILY_CALL_BUDGET` | 55, on this branch, not live |
 | `HUNTER_DAILY_FILED_CAP` | 48 |
 | `HUNTER_ALARM_WEBHOOK_URL` | unset. Rex, primary |
-| `HUNTER_ALARM_CC_WEBHOOK_URLS` | unset. Bo, Derek |
+| `HUNTER_ALARM_WEBHOOK_KEY` | unset. Authorization for Rex only. A bare key is sent as Bearer. |
+| `HUNTER_ALARM_CC_WEBHOOK_URLS` | unset. Bo and Derek are copied by Rex's routine, so this stays unset. |
 | `APOLLO_DAILY_CREDIT_CAP` | 48. Separate from the call budget |
 
 ## Changelog
@@ -335,6 +336,7 @@ Settings Chris has not set, with the defaults in code:
 - 18 November 2026. Apollo is the chosen licensed database, per Chris. The integration is in progress and gated on `APOLLO_API_KEY`. Only a verified Apollo email can be used. Guessed, extrapolated, unavailable, catch-all, and likely-to-engage emails are flagged `Apollo email not verified` and left out of the contact-ready count. Reveals stop at `APOLLO_DAILY_CREDIT_CAP`, default 48. Cards store the source, Apollo person id, email status, date retrieved, and Apollo's last-updated date. A `Stale` flag shows when that date is more than 12 months old or the employer does not match. Both runs append to the run log, and the Bots page shows the last 20 entries.
 - 19th November 2026. File 30 named as the governing frame for leads work. Where this file differs, file 30 governs.
 - 19th November 2026. On the Hunter branch only, and not live: call budget 55, three calls a run so that budget can be reached, monthly xAI dollar cap 60, a fit signal required, moved-on contacts excluded from contact-ready, 48 total cards a day, and alarms to Rex then Bo and Derek. Apollo's credit cap stays 48. The same day, an Apollo email logs Apollo as its CASL basis, with the pull date, and no invented source page. A public-page email keeps its page. Not live.
+- 19th November 2026. `HUNTER_ALARM_WEBHOOK_KEY` is optional. When set, the primary alarm post to Rex sends it as the Authorization header. Copy URLs do not receive it. The key is not logged.
 
 ## Build notes
 

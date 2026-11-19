@@ -330,40 +330,61 @@ export function pageShowsMovedOn(page: string) {
   return /formerly|previously at|no longer at|no longer with|left the company|now at|moved on to|moved to/i.test(page);
 }
 
-export type AlarmTarget = { name: string; url: string };
+export type AlarmTarget = { name: string; url: string; primary: boolean };
 
 export function alarmWebhookTargets(env: { HUNTER_ALARM_WEBHOOK_URL?: string; HUNTER_ALARM_CC_WEBHOOK_URLS?: string } = process.env): AlarmTarget[] {
   const targets: AlarmTarget[] = [];
   const primary = env.HUNTER_ALARM_WEBHOOK_URL?.trim() ?? "";
-  if (primary) targets.push({ name: HUNTER_ALARM_PRIMARY, url: primary });
+  if (primary) targets.push({ name: HUNTER_ALARM_PRIMARY, url: primary, primary: true });
   const copies = (env.HUNTER_ALARM_CC_WEBHOOK_URLS ?? "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
   copies.forEach((url, index) => {
-    targets.push({ name: HUNTER_ALARM_COPIES[index] ?? `copy ${index + 1}`, url });
+    targets.push({ name: HUNTER_ALARM_COPIES[index] ?? `copy ${index + 1}`, url, primary: false });
   });
   return targets;
 }
 
-/** Posts to Rex first, then each copy. A failed post does not stop the rest. */
+/**
+ * Turns HUNTER_ALARM_WEBHOOK_KEY into an Authorization header value.
+ * A bare key is sent as Bearer. A value that already has a scheme is sent as-is.
+ * A value that starts with "Authorization:" has that prefix removed.
+ * Empty stays unset. The key is not logged.
+ */
+export function alarmAuthorizationHeader(raw: string | null | undefined): string | null {
+  const text = (raw ?? "").trim();
+  if (!text) return null;
+  if (/^authorization:/i.test(text)) {
+    const value = text.replace(/^authorization:/i, "").trim();
+    return value || null;
+  }
+  if (/^[A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*\s+\S/.test(text)) return text;
+  return `Bearer ${text}`;
+}
+
+/** Posts to Rex first, then each copy. The auth header goes only to the primary. A failed post does not stop the rest. */
 export async function deliverAlarmWebhooks(input: {
   targets: AlarmTarget[];
   body: string;
+  authorization?: string | null;
   fetchImpl?: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<unknown>;
 }) {
   const fetchImpl = input.fetchImpl ?? fetch;
+  const authorization = alarmAuthorizationHeader(input.authorization);
   const sent: string[] = [];
   for (const target of input.targets) {
     sent.push(target.name);
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (target.primary && authorization) headers.Authorization = authorization;
     try {
       await fetchImpl(target.url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: input.body,
       });
     } catch {
-      // A missed webhook must not stop the hunt or the copies after it.
+      // A missed webhook must not stop the hunt or the copies after it. Do not log the URL or the key.
     }
   }
   return sent;

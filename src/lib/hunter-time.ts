@@ -29,6 +29,14 @@ export function edmontonClock(now = new Date()): EdmontonClock {
   };
 }
 
+/** A clock time a person can read. Example: 2026-11-19 16:14 America/Edmonton. */
+export function edmontonWhen(now = new Date()) {
+  const clock = edmontonClock(now);
+  const hour = String(clock.hour).padStart(2, "0");
+  const minute = String(clock.minute).padStart(2, "0");
+  return `${clock.date} ${hour}:${minute} America/Edmonton`;
+}
+
 /** Start inclusive, end exclusive. Default 7:00 to 19:00, every day. */
 export function withinWorkingHours(now = new Date(), start?: number, end?: number) {
   const hours = start == null || end == null ? hunterWorkHours() : { start, end };

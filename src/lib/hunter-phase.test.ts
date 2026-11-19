@@ -20,6 +20,7 @@ import {
   HUNTER_KNOWN_GOOD,
   HUNTER_LIVE_LIST,
   addDrop,
+  alarmAuthorizationHeader,
   alarmWebhookTargets,
   applyReviewExpiry,
   belowMedianAlarm,
@@ -511,4 +512,60 @@ test("alarms go to Rex first, then Bo and Derek, and a failed webhook does not s
   });
   assert.deepEqual(sent, ["Rex", "Bo", "Derek"]);
   assert.deepEqual(calls, ["https://rex.example/hook", "https://bo.example/hook", "https://derek.example/hook"]);
+});
+
+test("the alarm key has three forms, and only the primary request is authorized", async () => {
+  assert.equal(alarmAuthorizationHeader("  alarm-key-plain  "), "Bearer alarm-key-plain");
+  assert.equal(alarmAuthorizationHeader("Bearer alarm-key-scheme"), "Bearer alarm-key-scheme");
+  assert.equal(alarmAuthorizationHeader("Authorization: Bearer alarm-key-prefixed"), "Bearer alarm-key-prefixed");
+  assert.equal(alarmAuthorizationHeader("  "), null);
+  const secret = "alarm-key-plain";
+  const targets = alarmWebhookTargets({
+    HUNTER_ALARM_WEBHOOK_URL: "https://rex.example/hook",
+    HUNTER_ALARM_CC_WEBHOOK_URLS: "https://bo.example/hook, https://derek.example/hook",
+  });
+  const seen: { url: string; authorization: string }[] = [];
+  const logged: string[] = [];
+  const previous = {
+    log: console.log,
+    info: console.info,
+    warn: console.warn,
+    error: console.error,
+  };
+  const capture = (...args: unknown[]) => {
+    logged.push(args.map((item) => String(item)).join(" "));
+  };
+  console.log = capture;
+  console.info = capture;
+  console.warn = capture;
+  console.error = capture;
+  try {
+    const sent = await deliverAlarmWebhooks({
+      targets,
+      authorization: secret,
+      body: JSON.stringify({
+        what: ["Zero candidates this run."],
+        when: "2026-11-19 16:14 America/Edmonton",
+        run: "always-on",
+        state: { paused: false, killed: false, callsToday: 1, contactReadyToday: 0, lastResult: "" },
+      }),
+      fetchImpl: async (url, init) => {
+        seen.push({ url, authorization: init.headers.Authorization ?? "" });
+        if (url.includes("bo.example")) throw new Error(`webhook down ${secret} ${url}`);
+        return new Response("ok");
+      },
+    });
+    assert.deepEqual(sent, ["Rex", "Bo", "Derek"]);
+    assert.equal(seen[0]?.authorization, "Bearer alarm-key-plain");
+    assert.equal(seen[1]?.authorization, "");
+    assert.equal(seen[2]?.authorization, "");
+    const record = `${logged.join("\n")}\n${JSON.stringify(sent)}`;
+    assert.equal(record.includes(secret), false);
+    assert.equal(record.includes("rex.example"), false);
+  } finally {
+    console.log = previous.log;
+    console.info = previous.info;
+    console.warn = previous.warn;
+    console.error = previous.error;
+  }
 });

@@ -100,7 +100,7 @@ import {
   type DncReason,
   type HunterFunnel,
 } from "./hunter-phase.ts";
-import { edmontonClock, nightlySkip, withinWorkingHours } from "./hunter-time.ts";
+import { edmontonClock, edmontonWhen, nightlySkip, withinWorkingHours } from "./hunter-time.ts";
 import { searchWithRetries } from "./xai-search.ts";
 
 export const HUNTER_KEY = "unearth:hunter:v1";
@@ -1061,9 +1061,24 @@ async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, r
   await redis.ltrim?.(HUNTER_ALARM_KEY, 0, 400);
   const targets = alarmWebhookTargets();
   if (!targets.length) return;
+  const state = await loadHunterState();
+  const counts = countsForToday(state, edmontonClock(new Date(at)).date);
+  const lastResult = /https?:\/\//i.test(state.lastRunResult) ? "" : state.lastRunResult;
   await deliverAlarmWebhooks({
     targets,
-    body: JSON.stringify({ at, run, alarms, to: targets.map((target) => target.name) }),
+    authorization: process.env.HUNTER_ALARM_WEBHOOK_KEY,
+    body: JSON.stringify({
+      what: alarms,
+      when: edmontonWhen(new Date(at)),
+      run,
+      state: {
+        paused: state.paused,
+        killed: hunterKilled(),
+        callsToday: counts.callsToday,
+        contactReadyToday: counts.filedToday,
+        lastResult,
+      },
+    }),
   });
 }
 

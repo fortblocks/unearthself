@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/fix-ssr-entry.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "hunter:dry": "node --experimental-strip-types src/lib/hunter-dry-run.ts",
