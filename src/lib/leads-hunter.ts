@@ -623,7 +623,7 @@ export async function researchHunterSlot(
   return callXaiWebSearch(
     "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
     hunterPrompt(slot, knownDomains),
-    100000,
+    240000,
   );
 }
 
@@ -791,7 +791,7 @@ export async function runHunterBatch(): Promise<
   const counts = countsForToday(state, today);
   state = {
     ...state,
-    lockedUntil: now + 130_000,
+    lockedUntil: now + 270_000,
     callsOn: today,
     callsToday: counts.callsToday + 1,
     filedOn: today,

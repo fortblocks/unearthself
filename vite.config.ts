@@ -15,8 +15,8 @@ export default defineConfig(({ command, isPreview }) => ({
             preset: "vercel",
             vercel: {
               functionRules: {
-                "/api/cron/leads-hunter": { maxDuration: 120 },
-                "/api/cron/leads-scout": { maxDuration: 120 },
+                "/api/cron/leads-hunter": { maxDuration: 300 },
+                "/api/cron/leads-scout": { maxDuration: 300 },
               },
               config: {
                 crons: [
