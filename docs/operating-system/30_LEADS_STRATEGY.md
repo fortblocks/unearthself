@@ -84,7 +84,7 @@ Section 10 of `29` is Hunter's search strategy for the Find step. It sits under 
 
 `cursor/hunter-phase-one-hardening-1ff2` is in progress on the Find step. That branch hardens phase one and does not change the search. On that branch, 48 contact-ready cards is a ceiling, and the day is not padded to reach 48. The branch does not connect a booking-link service. Booked is still a desk tap. The tool choice and the connection stay open, as logged in `28`.
 
-Applied on the branch, and not live:
+Applied on main and live on production as of 19th November 2026:
 
 - The call budget default is 55. Three calls a run make 72 calls available in the working day, and 55 is the hard stop. The cron is unchanged.
 - `HUNTER_MONTHLY_DOLLAR_CAP` defaults to 60. It counts known xAI cost for the calendar month. Apollo credits are separate. At 60 dollars Hunter stops calling until the next month.
@@ -103,3 +103,4 @@ Not applied. Still open:
 - 19th November 2026. Frame opened from Chris's call. Purpose, three steps, and the governing rule recorded. Files 26 to 29 and the Hunter branch mapped to the steps. Differences logged in `28`, not resolved.
 - 19th November 2026. Eight decisions recorded from Chris's call.
 - 19th November 2026. On the Hunter branch only, and not live: decision 5, the Apollo CASL basis, is applied in code. Decisions 1, 2, and 4 are not.
+- 19th November 2026. The settings listed under the Hunter branch heading are on main and live on production (0297d04): call budget 55, three calls a run with the cron unchanged, monthly xAI cap of 60 US dollars, a verified fit signal, moved-on contacts not contact-ready, 48 cards a day, alarms to Rex then Bo and Derek, and the Apollo email CASL basis.

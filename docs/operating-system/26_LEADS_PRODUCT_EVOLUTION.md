@@ -19,7 +19,7 @@ This file is the next sales spec. `07` remains the workstream. Do not treat this
 - Basecamp is one word.
 - Canadian spelling.
 - No em dashes anywhere in this doc, and none in a lead email.
-- Do not buy Apollo. `07` says so, and the partners have not lifted it. Do not propose Clay or any other paid data vendor as the way to build this. A paid source may appear only as an open question for the partners.
+- Do not propose Clay or any other paid data vendor as the way to build this. A paid source may appear only as an open question for the partners.
 - The access gate in `07` stays: named person, plus a published email, plus the source URL. Otherwise the draft may exist and Send stays blocked.
 - Sends go from chris@badlandsbootcamp.com. Gmail is not wired into the site. Approve, then the person sends.
 

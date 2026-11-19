@@ -34,7 +34,6 @@ Everything else is important. Those five are load-bearing.
 
 ### Weeks 1–2 (8–21 Sep)
 
-- CEO: spawn WEB-01, SALES-01, TECH-01, PLACE-01, COM-01
 - Partners: fill yellow cells on the rate card
 - Brand: stop using `#FC7D6D`
 - Sales: 80-account list structure + one-pager draft
