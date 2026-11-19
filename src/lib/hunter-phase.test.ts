@@ -37,7 +37,13 @@ import {
   emptyFunnel,
   heartbeatLate,
   isDuplicateCard,
+  capSpend,
+  dollarsToTicks,
+  dncUpsertPlan,
   makeDncEntry,
+  makeRunClock,
+  monthSpendFromCounts,
+  noteModelSpend,
   pageShowsMovedOn,
   methodStats,
   monthlyCapLabel,
@@ -458,7 +464,11 @@ test("a 25-point card with no fit signal is rejected, and the daily file cap sta
 });
 
 test("a public page that shows a new employer is not filed as contact-ready", () => {
-  assert.equal(pageShowsMovedOn("Ada North is now at Other Co."), true);
+  assert.equal(pageShowsMovedOn("Ada North is now at Other Co.", "Ada North", "Northwind Example"), true);
+  assert.equal(pageShowsMovedOn("The team is now at a new stage of growth.", "Ada North", "Northwind Example"), false);
+  assert.equal(pageShowsMovedOn("Ada North is now at the offsite.", "Ada North", "Northwind Example"), false);
+  assert.equal(pageShowsMovedOn("We moved to a larger office this year.", "Ada North", "Northwind Example"), false);
+  assert.equal(pageShowsMovedOn("Ada North is now at Northwind Example too.", "Ada North", "Northwind Example"), false);
   const about = "https://northwind.example/about";
   const team = "https://northwind.example/team";
   const cards = verifyHunterDrafts(
@@ -510,8 +520,33 @@ test("alarms go to Rex first, then Bo and Derek, and a failed webhook does not s
       return new Response("ok");
     },
   });
-  assert.deepEqual(sent, ["Rex", "Bo", "Derek"]);
+  assert.deepEqual(sent.map((post) => post.name), ["Rex", "Bo", "Derek"]);
+  assert.equal(sent[0]?.ok, true);
+  assert.equal(sent[1]?.ok, false);
+  assert.equal(sent[2]?.ok, true);
   assert.deepEqual(calls, ["https://rex.example/hook", "https://bo.example/hook", "https://derek.example/hook"]);
+});
+
+test("a non-200 alarm post is recorded as failed, and a short timeout is used", async () => {
+  const posts = await deliverAlarmWebhooks({
+    targets: alarmWebhookTargets({ HUNTER_ALARM_WEBHOOK_URL: "https://rex.example/hook" }),
+    body: "{}",
+    timeoutMs: 1000,
+    fetchImpl: async (_url, init) => {
+      assert.ok(init.signal);
+      return new Response("no", { status: 503 });
+    },
+  });
+  assert.equal(posts[0]?.ok, false);
+  const skipped = await deliverAlarmWebhooks({
+    targets: alarmWebhookTargets({ HUNTER_ALARM_WEBHOOK_URL: "https://rex.example/hook" }),
+    body: "{}",
+    timeoutFor: () => 0,
+    fetchImpl: async () => {
+      throw new Error("should not post");
+    },
+  });
+  assert.equal(skipped[0]?.ok, false);
 });
 
 test("the alarm key has three forms, and only the primary request is authorized", async () => {
@@ -555,7 +590,7 @@ test("the alarm key has three forms, and only the primary request is authorized"
         return new Response("ok");
       },
     });
-    assert.deepEqual(sent, ["Rex", "Bo", "Derek"]);
+    assert.deepEqual(sent.map((post) => post.name), ["Rex", "Bo", "Derek"]);
     assert.equal(seen[0]?.authorization, "Bearer alarm-key-plain");
     assert.equal(seen[1]?.authorization, "");
     assert.equal(seen[2]?.authorization, "");
@@ -567,5 +602,85 @@ test("the alarm key has three forms, and only the primary request is authorized"
     console.info = previous.info;
     console.warn = previous.warn;
     console.error = previous.error;
+  }
+});
+
+test("a permanent do-not-contact replaces a temporary entry for the same domain or email", () => {
+  const skip = makeDncEntry({ domain: "acme.example", reason: "skipped", today: "2026-11-01" });
+  const dont = makeDncEntry({ domain: "acme.example", reason: "dont-contact", today: "2026-11-19" });
+  const upgraded = dncUpsertPlan([skip], dont, "2026-11-19");
+  assert.equal(upgraded.length, 1);
+  assert.equal(upgraded[0]?.reason, "dont-contact");
+  assert.equal(upgraded[0]?.until, "never");
+  const lost = makeDncEntry({ domain: "acme.example", email: "ada@acme.example", reason: "lost", today: "2026-11-01" });
+  const unsub = makeDncEntry({ domain: "acme.example", email: "ada@acme.example", reason: "unsubscribe", today: "2026-11-19" });
+  const replaced = dncUpsertPlan([lost], unsub, "2026-11-19");
+  assert.equal(replaced[0]?.reason, "unsubscribe");
+  assert.equal(replaced[0]?.until, "never");
+  const noEmail = makeDncEntry({ domain: "acme.example", reason: "dont-contact", today: "2026-11-19" });
+  const domainWide = dncUpsertPlan([lost], noEmail, "2026-11-19");
+  assert.equal(domainWide.some((entry) => entry.email === "" && entry.until === "never"), true);
+  assert.equal(domainWide.some((entry) => entry.email === "ada@acme.example" && entry.until === "never"), true);
+});
+
+test("a missing model cost still moves the monthly cap, and ticks are not whole cents", async () => {
+  assert.equal(dollarsToTicks(0.019), Math.round(0.019 * 10_000_000_000));
+  assert.notEqual(dollarsToTicks(0.019), Math.round(0.019 * 100));
+  const keys = new Map<string, number>();
+  const client = {
+    async incr() {
+      return 0;
+    },
+    async decr() {
+      return 0;
+    },
+    async incrby(key: string, amount: number) {
+      const next = (keys.get(key) ?? 0) + amount;
+      keys.set(key, next);
+      return next;
+    },
+  };
+  await noteModelSpend(client, "2026-11", null);
+  await noteModelSpend(client, "2026-11", 59.8);
+  const spend = monthSpendFromCounts(0, keys.get("unearth:hunter:spend-ticks:v1:2026-11") ?? 0, keys.get("unearth:hunter:spend-estimate-ticks:v1:2026-11") ?? 0);
+  assert.ok(Math.abs(spend.actual - 59.8) < 1e-6);
+  assert.ok(spend.estimated > 0);
+  assert.equal(monthlyCapState(capSpend(spend)), "stop");
+});
+
+test("the run clock stops work before the function limit and clips a call", () => {
+  let now = 1_000;
+  const clock = makeRunClock(() => now);
+  now = 1_000 + 200_000;
+  assert.equal(clock.clip(90_000), 60_000);
+  now = 1_000 + 259_500;
+  assert.equal(clock.clip(90_000), 0);
+  assert.equal(clock.out(), true);
+});
+
+test("a search does not start when the run clock is already out", async () => {
+  const previous = process.env.XAI_API_KEY;
+  process.env.XAI_API_KEY = "xai-test-key";
+  let called = 0;
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => {
+    called += 1;
+    return new Response("no", { status: 500 });
+  };
+  try {
+    const stopped = await searchWithRetries({
+      system: "s",
+      prompt: "p",
+      timeoutMs: 90_000,
+      maxRetries: 2,
+      beforeAttempt: async () => ({ allowed: false, reason: "time" }),
+    });
+    assert.equal("error" in stopped, true);
+    if ("error" in stopped) assert.equal(stopped.timedOut, true);
+    assert.equal(called, 0);
+  } finally {
+    globalThis.fetch = original;
+    if (previous == null) delete process.env.XAI_API_KEY;
+    else process.env.XAI_API_KEY = previous;
   }
 });

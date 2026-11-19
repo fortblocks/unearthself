@@ -3,6 +3,7 @@
  * Read only on the Bots page. Nothing here stores a secret.
  */
 
+import { HUNTER_RUN_OPEN_KEY } from "./hunter-config.ts";
 import type { HunterFunnel } from "./hunter-phase.ts";
 import { getRedisClient } from "./leads-book.ts";
 
@@ -23,6 +24,7 @@ export type HunterRunOutcome =
   | "capped-budget"
   | "capped-spend"
   | "skipped-busy"
+  | "stopped-time"
   | "error";
 
 export type HunterRunEntry = {
@@ -41,6 +43,8 @@ export type HunterRunEntry = {
   inputTokens: number;
   outputTokens: number;
   dollars: number | null;
+  /** Stand-in dollars for calls with no cost field. Not actual spend. */
+  estimatedDollars: number;
   funnel: HunterFunnel | null;
 };
 
@@ -55,6 +59,7 @@ const OUTCOMES = new Set<HunterRunOutcome>([
   "capped-budget",
   "capped-spend",
   "skipped-busy",
+  "stopped-time",
   "error",
 ]);
 
@@ -63,7 +68,7 @@ function count(value: number) {
   return Math.round(value);
 }
 
-export function hunterRunEntry(input: Omit<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "funnel"> & Partial<Pick<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "funnel">>): HunterRunEntry {
+export function hunterRunEntry(input: Omit<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "estimatedDollars" | "funnel"> & Partial<Pick<HunterRunEntry, "at" | "model" | "alarms" | "inputTokens" | "outputTokens" | "dollars" | "estimatedDollars" | "funnel">>): HunterRunEntry {
   return {
     at: input.at?.trim() || new Date().toISOString(),
     run: input.run,
@@ -80,6 +85,7 @@ export function hunterRunEntry(input: Omit<HunterRunEntry, "at" | "model" | "ala
     inputTokens: count(input.inputTokens ?? 0),
     outputTokens: count(input.outputTokens ?? 0),
     dollars: typeof input.dollars === "number" && Number.isFinite(input.dollars) ? input.dollars : null,
+    estimatedDollars: typeof input.estimatedDollars === "number" && Number.isFinite(input.estimatedDollars) ? input.estimatedDollars : 0,
     funnel: input.funnel ?? null,
   };
 }
@@ -106,8 +112,58 @@ export function parseHunterRun(raw: unknown): HunterRunEntry | null {
     inputTokens: Number(record.inputTokens ?? 0),
     outputTokens: Number(record.outputTokens ?? 0),
     dollars: typeof record.dollars === "number" ? record.dollars : null,
+    estimatedDollars: typeof record.estimatedDollars === "number" ? record.estimatedDollars : 0,
     funnel: record.funnel ?? null,
   });
+}
+
+export type OpenRun = { run: HunterRunName; id: string; at: string };
+
+export function parseOpenRun(raw: unknown): OpenRun | null {
+  const row = typeof raw === "string" ? safeJson(raw) : raw;
+  if (!row || typeof row !== "object") return null;
+  const record = row as Partial<OpenRun>;
+  if (record.run !== "always-on" && record.run !== "nightly") return null;
+  if (!record.id || !record.at) return null;
+  return { run: record.run, id: record.id, at: record.at };
+}
+
+export async function readUnfinishedRun(): Promise<OpenRun | null> {
+  const redis = await getRedisClient();
+  if (!redis) return null;
+  return parseOpenRun(await redis.get(HUNTER_RUN_OPEN_KEY));
+}
+
+export async function markRunStarted(run: HunterRunName, id: string, at: string) {
+  const redis = await getRedisClient();
+  if (!redis) return;
+  await redis.set(HUNTER_RUN_OPEN_KEY, JSON.stringify({ run, id, at }));
+}
+
+export async function clearRunStarted(id: string) {
+  const redis = await getRedisClient();
+  if (!redis) return;
+  const open = parseOpenRun(await redis.get(HUNTER_RUN_OPEN_KEY));
+  if (!open || open.id !== id) return;
+  await redis.del?.(HUNTER_RUN_OPEN_KEY);
+}
+
+/** One line in the Vercel runtime log. No secrets, no webhook URL, no key. */
+export function logHunterRunLine(line: {
+  runId: string;
+  run: HunterRunName;
+  startedAt: string;
+  endedAt: string;
+  passes: number;
+  calls: number;
+  funnel: HunterFunnel | null;
+  cardsFiled: number;
+  spendActual: number;
+  spendEstimated: number;
+  alarms: string[];
+  outcome: string;
+}) {
+  console.log(JSON.stringify({ hunterRun: line }));
 }
 
 function safeJson(raw: string): unknown {

@@ -76,6 +76,7 @@ import { Route as AdminMinutesIndexRouteImport } from './routes/admin.minutes.in
 import { Route as AdminMinutesMeetingIdRouteImport } from './routes/admin.minutes.$meetingId'
 import { Route as ApiCronLeadsHunterRouteImport } from './routes/api.cron.leads-hunter'
 import { Route as ApiCronLeadsScoutRouteImport } from './routes/api.cron.leads-scout'
+import { Route as ApiHunterReadRouteImport } from './routes/api.hunter.read'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
 import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
 import { Route as QuestAdminBroadcastRouteImport } from './routes/quest.admin.broadcast'
@@ -420,6 +421,11 @@ const ApiCronLeadsScoutRoute = ApiCronLeadsScoutRouteImport.update({
   path: '/api/cron/leads-scout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHunterReadRoute = ApiHunterReadRouteImport.update({
+  id: '/api/hunter/read',
+  path: '/api/hunter/read',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuestAdminIndexRoute = QuestAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -528,6 +534,7 @@ export interface FileRoutesByFullPath {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -598,6 +605,7 @@ export interface FileRoutesByTo {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -676,6 +684,7 @@ export interface FileRoutesById {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -755,6 +764,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -825,6 +835,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -902,6 +913,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -948,6 +960,7 @@ export interface RootRouteChildren {
   ThingsToSeeIndexRoute: typeof ThingsToSeeIndexRoute
   ApiCronLeadsHunterRoute: typeof ApiCronLeadsHunterRoute
   ApiCronLeadsScoutRoute: typeof ApiCronLeadsScoutRoute
+  ApiHunterReadRoute: typeof ApiHunterReadRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1421,6 +1434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronLeadsScoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hunter/read': {
+      id: '/api/hunter/read'
+      path: '/api/hunter/read'
+      fullPath: '/api/hunter/read'
+      preLoaderRoute: typeof ApiHunterReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/quest/admin/': {
       id: '/quest/admin/'
       path: '/'
@@ -1658,6 +1678,7 @@ const rootRouteChildren: RootRouteChildren = {
   ThingsToSeeIndexRoute: ThingsToSeeIndexRoute,
   ApiCronLeadsHunterRoute: ApiCronLeadsHunterRoute,
   ApiCronLeadsScoutRoute: ApiCronLeadsScoutRoute,
+  ApiHunterReadRoute: ApiHunterReadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

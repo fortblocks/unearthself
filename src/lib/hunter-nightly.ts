@@ -1,9 +1,9 @@
 import { apolloApiKey } from "./apollo.ts";
 import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
 import { HUNTER_MODEL_ID } from "./hunter-config.ts";
-import { appendHunterRun, hunterRunEntry, type HunterRunOutcome } from "./hunter-runs.ts";
+import { appendHunterRun, clearRunStarted, hunterRunEntry, logHunterRunLine, markRunStarted, readUnfinishedRun, type HunterRunOutcome } from "./hunter-runs.ts";
 import { enrichUnderApolloCap, gateNightly, loadDoNotContact, markNightlySwept, publishHunterAlarms, recordHunterEffort } from "./leads-hunter.ts";
-import { dncBlocks } from "./hunter-phase.ts";
+import { dncBlocks, makeRunClock } from "./hunter-phase.ts";
 import { getRedisClient } from "./leads-book.ts";
 import { edmontonToday } from "./lead-score.ts";
 import { runNightlyScout } from "./leads-scout.ts";
@@ -11,7 +11,25 @@ import { runNightlyScout } from "./leads-scout.ts";
 /**
  * Nightly local sweep. The route is a thin wrapper. Vercel cron sends Authorization: Bearer $CRON_SECRET.
  */
+function logNightly(outcome: string, startedAt: string) {
+  logHunterRunLine({
+    runId: "nightly",
+    run: "nightly",
+    startedAt,
+    endedAt: new Date().toISOString(),
+    passes: 0,
+    calls: 0,
+    funnel: null,
+    cardsFiled: 0,
+    spendActual: 0,
+    spendEstimated: 0,
+    alarms: [],
+    outcome,
+  });
+}
+
 export async function runNightlyCron(request: Request, now = new Date()) {
+  const startedAt = now.toISOString();
   const secret = process.env.CRON_SECRET?.trim();
   const auth = request.headers.get("authorization")?.trim();
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -33,6 +51,7 @@ export async function runNightlyCron(request: Request, now = new Date()) {
         model: HUNTER_MODEL_ID,
       }),
     );
+    logNightly("error", startedAt);
     return Response.json({ error: gate.error }, { status: 500 });
   }
   if (!gate.proceed) {
@@ -62,6 +81,7 @@ export async function runNightlyCron(request: Request, now = new Date()) {
         model: HUNTER_MODEL_ID,
       }),
     );
+    logNightly(outcome, startedAt);
     return Response.json({ ok: true, skipped: gate.skipped });
   }
   const redis = await getRedisClient();
@@ -83,15 +103,25 @@ export async function runNightlyCron(request: Request, now = new Date()) {
         model: HUNTER_MODEL_ID,
       }),
     );
+    logNightly("skipped-busy", startedAt);
     return Response.json({ ok: true, skipped: "busy" });
   }
+  const runClock = makeRunClock(() => Date.now());
   try {
+    const unfinished = await readUnfinishedRun();
+    if (unfinished && unfinished.id !== token) {
+      await publishHunterAlarms(["A previous run started and never finished."], now.toISOString(), "nightly");
+      await clearRunStarted(unfinished.id);
+    }
+    await markRunStarted("nightly", token, startedAt);
     const today = edmontonToday(now);
     const dnc = await loadDoNotContact(redis);
     const result = await runNightlyScout({
       now,
+      timeLeft: () => runClock.clip(90_000),
       skip: (row) => dncBlocks(dnc, row.domain, row.email ?? "", today),
-      enrich: (companies, domains, day) => enrichUnderApolloCap({ companies, domains, today: day, limit: 15 }),
+      enrich: (companies, domains, day) =>
+        enrichUnderApolloCap({ companies, domains, today: day, limit: 15, timeLeft: () => runClock.clip(20_000) }),
     });
     await recordHunterEffort({
       calls: 0,
@@ -99,13 +129,19 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       note: result.ok ? `Nightly sweep. Contact-ready cards this run: ${result.contactReady}.` : result.error,
     });
     if (result.ok) await markNightlySwept(result.date);
-    if (!result.ok && result.error.includes("Monthly dollar cap")) {
-      await publishHunterAlarms(["Monthly dollar cap reached. Calling resumes next month."], now.toISOString(), "nightly");
+    const alarms: string[] = [];
+    if (!result.ok && result.error.includes("Monthly dollar cap")) alarms.push("Monthly dollar cap reached. Calling resumes next month.");
+    if (!result.ok && /xAI|search failed|Stopped for time/i.test(result.error) && !result.error.includes("Monthly dollar cap")) {
+      alarms.push(result.timedOut || result.error.includes("Stopped for time") ? "Stopped early for time." : "xAI search failed.");
     }
+    if (result.ok && result.apolloFailed) alarms.push("Apollo request failed.");
+    if (result.ok && result.timedOut) alarms.push("Stopped early for time.");
+    if (alarms.length) await publishHunterAlarms(alarms, now.toISOString(), "nightly");
+    const outcome = result.ok ? (result.timedOut ? "stopped-time" : "fired") : result.timedOut ? "stopped-time" : "error";
     await appendHunterRun(
       hunterRunEntry({
         run: "nightly",
-        outcome: result.ok ? "fired" : "error",
+        outcome,
         modelCalls: result.attempts,
         candidates: result.ok ? result.candidates : 0,
         cardsFiled: result.ok ? result.stored : 0,
@@ -114,10 +150,62 @@ export async function runNightlyCron(request: Request, now = new Date()) {
         apolloReveals: result.ok ? result.apolloReveals : 0,
         error: result.ok ? result.apolloNote : nightlyNote(result.error),
         model: HUNTER_MODEL_ID,
+        alarms,
+        dollars: result.ok ? result.dollars : null,
+        estimatedDollars: result.ok ? result.estimatedDollars : 0,
       }),
     );
+    logHunterRunLine({
+      runId: token,
+      run: "nightly",
+      startedAt,
+      endedAt: new Date().toISOString(),
+      passes: result.attempts,
+      calls: result.attempts,
+      funnel: null,
+      cardsFiled: result.ok ? result.stored : 0,
+      spendActual: result.ok && result.dollars != null ? result.dollars : 0,
+      spendEstimated: result.ok ? result.estimatedDollars : 0,
+      alarms,
+      outcome,
+    });
     return Response.json(result, { status: result.ok ? 200 : 500 });
+  } catch (error) {
+    const alarms = ["Nightly run crashed."];
+    await publishHunterAlarms(alarms, now.toISOString(), "nightly");
+    await appendHunterRun(
+      hunterRunEntry({
+        run: "nightly",
+        outcome: "error",
+        modelCalls: 0,
+        candidates: 0,
+        cardsFiled: 0,
+        contactReady: 0,
+        apolloSearches: 0,
+        apolloReveals: 0,
+        error: nightlyNote("Nightly run crashed."),
+        model: HUNTER_MODEL_ID,
+        alarms,
+      }),
+    );
+    logHunterRunLine({
+      runId: token,
+      run: "nightly",
+      startedAt,
+      endedAt: new Date().toISOString(),
+      passes: 0,
+      calls: 0,
+      funnel: null,
+      cardsFiled: 0,
+      spendActual: 0,
+      spendEstimated: 0,
+      alarms,
+      outcome: "error",
+    });
+    void error;
+    return Response.json({ error: "Nightly run crashed." }, { status: 500 });
   } finally {
+    await clearRunStarted(token);
     await releaseHunterLock(redis, token);
   }
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { LEADS_KEY, emptyBook, useRedisClientForTests } from "./leads-book.ts";
+import { HUNTER_ALARM_KEY, HUNTER_RUN_OPEN_KEY } from "./hunter-config.ts";
 import { HUNTER_KEY, appendDoNotContact, enrichUnderApolloCap, readHunterDesk, runHunterBatch, useMxLookupForTests } from "./leads-hunter.ts";
 import { runNightlyCron } from "./hunter-nightly.ts";
 import type { Company } from "./lead-score.ts";
@@ -373,6 +374,55 @@ test("an empty search records an alarm for the last day and posts it when the we
     assert.match(posted[0] ?? "", /Zero candidates/);
     const desk = await readHunterDesk("2026-11-19", HUNT_AT);
     assert.equal(desk.alarms.some((alarm) => alarm.includes("Zero candidates")), true);
+  } finally {
+    await restore(previousFetch, env);
+  }
+});
+
+test("a permanent reason replaces Skip or Lost, including a card with no email", async () => {
+  const redis = memoryRedis();
+  install(redis);
+  try {
+    await appendDoNotContact({ domain: "skip.example", reason: "skipped", today: "2026-11-01" });
+    const skipped = await appendDoNotContact({ domain: "skip.example", reason: "dont-contact", today: "2026-11-19" });
+    assert.equal(skipped.find((entry) => entry.domain === "skip.example")?.until, "never");
+    assert.equal(skipped.find((entry) => entry.domain === "skip.example")?.reason, "dont-contact");
+    await appendDoNotContact({ domain: "lost.example", email: "ada@lost.example", reason: "lost", today: "2026-11-01" });
+    const unsubscribed = await appendDoNotContact({
+      domain: "lost.example",
+      email: "ada@lost.example",
+      reason: "unsubscribe",
+      today: "2026-11-19",
+    });
+    const lost = unsubscribed.find((entry) => entry.email === "ada@lost.example");
+    assert.equal(lost?.reason, "unsubscribe");
+    assert.equal(lost?.until, "never");
+    await appendDoNotContact({ domain: "blank.example", email: "ada@blank.example", reason: "skipped", today: "2026-11-01" });
+    const noEmail = await appendDoNotContact({ domain: "blank.example", reason: "dont-contact", today: "2026-11-19" });
+    assert.equal(noEmail.some((entry) => entry.domain === "blank.example" && entry.email === "" && entry.until === "never"), true);
+  } finally {
+    await restore(globalThis.fetch, {});
+  }
+});
+
+test("the next run alarms when a previous run started and never finished", async () => {
+  const redis = memoryRedis();
+  const previousFetch = globalThis.fetch;
+  const env = { XAI_API_KEY: process.env.XAI_API_KEY, HUNTER_KILL_SWITCH: process.env.HUNTER_KILL_SWITCH };
+  delete process.env.HUNTER_KILL_SWITCH;
+  process.env.XAI_API_KEY = "xai-test-key";
+  install(redis);
+  await redis.set(HUNTER_RUN_OPEN_KEY, JSON.stringify({ run: "always-on", id: "old-run", at: "2026-11-19T12:00:00.000Z" }));
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("api.x.ai")) return Response.json(xaiBody([]));
+    return new Response("missing", { status: 404 });
+  };
+  try {
+    await runHunterBatch(HUNT_AT, { clock: () => HUNT_AT.getTime() });
+    const stored = await redis.lrange(HUNTER_ALARM_KEY, 0, 10);
+    assert.match(JSON.stringify(stored), /never finished/);
+    assert.equal(await redis.get(HUNTER_RUN_OPEN_KEY), null);
   } finally {
     await restore(previousFetch, env);
   }

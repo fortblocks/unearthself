@@ -17,7 +17,7 @@ import {
   hunterStop,
   type CapacityProblem,
 } from "./hunter-cap.ts";
-import { appendHunterRun, hunterRunEntry, readHunterRuns, type HunterRunOutcome } from "./hunter-runs.ts";
+import { appendHunterRun, clearRunStarted, hunterRunEntry, logHunterRunLine, markRunStarted, readHunterRuns, readUnfinishedRun, type HunterRunOutcome } from "./hunter-runs.ts";
 import { getRedisClient, loadBook, saveBook } from "./leads-book.ts";
 import {
   asLeadCompany,
@@ -45,6 +45,7 @@ import {
   hunterMaxRetries,
   hunterMonthlyDollarCap,
   HUNTER_PASS_BUDGET_MS,
+  HUNTER_RUN_DEADLINE_MS,
   HUNTER_PROMPT_DOMAIN_CHARS,
   hunterDailyFiledCap,
   hunterQualityFloor,
@@ -65,7 +66,6 @@ import {
   dncField,
   explorationTurn,
   filedThroughHour,
-  addSpendCents,
   apolloCounterKey,
   applyReviewExpiry,
   belowMedianAlarm,
@@ -75,6 +75,7 @@ import {
   cardDedupeKey,
   caslBasis,
   dncBlocks,
+  dncUpsertPlan,
   doNotContactKey,
   mergeHunterCompanies,
   pageShowsMovedOn,
@@ -84,17 +85,23 @@ import {
   heartbeatLate,
   isDuplicateCard,
   makeDncEntry,
+  makeRunClock,
   makeLineage,
   methodStats,
+  monthSpendFromCounts,
   monthlyCapLabel,
   monthlyCapState,
+  noteModelSpend,
+  capSpend,
+  ticksToDollars,
   passesQualityFloor,
   quoteSnippet,
   reserveCounter,
   slotUsage,
   slotWeights,
   spendCounterKey,
-  spendUnknownKey,
+  spendEstimateKey,
+  spendTicksKey,
   zeroCandidateAlarm,
   type DncEntry,
   type DncReason,
@@ -501,10 +508,34 @@ function verifiedHits(draft: HunterDraft, pages: Record<string, string>, today: 
   return hits;
 }
 
-function partnerFromPages(pages: Record<string, string>): PartnerFlag {
+function urlsForCompany(draft: HunterDraft) {
+  const urls = new Set<string>();
+  const add = (url: string) => {
+    if (/^https?:\/\//i.test(url)) urls.add(url);
+  };
+  add(draft.sourceUrl);
+  add(draft.buyer.emailSource);
+  for (const hit of draft.profileSignals) add(hit.sourceUrl);
+  for (const signal of normalizeSignals(draft.signals)) add(signal.sourceUrl);
+  return urls;
+}
+
+function hostOnDomain(url: string, domain: string) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    const root = normalizeDomain(domain);
+    return host === root || host.endsWith(`.${root}`);
+  } catch {
+    return false;
+  }
+}
+
+function partnerFromPages(draft: HunterDraft, pages: Record<string, string>): PartnerFlag {
   const empty = { flagged: false, reason: "", sourceUrl: "" };
+  const owned = urlsForCompany(draft);
   for (const [url, page] of Object.entries(pages)) {
     if (!page || !/^https?:\/\//i.test(url)) continue;
+    if (!owned.has(url) && !hostOnDomain(url, draft.domain)) continue;
     for (const kind of PARTNER_KINDS) {
       const term = kind.terms.find((item) => pageHas(page, item));
       if (!term) continue;
@@ -550,7 +581,7 @@ export function verifyHunterDrafts(
     if (!placeMatchesRegion(place || city, city, opts.regionId)) continue;
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
-    const movedOn = pageShowsMovedOn(contactPage) || pageShowsMovedOn(page);
+    const movedOn = pageShowsMovedOn(contactPage, draft.buyer.name, draft.org) || pageShowsMovedOn(page, draft.buyer.name, draft.org);
     const contact = contactPage && !movedOn
       ? contactIfPresent(contactPage, draft.buyer.name, draft.buyer.email, contactPageUrl)
       : { name: "", title: "", email: "", emailSource: "" };
@@ -558,7 +589,7 @@ export function verifyHunterDrafts(
     const buyerTitle = titleOnPage(contactPage, draft.buyer.title, Boolean(buyerName));
     const hits = verifiedHits(draft, pages, opts.today);
     const signals = verifiedSignals(draft.signals, pages, `H-${cards.length + 1}`);
-    const partnerFlag = partnerFromPages(pages);
+    const partnerFlag = partnerFromPages(draft, pages);
     const hunterBreak = scoreHunter({
       hitIds: hits.map((hit) => hit.id),
       buyerName,
@@ -804,14 +835,15 @@ export async function researchHunterSlot(
   );
 }
 
-async function readPublishedPage(url: string): Promise<import("./hunter-phase.ts").PageRead> {
+async function readPublishedPage(url: string, timeoutMs = 6000): Promise<import("./hunter-phase.ts").PageRead> {
   if (!/^https?:\/\//i.test(url)) return { text: "", reason: "fetch-failed" };
+  const timeout = Math.max(500, Math.min(6000, timeoutMs));
   let last: import("./hunter-phase.ts").PageRead = { text: "", reason: "fetch-failed" };
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, {
         headers: { "user-agent": "UnearthSelfLeadHunter/1.0" },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(timeout),
         redirect: "follow",
       });
       const body = response.ok || response.status === 200 ? await response.text() : "";
@@ -837,15 +869,19 @@ export function urlsForDrafts(drafts: HunterDraft[]) {
   return [...urls].slice(0, 40);
 }
 
-export async function readPages(urls: string[]) {
+export async function readPages(urls: string[], timeLeft?: () => number) {
   const pages: Record<string, import("./hunter-phase.ts").PageRead> = {};
+  if (timeLeft && timeLeft() < 1_000) return pages;
   let cursor = 0;
   async function worker() {
     while (cursor < urls.length) {
+      if (timeLeft && timeLeft() < 1_000) return;
       const url = urls[cursor];
       cursor += 1;
       if (!url) continue;
-      pages[url] = await readPublishedPage(url);
+      const timeout = timeLeft ? timeLeft() : 6000;
+      if (timeout < 500) return;
+      pages[url] = await readPublishedPage(url, timeout);
     }
   }
   await Promise.all(Array.from({ length: Math.min(5, urls.length) }, () => worker()));
@@ -870,7 +906,7 @@ export function draftDropReason(
   return null;
 }
 
-async function loadHunterState(): Promise<HunterState> {
+export async function loadHunterState(): Promise<HunterState> {
   const redis = await getRedisClient();
   if (!redis) return freshHunterState();
   return parseHunterState(await redis.get<unknown>(HUNTER_KEY));
@@ -981,17 +1017,20 @@ export async function appendDoNotContact(input: {
   const client = redis as HunterRedis;
   const next = makeDncEntry(input);
   const entries = await loadDoNotContact(client);
-  if (dncBlocks(entries, next.domain, next.email, input.today)) return entries;
+  const writes = dncUpsertPlan(entries, next, input.today);
+  if (writes.length === 0) return entries;
   if (client.hset) {
     const legacy = await client.get<unknown>(doNotContactKey());
     if (Array.isArray(legacy)) {
       await client.del?.(doNotContactKey());
       for (const row of entries) await client.hset(doNotContactKey(), dncField(row), JSON.stringify(row));
     }
-    await client.hset(doNotContactKey(), dncField(next), JSON.stringify(next));
+    for (const row of writes) await client.hset(doNotContactKey(), dncField(row), JSON.stringify(row));
     return loadDoNotContact(client);
   }
-  const saved = [...entries, next];
+  const byField = new Map(entries.map((row) => [dncField(row), row]));
+  for (const row of writes) byField.set(dncField(row), row);
+  const saved = [...byField.values()];
   await client.set(doNotContactKey(), saved);
   return saved;
 }
@@ -1001,6 +1040,7 @@ export async function enrichUnderApolloCap(input: {
   domains: string[];
   today: string;
   limit: number;
+  timeLeft?: () => number;
 }) {
   const state = await loadHunterState();
   const redis = await getRedisClient();
@@ -1020,8 +1060,14 @@ export async function enrichUnderApolloCap(input: {
       ? async () => (await reserveCounter(client, apolloCounterKey(input.today), cap)).allowed
       : undefined,
     skip: (company) => dncBlocks(dnc, company.domain, company.email, input.today),
+    timeLeft: input.timeLeft,
   });
-  result.companies = await Promise.all(result.companies.map((company) => settleApolloCompany(company, dnc, input.today)));
+  result.companies = await Promise.all(
+    result.companies.map((company) => {
+      if (input.timeLeft && input.timeLeft() < 1_000) return company;
+      return settleApolloCompany(company, dnc, input.today);
+    }),
+  );
   if (result.reveals > 0) {
     const fresh = await loadHunterState();
     await saveHunterState({
@@ -1055,18 +1101,19 @@ async function keepRunFlags(state: HunterState) {
   };
 }
 
-async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, run: string) {
-  if (!alarms.length || !redis.lpush) return;
+async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, run: string, timeoutFor?: () => number) {
+  if (!alarms.length || !redis.lpush) return { failed: false };
   for (const text of alarms) await redis.lpush(HUNTER_ALARM_KEY, JSON.stringify({ at, text, run }));
   await redis.ltrim?.(HUNTER_ALARM_KEY, 0, 400);
   const targets = alarmWebhookTargets();
-  if (!targets.length) return;
+  if (!targets.length) return { failed: false };
   const state = await loadHunterState();
   const counts = countsForToday(state, edmontonClock(new Date(at)).date);
   const lastResult = /https?:\/\//i.test(state.lastRunResult) ? "" : state.lastRunResult;
-  await deliverAlarmWebhooks({
+  const posts = await deliverAlarmWebhooks({
     targets,
     authorization: process.env.HUNTER_ALARM_WEBHOOK_KEY,
+    timeoutFor,
     body: JSON.stringify({
       what: alarms,
       when: edmontonWhen(new Date(at)),
@@ -1080,6 +1127,14 @@ async function publishAlarms(redis: HunterRedis, alarms: string[], at: string, r
       },
     }),
   });
+  return { failed: posts.some((post) => !post.ok) };
+}
+
+async function readMonthSpend(redis: HunterRedis, month: string) {
+  const cents = Number(await redis.get<string>(spendCounterKey(month)));
+  const ticks = Number(await redis.get<string>(spendTicksKey(month)));
+  const estimate = Number(await redis.get<string>(spendEstimateKey(month)));
+  return monthSpendFromCounts(Number.isFinite(cents) ? cents : 0, Number.isFinite(ticks) ? ticks : 0, Number.isFinite(estimate) ? estimate : 0);
 }
 
 export async function publishHunterAlarms(alarms: string[], at: string, run: string) {
@@ -1116,18 +1171,39 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     error: "",
     model: HUNTER_MODEL_ID,
   };
+  const startedAtSkip = now.toISOString();
+  const skipId = crypto.randomUUID();
+  const logSkip = (outcome: string, calls = counts.callsToday) => {
+    logHunterRunLine({
+      runId: skipId,
+      run: "always-on",
+      startedAt: startedAtSkip,
+      endedAt: new Date().toISOString(),
+      passes: 0,
+      calls,
+      funnel: null,
+      cardsFiled: counts.filedToday,
+      spendActual: 0,
+      spendEstimated: 0,
+      alarms: [],
+      outcome,
+    });
+  };
   if (hunterKilled()) {
     await rememberRun({ ...blank, outcome: "skipped-killed", error: runNote("Kill switch is on.") });
+    logSkip("skipped-killed");
     return { ok: true, skipped: "killed", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   if (!withinWorkingHours(now)) {
     await rememberRun({ ...blank, outcome: "skipped-hours", error: runNote() });
+    logSkip("skipped-hours");
     return { ok: true, skipped: "hours", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   if (state.paused) {
     state = { ...state, lastRunAt: now.toISOString(), lastRunResult: "Paused. No search." };
     await saveHunterState(state);
     await rememberRun({ ...blank, outcome: "skipped-paused", error: runNote() });
+    logSkip("skipped-paused");
     return { ok: true, skipped: "paused", callsToday: counts.callsToday, filedToday: counts.filedToday };
   }
   const callsUsed = await seedCounter(redis, callCounterKey(today), counts.callsToday);
@@ -1146,6 +1222,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       outcome: stop === "cards" ? "skipped-target-met" : "capped-budget",
       error: runNote(),
     });
+    logSkip(stop === "cards" ? "skipped-target-met" : "capped-budget", callsUsed);
     return { ok: true, skipped: stop, callsToday: callsUsed, filedToday: counts.filedToday };
   }
 
@@ -1153,6 +1230,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
   const gotLock = await acquireHunterLock(redis, token);
   if (!gotLock) {
     await rememberRun({ ...blank, outcome: "skipped-busy", error: runNote() });
+    logSkip("skipped-busy", callsUsed);
     return { ok: true, skipped: "busy", callsToday: callsUsed, filedToday: counts.filedToday };
   }
 
@@ -1174,26 +1252,41 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     let companies = expired.companies;
     const known = new Set(companies.map((company) => normalizeDomain(company.domain)));
     const clock = hooks?.clock ?? Date.now;
-    const started = clock();
+    const runClock = makeRunClock(clock);
+    const startedAt = now.toISOString();
     const funnel = emptyFunnel();
     const held: string[] = [];
     let cursor = state.cursor;
     let slotLabel = "";
     let lastError = "";
     let abandoned = false;
+    let xaiFailed = false;
+    let timedOut = false;
     let stopReason: "" | "budget" | "spend" = "";
     let inputTokens = 0;
     let outputTokens = 0;
-    let dollars = 0;
-    let sawDollars = false;
-    let missedDollars = false;
+    let actualDollars = 0;
+    let estimatedDollars = 0;
+    let passesRun = 0;
     const dnc = await loadDoNotContact(redis);
     const passes = hunterCallsPerRun();
     const retries = hunterMaxRetries();
     const month = today.slice(0, 7);
+    const unfinished = await readUnfinishedRun();
+    const priorAlarms: string[] = [];
+    if (unfinished && unfinished.id !== token) {
+      priorAlarms.push("A previous run started and never finished.");
+      await clearRunStarted(unfinished.id);
+    }
+    await markRunStarted("always-on", token, startedAt);
 
     for (let pass = 0; pass < passes; pass += 1) {
-      if (pass > 0 && clock() - started >= HUNTER_PASS_BUDGET_MS) break;
+      const elapsed = runClock.elapsed();
+      if (elapsed >= HUNTER_RUN_DEADLINE_MS) {
+        timedOut = true;
+        break;
+      }
+      if (pass > 0 && elapsed >= HUNTER_PASS_BUDGET_MS) break;
       const live = await loadHunterState();
       if (live.paused) {
         state = { ...state, paused: true };
@@ -1201,10 +1294,8 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       }
       if (hunterStop(state, today, budget)) break;
       if (companies.filter((company) => company.filedOn === today).length >= hunterDailyFiledCap()) break;
-      const spendUnknown = await redis.get<string>(spendUnknownKey(month));
-      const spentRaw = Number(await redis.get<string>(spendCounterKey(month)));
-      const spent = spendUnknown || !Number.isFinite(spentRaw) ? null : spentRaw / 100;
-      if (monthlyCapState(spent) === "stop") {
+      const spent = await readMonthSpend(redis, month);
+      if (monthlyCapState(capSpend(spent)) === "stop") {
         stopReason = "spend";
         lastError = "Monthly dollar cap reached.";
         break;
@@ -1227,34 +1318,38 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         timeoutMs: 90_000,
         maxRetries: retries,
         beforeAttempt: async () => {
+          if (runClock.out()) return { allowed: false, reason: "time" as const };
           const reserved = await reserveCounter(redis, callCounterKey(today), budget);
-          if (!reserved.allowed) return { allowed: false };
+          if (!reserved.allowed) return { allowed: false, reason: "budget" as const };
           state = { ...state, callsOn: today, callsToday: reserved.used };
           return { allowed: true };
         },
+        timeoutForAttempt: () => runClock.clip(90_000),
       });
       if ("error" in research) {
+        if (research.timedOut) {
+          timedOut = true;
+          lastError = "Stopped for time.";
+          break;
+        }
         if (research.error === "Model-call budget reached") {
           stopReason = "budget";
           lastError = research.error;
           break;
         }
         lastError = research.error;
+        xaiFailed = true;
         abandoned = Boolean(research.abandoned);
         if (abandoned) break;
         continue;
       }
+      passesRun += 1;
       cursor = advanceCursor(cursor);
       inputTokens += research.usage.inputTokens;
       outputTokens += research.usage.outputTokens;
-      if (research.usage.dollars == null) {
-        missedDollars = true;
-        await redis.set(spendUnknownKey(month), "1", { ex: 120 * 24 * 60 * 60 });
-      } else {
-        sawDollars = true;
-        dollars += research.usage.dollars;
-        await addSpendCents(redis, month, research.usage.dollars);
-      }
+      const noted = await noteModelSpend(redis, month, research.usage.dollars);
+      if (research.usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
+      else actualDollars += research.usage.dollars;
       const drafts = selectHunterRows(research).filter((draft) => {
         if (!known.has(normalizeDomain(draft.domain))) return true;
         addDrop(funnel, "duplicate");
@@ -1262,7 +1357,11 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       });
       funnel.searched += 1;
       funnel.candidates += drafts.length;
-      const fetched = await readPages(urlsForDrafts(drafts));
+      if (runClock.out()) {
+        timedOut = true;
+        break;
+      }
+      const fetched = await readPages(urlsForDrafts(drafts), () => runClock.clip(6_000));
       const pages: Record<string, string> = {};
       for (const [url, page] of Object.entries(fetched)) pages[url] = page.text;
       const kept = drafts.filter((draft) => {
@@ -1279,6 +1378,11 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       for (const card of verified) {
         const stamped = { ...card, query, exploration: explore };
         if (stamped.email) {
+          if (runClock.out()) {
+            timedOut = true;
+            ready.push(stamped);
+            break;
+          }
           const mx = await checkEmailMx(stamped.email, lookupMx);
           if (mx === "yes") mxYes.add(normalizeDomain(stamped.domain));
           if (mx === "no") {
@@ -1309,12 +1413,16 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       await saveHunterState(state);
     }
 
-    const apollo = await enrichUnderApolloCap({
-      companies,
-      domains: companies.filter((company) => company.filedOn === today).map((company) => company.domain),
-      today,
-      limit: 8,
-    });
+    const apollo = timedOut
+      ? { companies, searches: 0, reveals: 0, note: "Stopped for time.", failed: false, timedOut: true }
+      : await enrichUnderApolloCap({
+          companies,
+          domains: companies.filter((company) => company.filedOn === today).map((company) => company.domain),
+          today,
+          limit: 8,
+          timeLeft: () => runClock.clip(20_000),
+        });
+    if (apollo.timedOut) timedOut = true;
     companies = apollo.companies;
     const contactReady = countContactReadyGain(loaded.book.companies, companies);
     companies = await persistCompanies(loaded.book.companies, companies);
@@ -1333,9 +1441,12 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       if (value != null) previous.push(value);
     }
     const todaySoFar = (filedThroughHour(history, today, hour, (at) => edmontonClock(new Date(at))) ?? 0) + funnel.filed;
-    const alarms: string[] = [];
+    const alarms: string[] = [...priorAlarms];
     const quietStop = stopReason !== "" && funnel.searched === 0;
-    if (zeroCandidateAlarm(funnel.candidates, abandoned || quietStop)) alarms.push("Zero candidates this run.");
+    if (xaiFailed) alarms.push("xAI search failed.");
+    if (apollo.failed) alarms.push("Apollo request failed.");
+    if (timedOut) alarms.push("Stopped early for time.");
+    if (zeroCandidateAlarm(funnel.candidates, abandoned || quietStop || xaiFailed || timedOut)) alarms.push("Zero candidates this run.");
     if (belowMedianAlarm(todaySoFar, previous)) {
       alarms.push("Filed cards are under half the 7-day median at this time of day.");
     }
@@ -1360,10 +1471,20 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       apolloReveals: revealsOn(state, today) + apollo.reveals,
       reviewEpoch: state.reviewEpoch,
     }));
-    await publishAlarms(redis, alarms, now.toISOString(), "always-on");
+    const delivery = await publishAlarms(redis, alarms, now.toISOString(), "always-on", () => runClock.clipWall(8_000));
+    if (delivery.failed) alarms.push("Alarm post failed.");
+    const outcome = timedOut
+      ? "stopped-time"
+      : abandoned || xaiFailed
+        ? "error"
+        : stopReason === "spend"
+          ? "capped-spend"
+          : stopReason === "budget" && funnel.searched === 0
+            ? "capped-budget"
+            : "fired";
     await rememberRun({
       run: "always-on",
-      outcome: abandoned ? "error" : stopReason === "spend" ? "capped-spend" : stopReason === "budget" && funnel.searched === 0 ? "capped-budget" : "fired",
+      outcome,
       modelCalls: Math.max(0, state.callsToday - callsUsed),
       candidates: funnel.candidates,
       cardsFiled: funnel.filed,
@@ -1375,8 +1496,23 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       alarms,
       inputTokens,
       outputTokens,
-      dollars: sawDollars && !missedDollars ? dollars : null,
+      dollars: actualDollars > 0 ? actualDollars : null,
+      estimatedDollars,
       funnel,
+    });
+    logHunterRunLine({
+      runId: token,
+      run: "always-on",
+      startedAt,
+      endedAt: new Date().toISOString(),
+      passes: passesRun,
+      calls: Math.max(0, state.callsToday - callsUsed),
+      funnel,
+      cardsFiled: funnel.filed,
+      spendActual: actualDollars,
+      spendEstimated: estimatedDollars,
+      alarms,
+      outcome,
     });
     if (abandoned && lastError) return { ok: false, error: lastError };
     return {
@@ -1389,7 +1525,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       slot: slotLabel,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Hunter batch failed";
+    const message = publicFailure(error);
     const settled = applyHunterWork(
       { ...state, callsOn: today, callsToday: callsUsed, filedToday: counts.filedToday, filedOn: today },
       today,
@@ -1403,11 +1539,34 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       lastRunResult: message,
       reviewEpoch: state.reviewEpoch,
     }));
-    await rememberRun({ ...blank, outcome: "error", modelCalls: Math.max(0, state.callsToday - callsUsed), error: runNote(message) });
+    const crashAlarms = ["Hunter run crashed."];
+    await publishAlarms(redis, crashAlarms, now.toISOString(), "always-on");
+    await rememberRun({ ...blank, outcome: "error", modelCalls: Math.max(0, state.callsToday - callsUsed), error: runNote(message), alarms: crashAlarms });
+    logHunterRunLine({
+      runId: token,
+      run: "always-on",
+      startedAt: now.toISOString(),
+      endedAt: new Date().toISOString(),
+      passes: 0,
+      calls: Math.max(0, state.callsToday - callsUsed),
+      funnel: null,
+      cardsFiled: 0,
+      spendActual: 0,
+      spendEstimated: 0,
+      alarms: crashAlarms,
+      outcome: "error",
+    });
     return { ok: false, error: message };
   } finally {
+    await clearRunStarted(token);
     await releaseHunterLock(redis, token);
   }
+}
+
+function publicFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : "Hunter batch failed";
+  const cleaned = message.replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
+  return cleaned.slice(0, 180) || "Hunter batch failed";
 }
 
 function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
@@ -1539,10 +1698,9 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
   const book = redis ? await loadBook() : null;
   const companies = book?.book.companies ?? [];
   const month = today.slice(0, 7);
-  const spendUnknown = redis ? await redis.get<string>(spendUnknownKey(month)) : null;
-  const spentRaw = redis ? await redis.get<string>(spendCounterKey(month)) : null;
-  const spent = spendUnknown || spentRaw == null || spentRaw === "" ? null : Number(spentRaw) / 100;
-  const cap = monthlyCapState(Number.isFinite(spent) ? spent : null);
+  const spend = redis ? await readMonthSpend(redis, month) : { actual: 0, estimated: 0 };
+  const spent = capSpend(spend);
+  const cap = monthlyCapState(spent);
   const lastLine = recentRuns[0]?.at || state.lastRunAt;
   const beat = heartbeatLate(lastLine, now, withinWorkingHours(now));
   const stored = redis?.lrange ? await redis.lrange(HUNTER_ALARM_KEY, 0, 400) : [];
@@ -1585,7 +1743,8 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
     heartbeatAt: lastLine,
     monthlyCap: monthlyCapLabel(cap),
     bookedThisMonth: bookedThisMonth(companies, month),
-    methods: methodStats(companies, Number.isFinite(spent) ? spent : null),
+    methods: methodStats(companies, spend.actual > 0 ? spend.actual : null),
+    spendEstimated: spend.estimated,
     methodRegistry: findingMethods(),
     bookingLink: BOOKING_LINK_HOOK,
     alarms,

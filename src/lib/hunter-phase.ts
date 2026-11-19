@@ -5,20 +5,26 @@
  */
 
 import { daysBetween, normalizeDomain } from "./lead-score.ts";
-import { readXaiUsage } from "./xai-search.ts";
+import { readXaiUsage, XAI_USD_TICKS } from "./xai-search.ts";
 import {
+  HUNTER_ALARM_TIMEOUT_MS,
   HUNTER_APOLLO_KEY_PREFIX,
   HUNTER_CALLS_KEY_PREFIX,
   HUNTER_DNC_KEY,
+  HUNTER_ESTIMATED_CALL_DOLLARS,
   HUNTER_HEARTBEAT_GAP_MS,
   HUNTER_HEARTBEAT_OFF_HOURS_MS,
   HUNTER_METHOD_ID,
   HUNTER_MODEL_ID,
   HUNTER_PROMPT_VERSION,
   HUNTER_RESET_KEYS,
+  HUNTER_RUN_DEADLINE_MS,
+  HUNTER_RUN_WALL_MS,
   HUNTER_SAMPLE_FLOOR,
   HUNTER_SCORE_VERSION,
+  HUNTER_SPEND_ESTIMATE_PREFIX,
   HUNTER_SPEND_KEY_PREFIX,
+  HUNTER_SPEND_TICKS_PREFIX,
   HUNTER_ALARM_COPIES,
   HUNTER_ALARM_KEY,
   HUNTER_ALARM_PRIMARY,
@@ -180,6 +186,28 @@ export function dncField(entry: { domain: string; email?: string }) {
   return `${normalizeDomain(entry.domain)}|${(entry.email ?? "").trim().toLowerCase()}`;
 }
 
+function dncCovers(entry: DncEntry, next: DncEntry) {
+  if (entry.domain !== next.domain) return false;
+  if (!entry.email || !next.email) return true;
+  return entry.email === next.email;
+}
+
+/**
+ * A permanent reason is always written. It replaces a temporary entry for the same domain or email.
+ * A temporary reason does not replace a permanent one.
+ */
+export function dncUpsertPlan(entries: DncEntry[], next: DncEntry, today: string): DncEntry[] {
+  if (!dncNeverExpires(next.reason)) {
+    if (dncBlocks(entries, next.domain, next.email, today)) return [];
+    return [next];
+  }
+  const upgraded = entries
+    .filter((entry) => dncCovers(entry, next) && !dncNeverExpires(entry.reason))
+    .map((entry) => ({ ...entry, reason: next.reason, until: "never", addedOn: next.addedOn }));
+  if (!upgraded.some((entry) => dncField(entry) === dncField(next))) upgraded.push(next);
+  return upgraded;
+}
+
 export function parseDncValue(raw: unknown): DncEntry | null {
   const row = typeof raw === "string" ? safeJson(raw) : raw;
   if (!row || typeof row !== "object") return null;
@@ -298,6 +326,25 @@ export function spendUnknownKey(month: string) {
   return `${HUNTER_SPEND_UNKNOWN_PREFIX}${month}`;
 }
 
+export function spendTicksKey(month: string) {
+  return `${HUNTER_SPEND_TICKS_PREFIX}${month}`;
+}
+
+export function spendEstimateKey(month: string) {
+  return `${HUNTER_SPEND_ESTIMATE_PREFIX}${month}`;
+}
+
+/** Nearest tick. A tick is 10^-10 dollars, so this is not a whole-cent rounding. */
+export function dollarsToTicks(dollars: number) {
+  if (!Number.isFinite(dollars) || dollars <= 0) return 0;
+  return Math.round(dollars * XAI_USD_TICKS);
+}
+
+export function ticksToDollars(ticks: number) {
+  if (!Number.isFinite(ticks) || ticks <= 0) return 0;
+  return ticks / XAI_USD_TICKS;
+}
+
 /** Increments first. Gives the count back when the cap would be passed, and does not make the call. */
 export async function reserveCounter(client: CounterClient, key: string, cap: number) {
   const used = await client.incr(key);
@@ -309,12 +356,38 @@ export async function reserveCounter(client: CounterClient, key: string, cap: nu
   return { allowed: true, used };
 }
 
-export async function addSpendCents(client: CounterClient, month: string, dollars: number) {
-  const cents = Math.round(dollars * 100);
-  if (cents <= 0 || !client.incrby) return 0;
-  const total = await client.incrby(spendCounterKey(month), cents);
-  await client.expire?.(spendCounterKey(month), 120 * 24 * 60 * 60);
+export async function addSpendTicks(client: CounterClient, key: string, ticks: number) {
+  if (ticks <= 0 || !client.incrby) return 0;
+  const total = await client.incrby(key, ticks);
+  await client.expire?.(key, 120 * 24 * 60 * 60);
   return total;
+}
+
+/**
+ * Records a model call toward the monthly cap.
+ * A missing cost adds the documented estimate, on its own key, and is not actual spend.
+ */
+export async function noteModelSpend(client: CounterClient, month: string, dollars: number | null) {
+  if (dollars == null) {
+    const ticks = dollarsToTicks(HUNTER_ESTIMATED_CALL_DOLLARS);
+    await addSpendTicks(client, spendEstimateKey(month), ticks);
+    return { actualTicks: 0, estimatedTicks: ticks };
+  }
+  const ticks = dollarsToTicks(dollars);
+  await addSpendTicks(client, spendTicksKey(month), ticks);
+  return { actualTicks: ticks, estimatedTicks: 0 };
+}
+
+export type MonthSpend = { actual: number; estimated: number };
+
+/** Actual dollars from the old cent counter plus tick counter. Estimates are separate and still count toward the cap. */
+export function monthSpendFromCounts(cents: number, ticks: number, estimateTicks: number): MonthSpend {
+  const actual = (Number.isFinite(cents) ? Math.max(0, cents) : 0) / 100 + ticksToDollars(ticks);
+  return { actual, estimated: ticksToDollars(estimateTicks) };
+}
+
+export function capSpend(spend: MonthSpend) {
+  return spend.actual + spend.estimated;
 }
 
 export function passesQualityFloor(score: number, floor = hunterQualityFloor()) {
@@ -325,9 +398,77 @@ export function dailyFileRoom(filedToday: number, cap = hunterDailyFiledCap()) {
   return Math.max(0, cap - Math.max(0, filedToday));
 }
 
-/** A public page that says this person has left, or now works somewhere else. */
-export function pageShowsMovedOn(page: string) {
-  return /formerly|previously at|no longer at|no longer with|left the company|now at|moved on to|moved to/i.test(page);
+const MOVED_PHRASE = /no longer (?:at|with)|left the company|formerly|previously at|now at|moved on to|moved to/i;
+const EMPLOYER_STOP = new Set([
+  "the",
+  "our",
+  "this",
+  "that",
+  "a",
+  "an",
+  "now",
+  "new",
+  "office",
+  "team",
+  "company",
+  "calgary",
+  "edmonton",
+  "canada",
+  "alberta",
+]);
+
+/**
+ * True only when the named person is tied, next to a move phrase, to a different employer.
+ * A loose "now at" or "moved to" on the page is not enough. Apollo's employer check stays the main stale signal.
+ */
+export function pageShowsMovedOn(page: string, person = "", currentOrg = "") {
+  const name = person.trim();
+  if (name.length < 3 || !page) return false;
+  const at = page.toLowerCase().indexOf(name.toLowerCase());
+  if (at < 0) return false;
+  const window = page.slice(at, Math.min(page.length, at + name.length + 90));
+  const match = MOVED_PHRASE.exec(window);
+  if (!match) return false;
+  const after = window.slice(match.index + match[0].length);
+  const named = after.match(/\b([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,3})/);
+  if (!named) return false;
+  const employer = named[1].trim();
+  const words = employer.split(/\s+/);
+  if (words.every((word) => EMPLOYER_STOP.has(word.toLowerCase()))) return false;
+  const org = currentOrg.trim().toLowerCase();
+  const next = employer.toLowerCase();
+  if (org && (next.includes(org) || org.includes(next))) return false;
+  return true;
+}
+
+export type RunClock = {
+  elapsed: () => number;
+  remaining: () => number;
+  out: () => boolean;
+  clip: (wantedMs: number) => number;
+  clipWall: (wantedMs: number) => number;
+};
+
+/** Samples `clock` on each check. Work stops at the deadline. Alarm posts may use the later wall. */
+export function makeRunClock(clock: () => number, deadlineMs = HUNTER_RUN_DEADLINE_MS, wallMs = HUNTER_RUN_WALL_MS): RunClock {
+  const started = clock();
+  const elapsed = () => Math.max(0, clock() - started);
+  const remaining = () => Math.max(0, deadlineMs - elapsed());
+  return {
+    elapsed,
+    remaining,
+    out: () => remaining() < 2_000,
+    clip(wantedMs: number) {
+      const left = remaining();
+      if (left < 1_000) return 0;
+      return Math.min(wantedMs, left);
+    },
+    clipWall(wantedMs: number) {
+      const left = Math.max(0, wallMs - elapsed());
+      if (left < 500) return 0;
+      return Math.min(wantedMs, left);
+    },
+  };
 }
 
 export type AlarmTarget = { name: string; url: string; primary: boolean };
@@ -363,31 +504,43 @@ export function alarmAuthorizationHeader(raw: string | null | undefined): string
   return `Bearer ${text}`;
 }
 
+export type AlarmPost = { name: string; ok: boolean };
+
 /** Posts to Rex first, then each copy. The auth header goes only to the primary. A failed post does not stop the rest. */
 export async function deliverAlarmWebhooks(input: {
   targets: AlarmTarget[];
   body: string;
   authorization?: string | null;
-  fetchImpl?: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<unknown>;
-}) {
+  timeoutMs?: number;
+  timeoutFor?: () => number;
+  fetchImpl?: (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<unknown>;
+}): Promise<AlarmPost[]> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const authorization = alarmAuthorizationHeader(input.authorization);
-  const sent: string[] = [];
+  const posts: AlarmPost[] = [];
   for (const target of input.targets) {
-    sent.push(target.name);
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (target.primary && authorization) headers.Authorization = authorization;
+    const timeoutMs = input.timeoutFor?.() ?? input.timeoutMs ?? HUNTER_ALARM_TIMEOUT_MS;
+    if (timeoutMs < 500) {
+      posts.push({ name: target.name, ok: false });
+      continue;
+    }
     try {
-      await fetchImpl(target.url, {
+      const response = await fetchImpl(target.url, {
         method: "POST",
         headers,
         body: input.body,
+        signal: AbortSignal.timeout(timeoutMs),
       });
+      const ok = response != null && typeof response === "object" && "ok" in response ? Boolean((response as { ok: boolean }).ok) : false;
+      posts.push({ name: target.name, ok });
     } catch {
       // A missed webhook must not stop the hunt or the copies after it. Do not log the URL or the key.
+      posts.push({ name: target.name, ok: false });
     }
   }
-  return sent;
+  return posts;
 }
 
 export function reviewExpired(filedOn: string, today: string, review: ReviewState, days: number) {

@@ -142,6 +142,16 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
   assert.equal(card.partnerFlag.flagged, true);
   assert.match(card.partnerFlag.reason, /Outdoor or adventure brand/);
   assert.equal(card.partnerFlag.sourceUrl, url);
+  const other = "https://otherco.example/about";
+  const [own] = verifyHunterDrafts(
+    [draft()],
+    {
+      [url]: page.replace("outdoor apparel", "wool coats"),
+      [other]: "Other Co builds outdoor apparel and runs adventure trips.",
+    },
+    { regionId: "europe", today: "2026-11-18" },
+  );
+  assert.equal(own?.partnerFlag.flagged, false);
   assert.equal(card.signals.length, 1);
   assert.equal(card.hunterBreak.travel, 5);
   assert.equal(card.hunterBreak.profile, 14);

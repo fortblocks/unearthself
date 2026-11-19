@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "hunter:dry": "node --experimental-strip-types src/lib/hunter-dry-run.ts",
-    "test": "npm run typecheck && node --experimental-strip-types --test scripts/fix-ssr-entry.test.mjs src/lib/lead-score.test.ts src/lib/leads-scout.test.ts src/lib/leads-hunter.test.ts src/lib/xai-search.test.ts src/lib/apollo.test.ts src/lib/hunter-runs.test.ts src/lib/hunter-phase.test.ts src/lib/hunter-run.test.ts src/lib/lead-copy.test.ts src/lib/leads-table.test.ts src/lib/minutes.test.ts src/lib/minutes-archive.test.ts src/lib/structured-minutes.test.ts src/components/desk/Shell.test.ts src/lib/date-format.test.ts src/routes/admin.minutes.$meetingId.test.ts src/lib/action-extraction-pipeline.test.ts src/lib/actions/actions.test.ts src/lib/today/today.test.ts src/data/treatments.test.ts"
+    "test": "npm run typecheck && node --experimental-strip-types --test scripts/fix-ssr-entry.test.mjs src/lib/lead-score.test.ts src/lib/leads-scout.test.ts src/lib/leads-hunter.test.ts src/lib/xai-search.test.ts src/lib/apollo.test.ts src/lib/hunter-runs.test.ts src/lib/hunter-phase.test.ts src/lib/hunter-run.test.ts src/lib/hunter-read.test.ts src/lib/lead-copy.test.ts src/lib/leads-table.test.ts src/lib/minutes.test.ts src/lib/minutes-archive.test.ts src/lib/structured-minutes.test.ts src/components/desk/Shell.test.ts src/lib/date-format.test.ts src/routes/admin.minutes.$meetingId.test.ts src/lib/action-extraction-pipeline.test.ts src/lib/actions/actions.test.ts src/lib/today/today.test.ts src/data/treatments.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

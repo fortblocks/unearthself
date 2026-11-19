@@ -168,9 +168,13 @@ Return at most 15 companies. Return a company when you have its name, domain, an
 
 export async function researchCompanies(
   knownDomains: string[],
-): Promise<{ companies: unknown; attempts: number } | { error: string; attempts: number }> {
+  timeLeft?: () => number,
+): Promise<
+  | { companies: unknown; attempts: number; dollars: number | null; estimatedDollars: number }
+  | { error: string; attempts: number; timedOut?: boolean }
+> {
   const { searchWithRetries } = await import("./xai-search.ts");
-  const { monthlyCapState, reserveCounter, callCounterKey, spendCounterKey, spendUnknownKey } = await import("./hunter-phase.ts");
+  const { monthlyCapState, reserveCounter, callCounterKey, spendCounterKey, spendTicksKey, spendEstimateKey, monthSpendFromCounts, capSpend, noteModelSpend, ticksToDollars } = await import("./hunter-phase.ts");
   const { hunterCallBudget } = await import("./hunter-cap.ts");
   const { hunterMaxRetries } = await import("./hunter-config.ts");
   const { getRedisClient } = await import("./leads-book.ts");
@@ -179,31 +183,43 @@ export async function researchCompanies(
   if (!redis) return { error: "Redis is not configured", attempts: 0 };
   const today = edmontonToday();
   const month = today.slice(0, 7);
-  const spendUnknown = await redis.get<string>(spendUnknownKey(month));
-  const spentRaw = Number(await redis.get<string>(spendCounterKey(month)));
-  const spent = spendUnknown || !Number.isFinite(spentRaw) ? null : spentRaw / 100;
-  if (monthlyCapState(spent) === "stop") return { error: "Monthly dollar cap reached.", attempts: 0 };
+  const cents = Number(await redis.get<string>(spendCounterKey(month)));
+  const ticks = Number(await redis.get<string>(spendTicksKey(month)));
+  const estimate = Number(await redis.get<string>(spendEstimateKey(month)));
+  const spent = monthSpendFromCounts(Number.isFinite(cents) ? cents : 0, Number.isFinite(ticks) ? ticks : 0, Number.isFinite(estimate) ? estimate : 0);
+  if (monthlyCapState(capSpend(spent)) === "stop") return { error: "Monthly dollar cap reached.", attempts: 0 };
   const budget = hunterCallBudget();
-  return searchWithRetries({
+  const research = await searchWithRetries({
     system: "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
     prompt: scoutPrompt(knownDomains),
     timeoutMs: 90000,
     maxRetries: hunterMaxRetries(),
     beforeAttempt: async () => {
+      if (timeLeft && timeLeft() < 1_000) return { allowed: false, reason: "time" };
       const reserved = await reserveCounter(redis, callCounterKey(today), budget);
-      return { allowed: reserved.allowed };
+      return { allowed: reserved.allowed, reason: reserved.allowed ? undefined : "budget" as const };
     },
+    timeoutForAttempt: () => (timeLeft ? timeLeft() : 90_000),
   });
+  if ("error" in research) return research;
+  const noted = await noteModelSpend(redis, month, research.usage.dollars);
+  return {
+    companies: research.companies,
+    attempts: research.attempts,
+    dollars: research.usage.dollars,
+    estimatedDollars: research.usage.dollars == null ? ticksToDollars(noted.estimatedTicks) : 0,
+  };
 }
 
-async function readPublishedPage(url: string): Promise<string> {
+async function readPublishedPage(url: string, timeoutMs = 6000): Promise<string> {
   if (!/^https?:\/\//i.test(url)) return "";
+  const timeout = Math.max(500, Math.min(6000, timeoutMs));
   let last = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(url, {
         headers: { "user-agent": "UnearthSelfLeadScout/1.0" },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(timeout),
         redirect: "follow",
       });
       if (response.ok) return await response.text();
@@ -216,16 +232,20 @@ async function readPublishedPage(url: string): Promise<string> {
   return last;
 }
 
-export async function verifyRows(rows: ScoutIngest[]): Promise<ScoutIngest[]> {
+export async function verifyRows(rows: ScoutIngest[], timeLeft?: () => number): Promise<ScoutIngest[]> {
   const urls = [...new Set(rows.map((row) => row.buyer?.emailSource?.trim() ?? "").filter((url) => /^https?:\/\//i.test(url)))];
   const pages: Record<string, string> = {};
+  if (timeLeft && timeLeft() < 1_000) return applyVerifiedContacts(rows, pages);
   let cursor = 0;
   async function worker() {
     while (cursor < urls.length) {
+      if (timeLeft && timeLeft() < 1_000) return;
       const url = urls[cursor];
       cursor += 1;
       if (!url) continue;
-      pages[url] = await readPublishedPage(url);
+      const timeout = timeLeft ? timeLeft() : 6000;
+      if (timeout < 500) return;
+      pages[url] = await readPublishedPage(url, timeout);
     }
   }
   await Promise.all(Array.from({ length: Math.min(5, urls.length) }, () => worker()));
@@ -236,12 +256,13 @@ export type NightlyEnrichment = (
   companies: Company[],
   domains: string[],
   today: string,
-) => Promise<{ companies: Company[]; searches: number; reveals: number; note: string }>;
+) => Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed?: boolean; timedOut?: boolean }>;
 
 export async function runNightlyScout(opts?: {
   enrich?: NightlyEnrichment;
   now?: Date;
   skip?: (row: { domain: string; email?: string }) => boolean;
+  timeLeft?: () => number;
 }): Promise<
   | {
       ok: true;
@@ -255,22 +276,29 @@ export async function runNightlyScout(opts?: {
       apolloReveals: number;
       apolloNote: string;
       attempts: number;
+      dollars: number | null;
+      estimatedDollars: number;
+      apolloFailed: boolean;
+      timedOut: boolean;
     }
-  | { ok: false; error: string; called: boolean; attempts: number }
+  | { ok: false; error: string; called: boolean; attempts: number; timedOut?: boolean }
 > {
   const loaded = await loadBook();
   if (loaded.storage !== "redis") return { ok: false, error: "Redis is not configured", called: false, attempts: 0 };
   const today = edmontonToday(opts?.now);
-  let research: { companies: unknown; attempts: number } | { error: string; attempts: number };
+  let research: Awaited<ReturnType<typeof researchCompanies>>;
   try {
-    research = await researchCompanies(loaded.book.companies.map((company) => company.domain));
+    research = await researchCompanies(loaded.book.companies.map((company) => company.domain), opts?.timeLeft);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Nightly search failed";
     return { ok: false, error: message, called: true, attempts: 1 };
   }
-  if ("error" in research) return { ok: false, error: research.error, called: research.attempts > 0, attempts: research.attempts };
+  if ("error" in research) return { ok: false, error: research.error, called: research.attempts > 0, attempts: research.attempts, timedOut: research.timedOut };
+  if (opts?.timeLeft && opts.timeLeft() < 1_000) {
+    return { ok: false, error: "Stopped for time.", called: true, attempts: research.attempts, timedOut: true };
+  }
   const selected = selectScoutRows(research);
-  const verified = await verifyRows(selected);
+  const verified = await verifyRows(selected, opts?.timeLeft);
   const open = opts?.skip ? verified.filter((row) => !opts.skip?.({ domain: row.domain, email: row.buyer?.email })) : verified;
   const batch = buildMorningBatch(loaded.book.companies, open, {
     today,
@@ -284,7 +312,7 @@ export async function runNightlyScout(opts?: {
   const domains = verified.map((row) => row.domain);
   const enriched = opts?.enrich
     ? await opts.enrich(marked, domains, today)
-    : { companies: marked, searches: 0, reveals: 0, note: "" };
+    : { companies: marked, searches: 0, reveals: 0, note: "", failed: false, timedOut: false };
   const contactReady = countContactReadyGain(loaded.book.companies, enriched.companies);
   await saveBook({
     ...loaded.book,
@@ -303,5 +331,9 @@ export async function runNightlyScout(opts?: {
     apolloSearches: enriched.searches,
     apolloReveals: enriched.reveals,
     apolloNote: enriched.note,
+    dollars: research.dollars,
+    estimatedDollars: research.estimatedDollars,
+    apolloFailed: Boolean(enriched.failed),
+    timedOut: Boolean(enriched.timedOut) || Boolean(opts?.timeLeft && opts.timeLeft() < 1_000),
   };
 }

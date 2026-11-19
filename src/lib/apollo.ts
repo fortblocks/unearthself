@@ -316,7 +316,9 @@ export async function enrichHunterContacts(input: {
   maxRetries?: number;
   skip?: (company: Company) => boolean;
   sleep?: (ms: number) => Promise<void>;
-}): Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed: boolean }> {
+  /** Milliseconds left for the next Apollo call. 0 means stop. */
+  timeLeft?: () => number;
+}): Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed: boolean; timedOut?: boolean }> {
   const companies = input.companies.map((company) => markPublicContact(company, input.today));
   if (!input.apiKey) {
     return { companies, searches: 0, reveals: 0, note: APOLLO_OFF, failed: false };
@@ -340,6 +342,7 @@ export async function enrichHunterContacts(input: {
   let serviceFailures = 0;
   const sleep = input.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
 
+  let timedOut = false;
   for (const company of queue) {
     if (input.skip?.(company)) continue;
     if (serviceFailures > retries) break;
@@ -347,8 +350,14 @@ export async function enrichHunterContacts(input: {
       hitCeiling = true;
       break;
     }
+    const budget = input.timeLeft?.() ?? 20_000;
+    if (input.timeLeft && budget < 1_000) {
+      note = "Stopped for time.";
+      timedOut = true;
+      break;
+    }
     const searchUrl = apolloRequestUrl("mixed_people/api_search", apolloSearchParams(company));
-    const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries, sleep);
+    const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries, sleep, budget);
     if ("failure" in searchedAttempt) {
       note = searchedAttempt.failure;
       failed = true;
@@ -380,10 +389,16 @@ export async function enrichHunterContacts(input: {
       hitCeiling = true;
       break;
     }
+    const revealBudget = input.timeLeft?.() ?? 20_000;
+    if (input.timeLeft && revealBudget < 1_000) {
+      note = "Stopped for time.";
+      timedOut = true;
+      break;
+    }
     revealsUsed += 1;
     reveals += 1;
     const revealUrl = apolloRequestUrl("people/match", apolloRevealParams(chosen.id));
-    const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries, sleep);
+    const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries, sleep, revealBudget);
     if ("failure" in revealAttempt) {
       note = revealAttempt.failure;
       failed = true;
@@ -410,6 +425,7 @@ export async function enrichHunterContacts(input: {
     reveals,
     note,
     failed,
+    timedOut,
   };
 }
 
@@ -423,8 +439,10 @@ async function apolloCall(
   key: string,
   maxRetries: number,
   sleep: (ms: number) => Promise<void>,
+  timeoutMs = 20_000,
 ): Promise<{ response: Response } | { failure: string }> {
   let last = "Apollo request failed";
+  const timeout = Math.max(1_000, Math.min(20_000, timeoutMs));
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
       const response = await fetchImpl(url, {
@@ -435,7 +453,7 @@ async function apolloCall(
           "x-api-key": key,
         },
         body: "{}",
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(timeout),
       });
       if (apolloRetryable(response.status) && attempt < maxRetries) {
         await sleep(retryDelayMs(attempt + 1));

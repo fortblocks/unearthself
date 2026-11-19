@@ -24,11 +24,27 @@ export const HUNTER_CARD_CEILING = HUNTER_DAILY_CARD_TARGET;
 export const HUNTER_DAILY_FILED_CAP_DEFAULT = 48;
 
 /**
- * Do not start another search once this much of the 300 second function limit is gone.
- * Three 90 second searches are 270 seconds, so a third call can still start.
- * A search that has already used 200 seconds does not start another one.
+ * Do not start another pass once this much of the 300 second function limit is gone.
+ * The whole-run deadline below is the hard stop. This one still skips a later pass.
  */
 export const HUNTER_PASS_BUDGET_MS = 200_000;
+
+/**
+ * Time kept at the end of the 300 second function limit for the book save, the run log, and alarms.
+ * Work (search, pages, MX, Apollo) stops when this reserve is all that is left.
+ */
+export const HUNTER_RUN_RESERVE_MS = 40_000;
+
+/** Alarm posts use a short timeout so a hung receiver cannot use the rest of the run. */
+export const HUNTER_ALARM_TIMEOUT_MS = 8_000;
+
+/**
+ * Stand-in US dollars for one model call whose response has no cost field.
+ * This is not an xAI price and is never stored as an actual cost.
+ * It is counted toward the monthly cap so one missing cost cannot leave the cap open.
+ * The run log marks these dollars as estimated.
+ */
+export const HUNTER_ESTIMATED_CALL_DOLLARS = 0.25;
 
 /** Skip-list in the prompt. Domains past this are still filtered after the search. */
 export const HUNTER_PROMPT_DOMAIN_CHARS = 12_000;
@@ -54,6 +70,12 @@ export const HUNTER_CALLS_PER_RUN_DEFAULT = 3;
 /** Longer than the 300 second function limit, so a slow run cannot overlap the next one. */
 export const HUNTER_LOCK_TTL_SECONDS = 360;
 export const HUNTER_FUNCTION_MAX_SECONDS = 300;
+
+/** Work stops here. The function limit minus the reserve kept for the save, the log, and alarms. */
+export const HUNTER_RUN_DEADLINE_MS = HUNTER_FUNCTION_MAX_SECONDS * 1000 - HUNTER_RUN_RESERVE_MS;
+
+/** Last moment for an alarm post, still inside the function limit. */
+export const HUNTER_RUN_WALL_MS = HUNTER_FUNCTION_MAX_SECONDS * 1000 - 5_000;
 
 /** Extra attempts after the first. 2 means 3 tries, then the run stops. Env HUNTER_MAX_RETRIES. */
 export const HUNTER_MAX_RETRIES_DEFAULT = 2;
@@ -93,9 +115,16 @@ export const HUNTER_DNC_KEY = "unearth:hunter:dnc:v1";
 export const HUNTER_LOCK_KEY = "unearth:hunter:lock:v1";
 export const HUNTER_CALLS_KEY_PREFIX = "unearth:hunter:calls:v1:";
 export const HUNTER_APOLLO_KEY_PREFIX = "unearth:hunter:apollo:v1:";
+/** Older runs stored whole cents here. New runs add ticks in the key below. Both are read. */
 export const HUNTER_SPEND_KEY_PREFIX = "unearth:hunter:spend-cents:v1:";
+/** xAI cost ticks. 10^10 ticks is one US dollar. Sub-cent costs stay intact. */
+export const HUNTER_SPEND_TICKS_PREFIX = "unearth:hunter:spend-ticks:v1:";
+/** Ticks added only because a response had no cost field. Not actual spend. */
+export const HUNTER_SPEND_ESTIMATE_PREFIX = "unearth:hunter:spend-estimate-ticks:v1:";
 export const HUNTER_SPEND_UNKNOWN_PREFIX = "unearth:hunter:spend-unknown:v1:";
 export const HUNTER_ALARM_KEY = "unearth:hunter:alarms:v1";
+/** A run writes this when it starts and removes it when it finishes. A kill leaves it behind. */
+export const HUNTER_RUN_OPEN_KEY = "unearth:hunter:run-open:v1";
 
 /** Alarm delivery order. Webhook URLs stay unset until deploy. */
 export const HUNTER_ALARM_PRIMARY = "Rex";
