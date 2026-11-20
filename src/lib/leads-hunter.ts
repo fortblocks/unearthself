@@ -22,10 +22,13 @@ import {
   coerceIndustry,
   coerceSize,
   edmontonToday,
+  isDuplicateEmail,
   normalizeDomain,
+  publicFieldSources,
   normalizeSignals,
   scoreCompany,
   timingFromSignals,
+  type CardHook,
   type Company,
   type DatedSignal,
   type Industry,
@@ -87,6 +90,7 @@ import {
   findingMethods,
   heartbeatLate,
   isDuplicateCard,
+  verifiedHook,
   makeDncEntry,
   makeRunClock,
   makeLineage,
@@ -162,6 +166,7 @@ export type HunterDraft = {
   profileSignals: { id: string; sourceUrl: string }[];
   buyer: { name: string; title: string; email: string; emailSource: string };
   sourceKind?: HunterSource;
+  hook?: { text: string; sourceUrl: string; sourceDate: string; kind: string };
 };
 
 export type HunterCard = {
@@ -189,6 +194,7 @@ export type HunterCard = {
   /** Set before filing. "unavailable" means the judgement call failed and the card must not be filed. */
   buyerJudgment?: BuyerJudgment | "unavailable";
   fitRating?: FitRating;
+  hook?: CardHook;
 };
 
 export function freshHunterState(): HunterState {
@@ -441,9 +447,20 @@ export function selectHunterRows(raw: unknown): HunterDraft[] {
         email: String(buyer?.email ?? "").trim(),
         emailSource: String(buyer?.emailSource ?? "").trim(),
       },
+      hook: readHook(asRecord(row.hook)),
     });
   }
   return rows.slice(0, 8);
+}
+
+function readHook(hook: Record<string, unknown> | null): HunterDraft["hook"] {
+  if (!hook) return undefined;
+  const text = String(hook.text ?? "").trim();
+  const sourceUrl = String(hook.sourceUrl ?? "").trim();
+  const sourceDate = String(hook.sourceDate ?? "").trim();
+  const kind = String(hook.kind ?? "").trim();
+  if (!text || !sourceUrl || !sourceDate || !kind) return undefined;
+  return { text, sourceUrl, sourceDate, kind };
 }
 
 function pageHas(page: string, needle: string) {
@@ -596,10 +613,11 @@ export function verifyHunterDrafts(
       why,
       whySources: hits.map((hit) => ({ url: hit.sourceUrl, label: hit.label })),
       signals,
-      buyerName,
-      buyerTitle,
-      email: contact.email,
-      emailSource: contact.emailSource,
+    buyerName,
+    buyerTitle,
+    email: contact.email,
+    emailSource: contact.emailSource,
+    hook: verifiedHook(draft.hook, pages[draft.hook?.sourceUrl ?? ""] ?? "", opts.today),
       profileHits: hits,
       hunterRegion: opts.regionId,
       sourceKind: draft.sourceKind,
@@ -673,6 +691,18 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     contactLastSeenOn: card.email ? today : "",
     buyerJudgment: isStoredJudgment(card.buyerJudgment) ? card.buyerJudgment : undefined,
     fitRating: card.fitRating,
+    hook: card.hook,
+    fieldSources: publicFieldSources({
+      buyerName: card.buyerName,
+      buyerTitle: card.buyerTitle,
+      email: card.email,
+      emailSource: card.emailSource,
+      place: card.place,
+      industry: card.industry,
+      sizeBand: card.sizeBand,
+      sourceUrl: card.sourceUrl,
+      seenOn: today,
+    }),
     lineage: makeLineage({
       query: card.query || card.hunterRegion,
       signals: card.profileHits.map((hit) => hit.id),
@@ -726,7 +756,7 @@ export function fileHunterCards(
       continue;
     }
     const index = next.findIndex((company) => company.domain === domain);
-    if (index === -1 && isDuplicateCard(next, domain, card.email)) {
+    if (index === -1 && (isDuplicateCard(next, domain, card.email) || isDuplicateEmail(next, card.email))) {
       noteDrop("duplicate");
       continue;
     }
@@ -852,6 +882,8 @@ profileSignals is a list of { id, sourceUrl }. Use only the ids above. Include o
 
 buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name, title, or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@. Never use a department name as a person.
 
+hook is optional. Include it only when the page prints both the exact sentence and a date as YYYY-MM-DD. hook has text, sourceUrl, sourceDate (the date printed on that page, not the day you fetched it), and kind. Omit hook when you do not have both the exact text and the printed date.
+
 Choose the contact by judging whether that person would buy a hotel spa team retreat in Drumheller, Alberta for their company. Reason from the company's size, industry, location, and how the team is set up, and from the person's role. There is no fixed list of job titles.
 
 Do not invent a price, a date, a partner, a building, or a programme. Do not mention any company other than the one on the page.
@@ -900,6 +932,7 @@ export function urlsForDrafts(drafts: HunterDraft[]) {
   for (const draft of drafts) {
     if (/^https?:\/\//i.test(draft.sourceUrl)) urls.add(draft.sourceUrl);
     if (/^https?:\/\//i.test(draft.buyer.emailSource)) urls.add(draft.buyer.emailSource);
+    if (draft.hook && /^https?:\/\//i.test(draft.hook.sourceUrl)) urls.add(draft.hook.sourceUrl);
     for (const hit of draft.profileSignals) urls.add(hit.sourceUrl);
     for (const signal of normalizeSignals(draft.signals)) urls.add(signal.sourceUrl);
   }

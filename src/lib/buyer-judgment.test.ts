@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { BUYER_JUDGMENT_MODEL, BUYER_JUDGMENT_SYSTEM, buyerJudgmentPrompt, isClearBuyer, judgeBuyerFit, parseBuyerJudgment, parseFitRating, useBuyerJudgeForTests } from "./buyer-judgment.ts";
+import { addDays } from "./hunter-phase.ts";
 import { fileHunterCards, stampCard, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 
@@ -149,6 +150,70 @@ test("a fit band parses beside the buyer judgement and a bad band does not block
     signals: "distributed team",
     role: "Software Engineer",
   })), false);
+});
+
+test("a hook stays only when the page prints the text and the date, and a duplicate email is not filed", () => {
+  const today = "2026-11-20";
+  const fresh = addDays(today, -10);
+  const stale = addDays(today, -366);
+  const sentence = "The team booked a retreat.";
+  const page = `Soft Co in Calgary, Canada. soft.example. We run a distributed team. ${sentence} ${fresh}. Employees: 120. Energy work. Sam Lee, Software Engineer, sam@soft.example.`;
+  const kept = verifyHunterDrafts(
+    [{ ...draft("Software Engineer", "Sam Lee"), hook: { text: sentence, sourceUrl: source, sourceDate: fresh, kind: "retreat" } }],
+    { [source]: page },
+    { regionId: "canada", today },
+  );
+  assert.equal(kept[0]?.hook?.sourceDate, fresh);
+  assert.equal(kept[0]?.hook?.text, sentence);
+  const filed = fileHunterCards([], [{ ...kept[0]!, buyerJudgment: { buyer: true, confidence: "high", reason: "The role owns the team retreat.", model: BUYER_JUDGMENT_MODEL } }], { today, floor: 0 });
+  assert.equal(filed.filed, 1);
+  assert.equal(filed.companies[0]?.hook?.sourceDate, fresh);
+  assert.equal(filed.companies[0]?.fieldSources?.email?.via, "Public page");
+  assert.equal(filed.companies[0]?.fieldSources?.email?.url, source);
+  assert.equal(filed.companies[0]?.fieldSources?.email?.seenOn, today);
+  assert.equal(filed.companies[0]?.fieldSources?.email?.sourceDate, undefined);
+  assert.equal(filed.companies[0]?.fieldSources?.buyerName?.url, source);
+  assert.equal(filed.companies[0]?.fieldSources?.place?.url, source);
+  const missing = verifyHunterDrafts(
+    [{ ...draft("Software Engineer", "Sam Lee"), hook: { text: "This sentence is not on the page.", sourceUrl: source, sourceDate: fresh, kind: "retreat" } }],
+    { [source]: page },
+    { regionId: "canada", today },
+  );
+  assert.equal(missing[0]?.hook, undefined);
+  const old = verifyHunterDrafts(
+    [{ ...draft("Software Engineer", "Sam Lee"), hook: { text: sentence, sourceUrl: source, sourceDate: stale, kind: "retreat" } }],
+    { [source]: page.replace(fresh, stale) },
+    { regionId: "canada", today },
+  );
+  assert.equal(old[0]?.hook, undefined);
+  const stored = {
+    id: "C-mail",
+    org: "Other Co",
+    domain: "other.example",
+    city: "Calgary" as const,
+    industry: "energy" as const,
+    sizeBand: "80-800" as const,
+    sourceUrl: "https://other.example/about",
+    why: "Keep.",
+    buyerName: "Sam Lee",
+    buyerTitle: "Software Engineer",
+    email: "sam@soft.example",
+    emailSource: source,
+    timingNote: "",
+    timingScore: 0,
+    status: "watch" as const,
+    filedLeadId: "",
+    draftSubject: "",
+    draftBody: "",
+    lastTouch: "",
+    scoutBatch: "",
+  };
+  const duplicate = fileHunterCards([stored], [{ ...kept[0]!, buyerJudgment: { buyer: true, confidence: "high", reason: "The role owns the team retreat.", model: BUYER_JUDGMENT_MODEL } }], { today, floor: 0 });
+  assert.equal(duplicate.filed, 0);
+  assert.equal(duplicate.drops.duplicate, 1);
+  assert.equal(duplicate.companies.length, 1);
+  assert.equal(duplicate.companies[0], stored);
+  assert.equal(stored.email, "sam@soft.example");
 });
 
 test("a failed judgement does not file", () => {

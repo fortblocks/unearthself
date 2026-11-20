@@ -144,6 +144,26 @@ export type Company = {
     ratedOn: string;
     model: string;
   };
+  fieldSources?: FieldSources;
+  hook?: CardHook;
+};
+
+export type FieldSource = {
+  url: string;
+  via: "Public page" | "Apollo";
+  seenOn: string;
+  sourceDate?: string;
+};
+
+export type FieldSources = Partial<
+  Record<"buyerName" | "buyerTitle" | "email" | "place" | "industry" | "sizeBand", FieldSource>
+>;
+
+export type CardHook = {
+  text: string;
+  sourceUrl: string;
+  sourceDate: string;
+  kind: string;
 };
 
 export type ScoutIngest = {
@@ -162,6 +182,7 @@ export type ScoutIngest = {
   };
   buyerJudgment?: Company["buyerJudgment"];
   fitRating?: Company["fitRating"];
+  hook?: CardHook;
   signals?: unknown;
   whySources?: unknown;
 };
@@ -199,6 +220,63 @@ export const FIRST_WAVE: Industry[] = [
 ];
 
 export const ADJACENT: Industry[] = ["tech"];
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function publicSource(url: string, seenOn: string): FieldSource | null {
+  const page = url.trim();
+  if (!/^https?:\/\//i.test(page) || !ISO_DATE.test(seenOn)) return null;
+  return { url: page, via: "Public page", seenOn };
+}
+
+/** Sources already verified on a page. Unknown fields stay absent. */
+export function publicFieldSources(input: {
+  buyerName: string;
+  buyerTitle: string;
+  email: string;
+  emailSource: string;
+  place: string;
+  industry: string;
+  sizeBand: string;
+  sourceUrl: string;
+  seenOn: string;
+}): FieldSources {
+  const sources: FieldSources = {};
+  const contact = publicSource(input.emailSource, input.seenOn);
+  const page = publicSource(input.sourceUrl, input.seenOn);
+  if (contact && input.buyerName.trim()) sources.buyerName = contact;
+  if (contact && input.buyerTitle.trim()) sources.buyerTitle = contact;
+  if (contact && input.email.trim()) sources.email = contact;
+  if (page && input.place.trim()) sources.place = page;
+  if (page && input.industry.trim() && input.industry !== "other") sources.industry = page;
+  if (page && input.sizeBand.trim() && input.sizeBand !== "unknown") sources.sizeBand = page;
+  return sources;
+}
+
+/** Apollo has no page URL. seenOn is the pull date. sourceDate is Apollo's updated date when we have it. */
+export function apolloFieldSources(input: {
+  buyerName: string;
+  buyerTitle: string;
+  email: string;
+  seenOn: string;
+  sourceDate?: string;
+}): FieldSources {
+  if (!ISO_DATE.test(input.seenOn)) return {};
+  const sourceDate = input.sourceDate && ISO_DATE.test(input.sourceDate) ? input.sourceDate : undefined;
+  const entry: FieldSource = { url: "", via: "Apollo", seenOn: input.seenOn, ...(sourceDate ? { sourceDate } : {}) };
+  const sources: FieldSources = {};
+  if (input.buyerName.trim()) sources.buyerName = entry;
+  if (input.buyerTitle.trim()) sources.buyerTitle = entry;
+  if (input.email.trim()) sources.email = entry;
+  return sources;
+}
+
+/** Same email on another card is a duplicate. A blank address matches nothing. */
+export function isDuplicateEmail(existing: { email?: string }[], email: string) {
+  const mail = email.trim().toLowerCase();
+  if (!mail.includes("@")) return false;
+  return existing.some((row) => (row.email ?? "").trim().toLowerCase() === mail);
+}
 
 export function normalizeDomain(raw: string) {
   const trimmed = raw.trim().toLowerCase();
@@ -543,6 +621,11 @@ export function mergeScoutRows(
     }
     const mail = sourcedEmail(row.buyer?.email ?? "", row.buyer?.emailSource ?? "");
     const incomingSignals = normalizeSignals(row.signals);
+    const existingEarly = next.find((c) => c.domain === domain);
+    if (!existingEarly && isDuplicateEmail(next, mail.email)) {
+      skipped += 1;
+      continue;
+    }
     const incomingWhy = normalizeWhySources(row.whySources);
     const existing = next.find((c) => c.domain === domain);
     if (existing) {
@@ -602,6 +685,18 @@ export function mergeScoutRows(
       scoutBatch: opts.batch,
       buyerJudgment: row.buyerJudgment,
       fitRating: row.fitRating,
+      hook: row.hook,
+      fieldSources: publicFieldSources({
+        buyerName: row.buyer?.name ?? "",
+        buyerTitle: row.buyer?.title ?? "",
+        email: mail.email,
+        emailSource: mail.emailSource,
+        place: "",
+        industry: "other",
+        sizeBand: "unknown",
+        sourceUrl: row.sourceUrl || "",
+        seenOn: opts.today,
+      }),
     };
     next.unshift(created);
     added += 1;

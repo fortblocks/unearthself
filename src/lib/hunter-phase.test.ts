@@ -20,6 +20,7 @@ import {
   HUNTER_KNOWN_BAD,
   HUNTER_KNOWN_GOOD,
   HUNTER_LIVE_LIST,
+  addDays,
   addDrop,
   alarmAuthorizationHeader,
   alarmWebhookTargets,
@@ -38,6 +39,7 @@ import {
   emailDomainHasMx,
   emptyFunnel,
   heartbeatLate,
+  hookFreshness,
   isDuplicateCard,
   capSpend,
   dollarsToTicks,
@@ -282,6 +284,16 @@ test("alarms separate a broken run from a quiet one, and a late heartbeat", () =
   assert.equal(late.late, true);
   const fresh = heartbeatLate("2026-11-19T15:50:00.000Z", new Date("2026-11-19T16:00:00.000Z"), true);
   assert.equal(fresh.late, false);
+});
+
+test("hook freshness is fresh through 90 days, older through 365, and no hook after that", () => {
+  const today = "2026-11-20";
+  assert.equal(hookFreshness(addDays(today, -90), today), "fresh");
+  assert.equal(hookFreshness(addDays(today, -91), today), "older");
+  assert.equal(hookFreshness(addDays(today, -365), today), "older");
+  assert.equal(hookFreshness(addDays(today, -366), today), "none");
+  assert.equal(hookFreshness("", today), "none");
+  assert.equal(hookFreshness("not-a-date", today), "none");
 });
 
 test("dedupe, do-not-contact, and a book reset stay apart", () => {

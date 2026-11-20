@@ -10,7 +10,7 @@ import { isClearBuyer, judgeBuyerFit } from "./buyer-judgment.ts";
 import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
 import { markPublicContact } from "./apollo.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
-import { isSeparateStudio } from "./hunter-phase.ts";
+import { isSeparateStudio, verifiedHook } from "./hunter-phase.ts";
 import {
   coerceCity,
   coerceIndustry,
@@ -94,6 +94,7 @@ export function selectScoutRows(raw: unknown): ScoutIngest[] {
             emailSource: String(buyer.emailSource ?? "").trim(),
           }
         : undefined,
+      hook: readScoutHook(asRecord(row.hook)),
     });
   }
   return rows;
@@ -118,22 +119,35 @@ export function scoutOutOfRegion(raw: unknown) {
   return count;
 }
 
-export function applyVerifiedContacts(rows: ScoutIngest[], pages: Record<string, string>): ScoutIngest[] {
+export function applyVerifiedContacts(rows: ScoutIngest[], pages: Record<string, string>, today = ""): ScoutIngest[] {
   return rows.map((row) => {
     const pageUrl = row.buyer?.emailSource?.trim() ?? "";
     const page = pageUrl ? pages[pageUrl] : undefined;
+    const hookPage = row.hook?.sourceUrl ? pages[row.hook.sourceUrl] : undefined;
+    const hook = verifiedHook(row.hook, hookPage ?? "", today);
     if (!page) {
-      return { ...row, buyer: { name: "", title: "", email: "", emailSource: "" } };
+      return { ...row, buyer: { name: "", title: "", email: "", emailSource: "" }, hook };
     }
     const contact = contactIfPresent(page, row.buyer?.name ?? "", row.buyer?.email ?? "", pageUrl);
     return {
       ...row,
+      hook,
       buyer: {
         ...contact,
         title: contact.name ? (row.buyer?.title ?? "") : "",
       },
     };
   });
+}
+
+function readScoutHook(hook: Record<string, unknown> | null): ScoutIngest["hook"] {
+  if (!hook) return undefined;
+  const text = String(hook.text ?? "").trim();
+  const sourceUrl = String(hook.sourceUrl ?? "").trim();
+  const sourceDate = String(hook.sourceDate ?? "").trim();
+  const kind = String(hook.kind ?? "").trim();
+  if (!text || !sourceUrl || !sourceDate || !kind) return undefined;
+  return { text, sourceUrl, sourceDate, kind };
 }
 
 /**
@@ -177,6 +191,8 @@ For each company include org, domain, city, industry, sizeBand ("1-49", "50-79",
 Signals are public dated events only: hiring, office, expansion, win, year-end. Each signal needs kind, date as YYYY-MM-DD, sourceUrl, and a short note. Omit a signal when you do not have both a date and a page URL.
 
 buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@.
+
+hook is optional. Include it only when the page prints both the exact sentence and a date as YYYY-MM-DD. hook has text, sourceUrl, sourceDate (the date printed on that page, not the day you fetched it), and kind. Omit hook when you do not have both the exact text and the printed date.
 
 Choose the contact by judging whether that person would buy a hotel spa team retreat in Drumheller, Alberta for their company. Reason from the company's size, industry, location, and how the team is set up, and from the person's role. There is no fixed list of job titles.
 
@@ -250,10 +266,14 @@ async function readPublishedPage(url: string, timeoutMs = 6000): Promise<string>
   return last;
 }
 
-export async function verifyRows(rows: ScoutIngest[], timeLeft?: () => number): Promise<ScoutIngest[]> {
-  const urls = [...new Set(rows.map((row) => row.buyer?.emailSource?.trim() ?? "").filter((url) => /^https?:\/\//i.test(url)))];
+export async function verifyRows(rows: ScoutIngest[], timeLeft?: () => number, today = ""): Promise<ScoutIngest[]> {
+  const urls = [
+    ...new Set(
+      rows.flatMap((row) => [row.buyer?.emailSource?.trim() ?? "", row.hook?.sourceUrl?.trim() ?? ""]).filter((url) => /^https?:\/\//i.test(url)),
+    ),
+  ];
   const pages: Record<string, string> = {};
-  if (timeLeft && timeLeft() < 1_000) return applyVerifiedContacts(rows, pages);
+  if (timeLeft && timeLeft() < 1_000) return applyVerifiedContacts(rows, pages, today);
   let cursor = 0;
   async function worker() {
     while (cursor < urls.length) {
@@ -267,7 +287,7 @@ export async function verifyRows(rows: ScoutIngest[], timeLeft?: () => number): 
     }
   }
   await Promise.all(Array.from({ length: Math.min(5, urls.length) }, () => worker()));
-  return applyVerifiedContacts(rows, pages);
+  return applyVerifiedContacts(rows, pages, today);
 }
 
 export type NightlyEnrichment = (
@@ -378,7 +398,7 @@ export async function runNightlyScout(opts?: {
   }
   const selected = selectScoutRows(research);
   const outOfRegion = scoutOutOfRegion(research);
-  const verified = await verifyRows(selected, opts?.timeLeft);
+  const verified = await verifyRows(selected, opts?.timeLeft, today);
   const open = opts?.skip ? verified.filter((row) => !opts.skip?.({ domain: row.domain, email: row.buyer?.email })) : verified;
   const judged = await judgeScoutContacts(open, opts?.timeLeft);
   const batch = buildMorningBatch(loaded.book.companies, judged.rows, {

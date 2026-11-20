@@ -129,6 +129,13 @@ test("a verified Apollo email can count, and an unverified one cannot", () => {
   assert.equal(verified.apolloPersonId, "person-1");
   assert.equal(verified.apolloEmailStatus, "verified");
   assert.equal(verified.contactRetrievedOn, "2026-11-18");
+  assert.equal(verified.fieldSources?.email?.via, "Apollo");
+  assert.equal(verified.fieldSources?.email?.url, "");
+  assert.equal(verified.fieldSources?.email?.seenOn, "2026-11-18");
+  assert.equal(verified.fieldSources?.email?.sourceDate, "2026-06-01");
+  assert.equal(verified.fieldSources?.buyerName?.via, "Apollo");
+  assert.equal(verified.fieldSources?.buyerTitle?.url, "");
+  assert.equal(verified.fieldSources?.place, undefined);
   assert.equal(verified.enrichment, "enriched");
   assert.equal(hasBuyerContact(verified), true);
   assert.equal(isContactReady(verified), true);

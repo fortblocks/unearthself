@@ -4,7 +4,7 @@
  * what may be filed, and what Rex sees.
  */
 
-import { daysBetween, normalizeDomain } from "./lead-score.ts";
+import { daysBetween, normalizeDomain, type CardHook } from "./lead-score.ts";
 import { readXaiUsage, XAI_USD_TICKS } from "./xai-search.ts";
 import {
   HUNTER_ALARM_TIMEOUT_MS,
@@ -188,6 +188,36 @@ export function cardDedupeKey(domain: string, email: string) {
 export function isDuplicateCard(existing: { domain: string; email?: string }[], domain: string, email: string) {
   const key = cardDedupeKey(domain, email);
   return existing.some((row) => cardDedupeKey(row.domain, row.email ?? "") === key);
+}
+
+/** 0 to 90 days is fresh, 91 to 365 is older, and older than that or a missing date is no hook. */
+export function hookFreshness(date: string, today: string): "fresh" | "older" | "none" {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return "none";
+  const age = daysBetween(today, date);
+  if (age == null || age < 0) return "none";
+  if (age <= 90) return "fresh";
+  if (age <= 365) return "older";
+  return "none";
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Keep a hook only when the fetched page prints the exact text and the date. A stale date is dropped. */
+export function verifiedHook(
+  hook: { text?: string; sourceUrl?: string; sourceDate?: string; kind?: string } | undefined,
+  page: string,
+  today: string,
+): CardHook | undefined {
+  const text = hook?.text?.trim() ?? "";
+  const sourceUrl = hook?.sourceUrl?.trim() ?? "";
+  const sourceDate = hook?.sourceDate?.trim() ?? "";
+  const kind = hook?.kind?.trim() ?? "";
+  if (text.length < 8 || kind.length < 2 || kind.length > 40) return undefined;
+  if (!/^https?:\/\//i.test(sourceUrl) || !ISO_DATE.test(sourceDate)) return undefined;
+  if (hookFreshness(sourceDate, today) === "none") return undefined;
+  const hay = page.toLowerCase();
+  if (!hay.includes(text.toLowerCase()) || !page.includes(sourceDate)) return undefined;
+  return { text, sourceUrl, sourceDate, kind };
 }
 
 export function addDays(isoDate: string, days: number) {

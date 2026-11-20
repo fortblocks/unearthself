@@ -9,7 +9,7 @@ import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
 import { isClearBuyer, type BuyerJudgment, type FitRating } from "./buyer-judgment.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
-import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
+import { apolloFieldSources, normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
 
 export const APOLLO_DAILY_CREDIT_CAP_DEFAULT = 48;
 export const APOLLO_OFF = "Apollo off: no key";
@@ -283,6 +283,16 @@ export function applyApolloContact(company: Company, person: ApolloReveal | null
     cardFlags: [...flags],
     caslStatus: usableEmail ? "recorded" : company.caslStatus,
     casl: usableEmail ? apolloCaslBasis(today, person.title) : company.casl,
+    fieldSources: {
+      ...company.fieldSources,
+      ...apolloFieldSources({
+        buyerName: person.name,
+        buyerTitle: person.title,
+        email: usableEmail,
+        seenOn: today,
+        sourceDate: person.updatedOn,
+      }),
+    },
   };
   return assignEnrichment(next, today);
 }

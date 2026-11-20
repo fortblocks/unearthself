@@ -120,6 +120,8 @@ function company(partial: Partial<Company> & { id: string }): Company {
     review: partial.review ?? "approved",
     hunterScore: partial.hunterScore ?? 70,
     fitRating: partial.fitRating,
+    hook: partial.hook,
+    fieldSources: partial.fieldSources,
     filedOn: partial.filedOn ?? "2026-11-01",
     enrichment: partial.enrichment ?? "enriched",
     contactSource: partial.contactSource ?? "Public page",
@@ -639,9 +641,27 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     );
     assert.equal(page.cards[0]?.fitRating?.band, "weak");
     assert.equal(page.cards[1]?.fitRating, null);
-    const one = (await (await read("/api/hunter/read?view=card&id=fit-weak")).json()) as { card: { fitRating: { band: string; reason: string } | null } };
+    const one = (await (await read("/api/hunter/read?view=card&id=fit-weak")).json()) as {
+      card: { fitRating: { band: string; reason: string } | null; hook: unknown; fieldSources: unknown };
+    };
     assert.equal(one.card.fitRating?.band, "weak");
     assert.equal(one.card.fitRating?.reason, "The company is a thin match for a retreat.");
+    assert.equal(one.card.hook, null);
+    assert.equal(one.card.fieldSources, null);
+    const withHook = company({
+      id: "fit-hook",
+      domain: "hook.example",
+      email: "ada@hook.example",
+      hook: { text: "The team booked a retreat.", sourceUrl: "https://hook.example/about", sourceDate: "2026-11-01", kind: "retreat" },
+      fieldSources: { email: { url: "https://hook.example/about", via: "Public page", seenOn: "2026-11-20" } },
+    });
+    await seed(redis, [withHook]);
+    const hooked = (await (await read("/api/hunter/read?view=card&id=fit-hook")).json()) as {
+      card: { hook: { sourceDate: string } | null; fieldSources: { email?: { via: string; url: string } } | null };
+    };
+    assert.equal(hooked.card.hook?.sourceDate, "2026-11-01");
+    assert.equal(hooked.card.fieldSources?.email?.via, "Public page");
+    assert.equal(hooked.card.fieldSources?.email?.url, "https://hook.example/about");
   });
 
   test("15. card views enforce each qualifying rule, sequence stops, and the snapshot stays put", async () => {

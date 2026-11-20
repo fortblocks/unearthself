@@ -1247,6 +1247,8 @@ function cocoCard(company: Company, record: OutreachRecord | null, dnc: DncEntry
     facts: company.facts ?? [],
     hunterScore: company.hunterScore ?? null,
     fitRating: company.fitRating ?? null,
+    hook: company.hook ?? null,
+    fieldSources: company.fieldSources ?? null,
     hunterBreak: company.hunterBreak ?? null,
     score100: scored.total,
     band: scored.band,
