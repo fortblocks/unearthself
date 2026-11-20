@@ -1,5 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { appendDoNotContact, readHunterDesk, writeHunterPaused } from "@/lib/leads-hunter";
+import {
+  approveAndQueueForCoco as queueForCoco,
+  approveWording as approveCardWording,
+  readCocoCard,
+  saveCocoDraftEdit as saveDraftEdit,
+  withdrawWording as withdrawCardWording,
+} from "@/lib/hunter-outreach";
 import type { DncReason } from "@/lib/hunter-phase";
 import { requireStaffSession } from "@/lib/staff-session";
 
@@ -29,4 +36,39 @@ export const addDoNotContact = createServerFn({ method: "POST" })
       today: data.today,
     });
     return { ok: true as const };
+  });
+
+export const approveAndQueueForCoco = createServerFn({ method: "POST" })
+  .validator((data: { cardId: string }) => data)
+  .handler(async ({ data }) => {
+    const session = await requireStaffSession();
+    return queueForCoco({ cardId: data.cardId, queuedBy: session.email });
+  });
+
+export const saveCocoDraftEdit = createServerFn({ method: "POST" })
+  .validator((data: { cardId: string; touch: number; subject: string; body: string }) => data)
+  .handler(async ({ data }) => {
+    await requireStaffSession();
+    return saveDraftEdit(data);
+  });
+
+export const approveWording = createServerFn({ method: "POST" })
+  .validator((data: { cardId: string; subject: string; body: string }) => data)
+  .handler(async ({ data }) => {
+    await requireStaffSession();
+    return approveCardWording(data);
+  });
+
+export const withdrawWording = createServerFn({ method: "POST" })
+  .validator((data: { cardId: string }) => data)
+  .handler(async ({ data }) => {
+    await requireStaffSession();
+    return withdrawCardWording(data);
+  });
+
+export const getCocoCard = createServerFn({ method: "POST" })
+  .validator((data: { cardId: string }) => data)
+  .handler(async ({ data }) => {
+    await requireStaffSession();
+    return readCocoCard(data.cardId);
   });

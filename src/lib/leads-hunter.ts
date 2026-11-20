@@ -750,8 +750,15 @@ export function fileHunterCards(
         profileHits,
         hunterRegion: existing.hunterRegion || card.hunterRegion,
         place: existing.place || card.place,
+        buyerName: existing.buyerName.trim() ? existing.buyerName : card.buyerName,
+        buyerTitle: existing.buyerTitle.trim() ? existing.buyerTitle : card.buyerTitle,
+        email: existing.email.trim() ? existing.email : card.email,
+        emailSource: existing.emailSource.trim() ? existing.emailSource : card.emailSource,
         contactLastSeenOn:
-          card.email && existing.email.trim().toLowerCase() === card.email.trim().toLowerCase() ? opts.today : existing.contactLastSeenOn,
+          (existing.email.trim() ? existing.email : card.email) &&
+          existing.email.trim().toLowerCase() === card.email.trim().toLowerCase()
+            ? opts.today
+            : existing.contactLastSeenOn,
         lineage: existing.lineage ?? makeLineage({
           query: card.query || card.hunterRegion,
           signals: profileHits.map((hit) => hit.id),

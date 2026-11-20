@@ -2,13 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Section } from "@/components/desk/Section";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDesk } from "@/lib/desk-store";
-import { draftProblems, refreshUnsentDrafts, wordCount } from "@/lib/lead-copy";
-import { DRAFT_REVISION } from "@/lib/leads-book";
+import { emptyCoco, LeadCardActions } from "@/lib/lead-card-view";
+import type { CocoJoin } from "@/lib/hunter-outreach";
 import {
   clampMorningCount,
   DESK_STORAGE_KEY,
@@ -17,7 +16,7 @@ import {
   type MorningBatch,
 } from "@/lib/leads-book";
 import { getLeadsBook, importLeadsCompanies, saveLeadsCompany, setLeadsMorningCount } from "@/lib/leads-api";
-import { addDoNotContact } from "@/lib/leads-hunter-api";
+import { addDoNotContact, approveAndQueueForCoco, approveWording, getCocoCard, saveCocoDraftEdit, withdrawWording } from "@/lib/leads-hunter-api";
 import { cardSource } from "@/lib/leads-hunter";
 import { DEFAULT_LEAD_SORT, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
 import {
@@ -40,7 +39,7 @@ const SEND_ERR: Record<string, string> = {
   missing: "That card is not on the list.",
   closed: "Stopped. Do not email.",
   paused: "Corporate AE is paused.",
-  access: "Send blocked. Named person, published email, and source URL.",
+  access: "Named person, published email, and source URL are required.",
   band: "Band says do not email, or watch only.",
   unsourced: "Email without a source URL is not published. Do not invent it.",
   copy: "Draft fails house voice.",
@@ -107,6 +106,7 @@ function LeadsPage() {
   const [band, setBand] = useState<ScoreBand | "all">("all");
   const [origin, setOrigin] = useState<(typeof ORIGINS)[number]>("all");
   const [openId, setOpenId] = useState("");
+  const [cocoById, setCocoById] = useState<Record<string, CocoJoin>>(loaded.coco ?? {});
   const rowsRef = useRef<Company[]>([]);
   rowsRef.current = rows ?? [];
   const today = edmontonToday();
@@ -136,19 +136,10 @@ function LeadsPage() {
         setMorningCount(book.morningCount);
         setMorning(book.morning);
         if (book.companies.length) {
-          let companies = book.companies;
-          if (book.draftRevision !== DRAFT_REVISION) {
-            const refreshed = refreshUnsentDrafts(companies, useDesk.getState().threads);
-            companies = refreshed.companies;
-            useDesk.setState({ threads: refreshed.threads });
-            for (const company of companies) {
-              book = await saveLeadsCompany({ data: { company, draftRevision: DRAFT_REVISION } });
-            }
-            if (gone) return;
-            companies = book.companies;
-          }
+          const companies = book.companies;
           setRows(companies);
           useDesk.setState({ companies });
+          setCocoById(loaded.coco ?? {});
         } else {
           setRows([]);
           useDesk.setState({ companies: [] });
@@ -329,6 +320,8 @@ function LeadsPage() {
             openId={openId}
             threads={threads}
             today={today}
+            cocoById={cocoById}
+            onCoco={(id, card) => setCocoById((current) => ({ ...current, [id]: card }))}
             onToggle={setOpenId}
             onMutate={mutate}
           />
@@ -348,6 +341,8 @@ function LeadsPage() {
             openId={openId}
             threads={threads}
             today={today}
+            cocoById={cocoById}
+            onCoco={(id, card) => setCocoById((current) => ({ ...current, [id]: card }))}
             onToggle={setOpenId}
             onMutate={mutate}
           />
@@ -393,6 +388,8 @@ function CompanyList({
   openId,
   threads,
   today,
+  cocoById,
+  onCoco,
   onToggle,
   onMutate,
 }: {
@@ -400,6 +397,8 @@ function CompanyList({
   openId: string;
   threads: Array<{ id: string; companyId?: string; dir: string; subject: string; at: string }>;
   today: string;
+  cocoById: Record<string, CocoJoin>;
+  onCoco: (id: string, card: CocoJoin) => void;
   onToggle: (id: string) => void;
   onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
@@ -431,7 +430,7 @@ function CompanyList({
             >
               <span
                 className={`size-2.5 shrink-0 rounded-full ${sendable ? "bg-ember" : "bg-line"}`}
-                aria-label={sendable ? "Sendable" : "Not sendable"}
+                aria-label={sendable ? "Ready" : "Not ready"}
               />
               <span className="min-w-0 flex-1 font-semibold">
                 {company.org}
@@ -448,9 +447,11 @@ function CompanyList({
             {open ? (
               <CompanyPanel
                 company={company}
+                coco={cocoById[company.id] ?? emptyCoco({ canApproveDraft: company.review !== "skipped" })}
                 score={score}
                 today={today}
                 threads={threads.filter((thread) => thread.companyId === company.id)}
+                onCoco={onCoco}
                 onMutate={onMutate}
               />
             ) : null}
@@ -463,19 +464,23 @@ function CompanyList({
 
 function CompanyPanel({
   company,
+  coco,
   score,
   today,
   threads,
+  onCoco,
   onMutate,
 }: {
   company: Company;
+  coco: CocoJoin;
   score: ReturnType<typeof scoreCompany>;
   today: string;
   threads: Array<{ id: string; dir: string; subject: string; at: string }>;
+  onCoco: (id: string, card: CocoJoin) => void;
   onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
-  const [subject, setSubject] = useState(company.draftSubject);
-  const [body, setBody] = useState(company.draftBody);
+  const [subject, setSubject] = useState(coco.subject);
+  const [body, setBody] = useState(coco.body);
   const [buyerName, setBuyerName] = useState(company.buyerName);
   const [buyerTitle, setBuyerTitle] = useState(company.buyerTitle);
   const [email, setEmail] = useState(company.email);
@@ -483,8 +488,11 @@ function CompanyPanel({
   const [sourceUrl, setSourceUrl] = useState(company.sourceUrl);
 
   useEffect(() => {
-    setSubject(company.draftSubject);
-    setBody(company.draftBody);
+    setSubject(coco.subject);
+    setBody(coco.body);
+  }, [coco.subject, coco.body, coco.stage]);
+
+  useEffect(() => {
     setBuyerName(company.buyerName);
     setBuyerTitle(company.buyerTitle);
     setEmail(company.email);
@@ -492,7 +500,37 @@ function CompanyPanel({
     setSourceUrl(company.sourceUrl);
   }, [company]);
 
-  const problems = body.trim() ? draftProblems(body) : [];
+  useEffect(() => {
+    if (coco.stage !== "queued" && coco.stage !== "drafting") return;
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - started > 10 * 60 * 1000) {
+        clearInterval(timer);
+        return;
+      }
+      void getCocoCard({ data: { cardId: company.id } }).then((next) => {
+        if (next) onCoco(company.id, next);
+      });
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [coco.stage, company.id, onCoco]);
+
+  async function refreshCoco() {
+    const next = await getCocoCard({ data: { cardId: company.id } });
+    if (next) onCoco(company.id, next);
+  }
+
+  async function markApproved() {
+    await onMutate(company.id, () => {
+      useDesk.setState({
+        companies: useDesk.getState().companies.map((row) =>
+          row.id === company.id ? { ...row, review: "approved", reviewedOn: today } : row,
+        ),
+      });
+      return null;
+    });
+  }
+
   const since = company.lastTouch ? daysBetween(today, company.lastTouch) : null;
 
   return (
@@ -523,128 +561,6 @@ function CompanyPanel({
             {company.skipReason ? ` · ${company.skipReason}` : ""}
             {company.pipeline ? ` · ${company.pipeline}` : ""}
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void onMutate(company.id, () => {
-                  useDesk.setState({
-                    companies: useDesk.getState().companies.map((row) =>
-                      row.id === company.id ? { ...row, review: "approved", reviewedOn: today } : row,
-                    ),
-                  });
-                  return null;
-                })
-              }
-            >
-              Approve
-            </Button>
-            {(
-              [
-                ["wrong-size", "Wrong size"],
-                ["wrong-sector", "Wrong sector"],
-                ["no-retreat-signal", "No retreat signal"],
-                ["bad-contact", "Bad contact"],
-                ["duplicate", "Duplicate"],
-                ["other", "Other"],
-              ] as const
-            ).map(([reason, label]) => (
-              <Button
-                key={reason}
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void (async () => {
-                    await onMutate(company.id, () => {
-                      useDesk.setState({
-                        companies: useDesk.getState().companies.map((row) =>
-                          row.id === company.id
-                            ? { ...row, review: "skipped", skipReason: reason, reviewedOn: today }
-                            : row,
-                        ),
-                      });
-                      return null;
-                    });
-                    try {
-                      await addDoNotContact({
-                        data: { domain: company.domain, email: company.email, reason: "skipped", today },
-                      });
-                    } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
-                    }
-                  })()
-                }
-              >
-                Skip, {label}
-              </Button>
-            ))}
-            {(
-              [
-                ["sent", "Sent"],
-                ["replied", "Replied"],
-                ["booked", "Booked"],
-                ["won", "Won"],
-                ["lost", "Lost"],
-              ] as const
-            ).map(([mark, label]) => (
-              <Button
-                key={mark}
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void (async () => {
-                    await onMutate(company.id, () => {
-                      useDesk.setState({
-                        companies: useDesk.getState().companies.map((row) =>
-                          row.id === company.id ? { ...row, pipeline: mark, pipelineOn: today } : row,
-                        ),
-                      });
-                      return null;
-                    });
-                    if (mark !== "lost") return;
-                    try {
-                      await addDoNotContact({
-                        data: { domain: company.domain, email: company.email, reason: "lost", today },
-                      });
-                    } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
-                    }
-                  })()
-                }
-              >
-                {label}
-              </Button>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void addDoNotContact({
-                  data: { domain: company.domain, email: company.email, reason: "dont-contact", today },
-                }).then(
-                  () => toast("Added to do-not-contact"),
-                  (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
-                )
-              }
-            >
-              Do not contact
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void addDoNotContact({
-                  data: { domain: company.domain, email: "", reason: "unsubscribe", today },
-                }).then(
-                  () => toast("Unsubscribe saved for this domain"),
-                  (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
-                )
-              }
-            >
-              Unsubscribe
-            </Button>
-          </div>
         </div>
         <div>
           <p className="text-xs tracking-widest text-sandstone uppercase">Named contact</p>
@@ -773,81 +689,141 @@ function CompanyPanel({
         </div>
       </form>
 
-      <div>
-        <p className="text-xs tracking-widest text-sandstone uppercase">Draft</p>
-        <p className="mt-2 text-sm text-shale">Approved sends go from chris@badlandsbootcamp.com.</p>
-        <label className="mt-3 block" htmlFor={`${company.id}-subject`}>
-          <span className="mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase">Subject</span>
-          <Input id={`${company.id}-subject`} value={subject} onChange={(event) => setSubject(event.target.value)} />
-        </label>
-        <label className="mt-3 block" htmlFor={`${company.id}-body`}>
-          <span className="mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase">Email</span>
-          <textarea
-            id={`${company.id}-body`}
-            className="min-h-48 w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal outline-none focus:border-ember"
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-          />
-        </label>
-        <p className="mt-2 text-xs text-muted">
-          {body.trim() ? `${wordCount(body)} words` : "No draft yet."}
-          {problems.length ? ` · ${problems[0]}` : ""}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void onMutate(company.id, () => useDesk.getState().saveCompanyDraft(company.id, subject, body))}
-          >
-            Save draft
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void onMutate(company.id, () => useDesk.getState().generateCompanyDraft(company.id))}
-          >
-            Write the draft
-          </Button>
-          <Button
-            type="button"
-            variant="coal"
-            onClick={() => void onMutate(company.id, () => useDesk.getState().approveCompanyDraft(company.id))}
-          >
-            Approve
-          </Button>
-          <Button type="button" onClick={() => void onMutate(company.id, () => useDesk.getState().sendCompany(company.id))}>
-            Send
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() =>
-              void onMutate(company.id, () => {
-                useDesk.getState().stopCompany(company.id);
-                return null;
-              })
+      <LeadCardActions
+        cardId={company.id}
+        coco={coco}
+        subject={subject}
+        body={body}
+        onSubject={setSubject}
+        onBody={setBody}
+        onApproveDraft={() => {
+          void approveAndQueueForCoco({ data: { cardId: company.id } }).then(async (result) => {
+            if (!result.ok && result.error === "blocked") {
+              toast.error(result.reasons?.join(" ") || "This card cannot be queued.");
+              return;
             }
-          >
-            Stop
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() =>
-              void onMutate(company.id, () => {
-                const result = useDesk.getState().fileCompany(company.id);
-                return result === "missing" ? "missing" : null;
-              })
+            if (!result.ok && result.error === "queue") {
+              await markApproved();
+              toast.error("Could not queue, try again.");
+              return;
             }
-          >
-            Hand file
-          </Button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge tone={score.band === "hold" ? "lost" : score.band === "pursue" ? "won" : "new"}>{score.total}</Badge>
-          {isSendable(company, score) ? <Badge tone="won">Sendable</Badge> : <Badge tone="new">Not sendable</Badge>}
-        </div>
-      </div>
+            if (!result.ok) {
+              toast.error("Could not queue, try again.");
+              return;
+            }
+            await markApproved();
+            await refreshCoco();
+          });
+        }}
+        onSkip={(reason) => {
+          void (async () => {
+            await onMutate(company.id, () => {
+              useDesk.setState({
+                companies: useDesk.getState().companies.map((row) =>
+                  row.id === company.id ? { ...row, review: "skipped", skipReason: reason, reviewedOn: today } : row,
+                ),
+              });
+              return null;
+            });
+            try {
+              await addDoNotContact({
+                data: { domain: company.domain, email: company.email, reason: "skipped", today },
+              });
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
+            }
+          })();
+        }}
+        onApproveWording={() => {
+          void approveWording({ data: { cardId: company.id, subject, body } }).then(async (result) => {
+            if (!result.ok && result.error === "unsubscribe") {
+              toast.error("Approve wording needs the unsubscribe link in the email.");
+              return;
+            }
+            if (!result.ok && result.error === "send-approved") {
+              toast.error("Wording is already approved. Withdraw it before approving again.");
+              return;
+            }
+            if (!result.ok) {
+              toast.error("Could not approve the wording.");
+              return;
+            }
+            await refreshCoco();
+          });
+        }}
+        onSaveCopy={() => {
+          if (!coco.touch) return;
+          void saveCocoDraftEdit({ data: { cardId: company.id, touch: coco.touch, subject, body } }).then(async (result) => {
+            if (!result.ok) {
+              toast.error("Could not save the copy.");
+              return;
+            }
+            for (const warning of result.warnings ?? []) toast(warning);
+            await refreshCoco();
+          });
+        }}
+        onStage={(mark) => {
+          void (async () => {
+            await onMutate(company.id, () => {
+              useDesk.setState({
+                companies: useDesk.getState().companies.map((row) =>
+                  row.id === company.id ? { ...row, pipeline: mark, pipelineOn: today } : row,
+                ),
+              });
+              return null;
+            });
+            if (mark !== "lost") return;
+            try {
+              await addDoNotContact({
+                data: { domain: company.domain, email: company.email, reason: "lost", today },
+              });
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
+            }
+          })();
+        }}
+        onStop={(scope) => {
+          void addDoNotContact({
+            data: {
+              domain: company.domain,
+              email: scope === "person" ? company.email : "",
+              reason: scope === "person" ? "dont-contact" : "unsubscribe",
+              today,
+            },
+          }).then(
+            () => toast(scope === "person" ? "This person will not be contacted." : "This company will not be contacted."),
+            (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
+          );
+        }}
+        onUnreview={() => {
+          void onMutate(company.id, () => {
+            useDesk.setState({
+              companies: useDesk.getState().companies.map((row) =>
+                row.id === company.id ? { ...row, review: "unreviewed", skipReason: undefined, reviewedOn: "" } : row,
+              ),
+            });
+            return null;
+          });
+        }}
+        onWithdraw={() => {
+          void withdrawWording({ data: { cardId: company.id } }).then(async (result) => {
+            if (!result.ok) {
+              toast.error("Could not withdraw the wording approval.");
+              return;
+            }
+            await refreshCoco();
+          });
+        }}
+        onRefresh={() => {
+          void refreshCoco();
+        }}
+        onHandFile={() => {
+          void onMutate(company.id, () => {
+            const result = useDesk.getState().fileCompany(company.id);
+            return result === "missing" ? "missing" : null;
+          });
+        }}
+      />
 
       {threads.length > 0 ? (
         <div>

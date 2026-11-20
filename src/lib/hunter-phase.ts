@@ -743,6 +743,12 @@ const DESK_FIELDS = [
   "sourceUrl",
 ] as const;
 
+const BUYER_FILL = new Set<string>(["buyerName", "buyerTitle", "email", "emailSource"]);
+
+function blankField(value: unknown) {
+  return !String(value ?? "").trim();
+}
+
 /** Keep a desk edit made while Hunter was running, and keep cards Hunter filed. */
 export function mergeHunterCompanies<T extends { id: string }>(start: T[], hunter: T[], fresh: T[]): T[] {
   const startBy = new Map(start.map((company) => [company.id, company]));
@@ -761,7 +767,9 @@ export function mergeHunterCompanies<T extends { id: string }>(start: T[], hunte
       const created = { ...hunted };
       for (const key of DESK_FIELDS) {
         const field = key as keyof T;
-        if (current[field] !== hunted[field]) created[field] = current[field];
+        if (current[field] === hunted[field]) continue;
+        if (BUYER_FILL.has(key) && blankField(current[field]) && !blankField(hunted[field])) continue;
+        created[field] = current[field];
       }
       merged.push(created);
       continue;
@@ -774,6 +782,10 @@ export function mergeHunterCompanies<T extends { id: string }>(start: T[], hunte
     for (const key of DESK_FIELDS) {
       const field = key as keyof T;
       if (current[field] !== started[field]) next[field] = current[field];
+    }
+    for (const key of BUYER_FILL) {
+      const field = key as keyof T;
+      if (blankField(current[field]) && blankField(started[field]) && !blankField(hunted[field])) next[field] = hunted[field];
     }
     merged.push(next);
   }

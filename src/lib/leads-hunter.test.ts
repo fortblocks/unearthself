@@ -265,6 +265,18 @@ test("a known domain is updated and a new domain is filed once", () => {
   assert.equal(again.contactReady, 0);
 });
 
+test("a blank name and title on a known card are filled from the verified page", () => {
+  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18" });
+  assert.ok(card);
+  const blank = company({ buyerName: "", buyerTitle: "", email: "" });
+  const filed = fileHunterCards([blank], [card], { today: "2026-11-18" });
+  assert.equal(filed.updated, 1);
+  assert.equal(filed.companies[0]?.buyerName, "Laura Starchuk");
+  assert.equal(filed.companies[0]?.buyerTitle, "Head of People");
+  assert.equal(filed.companies[0]?.email, "laura@acmealpine.example");
+  assert.equal(filed.companies[0]?.why, "Scout card. Leave this sentence.");
+});
+
 test("the batch cursor walks signal and region, then wraps", () => {
   const slots = hunterSlots();
   assert.equal(slots.length, HUNTER_SIGNALS.length * HUNTER_REGIONS.length + HUNTER_REGIONS.length);

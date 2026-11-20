@@ -281,9 +281,9 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const unknownBody = await unknown.json();
     assert.deepEqual(unknownBody, { error: "invalid", field: "leak" });
     assert.equal(JSON.stringify(unknownBody).includes("ECHO-ME-NOT"), false);
-    const drafted = await post({ ...sentBody(card.id), type: "drafting" });
-    assert.equal(drafted.status, 400);
-    assert.equal(((await drafted.json()) as { field: string }).field, "type");
+    const invented = await post({ ...sentBody(card.id), type: "pigeon" });
+    assert.equal(invented.status, 400);
+    assert.equal(((await invented.json()) as { field: string }).field, "type");
   });
 
   test("3. an unknown card is 404", async () => {
@@ -643,7 +643,8 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
       JSON.stringify({ cardId: bounced.id, touches: 0, bouncedEmail: "ada@bounce.example", events: [] }),
     );
     const queued = await read("/api/hunter/read?view=queued");
-    assert.equal(queued.status, 400);
+    assert.equal(queued.status, 200);
+    assert.equal(((await queued.json()) as { total: number }).total, 0);
     const denied = await read("/api/hunter/read?view=qualifying", READ);
     assert.equal(denied.status, 401);
     process.env.HUNTER_CARDS_TOKEN = "c".repeat(31);
@@ -704,7 +705,7 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const one = (await (await read("/api/hunter/read?view=card&id=ready-high")).json()) as { card: { id: string; stage?: string; draft?: string; email: string } };
     assert.equal(one.card.id, "ready-high");
     assert.equal(one.card.email, "ada@northwind.example");
-    assert.equal("stage" in one.card, false);
+    assert.equal(typeof one.card.stage, "string");
     assert.equal("draft" in one.card, false);
     const badLimit = await read("/api/hunter/read?view=qualifying&limit=nope");
     assert.equal(badLimit.status, 400);

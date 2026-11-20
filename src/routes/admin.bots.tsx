@@ -73,7 +73,6 @@ function BotsPage() {
   const paused = useDesk((s) => s.paused);
   const toggleBot = useDesk((s) => s.toggleBot);
   const draftMail = useDesk((s) => s.draftMail);
-  const sendMail = useDesk((s) => s.sendMail);
   const logReply = useDesk((s) => s.logReply);
   const stopLead = useDesk((s) => s.stopLead);
   const [leadId, setLeadId] = useState(search.lead || leads[0]?.id || "");
@@ -104,19 +103,18 @@ function BotsPage() {
     }
   }
 
-  function run(bot: BotId, send: boolean) {
+  function run(bot: BotId) {
     if (!lead) return;
-    const err = send ? sendMail(lead.id, bot) : draftMail(lead.id, bot);
+    const err = draftMail(lead.id, bot);
     if (err) toast(SEND_ERR[err] ?? err);
-    else toast(send ? `Queued ${bot} · mailto opened` : `Draft from ${bot}`);
+    else toast(`Draft from ${bot}`);
   }
 
   return (
     <div className="grid gap-10">
       <p className="max-w-prose text-pretty text-muted">
-        Grok Bots do first touch and follow-up. Humans close. Gmail is not connected yet, so send
-        writes the thread and opens a mail draft. Three unanswered nudges, then stop. Do not invent
-        a price.
+        Grok Bots can draft a note here. The email itself goes out only from Coco's chat, from
+        chris@badlandsbootcamp.com. Do not invent a price.
       </p>
       <p className="max-w-prose text-pretty text-muted">
         Want a new bot? Raise it with Rex, the Chief of Staff. New bots are added through the
@@ -348,13 +346,10 @@ function BotsPage() {
                 {lead.next}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button type="button" onClick={() => run(botForLead(lead.kind), false)}>
+                <Button type="button" onClick={() => run(botForLead(lead.kind))}>
                   Draft
                 </Button>
-                <Button type="button" variant="outline" onClick={() => run(botForLead(lead.kind), true)}>
-                  Send
-                </Button>
-                <Button type="button" variant="outline" onClick={() => run("followup", false)}>
+                <Button type="button" variant="outline" onClick={() => run("followup")}>
                   Follow-up draft
                 </Button>
                 <Button type="button" variant="outline" onClick={() => stopLead(lead.id)}>

@@ -85,9 +85,15 @@ function hasOutbound(company: Company, threads: DraftThread[]) {
  * Replace unsent drafts with the current letter.
  * Stopped companies, sent threads, and every other field stay as they are.
  */
-export function refreshUnsentDrafts<T extends DraftThread>(companies: Company[], threads: T[]) {
+export function refreshUnsentDrafts<T extends DraftThread>(
+  companies: Company[],
+  threads: T[],
+  outreachIds?: ReadonlySet<string>,
+) {
   const skip = new Set(
-    companies.filter((company) => company.status === "stopped" || hasOutbound(company, threads)).map((company) => company.id),
+    companies
+      .filter((company) => company.status === "stopped" || hasOutbound(company, threads) || outreachIds?.has(company.id))
+      .map((company) => company.id),
   );
   const nextCompanies = companies.map((company) => {
     if (skip.has(company.id)) return company;

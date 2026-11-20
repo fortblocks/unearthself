@@ -17,7 +17,7 @@ const NO_STORE = { "cache-control": "no-store" };
 /** New routes refuse a token that is missing or shorter than this. The read snapshot does not. */
 export const TOKEN_MIN_LENGTH = 32;
 
-const CARD_VIEWS = new Set(["qualifying", "in-sequence", "outreach", "card"]);
+const CARD_VIEWS = new Set(["qualifying", "in-sequence", "outreach", "card", "queued"]);
 
 /** Constant-time compare for a token that is long enough to be configured. Shorter tokens never match. */
 export function bearerConfigured(header: string | null, raw: string | undefined) {

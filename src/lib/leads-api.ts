@@ -7,18 +7,25 @@ import {
   upsertCompany,
   type LeadsBook,
 } from "@/lib/leads-book";
+import { readCocoDesk, type CocoJoin } from "@/lib/hunter-outreach";
 import { requireStaffSession } from "@/lib/staff-session";
 import type { Company } from "@/lib/lead-score";
 
 export type LeadsLoad =
-  | { storage: "redis"; book: LeadsBook }
-  | { storage: "browser"; book: null };
+  | { storage: "redis"; book: LeadsBook; coco: Record<string, CocoJoin> }
+  | { storage: "browser"; book: null; coco: Record<string, CocoJoin> };
 
 export const getLeadsBook = createServerFn({ method: "GET" }).handler(async (): Promise<LeadsLoad> => {
   await requireStaffSession();
   const loaded = await loadBook();
-  if (loaded.storage === "browser") return { storage: "browser", book: null };
-  return { storage: "redis", book: loaded.book };
+  if (loaded.storage === "browser") return { storage: "browser", book: null, coco: {} };
+  let coco: Record<string, CocoJoin> = {};
+  try {
+    coco = await readCocoDesk(loaded.book.companies);
+  } catch (error) {
+    console.error("[leads] outreach join was not read", error instanceof Error ? error.name : "error");
+  }
+  return { storage: "redis", book: loaded.book, coco };
 });
 
 export const importLeadsCompanies = createServerFn({ method: "POST" })

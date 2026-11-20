@@ -5,7 +5,7 @@
  * HUNTER_WRITE_TOKEN_PREVIOUS only verifies links from before a rotation.
  */
 
-import { createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, hkdfSync, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { getRedisClient, loadBook, saveBook, type LeadsRedis } from "./leads-book.ts";
 import { bearerConfigured } from "./hunter-read.ts";
 import { isContactReady } from "./hunter-cap.ts";
@@ -14,6 +14,7 @@ import {
   loadDoNotContact,
 } from "./leads-hunter.ts";
 import { dncBlocks, type DncEntry, type DncReason, type PipelineMark } from "./hunter-phase.ts";
+import { draftHasPrice, draftProblems } from "./lead-copy.ts";
 import {
   edmontonToday,
   normalizeDomain,
@@ -35,7 +36,19 @@ const LOCK_WAIT_MS = 200;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RELEASE_SCRIPT = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
 
-const EVENT_TYPES = ["sent", "followup_sent", "replied", "opted_out", "bounced", "booked"] as const;
+const EVENT_TYPES = [
+  "sent",
+  "followup_sent",
+  "replied",
+  "opted_out",
+  "bounced",
+  "booked",
+  "drafting",
+  "drafted",
+  "send_approved",
+  "draft_skipped",
+  "send_withdrawn",
+] as const;
 type EventType = (typeof EVENT_TYPES)[number];
 
 const REPLY_TYPES = ["positive", "neutral", "negative", "auto_reply", "referral"] as const;
@@ -67,6 +80,7 @@ const KNOWN_FIELDS = new Set([
   "subject",
   "body",
   "note",
+  "reason",
 ]);
 
 const FIELDS_FOR: Record<EventType, string[]> = {
@@ -76,7 +90,15 @@ const FIELDS_FOR: Record<EventType, string[]> = {
   opted_out: ["optOutScope", "messageId", "note"],
   bounced: ["messageId", "note"],
   booked: ["messageId", "note"],
+  drafting: ["touch"],
+  drafted: ["touch", "subject", "body", "variantId", "experimentId"],
+  send_approved: ["touch", "subject", "body"],
+  draft_skipped: ["touch", "reason"],
+  send_withdrawn: ["touch"],
 };
+
+const CLAIM_MS = 15 * 60 * 1000;
+const WEBHOOK_TIMEOUT_MS = 2500;
 
 const SKIP_RULES = [
   "contact-ready",
@@ -112,15 +134,36 @@ export type OutreachEvent = {
   consentBasis?: "public-page" | "apollo-decision-5";
   emailSource?: string;
   note?: string;
+  reason?: string;
 };
 
 type SentCopy = { subject: string; body: string; at: string };
+type DraftClaim = { eventId: string; at: string };
 
 type OutreachDraft = {
   subject?: string;
   body?: string;
+  editedSubject?: string;
+  editedBody?: string;
+  variantId?: string;
+  experimentId?: string;
+  draftedAt?: string;
+  problems?: string[];
+  claim?: DraftClaim;
   sent?: SentCopy;
 };
+
+type OutreachQueue = { queuedAt: string; queuedBy: string };
+
+export type SendApproved = {
+  eventId: string;
+  touch: number;
+  subject: string;
+  body: string;
+  at: string;
+};
+
+type DraftSkipped = { reason: string; touch: number; at: string };
 
 export type OutreachRecord = {
   cardId: string;
@@ -143,6 +186,9 @@ export type OutreachRecord = {
   bouncedAt?: string;
   bouncedEmail?: string;
   bookedAt?: string;
+  queue?: OutreachQueue;
+  sendApproved?: SendApproved;
+  draftSkipped?: DraftSkipped;
   drafts?: Partial<Record<"1" | "2" | "3", OutreachDraft>>;
   events: OutreachEvent[];
 };
@@ -166,6 +212,7 @@ type ParsedEvent = {
   subject?: string;
   body?: string;
   note?: string;
+  reason?: string;
 };
 
 class InvalidParam extends Error {
@@ -314,9 +361,37 @@ function asRecord(raw: unknown, cardId: string): OutreachRecord | null {
     bouncedAt: stringOrUndefined(row.bouncedAt),
     bouncedEmail: stringOrUndefined(row.bouncedEmail),
     bookedAt: stringOrUndefined(row.bookedAt),
+    queue: readQueue(row.queue),
+    sendApproved: readSendApproved(row.sendApproved),
+    draftSkipped: readDraftSkipped(row.draftSkipped),
     drafts: row.drafts && typeof row.drafts === "object" ? row.drafts : undefined,
     events: row.events.filter((event) => event && typeof event === "object" && typeof event.eventId === "string"),
   };
+}
+
+function readQueue(value: unknown): OutreachQueue | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as { queuedAt?: unknown; queuedBy?: unknown };
+  if (typeof row.queuedAt !== "string" || !row.queuedAt || typeof row.queuedBy !== "string") return undefined;
+  return { queuedAt: row.queuedAt, queuedBy: row.queuedBy };
+}
+
+function readSendApproved(value: unknown): SendApproved | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as { eventId?: unknown; touch?: unknown; subject?: unknown; body?: unknown; at?: unknown };
+  if (typeof row.eventId !== "string" || typeof row.subject !== "string" || typeof row.body !== "string" || typeof row.at !== "string") {
+    return undefined;
+  }
+  if (row.touch !== 1 && row.touch !== 2 && row.touch !== 3) return undefined;
+  return { eventId: row.eventId, touch: row.touch, subject: row.subject, body: row.body, at: row.at };
+}
+
+function readDraftSkipped(value: unknown): DraftSkipped | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as { reason?: unknown; touch?: unknown; at?: unknown };
+  if (typeof row.reason !== "string" || !row.reason || typeof row.at !== "string") return undefined;
+  if (row.touch !== 1 && row.touch !== 2 && row.touch !== 3) return undefined;
+  return { reason: row.reason, touch: row.touch, at: row.at };
 }
 
 function stringOrUndefined(value: unknown) {
@@ -533,6 +608,40 @@ function parseEvent(value: unknown, now: number): { ok: true; event: ParsedEvent
     if (row.optOutScope !== "person" && row.optOutScope !== "company") return { ok: false, field: "optOutScope" };
     event.optOutScope = row.optOutScope;
   }
+  if (
+    type === "drafting" ||
+    type === "drafted" ||
+    type === "send_approved" ||
+    type === "draft_skipped" ||
+    type === "send_withdrawn"
+  ) {
+    if (typeof row.touch !== "number" || !Number.isInteger(row.touch) || row.touch < 1 || row.touch > 3) {
+      return { ok: false, field: "touch" };
+    }
+    event.touch = row.touch;
+  }
+  if (type === "drafted" || type === "send_approved") {
+    if (typeof row.subject !== "string") return { ok: false, field: "subject" };
+    const subject = oneLine(row.subject, 200);
+    if (subject == null || subject.length === 0) return { ok: false, field: "subject" };
+    event.subject = subject;
+    if (typeof row.body !== "string") return { ok: false, field: "body" };
+    if (Buffer.byteLength(row.body, "utf8") > 4096) return { ok: false, field: "body" };
+    event.body = row.body;
+  }
+  if (type === "drafted") {
+    if (event.body?.includes("\u2014") || draftHasPrice(event.body ?? "")) return { ok: false, field: "body" };
+    if (typeof row.experimentId !== "string" || !slug(row.experimentId, 64)) return { ok: false, field: "experimentId" };
+    event.experimentId = row.experimentId;
+    if (typeof row.variantId !== "string" || !slug(row.variantId, 64)) return { ok: false, field: "variantId" };
+    event.variantId = row.variantId;
+  }
+  if (type === "draft_skipped") {
+    if (typeof row.reason !== "string") return { ok: false, field: "reason" };
+    const reason = oneLine(row.reason.trim(), 200);
+    if (!reason) return { ok: false, field: "reason" };
+    event.reason = reason;
+  }
   return { ok: true, event };
 }
 
@@ -552,6 +661,7 @@ function toStoredEvent(event: ParsedEvent, extra?: { edited?: boolean; optOutSou
   if (event.consentBasis) stored.consentBasis = event.consentBasis;
   if (event.emailSource) stored.emailSource = event.emailSource;
   if (event.note) stored.note = event.note;
+  if (event.reason) stored.reason = event.reason;
   return stored;
 }
 
@@ -563,7 +673,7 @@ function sameInstant(left: string, right: string) {
 
 type ApplyResult =
   | { ok: true; duplicate: boolean; record: OutreachRecord; lift: boolean }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; reasons?: string[] };
 
 function refusal(record: OutreachRecord, company: Company, dnc: DncEntry[], today: string, followup: boolean): ApplyResult | null {
   if (!followup && record.touches > 0) return { ok: false, status: 409, error: "touch" };
@@ -585,10 +695,16 @@ function storeSentCopy(record: OutreachRecord, touch: number, event: ParsedEvent
 }
 
 function editedFlag(record: OutreachRecord, touch: number, event: ParsedEvent) {
+  if (event.subject == null || event.body == null) return event.edited === true;
+  if (record.sendApproved && record.sendApproved.touch === touch) {
+    return event.subject !== record.sendApproved.subject || event.body !== record.sendApproved.body;
+  }
   const key = String(touch) as "1" | "2" | "3";
   const draft = record.drafts?.[key];
-  if (event.subject != null && event.body != null && draft && (draft.subject || draft.body)) {
-    return event.subject !== (draft.subject ?? "") || event.body !== (draft.body ?? "");
+  if (draft && (draft.subject || draft.body || draft.editedSubject != null || draft.editedBody != null)) {
+    const subject = draft.editedSubject ?? draft.subject ?? "";
+    const body = draft.editedBody ?? draft.body ?? "";
+    return event.subject !== subject || event.body !== body;
   }
   return event.edited === true;
 }
@@ -630,12 +746,30 @@ export async function recordOptOut(input: {
   return { ok: true, duplicate: false, record, lift: false };
 }
 
+function touchKey(touch: number): "1" | "2" | "3" {
+  if (touch === 2) return "2";
+  if (touch === 3) return "3";
+  return "1";
+}
+
+function claimLive(claim: DraftClaim | undefined, now: number) {
+  if (!claim?.at || !claim.eventId) return false;
+  const at = Date.parse(claim.at);
+  if (!Number.isFinite(at)) return false;
+  return now - at < CLAIM_MS;
+}
+
+function sequenceOpen(record: OutreachRecord) {
+  return !record.repliedAt && !record.optedOutAt && !record.bouncedAt && !record.bookedAt;
+}
+
 async function applyEvent(
   redis: LeadsRedis,
   company: Company,
   existing: OutreachRecord | null,
   event: ParsedEvent,
   dnc: DncEntry[],
+  now = Date.now(),
 ): Promise<ApplyResult> {
   const record: OutreachRecord = existing ?? { cardId: company.id, touches: 0, events: [] };
   const prior = record.events.find((item) => item.eventId === event.eventId);
@@ -718,10 +852,100 @@ async function applyEvent(
     await writeOutreachRecord(redis, record);
     return { ok: true, duplicate: false, record, lift: false };
   }
+  if (event.type === "drafting" || event.type === "drafted" || event.type === "send_approved" || event.type === "draft_skipped" || event.type === "send_withdrawn") {
+    return applyCocoEvent(redis, company, record, event, dnc, today, now);
+  }
   record.bookedAt = event.at;
   record.events.push(toStoredEvent(event));
   await writeOutreachRecord(redis, record);
   return { ok: true, duplicate: false, record, lift: true };
+}
+
+async function applyCocoEvent(
+  redis: LeadsRedis,
+  company: Company,
+  record: OutreachRecord,
+  event: ParsedEvent,
+  dnc: DncEntry[],
+  today: string,
+  now: number,
+): Promise<ApplyResult> {
+  const touch = event.touch ?? 0;
+  const key = touchKey(touch);
+  if (event.type === "drafting") {
+    const reasons = cocoBlockReasons(company, record, dnc, today).filter((rule) => touch === 1 || rule !== "already-sent");
+    if (reasons.length > 0) return { ok: false, status: 409, error: "blocked", reasons };
+    if (touch === 1) {
+      if (!record.queue?.queuedAt) return { ok: false, status: 409, error: "queue" };
+    } else if (record.touches !== touch - 1 || !sequenceOpen(record)) {
+      return { ok: false, status: 409, error: record.touches !== touch - 1 ? "touch" : "stopped" };
+    }
+    const drafts = { ...(record.drafts ?? {}) };
+    const prior = drafts[key] ?? {};
+    if (prior.claim && prior.claim.eventId !== event.eventId && claimLive(prior.claim, now)) {
+      return { ok: false, status: 409, error: "claimed" };
+    }
+    drafts[key] = { ...prior, claim: { eventId: event.eventId, at: event.at } };
+    record.drafts = drafts;
+    record.events.push(toStoredEvent(event));
+    await writeOutreachRecord(redis, record);
+    return { ok: true, duplicate: false, record, lift: false };
+  }
+  if (event.type === "drafted") {
+    if (touch === 1 && !record.queue?.queuedAt) return { ok: false, status: 409, error: "queue" };
+    if (touch > 1 && (record.touches !== touch - 1 || !sequenceOpen(record))) {
+      return { ok: false, status: 409, error: record.touches === touch - 1 ? "stopped" : "touch" };
+    }
+    const drafts = { ...(record.drafts ?? {}) };
+    const prior = drafts[key] ?? {};
+    if (prior.claim && claimLive(prior.claim, now) && prior.claim.eventId !== event.eventId && !record.events.some((item) => item.eventId === prior.claim?.eventId && item.type === "drafting")) {
+      return { ok: false, status: 409, error: "claimed" };
+    }
+    drafts[key] = {
+      subject: event.subject,
+      body: event.body,
+      variantId: event.variantId,
+      experimentId: event.experimentId,
+      draftedAt: event.at,
+      problems: draftProblems(event.body ?? ""),
+      sent: prior.sent,
+    };
+    record.drafts = drafts;
+    if (record.draftSkipped?.touch === touch) record.draftSkipped = undefined;
+    record.events.push(toStoredEvent(event));
+    await writeOutreachRecord(redis, record);
+    return { ok: true, duplicate: false, record, lift: false };
+  }
+  if (event.type === "send_approved") {
+    const link = unsubscribeUrl(company.id);
+    if (!link || !event.body?.includes(link)) return { ok: false, status: 409, error: "unsubscribe" };
+    if (record.touches >= touch) return { ok: false, status: 409, error: "touch" };
+    if (record.sendApproved && record.sendApproved.touch === touch && record.touches < touch) {
+      return { ok: false, status: 409, error: "send-approved" };
+    }
+    record.sendApproved = {
+      eventId: event.eventId,
+      touch,
+      subject: event.subject ?? "",
+      body: event.body ?? "",
+      at: event.at,
+    };
+    record.events.push(toStoredEvent(event));
+    await writeOutreachRecord(redis, record);
+    return { ok: true, duplicate: false, record, lift: false };
+  }
+  if (event.type === "draft_skipped") {
+    record.draftSkipped = { reason: event.reason ?? "", touch, at: event.at };
+    record.events.push(toStoredEvent(event));
+    await writeOutreachRecord(redis, record);
+    return { ok: true, duplicate: false, record, lift: false };
+  }
+  if (!record.sendApproved || record.sendApproved.touch !== touch) return { ok: false, status: 409, error: "none" };
+  if (record.touches >= touch) return { ok: false, status: 409, error: "touch" };
+  record.sendApproved = undefined;
+  record.events.push(toStoredEvent(event));
+  await writeOutreachRecord(redis, record);
+  return { ok: true, duplicate: false, record, lift: false };
 }
 
 export async function handleOutreach(request: Request) {
@@ -780,7 +1004,9 @@ export async function handleOutreach(request: Request) {
     if (outcome.missing) return finish(404, { error: "unknown-card" });
     if (!outcome.applied.ok) {
       if (outcome.applied.status === 503) return finish(503, { error: "Unavailable", retryable: true });
-      return finish(outcome.applied.status, { error: outcome.applied.error });
+      const body: { error: string; reasons?: string[] } = { error: outcome.applied.error };
+      if (outcome.applied.reasons && outcome.applied.reasons.length > 0) body.reasons = outcome.applied.reasons;
+      return finish(outcome.applied.status, body);
     }
     if (outcome.applied.lift || outcome.applied.duplicate) {
       try {
@@ -947,10 +1173,172 @@ function cocoCard(company: Company, record: OutreachRecord | null, dnc: DncEntry
     dnc: dncView(dnc, company.domain, company.email, today),
     outreach: record ? summaryOf(record, true) : null,
     unsubscribeUrl: link,
+    stage: cocoStage(company, record, Date.now(), dnc, today),
+    sendApproved: record?.sendApproved
+      ? {
+          eventId: record.sendApproved.eventId,
+          subject: record.sendApproved.subject,
+          body: record.sendApproved.body,
+          touch: record.sendApproved.touch,
+        }
+      : null,
+    draftSkipped: record?.draftSkipped ?? null,
   };
 }
 
 type CocoCard = ReturnType<typeof cocoCard>;
+
+export function cocoBlockReasons(company: Company, record: OutreachRecord | null, dnc: DncEntry[], today: string): SkipRule[] {
+  return qualifyingFailures(company, record, dnc, today).filter((rule) => rule !== "review");
+}
+
+export type CocoStage =
+  | "booked"
+  | "won"
+  | "closed"
+  | "replied"
+  | "opted-out"
+  | "bounced"
+  | "sent"
+  | "wording-approved"
+  | "draft-ready"
+  | "draft-skipped"
+  | "drafting"
+  | "queued"
+  | "approved"
+  | "blocked"
+  | "new";
+
+function nextTouchNumber(record: OutreachRecord | null) {
+  const touches = record?.touches ?? 0;
+  if (touches >= 3) return null;
+  return touches + 1;
+}
+
+function draftAt(record: OutreachRecord | null, touch: number) {
+  return record?.drafts?.[touchKey(touch)];
+}
+
+export function cocoStage(company: Company, record: OutreachRecord | null, now = Date.now(), dnc: DncEntry[] = [], today = edmontonToday()): CocoStage {
+  const pipeline = company.pipeline ?? "";
+  if (pipeline === "lost") return "closed";
+  if (pipeline === "won") return "won";
+  if (pipeline === "booked" || record?.bookedAt) return "booked";
+  if (record?.repliedAt) return "replied";
+  if (record?.optedOutAt) return "opted-out";
+  if (record?.bouncedAt) return "bounced";
+  const touch = nextTouchNumber(record);
+  if (record?.sendApproved && touch != null && record.sendApproved.touch === touch && (record.touches ?? 0) < record.sendApproved.touch) {
+    return "wording-approved";
+  }
+  if (touch != null && (draftAt(record, touch)?.subject || draftAt(record, touch)?.body)) return "draft-ready";
+  const claim = touch != null ? draftAt(record, touch)?.claim : undefined;
+  if (claim && claimLive(claim, now)) return "drafting";
+  if (touch != null && record?.draftSkipped?.touch === touch) return "draft-skipped";
+  if ((record?.touches ?? 0) > 0) return "sent";
+  if (record?.queue?.queuedAt) return "queued";
+  if (company.review === "approved") return "approved";
+  if (cocoBlockReasons(company, record, dnc, today).length > 0) return "blocked";
+  return "new";
+}
+
+export function stageLabel(stage: CocoStage, record: OutreachRecord | null) {
+  if (stage === "sent") return `Sent, ${record?.touches ?? 0} of 3`;
+  if (stage === "queued") return "Queued";
+  if (stage === "drafting") return "Drafting";
+  if (stage === "draft-ready") return "Draft ready";
+  if (stage === "wording-approved") return "Wording approved";
+  if (stage === "approved") return "Approved";
+  if (stage === "booked") return "Booked";
+  if (stage === "won") return "Won";
+  if (stage === "closed") return "Lost";
+  if (stage === "replied") return "Replied";
+  if (stage === "opted-out") return "Opted out";
+  if (stage === "bounced") return "Bounced";
+  if (stage === "blocked") return "Blocked";
+  if (stage === "draft-skipped") {
+    return record?.draftSkipped?.reason ? `Draft skipped: ${record.draftSkipped.reason}` : "Draft skipped";
+  }
+  return "Unreviewed";
+}
+
+export function draftEditWarnings(subject: string, body: string) {
+  const warnings: string[] = [];
+  if (subject.includes("\u2014") || body.includes("\u2014")) warnings.push("This copy has an em dash.");
+  if (draftHasPrice(subject) || draftHasPrice(body)) warnings.push("This copy has a price.");
+  return warnings;
+}
+
+const BLOCK_COPY: Record<string, string> = {
+  "contact-ready": "This card is not contact-ready.",
+  "already-sent": "The first email has already gone out.",
+  pipeline: "This card is already in a pipeline.",
+  "do-not-contact": "This contact is on the do-not-contact list.",
+  "no-unsolicited": "The card is flagged no unsolicited email.",
+  stale: "The contact is flagged stale.",
+  "apollo-unverified": "The Apollo email is not verified.",
+  "email-mx": "The email domain has no mail server.",
+  "email-blank": "There is no email address.",
+  "bounced-email": "Mail to this address bounced.",
+  "no-unsubscribe-link": "The unsubscribe link is not available.",
+};
+
+export type CocoJoin = {
+  stage: CocoStage;
+  stageLabel: string;
+  status: string;
+  touch: number | null;
+  subject: string;
+  body: string;
+  problems: string[];
+  blocked: string[];
+  skipNote: string;
+  canApproveDraft: boolean;
+  canApproveWording: boolean;
+  canWithdraw: boolean;
+  wordingNote: string;
+  unsubscribeUrl: string | null;
+};
+
+function statusFor(stage: CocoStage, record: OutreachRecord | null) {
+  if (stage === "queued") return "Approved, waiting for Coco.";
+  if (stage === "drafting") return "Coco is writing the draft.";
+  if (stage === "draft-ready") return "Read the draft, then approve the wording.";
+  if (stage === "wording-approved") return "Waiting for your Send in Coco's chat.";
+  if (stage === "sent") return `Sent, ${record?.touches ?? 0} of 3.`;
+  if (stage === "draft-skipped") {
+    return record?.draftSkipped?.reason ? `Coco skipped this draft. ${record.draftSkipped.reason}` : "Coco skipped this draft.";
+  }
+  return "";
+}
+
+export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: DncEntry[], today: string, now = Date.now()): CocoJoin {
+  const stage = cocoStage(company, record, now, dnc, today);
+  const touch = nextTouchNumber(record);
+  const draft = touch != null ? draftAt(record, touch) : undefined;
+  const subject = draft?.editedSubject ?? draft?.subject ?? "";
+  const body = draft?.editedBody ?? draft?.body ?? "";
+  const blocked = cocoBlockReasons(company, record, dnc, today).map((rule) => BLOCK_COPY[rule] ?? rule);
+  const link = unsubscribeUrl(company.id);
+  const hasDraft = Boolean(draft?.subject || draft?.body);
+  const wordingNote = hasDraft && link && !body.includes(link) ? "Approve wording needs the unsubscribe link in the email." : "";
+  return {
+    stage,
+    stageLabel: stageLabel(stage, record),
+    status: statusFor(stage, record),
+    touch,
+    subject,
+    body,
+    problems: draft?.problems ?? [],
+    blocked,
+    skipNote: record?.draftSkipped?.reason ?? "",
+    canApproveDraft: blocked.length === 0 && (stage === "new" || stage === "approved") && company.review !== "skipped",
+    canApproveWording: stage === "draft-ready" && wordingNote === "" && hasDraft,
+    canWithdraw: stage === "wording-approved",
+    wordingNote,
+    unsubscribeUrl: link,
+  };
+}
 
 function qualifyingFailures(company: Company, record: OutreachRecord | null, dnc: DncEntry[], today: string): SkipRule[] {
   const failed: SkipRule[] = [];
@@ -1091,6 +1479,29 @@ export async function handleCardRead(url: URL) {
       const page = pageByKey(cards, limit, cursor, (card) => JSON.stringify([card.outreach?.lastSentAt ?? "", card.id]));
       return json({ view, total: page.total, nextCursor: page.nextCursor, cards: page.slice }, 200);
     }
+    if (view === "queued") {
+      const now = Date.now();
+      const skipped = Object.fromEntries(SKIP_RULES.filter((rule) => rule !== "review").map((rule) => [rule, 0])) as Record<string, number>;
+      const waiting: { card: CocoCard; sort: string }[] = [];
+      for (const company of loaded.book.companies) {
+        const record = records.get(company.id) ?? null;
+        const waitingDraft = Boolean(record?.queue?.queuedAt) && !record?.firstSentAt;
+        const waitingSend = Boolean(record?.sendApproved) && (record?.touches ?? 0) < (record?.sendApproved?.touch ?? 0);
+        if (!waitingDraft && !waitingSend) continue;
+        const reasons = cocoBlockReasons(company, record, dnc, today);
+        if (reasons.length > 0) {
+          for (const rule of reasons) skipped[rule] = (skipped[rule] ?? 0) + 1;
+          continue;
+        }
+        const stage = cocoStage(company, record, now, dnc, today);
+        if (waitingDraft && !waitingSend && (stage === "drafting" || stage === "draft-skipped")) continue;
+        const sort = record?.queue?.queuedAt || record?.sendApproved?.at || "";
+        waiting.push({ card: cocoCard(company, record, dnc, today), sort });
+      }
+      waiting.sort((a, b) => a.sort.localeCompare(b.sort) || a.card.id.localeCompare(b.card.id));
+      const page = pageByKey(waiting.map((item) => item.card), limit, cursor, (card) => card.id);
+      return json({ view, total: page.total, nextCursor: page.nextCursor, skipped, cards: page.slice }, 200);
+    }
     const since = readSince(url);
     const cards = loaded.book.companies
       .flatMap((company) => {
@@ -1121,6 +1532,229 @@ export async function handleCardRead(url: URL) {
     if (error instanceof InvalidParam) return json({ error: "invalid", field: error.field }, 400);
     return json({ error: "Unavailable", retryable: true }, 503);
   }
+}
+
+type WakeFetch = (input: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ status: number }>;
+
+function webhookReady() {
+  const url = (process.env.COCO_DRAFT_WEBHOOK_URL ?? "").trim();
+  const key = (process.env.COCO_DRAFT_WEBHOOK_KEY ?? "").trim();
+  const header = (process.env.COCO_DRAFT_WEBHOOK_HEADER ?? "").trim();
+  if (!url || !key || !header || !/^[A-Za-z0-9-]+$/.test(header)) return null;
+  return { url, key, header };
+}
+
+/** Wakes Coco with the card id only. The header name comes from COCO_DRAFT_WEBHOOK_HEADER. A missing setting makes no call. */
+export async function wakeCocoDraft(cardId: string, fetchImpl?: WakeFetch) {
+  const ready = webhookReady();
+  if (!ready) return { called: false, status: 0 };
+  const call = fetchImpl ?? fetch;
+  try {
+    const response = await call(ready.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", [ready.header]: ready.key },
+      body: JSON.stringify({ cardId }),
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    });
+    console.info(JSON.stringify({ webhook: "coco-draft", status: response.status }));
+    return { called: true, status: response.status };
+  } catch {
+    console.info(JSON.stringify({ webhook: "coco-draft", status: 0 }));
+    return { called: true, status: 0 };
+  }
+}
+
+export type DeskCocoResult =
+  | { ok: true; stage: CocoStage; warnings?: string[] }
+  | { ok: false; error: string; reasons?: string[] };
+
+export async function approveAndQueueForCoco(input: {
+  cardId: string;
+  queuedBy: string;
+  fetchImpl?: WakeFetch;
+}): Promise<DeskCocoResult> {
+  const redis = await getRedisClient();
+  if (!redis) return { ok: false, error: "unavailable" };
+  const loaded = await loadBook();
+  if (loaded.storage !== "redis") return { ok: false, error: "unavailable" };
+  const company = loaded.book.companies.find((item) => item.id === input.cardId);
+  if (!company) return { ok: false, error: "unknown-card" };
+  const dnc = await loadDoNotContact(redis);
+  const today = edmontonToday();
+  const existing = await readOutreachRecord(redis, company.id);
+  const reasons = cocoBlockReasons(company, existing, dnc, today);
+  if (reasons.length > 0) return { ok: false, error: "blocked", reasons };
+  const reviewedOn = today;
+  const nextBook = {
+    ...loaded.book,
+    companies: loaded.book.companies.map((item) =>
+      item.id === company.id ? { ...item, review: "approved" as const, reviewedOn } : item,
+    ),
+  };
+  await saveBook(nextBook);
+  const approved = nextBook.companies.find((item) => item.id === company.id) ?? { ...company, review: "approved" as const, reviewedOn };
+  let alreadyQueued = Boolean(existing?.queue?.queuedAt);
+  let stored: OutreachRecord | null = null;
+  try {
+    stored = await withOutreachLock(redis, company.id, async () => {
+      const fresh = (await readOutreachRecord(redis, company.id)) ?? { cardId: company.id, touches: 0, events: [] };
+      if (fresh.queue?.queuedAt) {
+        alreadyQueued = true;
+        return fresh;
+      }
+      fresh.queue = { queuedAt: new Date().toISOString(), queuedBy: input.queuedBy };
+      await writeOutreachRecord(redis, fresh);
+      return fresh;
+    });
+  } catch {
+    return { ok: false, error: "queue" };
+  }
+  if (!stored) return { ok: false, error: "queue" };
+  if (!alreadyQueued) {
+    try {
+      await wakeCocoDraft(company.id, input.fetchImpl);
+    } catch {
+      // The queue is saved. Coco's sweep still finds the card.
+    }
+  }
+  return { ok: true, stage: cocoStage(approved, stored, Date.now(), dnc, today) };
+}
+
+export async function saveCocoDraftEdit(input: {
+  cardId: string;
+  touch: number;
+  subject: string;
+  body: string;
+}): Promise<DeskCocoResult> {
+  if (input.touch !== 1 && input.touch !== 2 && input.touch !== 3) return { ok: false, error: "touch" };
+  const redis = await getRedisClient();
+  if (!redis) return { ok: false, error: "unavailable" };
+  const warnings = draftEditWarnings(input.subject, input.body);
+  let failed: DeskCocoResult | null = null;
+  const stored = await withOutreachLock(redis, input.cardId, async () => {
+    const record = await readOutreachRecord(redis, input.cardId);
+    if (!record) {
+      failed = { ok: false, error: "draft" };
+      return record;
+    }
+    const key = touchKey(input.touch);
+    const draft = record.drafts?.[key];
+    if (!draft || (!draft.subject && !draft.body)) {
+      failed = { ok: false, error: "draft" };
+      return record;
+    }
+    const drafts = { ...(record.drafts ?? {}) };
+    drafts[key] = { ...draft, editedSubject: input.subject, editedBody: input.body };
+    record.drafts = drafts;
+    await writeOutreachRecord(redis, record);
+    return record;
+  });
+  if (failed) return failed;
+  if (!stored) return { ok: false, error: "unavailable" };
+  return { ok: true, stage: "draft-ready", warnings };
+}
+
+export async function approveWording(input: {
+  cardId: string;
+  subject: string;
+  body: string;
+  fetchImpl?: WakeFetch;
+}): Promise<DeskCocoResult> {
+  const redis = await getRedisClient();
+  if (!redis) return { ok: false, error: "unavailable" };
+  const loaded = await loadBook();
+  if (loaded.storage !== "redis") return { ok: false, error: "unavailable" };
+  const company = loaded.book.companies.find((item) => item.id === input.cardId);
+  if (!company) return { ok: false, error: "unknown-card" };
+  const link = unsubscribeUrl(company.id);
+  if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
+  const dnc = await loadDoNotContact(redis);
+  let outcome: ApplyResult | null = null;
+  try {
+    outcome = await withOutreachLock(redis, company.id, async () => {
+      const record = (await readOutreachRecord(redis, company.id)) ?? { cardId: company.id, touches: 0, events: [] };
+      const touch = nextTouchNumber(record);
+      if (!touch) return { ok: false, status: 409, error: "touch" } satisfies ApplyResult;
+      const key = touchKey(touch);
+      const draft = record.drafts?.[key];
+      if (!draft || (!draft.subject && !draft.body)) return { ok: false, status: 409, error: "draft" } satisfies ApplyResult;
+      const drafts = { ...(record.drafts ?? {}) };
+      drafts[key] = { ...draft, editedSubject: input.subject, editedBody: input.body };
+      record.drafts = drafts;
+      const event: ParsedEvent = {
+        eventId: randomUUID(),
+        cardId: company.id,
+        type: "send_approved",
+        at: new Date().toISOString(),
+        touch,
+        subject: input.subject,
+        body: input.body,
+      };
+      return applyEvent(redis, company, record, event, dnc);
+    });
+  } catch {
+    return { ok: false, error: "unavailable" };
+  }
+  if (!outcome) return { ok: false, error: "unavailable" };
+  if (!outcome.ok) return { ok: false, error: outcome.error, reasons: outcome.reasons };
+  try {
+    await wakeCocoDraft(company.id, input.fetchImpl);
+  } catch {
+    // The approval is saved. The sweep still finds it.
+  }
+  return { ok: true, stage: cocoStage(company, outcome.record, Date.now(), dnc, edmontonToday()) };
+}
+
+export async function withdrawWording(input: { cardId: string }): Promise<DeskCocoResult> {
+  const redis = await getRedisClient();
+  if (!redis) return { ok: false, error: "unavailable" };
+  const loaded = await loadBook();
+  if (loaded.storage !== "redis") return { ok: false, error: "unavailable" };
+  const company = loaded.book.companies.find((item) => item.id === input.cardId);
+  if (!company) return { ok: false, error: "unknown-card" };
+  const dnc = await loadDoNotContact(redis);
+  const outcome = await withOutreachLock(redis, company.id, async () => {
+    const record = (await readOutreachRecord(redis, company.id)) ?? { cardId: company.id, touches: 0, events: [] };
+    const touch = record.sendApproved?.touch;
+    if (!touch) return { ok: false, status: 409, error: "none" } satisfies ApplyResult;
+    const event: ParsedEvent = {
+      eventId: randomUUID(),
+      cardId: company.id,
+      type: "send_withdrawn",
+      at: new Date().toISOString(),
+      touch,
+    };
+    return applyEvent(redis, company, record, event, dnc);
+  });
+  if (!outcome) return { ok: false, error: "unavailable" };
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  return { ok: true, stage: cocoStage(company, outcome.record, Date.now(), dnc, edmontonToday()) };
+}
+
+export async function readCocoDesk(companies: Company[]) {
+  const empty: Record<string, CocoJoin> = {};
+  const redis = await getRedisClient();
+  if (!redis) return empty;
+  const records = await readOutreachMap(redis);
+  const dnc = await loadDoNotContact(redis);
+  const today = edmontonToday();
+  const now = Date.now();
+  for (const company of companies) {
+    empty[company.id] = cocoJoin(company, records.get(company.id) ?? null, dnc, today, now);
+  }
+  return empty;
+}
+
+export async function readCocoCard(cardId: string): Promise<CocoJoin | null> {
+  const loaded = await loadBook();
+  if (loaded.storage !== "redis") return null;
+  const company = loaded.book.companies.find((item) => item.id === cardId);
+  if (!company) return null;
+  const redis = await getRedisClient();
+  if (!redis) return null;
+  const record = await readOutreachRecord(redis, cardId);
+  const dnc = await loadDoNotContact(redis);
+  return cocoJoin(company, record, dnc, edmontonToday(), Date.now());
 }
 
 function escapeHtml(value: string) {

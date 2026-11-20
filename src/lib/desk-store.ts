@@ -40,7 +40,7 @@ import {
 } from "@/data/desk";
 import { SEED_POSTS, type PostStatus, type SocialChannel, type SocialPost } from "@/data/socials";
 import { draftFor } from "@/lib/bot-copy";
-import { draftForCompany, draftProblems, refreshUnsentDrafts } from "@/lib/lead-copy";
+import { draftProblems } from "@/lib/lead-copy";
 import {
   asLeadCompany,
   hasAccess,
@@ -322,45 +322,7 @@ export const useDesk = create<DeskState>()(
         }));
         return null;
       },
-      sendMail: (leadId, bot) => {
-        const lead = get().leads.find((l) => l.id === leadId);
-        if (!lead) return "missing";
-        if (lead.stopped || lead.status === "lost") return "closed";
-        if (get().paused[bot]) return "paused";
-        if (lead.nudges >= 3 && bot === "followup") return "cap";
-        if (lead.source === "scout" && !lead.email) return "unnamed";
-        if (lead.companyId) {
-          const company = get().companies.find((c) => c.id === lead.companyId);
-          if (company && !hasAccess(company)) return "access";
-        }
-        let draft = get().threads.find((m) => m.leadId === leadId && m.dir === "draft" && m.bot === bot);
-        if (!draft) {
-          const fail = get().draftMail(leadId, bot);
-          if (fail) return fail;
-          draft = get().threads.find((m) => m.leadId === leadId && m.dir === "draft" && m.bot === bot);
-        }
-        if (!draft) return "missing";
-        const nudge = bot === "followup" || bot === "concierge" || bot === "corporate" || bot === "stay";
-        set((s) => ({
-          threads: s.threads.map((m) => (m.id === draft!.id ? { ...m, dir: "out" as ThreadDir, at: stamp() } : m)),
-          leads: s.leads.map((l) =>
-            l.id === leadId
-              ? {
-                  ...l,
-                  nudges: nudge ? l.nudges + 1 : l.nudges,
-                  lastTouch: today(),
-                  next: l.nudges + (nudge ? 1 : 0) >= 3 ? "Stopped — three nudges" : "Wait 48h, then 7d",
-                  stopped: l.nudges + (nudge ? 1 : 0) >= 3,
-                }
-              : l,
-          ),
-        }));
-        if (lead.email && typeof window !== "undefined") {
-          const url = `mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
-          window.open(url, "_self");
-        }
-        return null;
-      },
+      sendMail: () => "closed",
       logReply: (leadId, body) => {
         const text = body.trim();
         if (!text) return;
@@ -452,12 +414,7 @@ export const useDesk = create<DeskState>()(
           added = result.added;
           merged = result.merged;
           skipped = result.skipped;
-          const companies = result.companies.map((c) => {
-            if (c.draftBody) return c;
-            const draft = draftForCompany(c);
-            return { ...c, draftSubject: draft.subject, draftBody: draft.body };
-          });
-          return { companies };
+          return { companies: result.companies };
         });
         return { added, merged, skipped, error: null };
       },
@@ -475,13 +432,7 @@ export const useDesk = create<DeskState>()(
       generateCompanyDraft: (id) => {
         const c = get().companies.find((x) => x.id === id);
         if (!c) return "missing";
-        const copy = draftForCompany(c);
-        set((s) => ({
-          companies: s.companies.map((x) =>
-            x.id === id ? { ...x, draftSubject: copy.subject, draftBody: copy.body, lastTouch: today() } : x,
-          ),
-        }));
-        return null;
+        return "closed";
       },
       approveCompanyDraft: (id) => {
         const c = get().companies.find((x) => x.id === id);
@@ -534,66 +485,7 @@ export const useDesk = create<DeskState>()(
       sendCompany: (id) => {
         const c = get().companies.find((x) => x.id === id);
         if (!c) return "missing";
-        if (c.status === "stopped") return "closed";
-        const score = scoreCompany(c);
-        const hunter = c.source === "hunter";
-        if (!hunter && score.band === "hold") return "band";
-        if (!hasAccess(c)) return "access";
-        if (!hunter && !isSendable(c, score)) return "band";
-        const problems = draftProblems(c.draftBody);
-        if (problems.length) return problems[0] ?? "copy";
-        if (get().paused.corporate) return "paused";
-        let leadId = c.filedLeadId;
-        if (!leadId) {
-          leadId = get().addLead({
-            org: c.org,
-            contact: c.buyerTitle ? `${c.buyerName} · ${c.buyerTitle}` : c.buyerName,
-            email: c.email,
-            kind: "bootcamp",
-            headcount: 12,
-            value: 18000,
-            dates: "spring 2027",
-            owner: "christopher",
-            note: `${c.city}. ${c.why} First send from the research list.`,
-            source: "scout",
-            companyId: c.id,
-          });
-        }
-        const fail = get().approveCompanyDraft(id);
-        if (fail) return fail;
-        const draft = get().threads.find((m) => m.companyId === id && m.dir === "draft");
-        set((s) => ({
-          companies: s.companies.map((x) =>
-            x.id === id ? { ...x, status: "filed" as CompanyStatus, filedLeadId: leadId, lastTouch: today() } : x,
-          ),
-          threads: s.threads.map((m) =>
-            draft && m.id === draft.id
-              ? { ...m, dir: "out" as ThreadDir, leadId, at: stamp() }
-              : m.companyId === id
-                ? { ...m, leadId }
-                : m,
-          ),
-          leads: s.leads.map((l) =>
-            l.id === leadId
-              ? {
-                  ...l,
-                  email: c.email,
-                  contact: c.buyerTitle ? `${c.buyerName} · ${c.buyerTitle}` : c.buyerName,
-                  nudges: l.nudges + 1,
-                  lastTouch: today(),
-                  next: "Wait 48h, then 7d",
-                  companyId: c.id,
-                }
-              : l,
-          ),
-        }));
-        if (c.email && typeof window !== "undefined") {
-          const subject = draft?.subject ?? c.draftSubject;
-          const body = draft?.body ?? c.draftBody;
-          const url = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-          window.open(url, "_self");
-        }
-        return null;
+        return "closed";
       },
       stopCompany: (id) =>
         set((s) => ({
@@ -741,7 +633,6 @@ export const useDesk = create<DeskState>()(
         const threads = (p.threads ?? seed.threads).filter(
           (thread) => !isDemoLead({ id: thread.leadId }) && !droppedCompanyIds.has(thread.companyId ?? ""),
         );
-        const refreshed = refreshUnsentDrafts(companies, threads);
         return {
           ...seed,
           ...p,
@@ -756,9 +647,9 @@ export const useDesk = create<DeskState>()(
               stopped: l.stopped ?? false,
               companyId: l.companyId,
             })),
-          threads: refreshed.threads,
+          threads,
           scout: p.scout ?? seed.scout,
-          companies: refreshed.companies,
+          companies,
           posts: p.posts ?? seed.posts,
           paused: { ...seed.paused, ...p.paused },
         };
