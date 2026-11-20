@@ -119,6 +119,7 @@ function company(partial: Partial<Company> & { id: string }): Company {
     source: "hunter",
     review: partial.review ?? "approved",
     hunterScore: partial.hunterScore ?? 70,
+    fitRating: partial.fitRating,
     filedOn: partial.filedOn ?? "2026-11-01",
     enrichment: partial.enrichment ?? "enriched",
     contactSource: partial.contactSource ?? "Public page",
@@ -606,6 +607,41 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const busy = await post({ eventId: randomUUID(), cardId: card.id, type: "replied", at: new Date().toISOString(), replyType: "auto_reply" });
     assert.equal(busy.status, 503);
     assert.equal(((await busy.json()) as { retryable: boolean }).retryable, true);
+  });
+
+  test("a stored fit band is on the card and does not change qualifying order", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const weak = company({
+      id: "fit-weak",
+      hunterScore: 90,
+      filedOn: "2026-11-02",
+      domain: "weak.example",
+      email: "ada@weak.example",
+      fitRating: { band: "weak", reason: "The company is a thin match for a retreat.", ratedOn: "2026-11-20", model: "grok-4.20-0309-non-reasoning" },
+    });
+    const strong = company({
+      id: "fit-strong",
+      hunterScore: 40,
+      filedOn: "2026-11-01",
+      domain: "strong.example",
+      email: "ada@strong.example",
+      fitRating: { band: "strong", reason: "The company matches the retreat profile.", ratedOn: "2026-11-20", model: "grok-4.20-0309-non-reasoning" },
+    });
+    const plain = company({ id: "fit-plain", hunterScore: 70, domain: "plain.example", email: "ada@plain.example" });
+    await seed(redis, [strong, weak, plain]);
+    const page = (await (await read("/api/hunter/read?view=qualifying&limit=10")).json()) as {
+      cards: { id: string; fitRating: { band: string } | null }[];
+    };
+    assert.deepEqual(
+      page.cards.map((card) => card.id),
+      ["fit-weak", "fit-plain", "fit-strong"],
+    );
+    assert.equal(page.cards[0]?.fitRating?.band, "weak");
+    assert.equal(page.cards[1]?.fitRating, null);
+    const one = (await (await read("/api/hunter/read?view=card&id=fit-weak")).json()) as { card: { fitRating: { band: string; reason: string } | null } };
+    assert.equal(one.card.fitRating?.band, "weak");
+    assert.equal(one.card.fitRating?.reason, "The company is a thin match for a retreat.");
   });
 
   test("15. card views enforce each qualifying rule, sequence stops, and the snapshot stays put", async () => {

@@ -137,6 +137,13 @@ export type Company = {
     reason: string;
     model: string;
   };
+  /** Shadow company fit. Absent on older cards. Not a filing gate and not shown on the desk. */
+  fitRating?: {
+    band: "strong" | "maybe" | "weak";
+    reason: string;
+    ratedOn: string;
+    model: string;
+  };
 };
 
 export type ScoutIngest = {
@@ -154,6 +161,7 @@ export type ScoutIngest = {
     emailSource?: string;
   };
   buyerJudgment?: Company["buyerJudgment"];
+  fitRating?: Company["fitRating"];
   signals?: unknown;
   whySources?: unknown;
 };
@@ -556,6 +564,7 @@ export function mergeScoutRows(
         lastTouch: opts.today,
         scoutBatch: opts.batch,
         buyerJudgment: existing.buyerJudgment ?? row.buyerJudgment,
+        fitRating: existing.fitRating ?? row.fitRating,
       };
       if (Array.isArray(next[idx].signals)) {
         next[idx].timingScore = timingFromSignals({
@@ -592,6 +601,7 @@ export function mergeScoutRows(
       lastTouch: opts.today,
       scoutBatch: opts.batch,
       buyerJudgment: row.buyerJudgment,
+      fitRating: row.fitRating,
     };
     next.unshift(created);
     added += 1;

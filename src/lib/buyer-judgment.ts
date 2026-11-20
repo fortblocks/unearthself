@@ -5,6 +5,7 @@
  * company and the role. It does not see a checklist of job titles.
  */
 
+import { edmontonToday } from "./lead-score.ts";
 import { callXaiJson, HUNTER_SEARCH_MODEL, type XaiUsage } from "./xai-search.ts";
 
 export const BUYER_JUDGMENT_MODEL = HUNTER_SEARCH_MODEL;
@@ -14,7 +15,8 @@ export const BUYER_JUDGMENT_SYSTEM = [
   "Reason from the company and from the person's role.",
   "Use the company's size, industry, location, how the team is set up, and any signals you are given.",
   "There is no fixed list of job titles. A title is one clue, not a rule.",
-  'Return JSON only: {"buyer": true or false, "confidence": "low" or "medium" or "high", "reason": "one or two sentences"}.',
+  'Return JSON only: {"buyer": true or false, "confidence": "low" or "medium" or "high", "reason": "one or two sentences", "fit": {"band": "strong" or "maybe" or "weak", "reason": "one line"}}.',
+  "Rate how well the company fits the Drumheller team-retreat customer against the profile signals you are given.",
   "Set buyer to true only when you are clear this person would buy the retreat for their team.",
   "Use confidence low when you are not clear.",
   "The reason must not include a person's name, an email address, or a phone number.",
@@ -30,6 +32,16 @@ export type BuyerJudgment = {
   model: string;
 };
 
+export type FitBand = "strong" | "maybe" | "weak";
+
+/** Shadow rating. It does not decide filing, the desk, or Coco's qualifying order. */
+export type FitRating = {
+  band: FitBand;
+  reason: string;
+  ratedOn: string;
+  model: string;
+};
+
 export type BuyerJudgmentInput = {
   org: string;
   domain: string;
@@ -42,7 +54,7 @@ export type BuyerJudgmentInput = {
 };
 
 export type BuyerJudgmentResult =
-  | { ok: true; judgment: BuyerJudgment; usage: XaiUsage }
+  | { ok: true; judgment: BuyerJudgment; fit?: FitRating | null; usage: XaiUsage }
   | { ok: false; usage: XaiUsage };
 
 const EMPTY_USAGE: XaiUsage = { inputTokens: 0, outputTokens: 0, dollars: null };
@@ -96,6 +108,21 @@ export function parseBuyerJudgment(payload: unknown): BuyerJudgment | null {
   return { buyer: record.buyer, confidence, reason, model: BUYER_JUDGMENT_MODEL };
 }
 
+/** A missing or malformed band is ignored. The buyer judgement still stands. */
+export function parseFitRating(payload: unknown, ratedOn: string): FitRating | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ratedOn)) return null;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const fit = (payload as { fit?: unknown }).fit;
+  if (!fit || typeof fit !== "object" || Array.isArray(fit)) return null;
+  const band = (fit as { band?: unknown }).band;
+  if (band !== "strong" && band !== "maybe" && band !== "weak") return null;
+  const raw = (fit as { reason?: unknown }).reason;
+  if (typeof raw !== "string") return null;
+  const reason = publicJudgmentReason(raw);
+  if (!reason) return null;
+  return { band, reason, ratedOn, model: BUYER_JUDGMENT_MODEL };
+}
+
 /** A clear buyer is a yes the model is not unsure about. Low confidence is not filed. */
 export function isClearBuyer(judgment: { buyer: boolean; confidence: string }) {
   return judgment.buyer === true && (judgment.confidence === "medium" || judgment.confidence === "high");
@@ -126,7 +153,7 @@ export async function judgeBuyerFit(input: BuyerJudgmentInput, opts?: { timeoutM
   await rememberSpend(called.usage);
   const judgment = parseBuyerJudgment(called.json);
   if (!judgment) return { ok: false, usage: called.usage };
-  return { ok: true, judgment, usage: called.usage };
+  return { ok: true, judgment, fit: parseFitRating(called.json, edmontonToday()), usage: called.usage };
 }
 
 async function rememberSpend(usage: XaiUsage) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { BUYER_JUDGMENT_MODEL, BUYER_JUDGMENT_SYSTEM, buyerJudgmentPrompt, isClearBuyer, judgeBuyerFit, parseBuyerJudgment, useBuyerJudgeForTests } from "./buyer-judgment.ts";
+import { BUYER_JUDGMENT_MODEL, BUYER_JUDGMENT_SYSTEM, buyerJudgmentPrompt, isClearBuyer, judgeBuyerFit, parseBuyerJudgment, parseFitRating, useBuyerJudgeForTests } from "./buyer-judgment.ts";
 import { fileHunterCards, stampCard, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 
@@ -97,6 +97,58 @@ test("a contact the model rejects is skipped and counted, and the book is not re
   assert.equal(book.length, 1);
   assert.equal(stored.org, "Keep Co");
   assert.equal(stored.buyerTitle, "People Lead");
+});
+
+test("a fit band is stored and a weak band still files", () => {
+  const card = cardFor("Software Engineer");
+  const reason = "The company shows a distributed team and a size that can book a retreat.";
+  const filed = fileHunterCards(
+    [],
+    [
+      {
+        ...card,
+        buyerJudgment: { buyer: true, confidence: "high", reason: "The role owns the team retreat.", model: BUYER_JUDGMENT_MODEL },
+        fitRating: { band: "weak", reason, ratedOn: "2026-11-20", model: BUYER_JUDGMENT_MODEL },
+      },
+    ],
+    { today: "2026-11-20", floor: 0 },
+  );
+  assert.equal(filed.filed, 1);
+  assert.equal(filed.drops.notBuyerJudged ?? 0, 0);
+  assert.equal(filed.companies[0]?.fitRating?.band, "weak");
+  assert.equal(filed.companies[0]?.fitRating?.reason, reason);
+  assert.equal(filed.companies[0]?.buyerJudgment?.buyer, true);
+  assert.equal("weakFit" in filed.drops, false);
+});
+
+test("a fit band parses beside the buyer judgement and a bad band does not block it", () => {
+  const buyer = { buyer: true, confidence: "high", reason: "The role owns the team retreat." };
+  const parsed = parseBuyerJudgment({ ...buyer, fit: { band: "strong", reason: "A distributed team of this size books retreats." } });
+  assert.equal(parsed?.buyer, true);
+  assert.equal(parsed?.confidence, "high");
+  const fit = parseFitRating({ ...buyer, fit: { band: "strong", reason: "Call Sam Lee at sam@soft.example or 403-555-0199." } }, "2026-11-20");
+  assert.equal(fit?.band, "strong");
+  assert.equal(fit?.reason.includes("sam@soft.example"), false);
+  assert.equal(fit?.reason.includes("403-555-0199"), false);
+  assert.equal(fit?.model, BUYER_JUDGMENT_MODEL);
+  assert.equal(fit?.ratedOn, "2026-11-20");
+  assert.equal(parseBuyerJudgment(buyer)?.buyer, true);
+  assert.equal(parseFitRating(buyer, "2026-11-20"), null);
+  assert.equal(parseBuyerJudgment({ ...buyer, fit: { band: "excellent", reason: "Nope." } })?.buyer, true);
+  assert.equal(parseFitRating({ ...buyer, fit: { band: "excellent", reason: "Nope." } }, "2026-11-20"), null);
+  assert.equal(parseFitRating({ ...buyer, fit: { band: "maybe", reason: "" } }, "2026-11-20"), null);
+  assert.match(BUYER_JUDGMENT_SYSTEM, /against the profile signals you are given/i);
+  assert.equal(/head of people|office manager|chief people/i.test(BUYER_JUDGMENT_SYSTEM), false);
+  assert.equal(/head of people|office manager|chief people/i.test(buyerJudgmentPrompt({
+    org: "Soft Co",
+    domain: "soft.example",
+    place: "Calgary, Canada",
+    city: "Calgary",
+    industry: "tech",
+    sizeBand: "80-800",
+    signals: "distributed team",
+    role: "Software Engineer",
+  })), false);
 });
 
 test("a failed judgement does not file", () => {

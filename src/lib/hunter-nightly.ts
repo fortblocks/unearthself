@@ -118,8 +118,23 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       now,
       timeLeft: () => runClock.clip(90_000),
       skip: (row) => dncBlocks(dnc, row.domain, row.email ?? "", today),
-      enrich: (companies, domains, day) =>
-        enrichUnderApolloCap({ companies, domains, today: day, limit: 15, timeLeft: () => runClock.clip(20_000) }),
+      enrich: async (companies, domains, day) => {
+        const enriched = await enrichUnderApolloCap({
+          companies,
+          domains,
+          today: day,
+          limit: 15,
+          timeLeft: () => runClock.clip(20_000),
+        });
+        return {
+          ...enriched,
+          companies: enriched.companies.map((company) => ({
+            ...company,
+            buyerJudgment: company.buyerJudgment,
+            fitRating: company.fitRating,
+          })),
+        };
+      },
     });
     await recordHunterEffort({
       calls: 0,

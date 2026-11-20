@@ -7,7 +7,7 @@
 
 import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, isPhaseOneCompany, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
-import { isClearBuyer, isStoredJudgment, judgeBuyerFit, type BuyerJudgment, type BuyerJudgmentInput } from "./buyer-judgment.ts";
+import { isClearBuyer, isStoredJudgment, judgeBuyerFit, type BuyerJudgment, type BuyerJudgmentInput, type FitRating } from "./buyer-judgment.ts";
 import {
   applyHunterWork,
   assignEnrichment,
@@ -188,6 +188,7 @@ export type HunterCard = {
   exploration?: boolean;
   /** Set before filing. "unavailable" means the judgement call failed and the card must not be filed. */
   buyerJudgment?: BuyerJudgment | "unavailable";
+  fitRating?: FitRating;
 };
 
 export function freshHunterState(): HunterState {
@@ -671,6 +672,7 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     dedupeKey: cardDedupeKey(card.domain, card.email),
     contactLastSeenOn: card.email ? today : "",
     buyerJudgment: isStoredJudgment(card.buyerJudgment) ? card.buyerJudgment : undefined,
+    fitRating: card.fitRating,
     lineage: makeLineage({
       query: card.query || card.hunterRegion,
       signals: card.profileHits.map((hit) => hit.id),
@@ -784,6 +786,7 @@ export function fileHunterCards(
           : isStoredJudgment(card.buyerJudgment)
             ? card.buyerJudgment
             : existing.buyerJudgment,
+        fitRating: existing.buyerName.trim() ? existing.fitRating : card.fitRating ?? existing.fitRating,
         email: existing.email.trim() ? existing.email : card.email,
         emailSource: existing.emailSource.trim() ? existing.emailSource : card.emailSource,
         contactLastSeenOn:
@@ -1098,7 +1101,7 @@ export async function enrichUnderApolloCap(input: {
       const left = input.timeLeft ? input.timeLeft() : 20_000;
       if (left < 1_000) return { ok: false };
       const result = await judgeBuyerFit(contact, { timeoutMs: Math.min(20_000, left) });
-      return result.ok ? { ok: true, judgment: result.judgment } : { ok: false };
+      return result.ok ? { ok: true, judgment: result.judgment, fit: result.fit ?? null } : { ok: false };
     },
   });
   result.companies = await Promise.all(
@@ -1609,7 +1612,7 @@ function judgmentInput(card: HunterCard): BuyerJudgmentInput {
     city: card.city,
     industry: card.industry,
     sizeBand: card.sizeBand,
-    signals: card.signals.map((signal) => signal.kind).filter(Boolean).join(", "),
+    signals: [...card.profileHits.map((hit) => hit.label), ...card.signals.map((signal) => signal.kind)].filter(Boolean).join(", "),
     role: card.buyerTitle,
   };
 }
@@ -1633,7 +1636,11 @@ async function attachBuyerJudgments(
     }
     const result = await judgeBuyerFit(judgmentInput(card), { timeoutMs });
     await noteUsage(result.usage);
-    next.push(result.ok ? { ...card, buyerJudgment: result.judgment } : { ...card, buyerJudgment: "unavailable" });
+    next.push(
+      result.ok
+        ? { ...card, buyerJudgment: result.judgment, ...(result.fit ? { fitRating: result.fit } : {}) }
+        : { ...card, buyerJudgment: "unavailable" },
+    );
   }
   return next;
 }

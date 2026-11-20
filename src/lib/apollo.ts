@@ -6,7 +6,7 @@
  */
 
 import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
-import { isClearBuyer, type BuyerJudgment } from "./buyer-judgment.ts";
+import { isClearBuyer, type BuyerJudgment, type FitRating } from "./buyer-judgment.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
@@ -327,7 +327,7 @@ export async function enrichHunterContacts(input: {
     sizeBand: string;
     signals: string;
     role: string;
-  }) => Promise<{ ok: true; judgment: BuyerJudgment } | { ok: false }>;
+  }) => Promise<{ ok: true; judgment: BuyerJudgment; fit?: FitRating | null } | { ok: false }>;
 }): Promise<{
   companies: Company[];
   searches: number;
@@ -472,6 +472,7 @@ export async function enrichHunterContacts(input: {
       const withFit: Company = {
         ...accepted,
         buyerJudgment: decision.judgment,
+        fitRating: current.fitRating ?? decision.fit ?? undefined,
         casl: accepted.casl ? { ...accepted.casl, roleFit: true } : accepted.casl,
       };
       if (withFit.email.trim() && apolloEmailIsVerified(withFit.apolloEmailStatus ?? "")) verifiedEmails += 1;

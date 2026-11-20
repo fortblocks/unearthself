@@ -327,7 +327,7 @@ async function judgeScoutContacts(rows: ScoutIngest[], timeLeft?: () => number) 
       continue;
     }
     console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "buyer", confidence: result.judgment.confidence, reason: result.judgment.reason }));
-    kept.push({ ...row, buyerJudgment: result.judgment });
+    kept.push({ ...row, buyerJudgment: result.judgment, ...(result.fit ? { fitRating: result.fit } : {}) });
   }
   return { rows: kept, notBuyerJudged, judgmentUnavailable };
 }
