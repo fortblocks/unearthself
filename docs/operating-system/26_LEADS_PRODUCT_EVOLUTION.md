@@ -61,7 +61,7 @@ Add, only when a public page supports them:
 |---|---|---|
 | `peopleLeadName` | Named person who leads people, HR, or culture | `peopleLeadSource` URL |
 | `peopleLeadTitle` | Title as printed on that page | same URL |
-| `fieldSources` | Map of field name to URL, for name, title, and email as well | one URL per filled field |
+| `fieldSources` | Map of field name to its source, for name, title, email, place, industry, and size band. Each source is the public page URL or Apollo, and it carries the date. A public page stores the date the page was fetched. Apollo stores the date the row was pulled, and Apollo's updated date when Apollo returns one. No source means the field stays blank. Built on main on 20th November 2026. | one source per filled field |
 
 Flow:
 
@@ -450,3 +450,4 @@ Do not quietly change the weights. A wider map needs a partner decision: which c
 - 18 November 2026. Added section 5, per-email customization from the `27` template, and section 6, A/B testing with a default threshold of 20 sends per version, pending Chris setting the real number.
 - 19th November 2026. File 30 named as the governing frame for leads work. Where this file differs, file 30 governs.
 - 19th November 2026. Calgary distance confirmed by Christopher and recorded in `20`: about 128 kilometres from Calgary airport, about 135 kilometres from downtown Calgary, roughly an hour and a half. The 90-minute line in this file now points there. Boardroom, resort, and Spring 2027 stay pending.
+- 20th November 2026. Christopher approved the field source date. Each `fieldSources` entry carries the date. A public page stores the date the page was fetched. Apollo stores the date the row was pulled, and Apollo's updated date when Apollo returns one. No source means the field stays blank. Changed 20th November 2026 on Christopher's approval.
