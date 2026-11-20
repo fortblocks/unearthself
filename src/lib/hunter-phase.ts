@@ -44,6 +44,7 @@ export const DROP_REASONS = [
   "name-missing",
   "domain-mismatch",
   "place-mismatch",
+  "no-canadian-office",
   "do-not-contact",
   "duplicate",
   "below-quality-floor",

@@ -1,6 +1,6 @@
 /** Score 100 = Fit 60 + Access 25 + Timing 15. Computed, never guessed. */
 
-export type LeadCity = "Calgary" | "Edmonton" | "Red Deer" | "Alberta" | "Elsewhere";
+export type LeadCity = "Calgary" | "Edmonton" | "Red Deer" | "Alberta" | "Canada" | "US" | "Europe" | "Elsewhere";
 export type SizeBand = "1-49" | "50-79" | "80-800" | "801-1500" | "1500+" | "unknown";
 export type Industry =
   | "energy"
@@ -217,7 +217,11 @@ export function geoPoints(city: LeadCity): number {
   if (city === "Calgary") return 22;
   if (city === "Edmonton") return 20;
   if (city === "Red Deer") return 16;
-  return 6;
+  if (city === "Alberta") return 14;
+  if (city === "Canada") return 10;
+  if (city === "US") return 6;
+  if (city === "Europe") return 3;
+  return 2;
 }
 
 /** Headcount is a soft guide. A very small company and a very large company still score. */
@@ -589,14 +593,104 @@ export function mergeScoutRows(
   return { companies: next, added, merged, skipped };
 }
 
+const CANADA_PLACE_TERMS = [
+  "canada",
+  "toronto",
+  "ottawa",
+  "montreal",
+  "montréal",
+  "vancouver",
+  "winnipeg",
+  "halifax",
+  "victoria",
+  "regina",
+  "saskatoon",
+  "british columbia",
+  "quebec",
+  "québec",
+  "ontario",
+  "manitoba",
+  "saskatchewan",
+  "nova scotia",
+  "new brunswick",
+  "newfoundland",
+];
+const US_PLACE_TERMS = [
+  "united states",
+  "usa",
+  "u.s.",
+  "seattle",
+  "california",
+  "washington",
+  "texas",
+  "denver",
+  "chicago",
+  "boston",
+  "new york",
+  "los angeles",
+  "san francisco",
+];
+const EUROPE_PLACE_TERMS = [
+  "europe",
+  "united kingdom",
+  "england",
+  "scotland",
+  "wales",
+  "ireland",
+  "london",
+  "germany",
+  "berlin",
+  "france",
+  "paris",
+  "netherlands",
+  "sweden",
+  "norway",
+  "denmark",
+  "spain",
+  "italy",
+  "portugal",
+  "belgium",
+  "switzerland",
+  "austria",
+  "finland",
+  "poland",
+];
+
 export function coerceCity(raw: string | undefined, fallback: LeadCity = "Alberta"): LeadCity {
   const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return fallback;
   if (v.includes("calgary") || v.includes("okotoks") || v.includes("airdrie")) return "Calgary";
   if (v.includes("edmonton") || v.includes("strathcona") || v.includes("st. albert") || v.includes("st albert"))
     return "Edmonton";
   if (v.includes("red deer")) return "Red Deer";
-  if (v.includes("alberta") || v === "ab") return "Alberta";
+  if (
+    v.includes("alberta") ||
+    v === "ab" ||
+    /\bab\b/.test(v) ||
+    v.includes("lethbridge") ||
+    v.includes("medicine hat") ||
+    v.includes("fort mcmurray") ||
+    v.includes("grande prairie") ||
+    v.includes("canmore") ||
+    v.includes("banff") ||
+    v.includes("jasper")
+  ) {
+    return "Alberta";
+  }
+  if (CANADA_PLACE_TERMS.some((term) => v.includes(term))) return "Canada";
+  if (US_PLACE_TERMS.some((term) => v.includes(term))) return "US";
+  if (EUROPE_PLACE_TERMS.some((term) => v.includes(term))) return "Europe";
   return fallback;
+}
+
+/** A stored Elsewhere card takes a finer city when its place text names one. Other cities stay put. */
+export function refineStoredCity(company: Company): Company {
+  if (company.city !== "Elsewhere") return company;
+  const place = company.place?.trim();
+  if (!place) return company;
+  const city = coerceCity(place, "Elsewhere");
+  if (city === "Elsewhere") return company;
+  return { ...company, city };
 }
 
 export function coerceIndustry(raw: string | undefined, fallback: Industry = "other"): Industry {

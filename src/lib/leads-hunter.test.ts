@@ -6,9 +6,13 @@ import {
   HUNTER_DAILY_CARD_TARGET,
   HUNTER_REGIONS,
   HUNTER_REGION_WEIGHTS,
+  HUNTER_REQUIRE_CANADIAN_OFFICE,
+  HUNTER_SEARCH_WEIGHTS,
   HUNTER_SIGNALS,
   HUNTER_STRATEGY_REVIEW,
+  pageShowsCanadianOffice,
   regionWeightForPlace,
+  searchRegionCycle,
 } from "../data/hunter-profile.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
 import {
@@ -137,9 +141,10 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
   const [card] = verifyHunterDrafts([draft({ buyer: { ...draft().buyer, email: "guessed@acmealpine.example", title: "Invented Title" } })], { [url]: page }, {
     regionId: "europe",
     today: "2026-11-18",
+    requireCanadianOffice: false,
   });
   assert.ok(card);
-  assert.equal(card.city, "Elsewhere");
+  assert.equal(card.city, "Europe");
   assert.equal(card.place, "Berlin, Germany");
   assert.equal(card.buyerName, "Laura Starchuk");
   assert.equal(card.buyerTitle, "");
@@ -156,7 +161,7 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
       [url]: page.replace("outdoor apparel", "wool coats"),
       [other]: "Other Co builds outdoor apparel and runs adventure trips.",
     },
-    { regionId: "europe", today: "2026-11-18" },
+    { regionId: "europe", today: "2026-11-18", requireCanadianOffice: false },
   );
   assert.ok(own);
   assert.equal("partnerFlag" in (own ?? {}), false);
@@ -183,7 +188,7 @@ test("geography scores a company and never drops it", () => {
       profileSignals: [],
       buyer,
     });
-  const opts = { regionId: "canada", today: "2026-11-18" };
+  const opts = { regionId: "canada", today: "2026-11-18", requireCanadianOffice: false };
   const [alberta] = verifyHunterDrafts([row("Northwind Energy", "northwind.example", "Calgary, Alberta", "https://northwind.example/about")], { "https://northwind.example/about": calgaryPage }, opts);
   const [seattle] = verifyHunterDrafts([row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about")], { "https://harbor.example/about": seattlePage }, opts);
   const [halifax] = verifyHunterDrafts([row("Atlantic Mills", "atlantic.example", "Halifax, NS", "https://atlantic.example/about")], { "https://atlantic.example/about": halifaxPage }, opts);
@@ -202,11 +207,36 @@ test("geography scores a company and never drops it", () => {
   assert.ok(alberta.hunterBreak.travel > seattle.hunterBreak.travel);
   assert.ok(seattle.hunterBreak.travel > halifax.hunterBreak.travel);
   assert.ok(halifax.hunterBreak.travel > 0);
-  assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), seattlePage, "canada", "ok"), null);
+  assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), seattlePage, "canada", "ok", undefined, false), null);
   assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), "", "canada", "blocked"), "blocked");
   assert.equal(regionWeightForPlace("Seattle, WA", "canada"), HUNTER_REGION_WEIGHTS.californiaWashington);
   assert.equal(regionWeightForPlace("Halifax, NS", "us"), HUNTER_REGION_WEIGHTS.elsewhere);
   assert.equal(regionWeightForPlace("", "canada"), HUNTER_REGION_WEIGHTS.elsewhere);
+});
+
+test("a Canadian office is required on this branch, and the other checks still come first", () => {
+  const seattle = "Harbor Software is in Seattle, WA. harbor.example.";
+  const calgary = "Northwind Energy is in Calgary, Alberta. northwind.example.";
+  const source = "https://harbor.example/about";
+  const dropped = verifyHunterDrafts(
+    [draft({ domain: "harbor.example", org: "Harbor Software", place: "Seattle, WA", sourceUrl: source, signals: [], profileSignals: [], buyer: { name: "", title: "", email: "", emailSource: "" } })],
+    { [source]: seattle },
+    { regionId: "us", today: "2026-11-18" },
+  );
+  assert.equal(dropped.length, 0);
+  assert.equal(pageShowsCanadianOffice(seattle), false);
+  assert.equal(pageShowsCanadianOffice(calgary), true);
+  const row = draft({ domain: "harbor.example", org: "Harbor Software", place: "Seattle, WA", sourceUrl: source, buyer: { name: "", title: "", email: "", emailSource: "" } });
+  assert.equal(draftDropReason(row, seattle, "us", "ok"), "no-canadian-office");
+  assert.equal(draftDropReason(row, "", "us", "blocked"), "blocked");
+  assert.equal(draftDropReason(row, "Someone else in Seattle.", "us", "ok"), "name-missing");
+  assert.equal(draftDropReason({ ...row, sourceUrl: "https://other.example" }, "Harbor Software", "us", "ok"), "domain-mismatch");
+  const [kept] = verifyHunterDrafts(
+    [draft({ domain: "northwind.example", org: "Northwind Energy", place: "Calgary, Alberta", sourceUrl: "https://northwind.example/about", signals: [], profileSignals: [], buyer: { name: "", title: "", email: "", emailSource: "" } })],
+    { "https://northwind.example/about": calgary },
+    { regionId: "alberta", today: "2026-11-18" },
+  );
+  assert.equal(kept?.city, "Calgary");
 });
 
 test("a United States company is scored, not dropped", () => {
@@ -226,7 +256,7 @@ test("a United States company is scored, not dropped", () => {
       }),
     ],
     { [source]: denver },
-    { regionId: "us", today: "2026-11-18" },
+    { regionId: "us", today: "2026-11-18", requireCanadianOffice: false },
   );
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.hunterBreak.travel, HUNTER_REGION_WEIGHTS.unitedStates);
@@ -273,7 +303,7 @@ test("travel points stay above zero", () => {
 });
 
 test("a known domain is updated and a new domain is filed once", () => {
-  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18" });
+  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18", requireCanadianOffice: false });
   assert.ok(card);
   const first = fileHunterCards([company()], [card], { today: "2026-11-18" });
   assert.equal(first.companies.length, 1);
@@ -308,7 +338,7 @@ test("a known domain is updated and a new domain is filed once", () => {
 });
 
 test("a blank name and title on a known card are filled from the verified page", () => {
-  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18" });
+  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18", requireCanadianOffice: false });
   assert.ok(card);
   const blank = company({ buyerName: "", buyerTitle: "", email: "" });
   const filed = fileHunterCards([blank], [card], { today: "2026-11-18" });
@@ -319,14 +349,25 @@ test("a blank name and title on a known card are filled from the verified page",
   assert.equal(filed.companies[0]?.why, "Scout card. Leave this sentence.");
 });
 
-test("the batch cursor walks signal and region, then wraps", () => {
+test("the batch cursor spends about three quarters of searches on Alberta and Canada", () => {
+  const cycle = searchRegionCycle();
+  const weight = (id: string) => HUNTER_SEARCH_WEIGHTS[id as keyof typeof HUNTER_SEARCH_WEIGHTS];
+  const count = (id: string) => cycle.filter((regionId) => regionId === id).length;
+  assert.equal(cycle.length, Object.values(HUNTER_SEARCH_WEIGHTS).reduce((sum, n) => sum + n, 0));
+  assert.equal(count("alberta"), weight("alberta"));
+  assert.equal(count("canada"), weight("canada"));
+  assert.equal(count("alberta") + count("canada"), 21);
+  assert.ok(count("alberta") > count("canada"));
+  assert.ok(count("us") > count("europe"));
+  assert.equal(count("us"), weight("us"));
   const slots = hunterSlots();
-  assert.equal(slots.length, HUNTER_SIGNALS.length * HUNTER_REGIONS.length + HUNTER_REGIONS.length);
-  assert.equal(slots.filter((slot) => slot.source === "public-linkedin").length, HUNTER_REGIONS.length);
+  assert.equal(slots.length, (HUNTER_SIGNALS.length + 1) * cycle.length);
+  assert.equal(slots.filter((slot) => slot.source === "public-linkedin").length, cycle.length);
   assert.equal(slotAt(0).slot.signalId, HUNTER_SIGNALS[0]?.id);
-  assert.equal(slotAt(0).slot.regionId, "canada");
+  assert.equal(slotAt(0).slot.regionId, cycle[0]);
   assert.equal(advanceCursor(slots.length - 1), 0);
-  assert.notEqual(slotAt(1).slot.regionId, slotAt(0).slot.regionId);
+  const canadaShare = slots.filter((slot) => slot.regionId === "alberta" || slot.regionId === "canada").length / slots.length;
+  assert.ok(canadaShare >= 0.74 && canadaShare <= 0.76);
 });
 
 test("the daily stop is the contact-ready ceiling, and calls do not stop the day", () => {
@@ -410,6 +451,14 @@ test("the hunter prompt is driven by the profile and does not name a data vendor
   const prompt = hunterPrompt(slotAt(0).slot, ["kept.example"]);
   assert.match(prompt, new RegExp(HUNTER_SIGNALS[0]?.search ?? "missing"));
   assert.match(prompt, /kept\.example/);
+  assert.match(prompt, /Drumheller/);
+  assert.match(prompt, /6 to 24/);
+  assert.match(prompt, /2 to 5 day/);
+  assert.equal(/any size|any industry|small company is allowed/i.test(prompt), false);
+  assert.equal(prompt.includes("\u2014"), false);
+  assert.equal(HUNTER_REQUIRE_CANADIAN_OFFICE, true);
+  assert.match(prompt, /real office or a team in Canada/);
+  assert.equal(/real office or a team in Canada/.test(hunterPrompt(slotAt(0).slot, [], false)), false);
   assert.equal(/apollo|clay|geolab/i.test(prompt), false);
 });
 
@@ -455,7 +504,7 @@ test("Europe and Mexico stay searchable", () => {
       }),
     ],
     { [source]: mexico },
-    { regionId: "latin-america", today: "2026-11-18" },
+    { regionId: "latin-america", today: "2026-11-18", requireCanadianOffice: false },
   );
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.hunterBreak.travel, HUNTER_REGION_WEIGHTS.mexico);
@@ -497,7 +546,7 @@ Alex Reid, Head of People. Write to alex@acmealpine.example.
   const [kept] = verifyHunterDrafts(
     [draft({ buyer: { name: "Laura Starchuk", title: "Head of People", email: "laura@acmealpine.example", emailSource: url } })],
     { [url]: moved },
-    { regionId: "europe", today: "2026-11-18" },
+    { regionId: "europe", today: "2026-11-18", requireCanadianOffice: false },
   );
   assert.ok(kept);
   assert.equal(kept?.buyerName, "Alex Reid");
@@ -509,7 +558,7 @@ Alex Reid, Head of People. Write to alex@acmealpine.example.
   const [open] = verifyHunterDrafts(
     [draft({ buyer: { name: "Laura Starchuk", title: "Head of People", email: "laura@acmealpine.example", emailSource: url } })],
     { [url]: gone },
-    { regionId: "europe", today: "2026-11-18" },
+    { regionId: "europe", today: "2026-11-18", requireCanadianOffice: false },
   );
   assert.ok(open);
   assert.equal(open?.org, "Acme Alpine");

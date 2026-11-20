@@ -336,7 +336,7 @@ test("drop reasons, the quality floor, and the fixture dry run", () => {
       },
     ],
     { [source]: "Weak Example sells paper." },
-    { regionId: "anywhere", today: "2026-11-19" },
+    { regionId: "anywhere", today: "2026-11-19", requireCanadianOffice: false },
   );
   assert.equal(cards.length, 1);
   assert.ok((cards[0]?.hunterScore ?? 100) < HUNTER_QUALITY_FLOOR_DEFAULT);
@@ -459,7 +459,7 @@ test("a 25-point card with no fit signal is rejected, and the daily file cap sta
       },
     ],
     { [source]: "Paper Example. Ada North, Head of People, ada@paper.example." },
-    { regionId: "anywhere", today: "2026-11-19" },
+    { regionId: "anywhere", today: "2026-11-19", requireCanadianOffice: false },
   );
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.profileHits.length, 0);

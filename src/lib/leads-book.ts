@@ -7,7 +7,7 @@
 
 import { isTestCompany } from "../data/desk.ts";
 import { isSeedCompany } from "../data/leads.ts";
-import { asLeadCompany, edmontonToday, timingFromSignals, type Company } from "./lead-score.ts";
+import { asLeadCompany, edmontonToday, refineStoredCity, timingFromSignals, type Company } from "./lead-score.ts";
 
 export const LEADS_KEY = "unearth:leads:v1";
 export const DESK_STORAGE_KEY = "unearthself-desk-v3";
@@ -47,7 +47,8 @@ export function seedBook(): LeadsBook {
 export function liveCompanies(companies: Company[]) {
   return companies
     .filter((company) => !isSeedCompany(company) && !isTestCompany(company.org, company.domain))
-    .map(asLeadCompany);
+    .map(asLeadCompany)
+    .map(refineStoredCity);
 }
 
 function isCompany(row: unknown): row is Company {

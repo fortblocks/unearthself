@@ -45,7 +45,7 @@ export function dryRunFixtures(floor: number, dnc: DncEntry[] = [], today = "202
     drafts.push(fixtureDraft(row));
     pages[row.sourceUrl] = row.page;
   }
-  const cards = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today });
+  const cards = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today, requireCanadianOffice: false });
   funnel.verified = cards.length;
   const filed = fileHunterCards([], cards, { today, floor, dnc });
   funnel.contactFound = filed.companies.filter((company) => company.email).length;

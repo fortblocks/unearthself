@@ -9,6 +9,7 @@ export const DROP_LABELS: Record<DropReason, string> = {
   "name-missing": "no person named",
   "domain-mismatch": "domain did not match",
   "place-mismatch": "place did not match",
+  "no-canadian-office": "no Canadian office",
   "do-not-contact": "do not contact",
   duplicate: "already in the book (duplicate)",
   "below-quality-floor": "below the quality floor",

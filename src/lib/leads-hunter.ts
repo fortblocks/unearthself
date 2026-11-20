@@ -5,7 +5,15 @@
  * Apollo may add one licensed contact when APOLLO_API_KEY is set. The key is never logged.
  */
 
-import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, regionWeightForPlace } from "../data/hunter-profile.ts";
+import {
+  HUNTER_DAILY_CARD_TARGET,
+  HUNTER_REGIONS,
+  HUNTER_REQUIRE_CANADIAN_OFFICE,
+  HUNTER_SIGNALS,
+  pageShowsCanadianOffice,
+  regionWeightForPlace,
+  searchRegionCycle,
+} from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
 import {
   applyHunterWork,
@@ -18,6 +26,7 @@ import { appendHunterRun, clearRunStarted, hunterRunEntry, logHunterRunLine, mar
 import { getRedisClient, loadBook, saveBook } from "./leads-book.ts";
 import {
   asLeadCompany,
+  coerceCity,
   coerceIndustry,
   coerceSize,
   edmontonToday,
@@ -244,27 +253,31 @@ export type HunterSlot = {
   source: HunterSource;
 };
 
+function slotFor(signalId: string, signalLabel: string, regionId: string, source: HunterSource): HunterSlot | null {
+  const region = HUNTER_REGIONS.find((item) => item.id === regionId);
+  if (!region) return null;
+  return {
+    signalId,
+    regionId: region.id,
+    signalLabel,
+    regionLabel: region.label,
+    source,
+  };
+}
+
+/** Weighted slots. About three quarters are Alberta or the rest of Canada, Alberta the larger share. */
 export function hunterSlots(): HunterSlot[] {
+  const cycle = searchRegionCycle();
   const slots: HunterSlot[] = [];
   for (const signal of HUNTER_SIGNALS) {
-    for (const region of HUNTER_REGIONS) {
-      slots.push({
-        signalId: signal.id,
-        regionId: region.id,
-        signalLabel: signal.label,
-        regionLabel: region.label,
-        source: "web",
-      });
+    for (const regionId of cycle) {
+      const slot = slotFor(signal.id, signal.label, regionId, "web");
+      if (slot) slots.push(slot);
     }
   }
-  for (const region of HUNTER_REGIONS) {
-    slots.push({
-      signalId: "public-linkedin",
-      regionId: region.id,
-      signalLabel: "Public LinkedIn post",
-      regionLabel: region.label,
-      source: "public-linkedin",
-    });
+  for (const regionId of cycle) {
+    const slot = slotFor("public-linkedin", "Public LinkedIn post", regionId, "public-linkedin");
+    if (slot) slots.push(slot);
   }
   return slots;
 }
@@ -445,12 +458,7 @@ function pageHas(page: string, needle: string) {
 }
 
 function cityFromPlace(place: string): LeadCity {
-  const v = place.toLowerCase();
-  if (v.includes("calgary")) return "Calgary";
-  if (v.includes("edmonton")) return "Edmonton";
-  if (v.includes("red deer")) return "Red Deer";
-  if (/\balberta\b/.test(v)) return "Alberta";
-  return "Elsewhere";
+  return coerceCity(place, "Elsewhere");
 }
 
 function domainOnSource(domain: string, sourceUrl: string, page: string) {
@@ -523,12 +531,13 @@ function industryFromPage(raw: string, page: string): Industry {
 
 /**
  * Drop anything the fetched page does not show.
- * Place is recorded and scored. It never drops a company.
+ * Place is recorded and scored. It drops a company only when the Canadian-office
+ * switch is on and the page shows no Canadian office or place.
  */
 export function verifyHunterDrafts(
   drafts: HunterDraft[],
   pages: Record<string, string>,
-  opts: { regionId: string; today: string },
+  opts: { regionId: string; today: string; requireCanadianOffice?: boolean },
 ): HunterCard[] {
   const cards: HunterCard[] = [];
   for (const draft of drafts) {
@@ -539,6 +548,8 @@ export function verifyHunterDrafts(
     if (!domainOnSource(draft.domain, draft.sourceUrl, page)) continue;
     const place = draft.place && pageHas(page, draft.place) ? draft.place : "";
     const city = place ? cityFromPlace(place) : "Elsewhere";
+    const requireOffice = opts.requireCanadianOffice ?? HUNTER_REQUIRE_CANADIAN_OFFICE;
+    if (requireOffice && !pageShowsCanadianOffice(page)) continue;
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
     const movedOnContact = pageShowsMovedOn(contactPage, draft.buyer.name, draft.org);
@@ -777,17 +788,20 @@ export function domainsForPrompt(knownDomains: string[], maxChars = HUNTER_PROMP
   return listed.join(", ");
 }
 
-export function hunterPrompt(slot: HunterSlot, knownDomains: string[]) {
+export function hunterPrompt(slot: HunterSlot, knownDomains: string[], requireCanadianOffice = HUNTER_REQUIRE_CANADIAN_OFFICE) {
   const signal = HUNTER_SIGNALS.find((item) => item.id === slot.signalId);
   const skip = domainsForPrompt(knownDomains);
   const signalList = HUNTER_SIGNALS.map((item) => `${item.id}: ${item.search}`).join("\n");
   const sourceRule = slot.source === "public-linkedin"
     ? "Source: a public LinkedIn post only. sourceUrl must be an https://www.linkedin.com URL whose path contains /posts/, /pulse/, or /feed/update/. Do not use a profile URL, a login page, or a page that asks you to sign in. Do not log in. Keep a field only when its exact text is on that public post."
     : "Source: a public web page. Do not use a login page.";
-  return `Find companies for Badlands Bootcamp at Unearth Self. One team of 6 to 24 people inside a company of any size. Any industry is allowed. A forward-thinking technology company is a strong lead. A small company is allowed. Return JSON only.
+  const placeRule = requireCanadianOffice
+    ? `Search focus: ${slot.regionLabel}. Only return a company with a real office or a team in Canada. Alberta is preferred.`
+    : `Region: ${slot.regionLabel}. Do not drop a company for being outside Canada. Geography is a score, not a reason to exclude a company.`;
+  return `Find companies that could realistically bring a team of 6 to 24 people to a 2 to 5 day offsite in Drumheller. Prefer a team within driving distance in Alberta, then a short flight from the rest of Western Canada, then the rest of Canada. Look for public signals of budget: headcount roughly 50 or more, funding, an offsite or culture or leadership programme, or hiring for events or learning and development. Return JSON only.
 
 This batch: ${signal?.label ?? slot.signalLabel}.
-Region: ${slot.regionLabel}. Do not drop a company for being outside Canada. Do not filter by headcount or industry. Europe and Mexico stay in the search.
+${placeRule}
 
 ${sourceRule}
 
@@ -881,6 +895,7 @@ export function draftDropReason(
   _regionId: string,
   fetchReason?: import("./hunter-phase.ts").PageRead["reason"],
   source?: HunterSource,
+  requireCanadianOffice = HUNTER_REQUIRE_CANADIAN_OFFICE,
 ): import("./hunter-phase.ts").DropReason | null {
   if ((source ?? draft.sourceKind) === "public-linkedin" && !isPublicLinkedInPost(draft.sourceUrl)) return "unverified";
   if (!page) {
@@ -889,6 +904,7 @@ export function draftDropReason(
   }
   if (!pageHas(page, draft.org)) return "name-missing";
   if (!domainOnSource(draft.domain, draft.sourceUrl, page)) return "domain-mismatch";
+  if (requireCanadianOffice && !pageShowsCanadianOffice(page)) return "no-canadian-office";
   return null;
 }
 

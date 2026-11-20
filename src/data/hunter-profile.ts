@@ -109,10 +109,16 @@ export const HUNTER_AFFORDABILITY_SIGNAL_IDS = ["big-tech", "funding", "events-h
 
 export const HUNTER_REGIONS: HunterRegion[] = [
   {
-    id: "canada",
-    label: "Canada",
+    id: "alberta",
+    label: "Alberta",
     travel: 10,
-    placeTerms: ["canada", "calgary", "edmonton", "alberta", "toronto", "vancouver", "ottawa", "montreal", "winnipeg"],
+    placeTerms: ["calgary", "edmonton", "red deer", "alberta", "lethbridge", "medicine hat", "fort mcmurray", "grande prairie", "canmore", "banff", "jasper"],
+  },
+  {
+    id: "canada",
+    label: "rest of Canada",
+    travel: 10,
+    placeTerms: ["canada", "toronto", "vancouver", "ottawa", "montreal", "winnipeg", "halifax", "victoria"],
   },
   {
     id: "us",
@@ -166,6 +172,96 @@ export const HUNTER_REGIONS: HunterRegion[] = [
     placeTerms: [],
   },
 ];
+
+/**
+ * How often each region is searched. Alberta plus the rest of Canada are 21 of 28 slots (75%).
+ * Alberta is the larger of those two. The United States is the largest share of what remains.
+ * The list is fixed so a cursor walk is the same every time.
+ */
+export const HUNTER_SEARCH_WEIGHTS = {
+  alberta: 15,
+  canada: 6,
+  us: 3,
+  europe: 1,
+  "asia-pacific": 1,
+  "latin-america": 1,
+  anywhere: 1,
+} as const;
+
+/** Spread the weights through one cycle. A higher weight is picked more often, not as a solid block. */
+export function searchRegionCycle(weights: Record<string, number> = HUNTER_SEARCH_WEIGHTS): string[] {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, count]) => sum + count, 0);
+  const used = entries.map(() => 0);
+  const cycle: string[] = [];
+  for (let step = 0; step < total; step += 1) {
+    let best = -1;
+    let bestDebt = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < entries.length; index += 1) {
+      const weight = entries[index]?.[1] ?? 0;
+      if (used[index] >= weight) continue;
+      const debt = weight * (step + 1) - used[index] * total;
+      if (debt > bestDebt) {
+        bestDebt = debt;
+        best = index;
+      }
+    }
+    if (best < 0) break;
+    used[best] += 1;
+    const id = entries[best]?.[0];
+    if (id) cycle.push(id);
+  }
+  return cycle;
+}
+
+/**
+ * When true, Hunter asks only for a company with a real office or team in Canada,
+ * and drops a page that shows no Canadian place. Default true on this review branch.
+ * Turning it on conflicts with spec 29 line 63, which says geography is never a filter.
+ * It needs Chris's approval before production.
+ */
+export const HUNTER_REQUIRE_CANADIAN_OFFICE = true;
+
+const CANADIAN_OFFICE_TERMS = [
+  "canada",
+  "canadian",
+  "calgary",
+  "edmonton",
+  "red deer",
+  "alberta",
+  "lethbridge",
+  "medicine hat",
+  "fort mcmurray",
+  "grande prairie",
+  "canmore",
+  "banff",
+  "jasper",
+  "toronto",
+  "vancouver",
+  "ottawa",
+  "montreal",
+  "montréal",
+  "winnipeg",
+  "halifax",
+  "victoria",
+  "regina",
+  "saskatoon",
+  "british columbia",
+  "quebec",
+  "québec",
+  "ontario",
+  "manitoba",
+  "saskatchewan",
+  "nova scotia",
+  "new brunswick",
+  "newfoundland",
+];
+
+/** A real office or team in Canada, as printed on the page. */
+export function pageShowsCanadianOffice(page: string) {
+  const hay = page.toLowerCase();
+  return CANADIAN_OFFICE_TERMS.some((term) => hay.includes(term));
+}
 
 /**
  * Soft regional priority. Not a filter, and not fixed: review it each month.

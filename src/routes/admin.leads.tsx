@@ -45,7 +45,7 @@ const SEND_ERR: Record<string, string> = {
   copy: "Draft fails house voice.",
 };
 
-const CITIES: Array<LeadCity | "all"> = ["all", "Calgary", "Edmonton", "Red Deer", "Alberta", "Elsewhere"];
+const CITIES: Array<LeadCity | "all"> = ["all", "Calgary", "Edmonton", "Red Deer", "Alberta", "Canada", "US", "Europe", "Elsewhere"];
 const ORIGINS = ["all", "scout", "hunter", "hand"] as const;
 
 function originLabel(origin: (typeof ORIGINS)[number]) {

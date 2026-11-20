@@ -4,12 +4,15 @@ import { SEED_COMPANIES } from "../data/leads.ts";
 import { draftForCompany, draftProblems, wordCount } from "./lead-copy.ts";
 import {
   bandFor,
+  coerceCity,
+  geoPoints,
   hasAccess,
   isSendable,
   mergeScoutRows,
   normalizeDomain,
   parseScoutBatch,
   recencyFactor,
+  refineStoredCity,
   scoreCompany,
   sizePoints,
   sourcedEmail,
@@ -302,6 +305,49 @@ test("scoreCompany uses signals when they are stored and ignores a typed timing 
   assert.equal(scored.total, 94);
   assert.equal(scored.band, "pursue");
 });
+
+test("dashboard geography ranks Calgary first and an old Elsewhere card follows its place", () => {
+  const order = ["Calgary", "Edmonton", "Red Deer", "Alberta", "Canada", "US", "Europe", "Elsewhere"] as const;
+  for (let index = 1; index < order.length; index += 1) {
+    const higher = order[index - 1] ?? "Calgary";
+    const lower = order[index] ?? "Elsewhere";
+    assert.ok(geoPoints(higher) > geoPoints(lower));
+  }
+  assert.ok(geoPoints("Elsewhere") > 0);
+  assert.equal(coerceCity("Lethbridge, AB", "Elsewhere"), "Alberta");
+  assert.equal(coerceCity("Halifax, NS", "Elsewhere"), "Canada");
+  assert.equal(coerceCity("Seattle, WA", "Elsewhere"), "US");
+  assert.equal(coerceCity("Berlin, Germany", "Elsewhere"), "Europe");
+  assert.equal(refineStoredCity({ ...baseCompany(), city: "Calgary", place: "Seattle, WA" }).city, "Calgary");
+  assert.equal(refineStoredCity({ ...baseCompany(), city: "Elsewhere", place: "Toronto, Canada" }).city, "Canada");
+  assert.equal(refineStoredCity({ ...baseCompany(), city: "Elsewhere", place: "" }).city, "Elsewhere");
+});
+
+function baseCompany(): Company {
+  return {
+    id: "C-1",
+    org: "Example",
+    domain: "example.test",
+    city: "Elsewhere",
+    industry: "other",
+    sizeBand: "unknown",
+    sourceUrl: "https://example.test",
+    why: "",
+    buyerName: "",
+    buyerTitle: "",
+    email: "",
+    emailSource: "",
+    timingNote: "",
+    timingScore: 0,
+    status: "watch",
+    filedLeadId: "",
+    draftSubject: "",
+    draftBody: "",
+    lastTouch: "",
+    scoutBatch: "",
+    place: "",
+  };
+}
 
 test("scoreCompany keeps a stored timing number when the company has no signal list", () => {
   const scored = scoreCompany({

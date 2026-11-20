@@ -84,7 +84,7 @@ test("selectScoutRows keeps any headcount, industry, and city", () => {
   ]);
   assert.equal(rows[0]?.sizeBand, "80-800");
   assert.equal(rows[1]?.sizeBand, "1-49");
-  assert.equal(rows[2]?.city, "Elsewhere");
+  assert.equal(rows[2]?.city, "Alberta");
   assert.equal(rows[4]?.sizeBand, "1500+");
   assert.equal(rows[0]?.buyer?.email, "pat.lee@northline.example");
   const scored = {
@@ -98,8 +98,10 @@ test("selectScoutRows keeps any headcount, industry, and city", () => {
     today: "2026-11-20",
   };
   const calgary = scoreCompany({ ...scored, city: "Calgary" });
+  const alberta = scoreCompany({ ...scored, city: "Alberta" });
   const away = scoreCompany({ ...scored, city: "Elsewhere" });
-  assert.ok(calgary.geo > away.geo);
+  assert.ok(calgary.geo > alberta.geo);
+  assert.ok(alberta.geo > away.geo);
   assert.ok(away.geo > 0);
 });
 
@@ -190,6 +192,17 @@ test("buildMorningBatch dedupes domains and stores the top new scores", () => {
   assert.ok(scored.timing > 0);
   assert.notEqual(fresh?.timingScore, 11);
   assert.equal(batch.companies.filter((company) => company.domain === "already.example").length, 1);
+});
+
+test("a stored Elsewhere card is re-derived from its place", () => {
+  const book = parseBook({
+    companies: [
+      { id: "C-010", org: "Harbour Co", domain: "harbour.example", city: "Elsewhere", place: "Halifax, NS" },
+      { id: "C-011", org: "Plain Co", domain: "plain.example", city: "Elsewhere", place: "" },
+    ],
+  });
+  assert.equal(book.companies.find((company) => company.domain === "harbour.example")?.city, "Canada");
+  assert.equal(book.companies.find((company) => company.domain === "plain.example")?.city, "Elsewhere");
 });
 
 test("morning count stays between 10 and 20 and the morning list is that day's ids", () => {

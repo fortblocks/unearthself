@@ -192,7 +192,7 @@ test("a contact on a contact page is filed, a pause and a desk edit survive, and
     assert.equal(filed?.email, "ada@northwind.test");
     assert.equal(filed?.emailSource, TEAM);
     assert.ok((filed?.profileHits?.length ?? 0) > 0);
-    assert.match(filed?.lineage?.query ?? "", /\|canada\|/);
+    assert.match(filed?.lineage?.query ?? "", /\|alberta\|/);
     assert.equal(old?.review, "approved");
     const state = await redis.get<{ paused?: boolean }>(HUNTER_KEY);
     assert.equal(state?.paused, true);
