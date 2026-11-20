@@ -25,14 +25,17 @@ test("web search uses the Responses API and the server-side web_search tool", ()
   assert.equal(JSON.stringify(body).includes("chat/completions"), false);
 });
 
-test("both hunts call the shared web search client and not live search", () => {
+test("the always-on xAI path still uses web search, and the nightly sweep does not", () => {
   const hunter = readFileSync(new URL("./leads-hunter.ts", import.meta.url), "utf8");
   const scout = readFileSync(new URL("./leads-scout.ts", import.meta.url), "utf8");
   for (const source of [hunter, scout]) {
     assert.equal(source.includes("search_parameters"), false);
     assert.equal(source.includes("chat/completions"), false);
-    assert.match(source, /searchWithRetries|callXaiWebSearch/);
   }
+  assert.match(hunter, /searchWithRetries/);
+  assert.match(hunter, /callXaiJson/);
+  assert.equal(scout.includes("searchWithRetries"), false);
+  assert.equal(scout.includes("callXaiWebSearch"), false);
 });
 
 test("an HTTP failure keeps the status and drops a secret echoed in the body", () => {

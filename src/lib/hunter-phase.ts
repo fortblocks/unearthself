@@ -90,7 +90,7 @@ export type ReviewState = "unreviewed" | "approved" | "skipped" | "expired-unrev
 export type PipelineMark = "" | "sent" | "replied" | "booked" | "won" | "lost";
 
 export type CardLineage = {
-  method: typeof HUNTER_METHOD_ID | "public-linkedin-post";
+  method: typeof HUNTER_METHOD_ID | "public-linkedin-post" | "apollo-campaign";
   query: string;
   promptVersion: string;
   model: string;
@@ -995,6 +995,13 @@ export function findingMethods(trialShare = hunterTrialShare()): FindingMethod[]
     {
       id: "public-linkedin-post",
       label: "Public LinkedIn posts",
+      enabled: true,
+      trial: false,
+      share: 0,
+    },
+    {
+      id: "apollo-campaign",
+      label: "Apollo campaign list",
       enabled: true,
       trial: false,
       share: 0,

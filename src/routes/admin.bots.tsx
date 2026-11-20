@@ -12,7 +12,7 @@ import { HUNTER_ROSTER } from "@/data/hunter-profile";
 import { partnerFirst, useDesk } from "@/lib/desk-store";
 import { botForLead } from "@/lib/bot-copy";
 import { formatFunnelDrops } from "@/lib/hunter-drops";
-import { getHunterDesk, setHunterPaused } from "@/lib/leads-hunter-api";
+import { getHunterDesk, setHunterPaused, signHunterSegment } from "@/lib/leads-hunter-api";
 
 export const Route = createFileRoute("/admin/bots")({
   loader: () => getHunterDesk(),
@@ -48,6 +48,8 @@ function outcomeLabel(outcome: string) {
   if (outcome === "capped-budget") return "Capped, model-call budget";
   if (outcome === "capped-spend") return "Capped, monthly dollar cap";
   if (outcome === "skipped-busy") return "Skipped, already running";
+  if (outcome === "stopped-time") return "Stopped for time";
+  if (outcome === "stopped-sweep") return "Nightly sweep stopped";
   if (outcome === "error") return "Error";
   return outcome;
 }
@@ -87,6 +89,22 @@ function BotsPage() {
   const dueFollow = leads.filter(
     (l) => !l.stopped && l.status !== "lost" && l.status !== "won" && l.nudges > 0 && l.nudges < 3,
   ).length;
+  async function signSegment() {
+    if (hunter.storage !== "redis") {
+      toast("Redis is not connected. Sign-off cannot be saved.");
+      return;
+    }
+    setSavingHunter(true);
+    try {
+      const next = await signHunterSegment({ data: { confirm: true } });
+      setHunter(next);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not sign off the segment");
+    } finally {
+      setSavingHunter(false);
+    }
+  }
+
   async function toggleHunter() {
     if (hunter.storage !== "redis") {
       toast("Redis is not connected. Pause cannot be saved.");
@@ -124,7 +142,7 @@ function BotsPage() {
       <section className="grid gap-6 sm:grid-cols-3">
         <Stat label="Booked calls this month" value={String(hunter.bookedThisMonth)} hint="Hunter cards marked booked or won" />
         <Stat label="Drafts waiting" value={String(queued)} hint="Human still sends" />
-        <Stat label="Hunter" value={hunter.killed ? "Killed" : hunter.paused ? "Paused" : "Running"} hint="Nightly and working hours" />
+        <Stat label="Hunter" value={hunter.killed ? "Killed" : hunter.paused ? "Paused" : "Running"} hint="Working hours, campaign list" />
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -151,7 +169,7 @@ function BotsPage() {
                 Also in Chris&apos;s Grok Bot dashboard as Hunter. Same job, same lead book. It finds and files. It never sends.
               </p>
               <p className="mt-2 text-sm text-pretty">
-                Pause stops the nightly local sweep and the always-on hunt.
+                Pause stops the campaign hunt. The nightly sweep is already stopped.
               </p>
               <p className="mt-2 text-sm text-muted">
                 {HUNTER_ROSTER.trigger} · {partnerFirst(HUNTER_ROSTER.owner)}
@@ -172,14 +190,31 @@ function BotsPage() {
                 Cards filed today: {hunter.cardsFiledToday} of {hunter.fileCap}.
               </p>
               <p className="mt-1 text-sm text-muted">
-                Contact-ready today: {hunter.filedToday} of {hunter.cardTarget} ceiling.
+                Contact-ready today: {hunter.filedToday} of {hunter.cardTarget} target.
               </p>
               <p className="mt-1 text-sm text-muted">
                 Model calls today: {hunter.callsToday}. No daily cap. Model {hunter.model}.
               </p>
               <p className="mt-1 text-sm text-muted">
-                Apollo reveals today: {hunter.apolloRevealsToday} of {hunter.apolloCreditCap}. Search is not counted.
+                Apollo reveals today: {hunter.apolloRevealsToday} of {hunter.apolloCreditCap}. People search is not counted.
               </p>
+              <p className="mt-1 text-sm text-muted">
+                Apollo credits today: {hunter.apolloCreditsToday}. This month: {hunter.apolloCreditsMonth}. Company search, sizing, and reveals. No credit cap.
+              </p>
+              {hunter.apolloCreditAlarm ? <p className="mt-1 text-sm text-coal">{hunter.apolloCreditAlarm}</p> : null}
+              <p className="mt-1 text-sm text-coal">
+                Signed segment: {hunter.campaign.segment}. Split {hunter.campaign.split}. {hunter.campaign.splitReason}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Canada list {hunter.campaign.canadaSize ?? "not sized"}. United States list {hunter.campaign.usSize ?? "not sized"}.
+              </p>
+              <p className="mt-1 text-sm text-muted">{hunter.campaign.weightNote}</p>
+              <p className="mt-1 text-sm text-pretty text-shale">{hunter.campaign.planNote}</p>
+              {hunter.campaign.needsSignOff ? (
+                <p className="mt-1 text-sm text-coal">
+                  Monday suggestion, not yet signed: {hunter.campaign.suggestion}.
+                </p>
+              ) : null}
               <p className="mt-1 text-sm text-muted">Monthly spend: {hunter.monthlyCap}.</p>
               <p className="mt-1 text-sm text-shale">{hunter.bookingLink.note}</p>
               {hunter.alarms.length > 0 ? (
@@ -265,14 +300,26 @@ function BotsPage() {
                 <p className="mt-2 text-sm text-shale">Redis is not connected. Pause cannot be saved.</p>
               ) : null}
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={savingHunter || hunter.storage !== "redis"}
-              onClick={() => void toggleHunter()}
-            >
-              {hunter.paused ? "Resume" : "Pause"}
-            </Button>
+            <div className="grid gap-2">
+              {hunter.campaign.needsSignOff ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={savingHunter || hunter.storage !== "redis"}
+                  onClick={() => void signSegment()}
+                >
+                  Sign off segment
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={savingHunter || hunter.storage !== "redis"}
+                onClick={() => void toggleHunter()}
+              >
+                {hunter.paused ? "Resume" : "Pause"}
+              </Button>
+            </div>
           </li>
           {BOTS.map((b) => (
             <li key={b.id} className="grid gap-3 border border-line bg-paper p-4 md:grid-cols-[1fr_auto] md:items-start">

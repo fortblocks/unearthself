@@ -475,15 +475,15 @@ export const HUNTER_DAILY_CARD_TARGET = 48;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",
-  job: "Two runs, one bot. Nightly local sweep at 4am Edmonton: Calgary, Edmonton, and Red Deer, any headcount, any industry. Always-on hunt every 30 minutes in working hours. Phase one searches Canada and the United States only. Canada is 70 percent of the search slots and runs first. 48 contact-ready cards is a ceiling, not a target. Never sends.",
-  trigger: "Nightly at 4am Edmonton, and every 30 minutes from 7am to 7pm Edmonton",
+  job: "One run. Every 30 minutes in working hours, Hunter works a signed Apollo campaign list. The first segment is technology companies in Canada and the United States, with no headcount cap. Canada is 70 percent of the draws unless a segment logs a different split. 48 contact-ready cards a day is the target under test. The nightly 4am sweep is stopped. Never sends.",
+  trigger: "Every 30 minutes from 7am to 7pm Edmonton",
   owner: "christopher" as const,
   escalate: "A company that cannot be confirmed on a public page.",
   limits: [
     "Never sends",
     "Never invents a fact",
     "No new paid source without approval",
-    "No daily call cap. The monthly dollar cap still stops both runs",
-    "Pause and the kill switch stop both runs",
+    "No daily call cap. The monthly dollar cap still stops the hunt",
+    "Pause and the kill switch stop the hunt",
   ],
 };

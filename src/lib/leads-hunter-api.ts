@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { appendDoNotContact, readHunterDesk, writeHunterPaused } from "@/lib/leads-hunter";
+import { appendDoNotContact, readHunterDesk, signHunterCampaign, writeHunterPaused } from "@/lib/leads-hunter";
 import {
   approveAndQueueForCoco as queueForCoco,
   approveWording as approveCardWording,
@@ -14,6 +14,13 @@ export const getHunterDesk = createServerFn({ method: "GET" }).handler(async () 
   await requireStaffSession();
   return readHunterDesk();
 });
+
+export const signHunterSegment = createServerFn({ method: "POST" })
+  .validator((data: { confirm?: boolean }) => data)
+  .handler(async () => {
+    await requireStaffSession();
+    return signHunterCampaign();
+  });
 
 export const setHunterPaused = createServerFn({ method: "POST" })
   .validator((data: { paused: boolean }) => data)

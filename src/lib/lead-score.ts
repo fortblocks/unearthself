@@ -74,7 +74,7 @@ export type Company = {
   place?: string;
   /** Search region used when the Hunter filed or updated the card. */
   hunterRegion?: string;
-  profileHits?: { id: string; label: string; sourceUrl: string }[];
+  profileHits?: { id: string; label: string; sourceUrl: string; snippet?: string }[];
   /** Set when a Hunter run evaluates the card. Absent on older cards. */
   enrichment?: EnrichmentState;
   /** Edmonton date the card was marked Enriched or No-signal. */

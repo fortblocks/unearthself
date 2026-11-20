@@ -535,6 +535,7 @@ async function apolloCall(
   maxRetries: number,
   sleep: (ms: number) => Promise<void>,
   timeoutMs = 20_000,
+  body = "{}",
 ): Promise<{ response: Response } | { failure: string }> {
   let last = "Apollo request failed";
   const timeout = Math.max(1_000, Math.min(20_000, timeoutMs));
@@ -547,7 +548,7 @@ async function apolloCall(
           "Cache-Control": "no-cache",
           "x-api-key": key,
         },
-        body: "{}",
+        body,
         signal: AbortSignal.timeout(timeout),
       });
       if (apolloRetryable(response.status) && attempt < maxRetries) {
@@ -562,4 +563,166 @@ async function apolloCall(
     }
   }
   return { failure: last };
+}
+
+/** One company-search page. People search stays on its own URL and still costs nothing. */
+export function companySearchUrl(params: URLSearchParams) {
+  return `${APOLLO_ORIGIN}/mixed_companies/search?${params.toString()}`;
+}
+
+export function companySearchParams(input: {
+  country: "Canada" | "United States";
+  industries: string[];
+  page: number;
+  perPage: number;
+}) {
+  const params = new URLSearchParams();
+  params.append("organization_locations[]", input.country);
+  for (const industry of input.industries) params.append("organization_industries[]", industry);
+  params.set("page", String(input.page));
+  params.set("per_page", String(input.perPage));
+  return params;
+}
+
+export type ApolloOrganization = {
+  id: string;
+  name: string;
+  domain: string;
+  website: string;
+  place: string;
+  country: string;
+  industry: string;
+  employees: number | null;
+  revenue: number | null;
+  latestFundingOn: string;
+  latestFundingAmount: number | null;
+  headcountGrowth: number | null;
+  jobCount: number | null;
+  jobTitles: string[];
+  keywords: string[];
+  technologies: string[];
+};
+
+function numberOrNull(value: unknown) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function stringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+}
+
+export function readApolloOrganization(raw: unknown): ApolloOrganization | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  const name = text(row.name);
+  const domain = normalizeDomain(text(row.primary_domain) || text(row.domain));
+  const id = text(row.id);
+  if (!name || !domain || !id) return null;
+  const city = text(row.city) || text(row.organization_city);
+  const state = text(row.state) || text(row.organization_state);
+  const country = text(row.country) || text(row.organization_country);
+  const place = [city, state, country].filter(Boolean).join(", ");
+  const latest = Array.isArray(row.funding_events) ? asRecord(row.funding_events[0]) : null;
+  return {
+    id,
+    name,
+    domain,
+    website: text(row.website_url) || text(row.website) || (domain ? `https://${domain}` : ""),
+    place,
+    country,
+    industry: text(row.industry) || stringList(row.industries)[0] || "",
+    employees: numberOrNull(row.estimated_num_employees),
+    revenue: numberOrNull(row.organization_revenue) ?? numberOrNull(row.annual_revenue),
+    latestFundingOn: dateOnly(text(row.latest_funding_round_date) || text(latest?.date)),
+    latestFundingAmount: numberOrNull(row.latest_funding_amount) ?? numberOrNull(latest?.amount),
+    headcountGrowth: numberOrNull(row.organization_headcount_six_month_growth) ?? numberOrNull(row.headcount_growth),
+    jobCount: numberOrNull(row.organization_num_current_job_postings) ?? numberOrNull(row.num_job_postings),
+    jobTitles: stringList(row.job_posting_titles),
+    keywords: stringList(row.keywords),
+    technologies: stringList(row.technology_names),
+  };
+}
+
+export function parseOrganizationSearch(body: unknown): { failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { failure: "Apollo returned an unexpected shape" };
+  const record = body as Record<string, unknown>;
+  const list = Array.isArray(record.organizations) ? record.organizations : Array.isArray(record.accounts) ? record.accounts : null;
+  if (!list) return { failure: "Apollo returned an unexpected shape" };
+  const pagination = asRecord(record.pagination);
+  const totalEntries = numberOrNull(pagination?.total_entries) ?? list.length;
+  const totalPages = numberOrNull(pagination?.total_pages) ?? (list.length > 0 ? 1 : 0);
+  return {
+    organizations: list.flatMap((item) => {
+      const org = readApolloOrganization(item);
+      return org ? [org] : [];
+    }),
+    totalEntries,
+    totalPages,
+  };
+}
+
+export function titlesFromPeopleSearch(body: unknown) {
+  const record = asRecord(body);
+  if (!record || !Array.isArray(record.people)) return [];
+  return record.people.flatMap((person) => {
+    const row = asRecord(person);
+    const title = row ? text(row.title) : "";
+    return title ? [title] : [];
+  });
+}
+
+/** Free people search. Titles only. It does not reveal an email. */
+export async function buyerTitlesAtCompany(input: {
+  domain: string;
+  org: string;
+  apiKey: string;
+  fetchImpl?: ApolloFetch;
+  maxRetries?: number;
+  sleep?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+}): Promise<string[]> {
+  const called = await apolloCall(
+    input.fetchImpl ?? fetch,
+    apolloRequestUrl("mixed_people/api_search", apolloSearchParams({ domain: input.domain, org: input.org })),
+    input.apiKey,
+    input.maxRetries ?? 1,
+    input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    input.timeoutMs ?? 8_000,
+  );
+  if ("failure" in called) return [];
+  const { body } = await readJson(called.response, input.apiKey);
+  if (!called.response.ok) return [];
+  return titlesFromPeopleSearch(body);
+}
+
+export async function searchApolloCompanies(input: {
+  country: "Canada" | "United States";
+  industries: string[];
+  page: number;
+  perPage: number;
+  apiKey: string;
+  fetchImpl?: ApolloFetch;
+  maxRetries?: number;
+  sleep?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+}): Promise<{ failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number; credits: 1 }> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const called = await apolloCall(
+    fetchImpl,
+    companySearchUrl(companySearchParams(input)),
+    input.apiKey,
+    input.maxRetries ?? 2,
+    input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    input.timeoutMs ?? 20_000,
+  );
+  if ("failure" in called) return { failure: called.failure };
+  const { body } = await readJson(called.response, input.apiKey);
+  const warning = `${called.response.headers.get("deprecation") ?? ""} ${called.response.headers.get("warning") ?? ""}`;
+  if (called.response.status === 410 || /deprecat/i.test(warning)) return { failure: `Apollo HTTP ${called.response.status}: deprecated` };
+  if (!called.response.ok) return { failure: `Apollo HTTP ${called.response.status}` };
+  const parsed = parseOrganizationSearch(body);
+  if ("failure" in parsed) return parsed;
+  return { ...parsed, credits: 1 };
 }

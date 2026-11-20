@@ -6,7 +6,30 @@
  */
 
 import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, isPhaseOneCompany, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
-import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
+import { apolloApiKey, apolloCreditCap, buyerTitlesAtCompany, enrichHunterContacts, searchApolloCompanies } from "./apollo.ts";
+import {
+  acceptPage,
+  apolloCreditKey,
+  apolloProfileSignals,
+  applyBuyerTitleBoost,
+  CAMPAIGN_COMPANIES_PER_PASS,
+  collectRegion,
+  companySource,
+  creditAlarm,
+  freshCampaign,
+  HUNTER_CAMPAIGN_KEY,
+  keywordSignalsOnPage,
+  needsAnotherPage,
+  nextWeights,
+  profileSignalsOnPage,
+  signOffSuggestion,
+  regionForDraw,
+  segmentById,
+  signedSegment,
+  withMondaySuggestion,
+  type CampaignState,
+  type OutcomeRow,
+} from "./hunter-campaign.ts";
 import { isClearBuyer, isStoredJudgment, judgeBuyerFit, type BuyerJudgment, type BuyerJudgmentInput, type FitRating } from "./buyer-judgment.ts";
 import {
   applyHunterWork,
@@ -34,6 +57,7 @@ import {
   type Industry,
   type LeadCity,
   type SizeBand,
+  type FieldSources,
   type WhySource,
 } from "./lead-score.ts";
 import { contactIfPresent } from "./leads-scout.ts";
@@ -115,7 +139,7 @@ import {
   type HunterFunnel,
 } from "./hunter-phase.ts";
 import { edmontonClock, edmontonWhen, nightlySkip, withinWorkingHours } from "./hunter-time.ts";
-import { searchWithRetries } from "./xai-search.ts";
+import { callXaiJson, searchWithRetries } from "./xai-search.ts";
 
 export const HUNTER_KEY = "unearth:hunter:v1";
 
@@ -163,10 +187,14 @@ export type HunterDraft = {
   sizeBand: string;
   sourceUrl: string;
   signals: unknown;
-  profileSignals: { id: string; sourceUrl: string }[];
+  profileSignals: { id: string; sourceUrl: string; via?: "Apollo"; snippet?: string }[];
+  /** Apollo place, industry, and size stay when the company site does not repeat them. */
+  apolloBacked?: boolean;
+  method?: "apollo-campaign";
   buyer: { name: string; title: string; email: string; emailSource: string };
   sourceKind?: HunterSource;
   hook?: { text: string; sourceUrl: string; sourceDate: string; kind: string };
+  keywordTags?: string[];
 };
 
 export type HunterCard = {
@@ -187,6 +215,9 @@ export type HunterCard = {
   profileHits: ProfileHit[];
   hunterRegion: string;
   sourceKind?: HunterSource;
+  method?: "apollo-campaign";
+  /** Fields the company site did not print. Their source is Apollo, not the homepage. */
+  apolloFields?: ("place" | "industry" | "sizeBand")[];
   hunterBreak: HunterBreak;
   hunterScore: number;
   query?: string;
@@ -518,6 +549,17 @@ function verifiedHits(draft: HunterDraft, pages: Record<string, string>, today: 
     if (seen.has(claimed.id)) continue;
     const signal = HUNTER_SIGNALS.find((item) => item.id === claimed.id);
     if (!signal) continue;
+    if (claimed.via === "Apollo") {
+      seen.add(signal.id);
+      hits.push({
+        id: signal.id,
+        label: signal.label,
+        sourceUrl: "Apollo",
+        snippet: claimed.snippet?.slice(0, 240) || "Apollo",
+        fetchedOn: today,
+      });
+      continue;
+    }
     const page = pages[claimed.sourceUrl] ?? "";
     if (!page) continue;
     const term = signal.terms.find((item) => pageHas(page, item));
@@ -562,7 +604,8 @@ export function verifyHunterDrafts(
     if (!page) continue;
     if (!pageHas(page, draft.org)) continue;
     if (!domainOnSource(draft.domain, draft.sourceUrl, page)) continue;
-    const place = draft.place && pageHas(page, draft.place) ? draft.place : "";
+    const placeOnPage = Boolean(draft.place && pageHas(page, draft.place));
+    const place = placeOnPage ? draft.place : draft.apolloBacked && draft.place ? draft.place : "";
     const city = place ? cityFromPlace(place) : "Elsewhere";
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
@@ -586,6 +629,14 @@ export function verifyHunterDrafts(
     const buyerName = usableName(contact.name);
     const titlePage = contact.emailSource ? (pages[contact.emailSource] ?? "") : contactPage;
     const buyerTitle = titleOnPage(titlePage || contactPage, draft.buyer.title, Boolean(buyerName));
+    const pageIndustry = industryFromPage(draft.industry, page);
+    const pageSize = sizeFromPage(draft.sizeBand, page);
+    const industry = pageIndustry !== "other" ? pageIndustry : draft.apolloBacked ? coerceIndustry(draft.industry, "other") : "other";
+    const sizeBand = pageSize !== "unknown" ? pageSize : draft.apolloBacked ? coerceSize(draft.sizeBand, "unknown") : "unknown";
+    const apolloFields: ("place" | "industry" | "sizeBand")[] = [];
+    if (draft.apolloBacked && !placeOnPage && place) apolloFields.push("place");
+    if (draft.apolloBacked && pageIndustry === "other" && industry !== "other") apolloFields.push("industry");
+    if (draft.apolloBacked && pageSize === "unknown" && sizeBand !== "unknown") apolloFields.push("sizeBand");
     const hits = verifiedHits(draft, pages, opts.today);
     const signals = verifiedSignals(draft.signals, pages, `H-${cards.length + 1}`);
     const hunterBreak = scoreHunter({
@@ -607,8 +658,8 @@ export function verifyHunterDrafts(
       org: draft.org,
       city,
       place,
-      industry: industryFromPage(draft.industry, page),
-      sizeBand: sizeFromPage(draft.sizeBand, page),
+      industry,
+      sizeBand,
       sourceUrl: draft.sourceUrl,
       why,
       whySources: hits.map((hit) => ({ url: hit.sourceUrl, label: hit.label })),
@@ -621,6 +672,8 @@ export function verifyHunterDrafts(
       profileHits: hits,
       hunterRegion: opts.regionId,
       sourceKind: draft.sourceKind,
+      method: draft.method,
+      apolloFields,
       hunterBreak,
       hunterScore: hunterBreak.total,
     });
@@ -652,6 +705,14 @@ function mergeHits(current: ProfileHit[] | undefined, incoming: ProfileHit[]) {
     merged.push(hit);
   }
   return merged;
+}
+
+function apolloFieldOverlay(sources: FieldSources | undefined, fields: HunterCard["apolloFields"], today: string) {
+  if (!fields?.length) return sources;
+  const next: FieldSources = { ...(sources ?? {}) };
+  const entry = { url: "", via: "Apollo" as const, seenOn: today };
+  for (const field of fields) next[field] = entry;
+  return next;
 }
 
 function blankCompany(card: HunterCard, id: string, today: string): Company {
@@ -692,24 +753,28 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     buyerJudgment: isStoredJudgment(card.buyerJudgment) ? card.buyerJudgment : undefined,
     fitRating: card.fitRating,
     hook: card.hook,
-    fieldSources: publicFieldSources({
-      buyerName: card.buyerName,
-      buyerTitle: card.buyerTitle,
-      email: card.email,
-      emailSource: card.emailSource,
-      place: card.place,
-      industry: card.industry,
-      sizeBand: card.sizeBand,
-      sourceUrl: card.sourceUrl,
-      seenOn: today,
-    }),
+    fieldSources: apolloFieldOverlay(
+      publicFieldSources({
+        buyerName: card.buyerName,
+        buyerTitle: card.buyerTitle,
+        email: card.email,
+        emailSource: card.emailSource,
+        place: card.place,
+        industry: card.industry,
+        sizeBand: card.sizeBand,
+        sourceUrl: card.sourceUrl,
+        seenOn: today,
+      }),
+      card.apolloFields,
+      today,
+    ),
     lineage: makeLineage({
       query: card.query || card.hunterRegion,
       signals: card.profileHits.map((hit) => hit.id),
       sourceUrl: card.sourceUrl,
       cardId: id,
       exploration: card.exploration,
-      method: card.sourceKind === "public-linkedin" ? HUNTER_LINKEDIN_METHOD_ID : undefined,
+      method: card.method ?? (card.sourceKind === "public-linkedin" ? HUNTER_LINKEDIN_METHOD_ID : undefined),
     }),
     facts: cardFacts(card, today),
   });
@@ -933,7 +998,9 @@ export function urlsForDrafts(drafts: HunterDraft[]) {
     if (/^https?:\/\//i.test(draft.sourceUrl)) urls.add(draft.sourceUrl);
     if (/^https?:\/\//i.test(draft.buyer.emailSource)) urls.add(draft.buyer.emailSource);
     if (draft.hook && /^https?:\/\//i.test(draft.hook.sourceUrl)) urls.add(draft.hook.sourceUrl);
-    for (const hit of draft.profileSignals) urls.add(hit.sourceUrl);
+    for (const hit of draft.profileSignals) {
+      if (/^https?:\/\//i.test(hit.sourceUrl)) urls.add(hit.sourceUrl);
+    }
     for (const signal of normalizeSignals(draft.signals)) urls.add(signal.sourceUrl);
   }
   return [...urls].slice(0, 40);
@@ -1222,6 +1289,189 @@ function dayStopCopy() {
   return `Daily ceiling of ${HUNTER_CARD_CEILING} contact-ready cards filed.`;
 }
 
+function parseCampaign(raw: unknown, today: string): CampaignState {
+  const value = typeof raw === "string" ? safeJson(raw) : raw;
+  if (!value || typeof value !== "object") return freshCampaign(today);
+  const row = value as CampaignState;
+  if (!row.segmentId || !Array.isArray(row.queued) || !row.split) return freshCampaign(today);
+  return row;
+}
+
+function safeJson(raw: string) {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+async function readCampaign(redis: { get<T>(key: string): Promise<T | null> }, today: string) {
+  return parseCampaign(await redis.get<unknown>(HUNTER_CAMPAIGN_KEY), today);
+}
+
+async function saveCampaign(redis: { set(key: string, value: unknown): Promise<unknown> }, state: CampaignState) {
+  await redis.set(HUNTER_CAMPAIGN_KEY, JSON.stringify(state));
+}
+
+function campaignOutcomes(companies: Company[], segmentId: string): OutcomeRow[] {
+  return companies.flatMap((company) => {
+    if (company.lineage?.method !== "apollo-campaign") return [];
+    if (!(company.lineage.query ?? "").includes(segmentId)) return [];
+    const reviewed = company.review === "approved" || company.review === "skipped";
+    return [{
+      segmentId,
+      reviewed,
+      approved: company.review === "approved",
+      replied: company.pipeline === "replied" || company.pipeline === "booked" || company.pipeline === "won",
+      booked: company.pipeline === "booked" || company.pipeline === "won",
+      hadFunding: (company.profileHits ?? []).some((hit) => /funding/i.test(hit.snippet ?? "")),
+    }];
+  });
+}
+
+function draftsFromRanked(rows: import("./hunter-campaign.ts").RankedCompany[], today: string): HunterDraft[] {
+  return rows.map((row) => {
+    const org = row.organization;
+    return {
+      domain: org.domain,
+      org: org.name,
+      place: org.place,
+      industry: org.industry || "other",
+      sizeBand: org.employees == null ? "unknown" : String(org.employees),
+      sourceUrl: /^https?:\/\//i.test(org.website) ? org.website : `https://${org.domain}`,
+      signals: [],
+      profileSignals: apolloProfileSignals(org, today),
+      apolloBacked: true,
+      method: "apollo-campaign" as const,
+      buyer: { name: "", title: "", email: "", emailSource: "" },
+      keywordTags: org.keywords,
+    };
+  });
+}
+
+let pageNoteForTests: ((page: string) => { text: string; sourceDate: string; kind: string } | null) | null = null;
+
+/** Tests inject the page note. Production uses a short xAI JSON call with no web search. */
+export function usePageNoteForTests(reader: typeof pageNoteForTests) {
+  pageNoteForTests = reader;
+}
+
+async function noteOnPage(page: string, timeoutMs: number, onSpend: (usage: { inputTokens: number; outputTokens: number; dollars: number | null }) => Promise<void>) {
+  if (pageNoteForTests) return pageNoteForTests(page);
+  if (timeoutMs < 1_000 || page.length < 80) return null;
+  const result = await callXaiJson(
+    "You read one company page and return JSON. You never invent a sentence or a date.",
+    `Return {"hook":{"text":"","sourceDate":"YYYY-MM-DD","kind":""}} only when that exact sentence and that printed date are both in the page. Otherwise return {"hook":null}.\n\n${page.slice(0, 6000)}`,
+    timeoutMs,
+  );
+  if ("error" in result) return null;
+  await onSpend(result.usage);
+  const hook = (result.json as { hook?: { text?: string; sourceDate?: string; kind?: string } | null } | null)?.hook;
+  if (!hook?.text || !hook.sourceDate) return null;
+  return { text: hook.text, sourceDate: hook.sourceDate, kind: hook.kind || "note" };
+}
+
+async function prepareCampaignDrafts(
+  redis: { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown): Promise<unknown>; incrby?: (key: string, amount: number) => Promise<number> },
+  input: { today: string; known: Set<string>; companies: Company[]; timeLeft: () => number },
+): Promise<{ drafts: HunterDraft[]; query: string; regionId: string; note: string; alarm: string }> {
+  let state = await readCampaign(redis, input.today);
+  const reviewedBySegment: Record<string, number> = {};
+  const scoreBySegment: Record<string, number> = {};
+  for (const row of campaignOutcomes(input.companies, state.segmentId)) {
+    reviewedBySegment[row.segmentId] = (reviewedBySegment[row.segmentId] ?? 0) + (row.reviewed ? 1 : 0);
+    if (row.booked) scoreBySegment[row.segmentId] = (scoreBySegment[row.segmentId] ?? 0) + 3;
+    else if (row.replied) scoreBySegment[row.segmentId] = (scoreBySegment[row.segmentId] ?? 0) + 2;
+    else if (row.approved) scoreBySegment[row.segmentId] = (scoreBySegment[row.segmentId] ?? 0) + 1;
+  }
+  state = withMondaySuggestion(state, input.today, reviewedBySegment, scoreBySegment);
+  const weights = nextWeights(state.weights, campaignOutcomes(input.companies, state.segmentId));
+  if (weights.note !== state.weightNote) {
+    state = { ...state, weights: weights.weights, weightNote: weights.note, planNote: `${state.planNote} ${weights.note}` };
+  }
+  const segment = signedSegment(state);
+  let note = state.planNote;
+  const key = apolloApiKey();
+  if (key && input.timeLeft() > 8_000) {
+    for (const regionName of ["canada", "us"] as const) {
+      const sizeKey = regionName === "canada" ? "canadaSize" : "usSize";
+      if (state[sizeKey] != null) continue;
+      const sized = await searchApolloCompanies({
+        country: regionName === "us" ? "United States" : "Canada",
+        industries: segment.industries,
+        page: 1,
+        perPage: 1,
+        apiKey: key,
+        sleep: async () => {},
+        timeoutMs: Math.min(12_000, input.timeLeft()),
+      });
+      if ("failure" in sized) continue;
+      state = { ...state, [sizeKey]: sized.totalEntries };
+      if (redis.incrby) {
+        await redis.incrby(apolloCreditKey(input.today.slice(0, 7)), sized.credits);
+        await redis.incrby(apolloCreditKey(input.today), sized.credits);
+      }
+    }
+    note = `${state.planNote} Canada list size ${state.canadaSize ?? "not sized"}. United States list size ${state.usSize ?? "not sized"}.`;
+  }
+  const region = regionForDraw(state.drawCursor, state.split);
+  let collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
+  state = collected.state;
+  let taken = collected.taken;
+  if (taken.length === 0 && needsAnotherPage(state, region) && key && input.timeLeft() > 5_000) {
+    const country = region === "us" ? "United States" : "Canada";
+    const searched = await searchApolloCompanies({
+      country,
+      industries: segment.industries,
+      page: state.nextPage[region],
+      perPage: 100,
+      apiKey: key,
+      sleep: async () => {},
+      timeoutMs: Math.min(20_000, input.timeLeft()),
+    });
+    if ("failure" in searched) {
+      await saveCampaign(redis, state);
+      return { drafts: [], query: `campaign:${segment.id}`, regionId: region, note: searched.failure, alarm: "" };
+    }
+    const month = input.today.slice(0, 7);
+    if (redis.incrby) {
+      await redis.incrby(apolloCreditKey(month), searched.credits);
+      await redis.incrby(apolloCreditKey(input.today), searched.credits);
+    }
+    const accepted = acceptPage(state, region, searched.organizations, input.today);
+    state = accepted.state;
+    if (accepted.added > 0 && input.timeLeft() > 8_000) {
+      const top = [...state.queued].filter((row) => row.region === region && row.page === state.nextPage[region] - 1).sort((a, b) => b.score - a.score).slice(0, 5);
+      const titles: Record<string, string[]> = {};
+      for (const row of top) {
+        if (input.timeLeft() < 2_000) break;
+        titles[row.domain] = await buyerTitlesAtCompany({ domain: row.domain, org: row.name, apiKey: key, sleep: async () => {}, timeoutMs: Math.min(8_000, input.timeLeft()) });
+      }
+      state = { ...state, queued: applyBuyerTitleBoost(state.queued, titles, state.weights) };
+    }
+    if (accepted.stopPulls) note = `${note} A page added no new companies, so further pulls for ${region} are stopped.`;
+    collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
+    state = collected.state;
+    taken = collected.taken;
+  } else if (taken.length === 0 && !key) {
+    note = `${note} Apollo key is not set, so no company page was pulled.`;
+  } else if (taken.length === 0 && state.exhausted[region]) {
+    note = `${note} The signed list has no queued companies left in ${region}. Hunter keeps the signed segment and does not pick a new one.`;
+  } else if (taken.length === 0 && !needsAnotherPage(state, region)) {
+    note = `${note} The signed list is thin in ${region}. Hunter keeps the signed segment and pulls no further pages this week.`;
+  }
+  state = { ...state, drawCursor: state.drawCursor + 1, planNote: note };
+  await saveCampaign(redis, state);
+  const monthCredits = Number(await redis.get<string | number>(apolloCreditKey(input.today.slice(0, 7)))) || 0;
+  return {
+    drafts: draftsFromRanked(taken, input.today),
+    query: `campaign:${segment.id}`,
+    regionId: region,
+    note,
+    alarm: creditAlarm(monthCredits),
+  };
+}
+
 export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => number }): Promise<
   | { ok: true; skipped: "paused" | "cards" | "busy" | "killed" | "hours"; callsToday: number; filedToday: number }
   | { ok: true; filed: number; contactReady: number; updated: number; callsToday: number; filedToday: number; slot: string }
@@ -1339,6 +1589,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     let actualDollars = 0;
     let estimatedDollars = 0;
     let passesRun = 0;
+    const campaignAlarms: string[] = [];
     const dnc = await loadDoNotContact(redis);
     const passes = hunterCallsPerRun();
     const retries = hunterMaxRetries();
@@ -1371,55 +1622,84 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         lastError = "Monthly dollar cap reached.";
         break;
       }
-      const explore = explorationTurn(cursor, hunterTrialShare());
-      const slotIndex = chooseSlotIndex({
-        cursor,
-        slots: hunterSlots(),
-        usage: slotUsage(companies),
-        weights: slotWeights(companies),
-        explore,
-      });
-      const picked = slotAt(slotIndex);
-      const query = huntQuery(picked.slot, explore);
-      slotLabel = `${picked.slot.signalLabel} / ${picked.slot.regionLabel}${explore ? " / explore" : ""}`;
-      const research = await searchWithRetries({
-        system:
-          "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
-        prompt: hunterPrompt(picked.slot, [...known]),
-        timeoutMs: 90_000,
-        maxRetries: retries,
-        beforeAttempt: async () => {
-          if (runClock.out()) return { allowed: false, reason: "time" as const };
-          const used = await countCall(redis, callCounterKey(today));
-          state = { ...state, callsOn: today, callsToday: used };
-          return { allowed: true };
-        },
-        timeoutForAttempt: () => runClock.clip(90_000),
-      });
-      if ("error" in research) {
-        if (research.timedOut) {
-          timedOut = true;
-          lastError = "Stopped for time.";
+      const explore = companySource() === "xai" && explorationTurn(cursor, hunterTrialShare());
+      let query = "";
+      let regionId = "canada";
+      let sourceKind: HunterSource | undefined;
+      let drafts: HunterDraft[] = [];
+      if (companySource() === "campaign") {
+        const batch = await prepareCampaignDrafts(redis, {
+          today,
+          known,
+          companies,
+          timeLeft: () => runClock.clip(20_000),
+        });
+        drafts = batch.drafts.filter((draft) => {
+          if (!known.has(normalizeDomain(draft.domain))) return true;
+          addDrop(funnel, "duplicate");
+          return false;
+        });
+        query = batch.query;
+        regionId = batch.regionId;
+        slotLabel = batch.note;
+        if (batch.alarm) campaignAlarms.push(batch.alarm);
+        if (batch.note.startsWith("Apollo")) lastError = batch.note;
+        if (drafts.length === 0 && batch.note.includes("Apollo")) {
+          xaiFailed = false;
           break;
         }
-        lastError = research.error;
-        xaiFailed = true;
-        abandoned = Boolean(research.abandoned);
-        if (abandoned) break;
-        continue;
+      } else {
+        const slotIndex = chooseSlotIndex({
+          cursor,
+          slots: hunterSlots(),
+          usage: slotUsage(companies),
+          weights: slotWeights(companies),
+          explore,
+        });
+        const picked = slotAt(slotIndex);
+        query = huntQuery(picked.slot, explore);
+        regionId = picked.slot.regionId;
+        sourceKind = picked.slot.source;
+        slotLabel = `${picked.slot.signalLabel} / ${picked.slot.regionLabel}${explore ? " / explore" : ""}`;
+        const research = await searchWithRetries({
+          system:
+            "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL. This search is only for Unearth Self.",
+          prompt: hunterPrompt(picked.slot, [...known]),
+          timeoutMs: 90_000,
+          maxRetries: retries,
+          beforeAttempt: async () => {
+            if (runClock.out()) return { allowed: false, reason: "time" as const };
+            const used = await countCall(redis, callCounterKey(today));
+            state = { ...state, callsOn: today, callsToday: used };
+            return { allowed: true };
+          },
+          timeoutForAttempt: () => runClock.clip(90_000),
+        });
+        if ("error" in research) {
+          if (research.timedOut) {
+            timedOut = true;
+            lastError = "Stopped for time.";
+            break;
+          }
+          lastError = research.error;
+          xaiFailed = true;
+          abandoned = Boolean(research.abandoned);
+          if (abandoned) break;
+          continue;
+        }
+        passesRun += 1;
+        cursor = advanceCursor(cursor);
+        inputTokens += research.usage.inputTokens;
+        outputTokens += research.usage.outputTokens;
+        const noted = await noteModelSpend(redis, month, research.usage.dollars);
+        if (research.usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
+        else actualDollars += research.usage.dollars;
+        drafts = selectHunterRows(research).map((draft) => ({ ...draft, sourceKind: picked.slot.source })).filter((draft) => {
+          if (!known.has(normalizeDomain(draft.domain))) return true;
+          addDrop(funnel, "duplicate");
+          return false;
+        });
       }
-      passesRun += 1;
-      cursor = advanceCursor(cursor);
-      inputTokens += research.usage.inputTokens;
-      outputTokens += research.usage.outputTokens;
-      const noted = await noteModelSpend(redis, month, research.usage.dollars);
-      if (research.usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
-      else actualDollars += research.usage.dollars;
-      const drafts = selectHunterRows(research).map((draft) => ({ ...draft, sourceKind: picked.slot.source })).filter((draft) => {
-        if (!known.has(normalizeDomain(draft.domain))) return true;
-        addDrop(funnel, "duplicate");
-        return false;
-      });
       funnel.searched += 1;
       funnel.candidates += drafts.length;
       if (runClock.out()) {
@@ -1431,13 +1711,34 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       for (const [url, page] of Object.entries(fetched)) pages[url] = page.text;
       const kept = drafts.filter((draft) => {
         const page = fetched[draft.sourceUrl] ?? { text: "", reason: "fetch-failed" as const };
-        const reason = draftDropReason(draft, page.text, picked.slot.regionId, page.reason, picked.slot.source);
+        const reason = draftDropReason(draft, page.text, regionId, page.reason, sourceKind);
         if (!reason) return true;
         addDrop(funnel, reason);
         if (reason === "fetch-failed" || reason === "blocked" || reason === "timed-out") held.push(`${draft.org} (${reason})`);
         return false;
       });
-      const verified = verifyHunterDrafts(kept, pages, { regionId: picked.slot.regionId, today });
+      if (companySource() === "campaign") {
+        for (const draft of kept) {
+          const page = pages[draft.sourceUrl] ?? "";
+          const seen = new Set(draft.profileSignals.map((hit) => hit.id));
+          for (const hit of [...profileSignalsOnPage(page, draft.sourceUrl), ...keywordSignalsOnPage(draft.keywordTags ?? [], page, draft.sourceUrl)]) {
+            if (seen.has(hit.id)) continue;
+            seen.add(hit.id);
+            draft.profileSignals.push(hit);
+          }
+          const hook = await noteOnPage(page, runClock.clip(8_000), async (usage) => {
+            inputTokens += usage.inputTokens;
+            outputTokens += usage.outputTokens;
+            const noted = await noteModelSpend(redis, month, usage.dollars);
+            if (usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
+            else actualDollars += usage.dollars;
+          });
+          if (hook && page.includes(hook.text) && page.includes(hook.sourceDate)) {
+            draft.hook = { text: hook.text, sourceUrl: draft.sourceUrl, sourceDate: hook.sourceDate, kind: hook.kind };
+          }
+        }
+      }
+      const verified = verifyHunterDrafts(kept, pages, { regionId, today });
       const ready: HunterCard[] = [];
       const mxYes = new Set<string>();
       for (const card of verified) {
@@ -1495,6 +1796,10 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         });
     if (apollo.timedOut) timedOut = true;
     companies = apollo.companies;
+    if (apollo.reveals > 0) {
+      await redis.incrby(apolloCreditKey(month), apollo.reveals);
+      await redis.incrby(apolloCreditKey(today), apollo.reveals);
+    }
     const contactReady = countContactReadyGain(loaded.book.companies, companies);
     companies = await persistCompanies(loaded.book.companies, companies);
     const settled = applyHunterWork(
@@ -1511,7 +1816,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       if (value != null) previous.push(value);
     }
     const todaySoFar = (filedThroughHour(history, today, hour, (at) => edmontonClock(new Date(at))) ?? 0) + funnel.filed;
-    const alarms: string[] = [...priorAlarms];
+    const alarms: string[] = [...priorAlarms, ...campaignAlarms];
     const quietStop = stopReason !== "" && funnel.searched === 0;
     if (xaiFailed) alarms.push("xAI search failed.");
     if (apollo.failed) alarms.push("Apollo request failed.");
@@ -1835,6 +2140,11 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
   const expired = companies.filter((company) => company.review === "expired-unreviewed").length;
   if (expired > 0) alarms.push(`${expired} cards expired unreviewed.`);
   const cardsFiledToday = companies.filter((company) => company.filedOn === today || company.scoutBatch === today).length;
+  const campaign = redis ? await readCampaign(redis, today) : freshCampaign(today);
+  const creditRaw = redis ? await redis.get<string | number>(apolloCreditKey(month)) : 0;
+  const apolloCreditsMonth = Number(creditRaw) || 0;
+  const dailyKey = apolloCreditKey(today);
+  const dailyRaw = redis ? await redis.get<string | number>(dailyKey) : 0;
   return {
     storage: redis ? ("redis" as const) : ("browser" as const),
     paused: state.paused,
@@ -1861,7 +2171,32 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
     alarms,
     funnel: recentRuns[0]?.funnel ?? null,
     model: HUNTER_MODEL_ID,
+    companySource: companySource(),
+    campaign: {
+      segment: signedSegment(campaign).label,
+      segmentId: campaign.segmentId,
+      suggestionId: campaign.suggestionId,
+      suggestion: segmentById(campaign.suggestionId).label,
+      needsSignOff: campaign.suggestionId !== campaign.segmentId,
+      planNote: campaign.planNote,
+      split: `${campaign.split.canada}/${campaign.split.us}`,
+      splitReason: campaign.splitReason,
+      weightNote: campaign.weightNote,
+      canadaSize: campaign.canadaSize,
+      usSize: campaign.usSize,
+    },
+    apolloCreditsMonth,
+    apolloCreditsToday: Number(dailyRaw) || 0,
+    apolloCreditAlarm: creditAlarm(apolloCreditsMonth),
   };
+}
+
+export async function signHunterCampaign(today = edmontonToday()) {
+  const redis = await getRedisClient();
+  if (!redis) throw new Error("Redis is not configured");
+  const state = await readCampaign(redis, today);
+  await saveCampaign(redis, signOffSuggestion(state, today));
+  return readHunterDesk(today);
 }
 
 export async function writeHunterPaused(paused: boolean) {

@@ -209,40 +209,9 @@ export async function researchCompanies(
   | { companies: unknown; attempts: number; dollars: number | null; estimatedDollars: number }
   | { error: string; attempts: number; timedOut?: boolean }
 > {
-  const { searchWithRetries } = await import("./xai-search.ts");
-  const { monthlyCapState, countCall, callCounterKey, spendCounterKey, spendTicksKey, spendEstimateKey, monthSpendFromCounts, capSpend, noteModelSpend, ticksToDollars } = await import("./hunter-phase.ts");
-  const { hunterMaxRetries } = await import("./hunter-config.ts");
-  const { getRedisClient } = await import("./leads-book.ts");
-  const { edmontonToday } = await import("./lead-score.ts");
-  const redis = await getRedisClient();
-  if (!redis) return { error: "Redis is not configured", attempts: 0 };
-  const today = edmontonToday();
-  const month = today.slice(0, 7);
-  const cents = Number(await redis.get<string>(spendCounterKey(month)));
-  const ticks = Number(await redis.get<string>(spendTicksKey(month)));
-  const estimate = Number(await redis.get<string>(spendEstimateKey(month)));
-  const spent = monthSpendFromCounts(Number.isFinite(cents) ? cents : 0, Number.isFinite(ticks) ? ticks : 0, Number.isFinite(estimate) ? estimate : 0);
-  if (monthlyCapState(capSpend(spent)) === "stop") return { error: "Monthly dollar cap reached.", attempts: 0 };
-  const research = await searchWithRetries({
-    system: "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
-    prompt: scoutPrompt(knownDomains),
-    timeoutMs: 90000,
-    maxRetries: hunterMaxRetries(),
-    beforeAttempt: async () => {
-      if (timeLeft && timeLeft() < 1_000) return { allowed: false, reason: "time" };
-      await countCall(redis, callCounterKey(today));
-      return { allowed: true };
-    },
-    timeoutForAttempt: () => (timeLeft ? timeLeft() : 90_000),
-  });
-  if ("error" in research) return research;
-  const noted = await noteModelSpend(redis, month, research.usage.dollars);
-  return {
-    companies: research.companies,
-    attempts: research.attempts,
-    dollars: research.usage.dollars,
-    estimatedDollars: research.usage.dollars == null ? ticksToDollars(noted.estimatedTicks) : 0,
-  };
+  void knownDomains;
+  void timeLeft;
+  return { error: "Nightly sweep stopped on 20th November 2026.", attempts: 0 };
 }
 
 async function readPublishedPage(url: string, timeoutMs = 6000): Promise<string> {

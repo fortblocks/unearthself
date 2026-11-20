@@ -25,6 +25,7 @@ export type HunterRunOutcome =
   | "capped-spend"
   | "skipped-busy"
   | "stopped-time"
+  | "stopped-sweep"
   | "error";
 
 export type HunterRunEntry = {
@@ -60,6 +61,7 @@ const OUTCOMES = new Set<HunterRunOutcome>([
   "capped-spend",
   "skipped-busy",
   "stopped-time",
+  "stopped-sweep",
   "error",
 ]);
 

@@ -133,6 +133,7 @@ const northwind = {
 };
 
 function install(redis: ReturnType<typeof memoryRedis>) {
+  process.env.HUNTER_COMPANY_SOURCE = "xai";
   useRedisClientForTests(redis);
   useMxLookupForTests(async (host) => {
     if (host === "northwind.test") return [{ exchange: "mail.northwind.test" }];
@@ -155,6 +156,7 @@ async function restore(previousFetch: typeof fetch, env: Record<string, string |
   useRedisClientForTests(null);
   useMxLookupForTests(null);
   useBuyerJudgeForTests(null);
+  delete process.env.HUNTER_COMPANY_SOURCE;
   for (const [key, value] of Object.entries(env)) {
     if (value == null) delete process.env[key];
     else process.env[key] = value;
@@ -317,15 +319,17 @@ test("the nightly route and Apollo both honour do-not-contact", async () => {
   try {
     const response = await runNightlyCron(new Request("https://unearth.test/api/cron/leads-scout", { headers: { authorization: "Bearer cron-test-secret" } }), NIGHT_AT);
     assert.equal(response.status, 200);
+    assert.equal(urls.some((url) => url.includes("api.x.ai")), false);
     const book = await redis.get<{ companies: Company[] }>(LEADS_KEY);
-    assert.equal(book?.companies.some((company) => company.domain === "blocked.example"), false);
-    assert.equal(book?.companies.some((company) => company.domain === "open.example"), true);
+    const stored = book?.companies ?? [];
+    assert.equal(stored.some((company) => company.domain === "blocked.example"), false);
+    assert.equal(stored.some((company) => company.domain === "open.example"), false);
     const apolloUrlsBefore = urls.filter((url) => url.includes("apollo.io")).length;
-    const blockedCard = {
-      ...(book?.companies.find((company) => company.domain === "open.example") as Company),
-      id: "C-blocked",
-      org: "Blocked Co",
-      domain: "blocked.example",
+    const openCard = {
+      ...oldCompany(),
+      id: "C-open",
+      org: "Open Co",
+      domain: "open.example",
       email: "",
       buyerName: "",
       buyerTitle: "",
@@ -333,8 +337,14 @@ test("the nightly route and Apollo both honour do-not-contact", async () => {
       apolloCheckedOn: "",
       apolloPersonId: "",
     };
+    const blockedCard = {
+      ...openCard,
+      id: "C-blocked",
+      org: "Blocked Co",
+      domain: "blocked.example",
+    };
     const enriched = await enrichUnderApolloCap({
-      companies: [...(book?.companies ?? []), blockedCard],
+      companies: [openCard, blockedCard],
       domains: ["blocked.example", "open.example"],
       today: "2026-11-19",
       limit: 8,

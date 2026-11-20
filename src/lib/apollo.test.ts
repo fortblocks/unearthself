@@ -16,6 +16,8 @@ import {
   applyApolloContact,
   apolloFailureCode,
   enrichHunterContacts,
+  companySearchParams,
+  searchApolloCompanies,
 } from "./apollo.ts";
 import { hasBuyerContact, isContactReady } from "./hunter-cap.ts";
 import { APOLLO_CASL_STATEMENT, titleFitsBuyerRole } from "./hunter-phase.ts";
@@ -294,4 +296,69 @@ test("an empty credit cap setting falls back to 48, and the search asks for the 
   const reveal = apolloRequestUrl("people/match", apolloRevealParams("person-1"));
   assert.equal(reveal.startsWith("https://api.apollo.io/api/v1/people/match?"), true);
   assert.equal(reveal.includes(KEY), false);
+});
+
+test("company search asks for a country and an industry, never a headcount range, and a 429 waits then succeeds", async () => {
+  const params = companySearchParams({
+    country: "Canada",
+    industries: ["information technology & services"],
+    page: 2,
+    perPage: 100,
+  });
+  assert.deepEqual(params.getAll("organization_locations[]"), ["Canada"]);
+  assert.deepEqual(params.getAll("organization_industries[]"), ["information technology & services"]);
+  assert.equal(params.get("page"), "2");
+  assert.equal(params.get("per_page"), "100");
+  assert.equal(params.has("organization_num_employees_ranges[]"), false);
+  const slept: number[] = [];
+  let calls = 0;
+  const result = await searchApolloCompanies({
+    country: "United States",
+    industries: ["information technology & services"],
+    page: 1,
+    perPage: 1,
+    apiKey: KEY,
+    sleep: async (ms) => {
+      slept.push(ms);
+    },
+    fetchImpl: async (url, init) => {
+      calls += 1;
+      assert.equal(url.includes(KEY), false);
+      assert.equal(new Headers(init.headers).get("x-api-key"), KEY);
+      assert.equal(url.includes("mixed_companies/search"), true);
+      assert.equal(url.includes("organization_num_employees_ranges"), false);
+      if (calls === 1) return new Response("busy", { status: 429 });
+      return Response.json({
+        organizations: [
+          {
+            id: "org-1",
+            name: "Northwind",
+            primary_domain: "northwind.example",
+            website_url: "https://northwind.example",
+            city: "Calgary",
+            state: "Alberta",
+            country: "Canada",
+            industry: "information technology & services",
+            estimated_num_employees: 18,
+            organization_revenue: 2_000_000,
+            latest_funding_round_date: "2026-06-01",
+            organization_headcount_six_month_growth: 0.2,
+            organization_num_current_job_postings: 2,
+            job_posting_titles: ["Head of People"],
+            keywords: ["outdoor"],
+            technology_names: ["Slack"],
+          },
+        ],
+        pagination: { total_entries: 440, total_pages: 440 },
+      });
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(slept.length, 1);
+  assert.equal(slept[0]! >= 400, true);
+  if ("failure" in result) assert.fail(result.failure);
+  assert.equal(result.credits, 1);
+  assert.equal(result.totalEntries, 440);
+  assert.equal(result.organizations[0]?.employees, 18);
+  assert.equal(result.organizations[0]?.country, "Canada");
 });
