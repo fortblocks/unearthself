@@ -132,7 +132,10 @@ export const HUNTER_ALARM_COPIES = ["Bo", "Derek"] as const;
 /** Known xAI dollars in a calendar month. Apollo credits are not included. Env HUNTER_MONTHLY_DOLLAR_CAP. */
 export const HUNTER_MONTHLY_DOLLAR_CAP_DEFAULT = 60;
 
-/** Keys a book reset is allowed to replace. The do-not-contact list is not one of them. */
+/**
+ * Keys a book reset is allowed to replace.
+ * The do-not-contact list and the outreach hash (unearth:hunter:outreach:v1) are not among them.
+ */
 export const HUNTER_RESET_KEYS = ["unearth:leads:v1", "unearth:hunter:v1"] as const;
 
 function intEnv(name: string, fallback: number, min: number, max: number) {

@@ -1076,7 +1076,7 @@ function huntQuery(slot: HunterSlot, explore: boolean) {
   return `${slot.signalId}|${slot.regionId}|${signal?.search ?? slot.signalLabel}${explore ? "|explore" : ""}`;
 }
 
-async function persistCompanies(start: Company[], hunter: Company[]) {
+export async function persistCompanies(start: Company[], hunter: Company[]) {
   const fresh = await loadBook();
   const merged = mergeHunterCompanies(start, hunter, fresh.book.companies);
   if (fresh.storage === "redis") await saveBook({ ...fresh.book, companies: merged });

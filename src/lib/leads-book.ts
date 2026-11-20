@@ -134,6 +134,7 @@ export type LeadsRedis = {
   expire: (key: string, seconds: number) => Promise<unknown>;
   eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
   hset?: (key: string, field: string, value: string) => Promise<unknown>;
+  hget?: (key: string, field: string) => Promise<unknown>;
   hgetall?: (key: string) => Promise<Record<string, unknown> | null>;
   lpush: (key: string, value: unknown) => Promise<unknown>;
   ltrim: (key: string, start: number, stop: number) => Promise<unknown>;
@@ -169,11 +170,29 @@ export async function loadBook(): Promise<{ book: LeadsBook; storage: "redis" | 
   return { book: parseBook(raw), storage: "redis" };
 }
 
+let outreachHealLogged = false;
+
+/** Lift marks from the outreach hash. A failed read must not stop the save. */
+async function withOutreachMarks(redis: LeadsRedis, companies: Company[]): Promise<Company[]> {
+  try {
+    if (!redis.hgetall) return companies;
+    const { applyOutreachMarks, readOutreachMap } = await import("./hunter-outreach.ts");
+    const records = await readOutreachMap(redis);
+    return applyOutreachMarks(companies, records);
+  } catch {
+    if (!outreachHealLogged) {
+      outreachHealLogged = true;
+      console.error("[leads] outreach marks were not applied on this save");
+    }
+    return companies;
+  }
+}
+
 export async function saveBook(book: LeadsBook): Promise<void> {
   const redis = await getRedisClient();
   if (!redis) throw new Error("Redis is not configured");
   const today = edmontonToday();
-  const companies = liveCompanies(book.companies);
+  const companies = await withOutreachMarks(redis, liveCompanies(book.companies));
   const kept = new Set(companies.map((company) => company.id));
   const next: LeadsBook = {
     companies: companies.map((company) => withTimingCache(company, today)),

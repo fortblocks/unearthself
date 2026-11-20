@@ -72,10 +72,12 @@ import { Route as QuestThirtyRouteImport } from './routes/quest.thirty'
 import { Route as QuestTodayRouteImport } from './routes/quest.today'
 import { Route as ThingsToSeeIndexRouteImport } from './routes/things-to-see.index'
 import { Route as ThingsToSeeSlugRouteImport } from './routes/things-to-see.$slug'
+import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as AdminMinutesIndexRouteImport } from './routes/admin.minutes.index'
 import { Route as AdminMinutesMeetingIdRouteImport } from './routes/admin.minutes.$meetingId'
 import { Route as ApiCronLeadsHunterRouteImport } from './routes/api.cron.leads-hunter'
 import { Route as ApiCronLeadsScoutRouteImport } from './routes/api.cron.leads-scout'
+import { Route as ApiHunterOutreachRouteImport } from './routes/api.hunter.outreach'
 import { Route as ApiHunterReadRouteImport } from './routes/api.hunter.read'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
 import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
@@ -401,6 +403,11 @@ const ThingsToSeeSlugRoute = ThingsToSeeSlugRouteImport.update({
   path: '/things-to-see/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UTokenRoute = UTokenRouteImport.update({
+  id: '/u/$token',
+  path: '/u/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminMinutesIndexRoute = AdminMinutesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -419,6 +426,11 @@ const ApiCronLeadsHunterRoute = ApiCronLeadsHunterRouteImport.update({
 const ApiCronLeadsScoutRoute = ApiCronLeadsScoutRouteImport.update({
   id: '/api/cron/leads-scout',
   path: '/api/cron/leads-scout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHunterOutreachRoute = ApiHunterOutreachRouteImport.update({
+  id: '/api/hunter/outreach',
+  path: '/api/hunter/outreach',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHunterReadRoute = ApiHunterReadRouteImport.update({
@@ -524,6 +536,7 @@ export interface FileRoutesByFullPath {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
+  '/u/$token': typeof UTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
@@ -534,6 +547,7 @@ export interface FileRoutesByFullPath {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -595,6 +609,7 @@ export interface FileRoutesByTo {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
+  '/u/$token': typeof UTokenRoute
   '/admin': typeof AdminIndexRoute
   '/d14': typeof D14IndexRoute
   '/haven': typeof HavenIndexRoute
@@ -605,6 +620,7 @@ export interface FileRoutesByTo {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -674,6 +690,7 @@ export interface FileRoutesById {
   '/quest/thirty': typeof QuestThirtyRoute
   '/quest/today': typeof QuestTodayRoute
   '/things-to-see/$slug': typeof ThingsToSeeSlugRoute
+  '/u/$token': typeof UTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/d14/': typeof D14IndexRoute
   '/haven/': typeof HavenIndexRoute
@@ -684,6 +701,7 @@ export interface FileRoutesById {
   '/admin/minutes/$meetingId': typeof AdminMinutesMeetingIdRoute
   '/api/cron/leads-hunter': typeof ApiCronLeadsHunterRoute
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
+  '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
@@ -754,6 +772,7 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/things-to-see/$slug'
+    | '/u/$token'
     | '/admin/'
     | '/d14/'
     | '/haven/'
@@ -764,6 +783,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/outreach'
     | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -825,6 +845,7 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/things-to-see/$slug'
+    | '/u/$token'
     | '/admin'
     | '/d14'
     | '/haven'
@@ -835,6 +856,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/outreach'
     | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -903,6 +925,7 @@ export interface FileRouteTypes {
     | '/quest/thirty'
     | '/quest/today'
     | '/things-to-see/$slug'
+    | '/u/$token'
     | '/admin/'
     | '/d14/'
     | '/haven/'
@@ -913,6 +936,7 @@ export interface FileRouteTypes {
     | '/admin/minutes/$meetingId'
     | '/api/cron/leads-hunter'
     | '/api/cron/leads-scout'
+    | '/api/hunter/outreach'
     | '/api/hunter/read'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
@@ -956,10 +980,12 @@ export interface RootRouteChildren {
   PackagesSlugRoute: typeof PackagesSlugRoute
   PackagesWomensWellnessRoute: typeof PackagesWomensWellnessRoute
   ThingsToSeeSlugRoute: typeof ThingsToSeeSlugRoute
+  UTokenRoute: typeof UTokenRoute
   PackagesIndexRoute: typeof PackagesIndexRoute
   ThingsToSeeIndexRoute: typeof ThingsToSeeIndexRoute
   ApiCronLeadsHunterRoute: typeof ApiCronLeadsHunterRoute
   ApiCronLeadsScoutRoute: typeof ApiCronLeadsScoutRoute
+  ApiHunterOutreachRoute: typeof ApiHunterOutreachRoute
   ApiHunterReadRoute: typeof ApiHunterReadRoute
 }
 
@@ -1406,6 +1432,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThingsToSeeSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/u/$token': {
+      id: '/u/$token'
+      path: '/u/$token'
+      fullPath: '/u/$token'
+      preLoaderRoute: typeof UTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/minutes/': {
       id: '/admin/minutes/'
       path: '/'
@@ -1432,6 +1465,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/leads-scout'
       fullPath: '/api/cron/leads-scout'
       preLoaderRoute: typeof ApiCronLeadsScoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hunter/outreach': {
+      id: '/api/hunter/outreach'
+      path: '/api/hunter/outreach'
+      fullPath: '/api/hunter/outreach'
+      preLoaderRoute: typeof ApiHunterOutreachRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/hunter/read': {
@@ -1674,10 +1714,12 @@ const rootRouteChildren: RootRouteChildren = {
   PackagesSlugRoute: PackagesSlugRoute,
   PackagesWomensWellnessRoute: PackagesWomensWellnessRoute,
   ThingsToSeeSlugRoute: ThingsToSeeSlugRoute,
+  UTokenRoute: UTokenRoute,
   PackagesIndexRoute: PackagesIndexRoute,
   ThingsToSeeIndexRoute: ThingsToSeeIndexRoute,
   ApiCronLeadsHunterRoute: ApiCronLeadsHunterRoute,
   ApiCronLeadsScoutRoute: ApiCronLeadsScoutRoute,
+  ApiHunterOutreachRoute: ApiHunterOutreachRoute,
   ApiHunterReadRoute: ApiHunterReadRoute,
 }
 export const routeTree = rootRouteImport

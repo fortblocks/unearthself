@@ -14,6 +14,18 @@ import { loadHunterState } from "./leads-hunter.ts";
 
 const NO_STORE = { "cache-control": "no-store" };
 
+/** New routes refuse a token that is missing or shorter than this. The read snapshot does not. */
+export const TOKEN_MIN_LENGTH = 32;
+
+const CARD_VIEWS = new Set(["qualifying", "in-sequence", "outreach", "card"]);
+
+/** Constant-time compare for a token that is long enough to be configured. Shorter tokens never match. */
+export function bearerConfigured(header: string | null, raw: string | undefined) {
+  const token = (raw ?? "").trim();
+  if (token.length < TOKEN_MIN_LENGTH) return false;
+  return hunterReadAuthorized(header, token);
+}
+
 /** Constant-time compare. A missing token never matches. */
 export function hunterReadAuthorized(header: string | null, token: string) {
   const expected = token.trim();
@@ -29,12 +41,36 @@ export async function handleHunterRead(request: Request) {
   if (request.method !== "GET") {
     return Response.json({ error: "Method not allowed" }, { status: 405, headers: NO_STORE });
   }
-  const token = process.env.HUNTER_READ_TOKEN ?? "";
-  if (!hunterReadAuthorized(request.headers.get("authorization"), token)) {
+  let view = "";
+  try {
+    view = new URL(request.url).searchParams.get("view")?.trim() ?? "";
+  } catch {
+    view = "";
+  }
+  if (!view || view === "snapshot") {
+    const token = process.env.HUNTER_READ_TOKEN ?? "";
+    if (!hunterReadAuthorized(request.headers.get("authorization"), token)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
+    }
+    try {
+      const body = await readHunterSnapshot();
+      return Response.json(body, { status: 200, headers: NO_STORE });
+    } catch {
+      return Response.json({ error: "Unavailable", retryable: true }, { status: 503, headers: NO_STORE });
+    }
+  }
+  if (!CARD_VIEWS.has(view)) {
+    return Response.json({ error: "invalid", field: "view" }, { status: 400, headers: NO_STORE });
+  }
+  if (!bearerConfigured(request.headers.get("authorization"), process.env.HUNTER_CARDS_TOKEN)) {
     return Response.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
-  const body = await readHunterSnapshot();
-  return Response.json(body, { status: 200, headers: NO_STORE });
+  try {
+    const { handleCardRead } = await import("./hunter-outreach.ts");
+    return await handleCardRead(new URL(request.url));
+  } catch {
+    return Response.json({ error: "Unavailable", retryable: true }, { status: 503, headers: NO_STORE });
+  }
 }
 
 export async function readHunterSnapshot(now = new Date()) {
