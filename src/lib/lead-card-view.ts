@@ -1,6 +1,7 @@
 import { createElement, type ReactNode } from "react";
-import { draftEditWarnings, type CocoJoin } from "./hunter-outreach.ts";
+import { draftEditWarnings, SEND_IMPOSSIBLE_COPY, type CocoJoin } from "./hunter-outreach.ts";
 import { wordCount } from "./lead-copy.ts";
+import { isSendable, scoreCompany, type Company, type ScoreBreak } from "./lead-score.ts";
 
 export const SKIP_REASONS = [
   ["wrong-size", "Wrong size"],
@@ -27,9 +28,30 @@ export function hasPublishedEmail(company: { email?: string | null }) {
   return typeof company.email === "string" && company.email.trim().length > 0;
 }
 
-/** Cards the leads lists may show. This does not change the stored book. */
-export function companiesWithPublishedEmail<T extends { email?: string | null }>(companies: readonly T[]): T[] {
-  return companies.filter(hasPublishedEmail);
+const CARD_SEND_BLOCKS = ["No unsolicited email", "Stale", "Apollo email not verified"] as const;
+
+/**
+ * A card the desk may list. Sendable is the gate: score band sequence or pursue, not stopped, and access
+ * (named person, published email, http source). Flags and a failed mail check are on the card.
+ * Do-not-contact and a bounce are only in the outreach join, passed in as blocked copy.
+ */
+export function leadOnDesk(company: Company, score: ScoreBreak, blocked: readonly string[] = []) {
+  if (!isSendable(company, score)) return false;
+  if (!hasPublishedEmail(company)) return false;
+  if (company.emailMx === false) return false;
+  if (company.cardFlags?.some((flag) => (CARD_SEND_BLOCKS as readonly string[]).includes(flag))) return false;
+  return !blocked.some((line) => SEND_IMPOSSIBLE_COPY.includes(line));
+}
+
+/** Display list only. The stored book is not changed. */
+export function companiesOnDesk<T extends Company>(
+  companies: readonly T[],
+  today?: string,
+  blockedById?: Readonly<Record<string, readonly string[] | undefined>>,
+): T[] {
+  return companies.filter((company) =>
+    leadOnDesk(company, scoreCompany({ ...company, today }), blockedById?.[company.id] ?? []),
+  );
 }
 
 /** How often an open card asks whether Coco's draft has landed. */

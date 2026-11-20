@@ -9,7 +9,7 @@ import { useDesk } from "@/lib/desk-store";
 import {
   cocoAwaitingDraft,
   COCO_DRAFT_POLL_MS,
-  companiesWithPublishedEmail,
+  companiesOnDesk,
   draftPollDecision,
   emptyCoco,
   LeadCardActions,
@@ -165,7 +165,15 @@ function LeadsPage() {
     };
   }, [loaded]);
 
-  const listed = useMemo(() => companiesWithPublishedEmail(rows ?? []), [rows]);
+  const listed = useMemo(
+    () =>
+      companiesOnDesk(
+        rows ?? [],
+        today,
+        Object.fromEntries(Object.entries(cocoById).map(([id, card]) => [id, card.blocked])),
+      ),
+    [rows, today, cocoById],
+  );
 
   const scored = useMemo(() => {
     return listed.map((company) => ({

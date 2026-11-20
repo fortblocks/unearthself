@@ -8,6 +8,7 @@ import {
   HUNTER_OUTREACH_KEY,
   approveAndQueueForCoco,
   approveWording,
+  cocoJoin,
   cocoStage,
   handleOutreach,
   readCocoCard,
@@ -89,9 +90,9 @@ function company(partial: Partial<Company> & { id: string }): Company {
     id: partial.id,
     org: partial.org ?? "Northwind Example",
     domain: partial.domain ?? "northwind.example",
-    city: "Calgary",
-    industry: "energy",
-    sizeBand: "80-800",
+    city: partial.city ?? "Calgary",
+    industry: partial.industry ?? "energy",
+    sizeBand: partial.sizeBand ?? "80-800",
     sourceUrl: "https://northwind.example/about",
     why: "The about page names a leadership offsite.",
     whySources: [{ url: "https://northwind.example/about", label: "About" }],
@@ -243,6 +244,28 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal((await readCocoCard(card.id))?.stage, "queued");
     const drafting = await post(letter(card.id, "drafting"));
     assert.equal(drafting.status, 200);
+  });
+
+  test("a card under the sendable score is not queued and has no Approve and draft", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const watch = company({ id: "watch-band", city: "Calgary", sizeBand: "80-800", industry: "other" });
+    const hold = company({ id: "hold-band", city: "Elsewhere", sizeBand: "unknown", industry: "other" });
+    await seed(redis, [watch, hold]);
+    for (const card of [watch, hold]) {
+      const view = cocoJoin(card, null, [], "2026-11-20");
+      assert.equal(view.canApproveDraft, false, card.id);
+      const result = await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" });
+      assert.equal(result.ok, false, card.id);
+      if (!result.ok) {
+        assert.equal(result.error, "blocked");
+        assert.equal(result.reasons?.includes("This card is below the sendable score."), true);
+      }
+    }
+    const book = await redis.get<{ companies: Company[] }>(LEADS_KEY);
+    assert.equal(book?.companies.every((item) => item.review !== "approved"), true);
+    const ready = company({ id: "ready-score" });
+    assert.equal(cocoJoin(ready, null, [], "2026-11-20").canApproveDraft, true);
   });
 
   test("blocked cards are refused with no write, and a second press queues once", async () => {

@@ -6,13 +6,14 @@ import {
   cocoAwaitingDraft,
   COCO_DRAFT_POLL_MS,
   COCO_DRAFT_WAIT_MS,
-  companiesWithPublishedEmail,
+  companiesOnDesk,
   draftPollDecision,
   emptyCoco,
-  hasPublishedEmail,
+  leadOnDesk,
   LeadCardActions,
 } from "./lead-card-view.ts";
 import type { CocoJoin, CocoStage } from "./hunter-outreach.ts";
+import { bandFor, scoreCompany, type Company } from "./lead-score.ts";
 
 const stages: CocoJoin[] = [
   emptyCoco({ stage: "new", stageLabel: "Unreviewed", canApproveDraft: true }),
@@ -51,34 +52,85 @@ function controlLabels(html: string) {
   );
 }
 
-test("a lead without a published email stays off the list", () => {
-  assert.equal(hasPublishedEmail({ email: "ada@northwind.example" }), true);
-  assert.equal(hasPublishedEmail({ email: "  ada@northwind.example  " }), true);
-  assert.equal(hasPublishedEmail({ email: "" }), false);
-  assert.equal(hasPublishedEmail({ email: "   " }), false);
-  assert.equal(hasPublishedEmail({ email: "\n\t" }), false);
-  assert.equal(hasPublishedEmail({}), false);
-  assert.equal(hasPublishedEmail({ email: null }), false);
+function deskCard(partial: Partial<Company> & { id: string }): Company {
+  return {
+    id: partial.id,
+    org: partial.org ?? "Northwind Example",
+    domain: partial.domain ?? "northwind.example",
+    city: partial.city ?? "Calgary",
+    industry: partial.industry ?? "energy",
+    sizeBand: partial.sizeBand ?? "80-800",
+    sourceUrl: partial.sourceUrl ?? "https://northwind.example/about",
+    why: "The about page names a leadership offsite.",
+    buyerName: partial.buyerName ?? "Ada North",
+    buyerTitle: "People Lead",
+    email: partial.email ?? "ada@northwind.example",
+    emailSource: partial.emailSource ?? "https://northwind.example/contact",
+    timingNote: "",
+    timingScore: partial.timingScore ?? 0,
+    status: partial.status ?? "watch",
+    filedLeadId: "",
+    draftSubject: "",
+    draftBody: "",
+    lastTouch: "",
+    scoutBatch: "",
+    emailMx: partial.emailMx,
+    cardFlags: partial.cardFlags,
+  };
+}
 
-  const rows = [
-    { id: "shown", org: "Northwind", email: "ada@northwind.example" },
-    { id: "missing", org: "Missing", email: "" },
-    { id: "blank", org: "Blank", email: "   " },
-    { id: "spaced", org: "Spaced", email: "  ada@campfire.example  " },
-  ];
-  const visible = companiesWithPublishedEmail(rows);
+test("only a sendable lead is listed", () => {
+  assert.equal(bandFor(49), "hold");
+  assert.equal(bandFor(50), "watch");
+  assert.equal(bandFor(69), "watch");
+  assert.equal(bandFor(70), "sequence");
+  assert.equal(bandFor(90), "pursue");
+
+  const hold = deskCard({ id: "hold", city: "Elsewhere", sizeBand: "unknown", industry: "other" });
+  const watch = deskCard({ id: "watch", city: "Calgary", sizeBand: "80-800", industry: "other" });
+  const sendable = deskCard({ id: "sendable", city: "Calgary", sizeBand: "unknown", industry: "energy" });
+  const blank = deskCard({ id: "blank", email: "   " });
+  const missing = deskCard({ id: "missing", email: "" });
+  const flagged = deskCard({ id: "stale", cardFlags: ["Stale"] });
+  assert.equal(scoreCompany(hold).band, "hold");
+  assert.ok(scoreCompany(hold).total < 50);
+  assert.equal(scoreCompany(watch).band, "watch");
+  assert.ok(scoreCompany(watch).total >= 50 && scoreCompany(watch).total <= 69);
+  assert.equal(scoreCompany(sendable).band, "sequence");
+  assert.ok(scoreCompany(sendable).total >= 70);
+
+  const visible = companiesOnDesk([hold, watch, sendable, blank, missing, flagged]);
   assert.deepEqual(
     visible.map((row) => row.id),
-    ["shown", "spaced"],
+    ["sendable"],
   );
-  const city = "all";
-  const query = "missing";
-  const filtered = visible.filter((row) => {
-    if (city !== "all") return false;
-    if (!query) return true;
-    return [row.org, row.email].join(" ").toLowerCase().includes(query);
-  });
+  assert.equal(leadOnDesk(sendable, scoreCompany(sendable), ["This contact is on the do-not-contact list."]), false);
+  assert.equal(leadOnDesk(sendable, scoreCompany(sendable), ["Mail to this address bounced."]), false);
+  const query = "hold";
+  const filtered = visible.filter((row) => row.org.toLowerCase().includes(query) || row.id.includes(query));
   assert.deepEqual(filtered, []);
+});
+
+test("Approve and draft is not offered when the card is not sendable", () => {
+  const hidden = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "low",
+      coco: emptyCoco({ stage: "new", stageLabel: "Unreviewed", canApproveDraft: false }),
+      subject: "",
+      body: "",
+    }),
+  );
+  assert.equal(controlLabels(hidden).includes("Approve and draft"), false);
+
+  const shown = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "ready",
+      coco: emptyCoco({ stage: "new", stageLabel: "Unreviewed", canApproveDraft: true }),
+      subject: "",
+      body: "",
+    }),
+  );
+  assert.equal(controlLabels(shown).includes("Approve and draft"), true);
 });
 
 test("the card page has no Send control and no mail link in any stage", () => {
