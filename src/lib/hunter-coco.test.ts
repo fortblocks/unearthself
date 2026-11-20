@@ -14,6 +14,7 @@ import {
   readCocoCard,
   saveCocoDraftEdit,
   unsubscribeUrl,
+  wakeCocoDraft,
   withdrawWording,
 } from "./hunter-outreach.ts";
 import { mergeHunterCompanies } from "./hunter-phase.ts";
@@ -228,6 +229,98 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(reason?.error, "queue");
     assert.equal(reason?.cardId, card.id);
     assert.equal(JSON.stringify(reason).includes("@"), false);
+  });
+
+  test("a 400 names the failed check and stores no draft text", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "reject-card" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    const secret = "BODY-SECRET-REJECT";
+    try {
+      const cases: Array<{ body: Record<string, unknown>; check: string; field: string }> = [
+        { body: letter(card.id, "drafted", { eventId: "not-a-uuid" }), check: "eventId-not-uuidv4", field: "eventId" },
+        { body: letter(card.id, "drafted", { subject: "SUBJECT-SECRET\nline", body: "Hello." }), check: "subject-multiline", field: "subject" },
+        { body: letter(card.id, "drafted", { body: `${secret}${"a".repeat(4096)}` }), check: "body-too-long", field: "body" },
+        { body: letter(card.id, "drafted", { body: `${secret} \u2014 there` }), check: "em-dash", field: "body" },
+        { body: letter(card.id, "drafted", { body: `${secret} is $12` }), check: "price", field: "body" },
+        { body: letter(card.id, "drafted", { experimentId: "not a slug" }), check: "experimentId", field: "experimentId" },
+        { body: letter(card.id, "drafted", { variantId: "not a slug" }), check: "variantId", field: "variantId" },
+        { body: letter(card.id, "drafted", { touch: undefined }), check: "missing-touch", field: "touch" },
+      ];
+      for (const item of cases) {
+        const response = await post(item.body);
+        assert.equal(response.status, 400, item.check);
+        assert.deepEqual(await response.json(), { error: "invalid", field: item.field });
+      }
+    } finally {
+      console.info = original;
+    }
+    const logged = lines.map((line) => JSON.parse(line) as { cardId?: string; type?: string; status?: number; check?: string });
+    for (const check of ["eventId-not-uuidv4", "subject-multiline", "body-too-long", "em-dash", "price", "experimentId", "variantId", "missing-touch"]) {
+      const line = logged.find((item) => item.check === check);
+      assert.equal(line?.cardId, card.id, check);
+      assert.equal(line?.type, "drafted", check);
+      assert.equal(line?.status, 400, check);
+    }
+    const text = lines.join("\n");
+    assert.equal(text.includes(secret), false);
+    assert.equal(text.includes("SUBJECT-SECRET"), false);
+    assert.equal(text.includes(WRITE), false);
+    assert.equal(text.includes("\u2014"), false);
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      draftRejected?: { at?: string; check?: string };
+      drafts?: unknown;
+    };
+    assert.equal(stored.draftRejected?.check, "missing-touch");
+    assert.match(stored.draftRejected?.at ?? "", /^\d{4}-\d{2}-\d{2}T/);
+    assert.equal(JSON.stringify(stored).includes(secret), false);
+    assert.equal(JSON.stringify(stored).includes("SUBJECT-SECRET"), false);
+    const view = await readCocoCard(card.id);
+    assert.equal(view?.draftRejected?.check, "missing-touch");
+    assert.equal(view?.subject, "");
+    assert.equal(view?.body, "");
+    const accepted = await post(letter(card.id, "drafted", { subject: "A short note", body: "Hello from Drumheller." }));
+    assert.equal(accepted.status, 200);
+    const after = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { draftRejected?: unknown };
+    assert.equal(after.draftRejected, undefined);
+    const ready = await readCocoCard(card.id);
+    assert.equal(ready?.draftRejected, null);
+    assert.equal(ready?.subject, "A short note");
+    assert.equal(ready?.body.includes("Hello from Drumheller."), true);
+  });
+
+  test("the coco wake log names the card and not the key", async () => {
+    process.env.COCO_DRAFT_WEBHOOK_URL = "https://coco.example/hook";
+    process.env.COCO_DRAFT_WEBHOOK_KEY = "secret-key";
+    process.env.COCO_DRAFT_WEBHOOK_HEADER = "X-Coco-Key";
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    try {
+      const woke = await wakeCocoDraft("ready-card", async () => ({ status: 202 }));
+      assert.equal(woke.status, 202);
+      const failed = await wakeCocoDraft("ready-card", async () => {
+        throw new Error("webhook down");
+      });
+      assert.equal(failed.status, 0);
+    } finally {
+      console.info = original;
+    }
+    assert.deepEqual(JSON.parse(lines[0] ?? "{}"), { webhook: "coco-draft", cardId: "ready-card", status: 202 });
+    assert.deepEqual(JSON.parse(lines[1] ?? "{}"), { webhook: "coco-draft", cardId: "ready-card", status: 0 });
+    const text = lines.join("\n");
+    assert.equal(text.includes("secret-key"), false);
+    assert.equal(text.includes("X-Coco-Key"), false);
+    assert.equal(text.includes("webhook down"), false);
   });
 
   test("approve leaves the card queued when Redis hset stores a field map", async () => {

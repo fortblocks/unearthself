@@ -44,14 +44,13 @@ export function companiesOnDesk<T extends Company>(
   return companies.filter((company) => leadOnDesk(company, blockedById?.[company.id] ?? []));
 }
 
-/** Stage, status, and the skip note should not each repeat Coco's reason. */
+/** Stage and status stay free of the reason. The stored skip reason is one plain line. */
 export function skipReasonLines(coco: { stage: string; stageLabel: string; status: string; skipNote: string }) {
   const reason = coco.skipNote.trim();
   if (coco.stage !== "draft-skipped" || !reason) return { stage: coco.stageLabel, status: coco.status, note: "" };
   const stage = coco.stageLabel.includes(reason) ? "Draft skipped" : coco.stageLabel;
-  if (coco.status.includes(reason)) return { stage, status: coco.status, note: "" };
-  if (stage.includes(reason)) return { stage: "Draft skipped", status: coco.status, note: reason };
-  return { stage, status: coco.status, note: reason };
+  const status = coco.status.includes(reason) ? "" : coco.status;
+  return { stage, status, note: reason };
 }
 
 /** How often an open card asks whether Coco's draft has landed. */
@@ -60,11 +59,23 @@ export const COCO_DRAFT_POLL_MS = 12_000;
 /** Stop asking after this long and leave the card for Coco's next sweep. */
 export const COCO_DRAFT_WAIT_MS = 20 * 60 * 1000;
 
-/** Queued or drafting, with no subject or email for the current touch. */
+/** Queued or drafting, with no subject or email for the current touch. A rejected write-back still waits. */
 export function cocoAwaitingDraft(coco: Pick<CocoJoin, "stage" | "subject" | "body">) {
   if (coco.stage !== "queued" && coco.stage !== "drafting") return false;
   return coco.subject.trim() === "" && coco.body.trim() === "";
 }
+
+/** The waiting panel. A rejected write-back replaces the blank wait until a draft is accepted. */
+export function draftPanelKind(
+  coco: Pick<CocoJoin, "stage" | "subject" | "body" | "draftRejected">,
+  late = false,
+): "writing" | "late" | "rejected" | null {
+  if (!cocoAwaitingDraft(coco)) return null;
+  if (coco.draftRejected?.at && coco.draftRejected.check) return "rejected";
+  return late ? "late" : "writing";
+}
+
+export const DRAFT_REJECTED_COPY = "Coco's draft was rejected, retrying";
 
 export type DraftPoll = "poll" | "stop-ready" | "stop-left" | "stop-timeout";
 
@@ -100,8 +111,8 @@ export type LeadCardActionsProps = {
   onWithdraw?: () => void;
   onRefresh?: () => void;
   onHandFile?: () => void;
-  /** Set once the wait has run out. The stage still decides whether the panel shows. */
-  draftWait?: "writing" | "late";
+  /** Set once the wait has run out, or when the last write-back was rejected. */
+  draftWait?: "writing" | "late" | "rejected";
 };
 
 function menu(title: string, open: boolean, children: ReactNode) {
@@ -146,7 +157,8 @@ export function LeadCardActions({
   const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved";
   const words = body.trim() ? `${wordCount(body)} words` : "No draft yet.";
   const awaiting = cocoAwaitingDraft(coco);
-  const wait = awaiting ? (draftWait ?? "writing") : null;
+  const rejected = awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check));
+  const wait = !awaiting ? null : rejected ? "rejected" : draftWait === "late" ? "late" : "writing";
   const skip = skipReasonLines(coco);
   return createElement(
     "div",
@@ -200,8 +212,7 @@ export function LeadCardActions({
         ],
       ),
     ),
-    wait === "writing" ? draftingPanel(false) : null,
-    wait === "late" ? draftingPanel(true) : null,
+    wait ? draftingPanel(wait) : null,
     coco.blocked.length > 0
       ? createElement(
           "ul",
@@ -209,7 +220,7 @@ export function LeadCardActions({
           coco.blocked.map((reason) => createElement("li", { key: reason, className: "text-sm text-coal" }, reason)),
         )
       : null,
-    wait
+    wait || coco.stage === "draft-skipped"
       ? null
       : createElement(
       "div",
@@ -253,27 +264,35 @@ export function LeadCardActions({
   );
 }
 
-function draftingPanel(late: boolean) {
+function draftingPanel(kind: "writing" | "late" | "rejected") {
+  const rejected = kind === "rejected";
+  const late = kind === "late";
   return createElement(
     "div",
     {
       className: "border border-line bg-fossil p-4",
       role: "status",
-      "data-draft-wait": late ? "late" : "writing",
+      "data-draft-wait": kind,
     },
     createElement(
       "div",
       { className: "flex items-center gap-3" },
       late ? null : spinner(),
-      createElement("p", { className: "text-sm font-semibold text-coal" }, "Coco drafting"),
+      createElement(
+        "p",
+        { className: "text-sm font-semibold text-coal" },
+        rejected ? DRAFT_REJECTED_COPY : "Coco drafting",
+      ),
     ),
-    createElement(
-      "p",
-      { className: "mt-2 text-sm text-shale" },
-      late
-        ? "The draft has not arrived yet. Coco's next sweep will pick it up."
-        : "This usually takes a few minutes. You can leave this page.",
-    ),
+    rejected
+      ? null
+      : createElement(
+          "p",
+          { className: "mt-2 text-sm text-shale" },
+          late
+            ? "The draft has not arrived yet. Coco's next sweep will pick it up."
+            : "This usually takes a few minutes. You can leave this page.",
+        ),
   );
 }
 
@@ -314,6 +333,7 @@ export function emptyCoco(partial: Partial<CocoJoin> = {}): CocoJoin {
     problems: [],
     blocked: [],
     skipNote: "",
+    draftRejected: null,
     canApproveDraft: true,
     canApproveWording: false,
     canWithdraw: false,

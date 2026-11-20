@@ -7,6 +7,8 @@ import {
   COCO_DRAFT_POLL_MS,
   COCO_DRAFT_WAIT_MS,
   companiesOnDesk,
+  DRAFT_REJECTED_COPY,
+  draftPanelKind,
   draftPollDecision,
   emptyCoco,
   leadOnDesk,
@@ -129,9 +131,56 @@ test("Coco's skip reason is shown once", () => {
   const html = renderToStaticMarkup(
     createElement(LeadCardActions, { cardId: "skipped", coco, subject: "", body: "" }),
   );
-  assert.equal(lines.note, "");
+  assert.equal(lines.stage, "Draft skipped");
+  assert.equal(lines.note, "No retreat fit");
+  assert.equal(lines.status.includes("No retreat fit"), false);
   assert.equal(html.split("No retreat fit").length - 1, 1);
   assert.equal(html.includes("Draft skipped"), true);
+  assert.equal(html.includes("No draft yet."), false);
+  assert.equal(html.includes("\u2014"), false);
+});
+
+test("a rejected write-back says Coco is retrying, and the skip reason stays one plain line", () => {
+  const rejected = emptyCoco({
+    stage: "queued",
+    stageLabel: "Queued",
+    status: "Approved, waiting for Coco.",
+    touch: 1,
+    draftRejected: { at: "2026-11-20T19:40:00.000Z", check: "em-dash" },
+  });
+  assert.equal(cocoAwaitingDraft(rejected), true);
+  assert.equal(draftPanelKind(rejected, true), "rejected");
+  assert.equal(DRAFT_REJECTED_COPY, "Coco's draft was rejected, retrying");
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, { cardId: "card-1", coco: rejected, subject: "", body: "" }),
+  );
+  assert.equal(html.includes("draft was rejected, retrying"), true);
+  assert.equal(html.includes("em-dash"), false);
+  assert.equal(html.includes("Coco drafting"), false);
+  assert.equal(html.includes("No draft yet."), false);
+  assert.equal(html.includes('id="card-1-subject"'), false);
+  assert.equal(html.includes("\u2014"), false);
+
+  const accepted = emptyCoco({
+    stage: "draft-ready",
+    stageLabel: "Draft ready",
+    subject: "A week in Drumheller",
+    body: "Hello from Drumheller.",
+    touch: 1,
+    draftRejected: { at: "2026-11-20T19:40:00.000Z", check: "price" },
+  });
+  assert.equal(cocoAwaitingDraft(accepted), false);
+  assert.equal(draftPanelKind(accepted), null);
+  const ready = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "card-1",
+      coco: accepted,
+      subject: "A week in Drumheller",
+      body: "Hello from Drumheller.",
+    }),
+  );
+  assert.equal(ready.includes("draft was rejected, retrying"), false);
+  assert.equal(ready.includes("A week in Drumheller"), true);
 });
 
 test("Approve and draft is not offered when the card is not sendable", () => {

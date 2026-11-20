@@ -166,6 +166,9 @@ export type SendApproved = {
 
 type DraftSkipped = { reason: string; touch: number; at: string };
 
+/** The last rejected write-back. The check is a short code. The draft text is not stored. */
+type DraftRejected = { at: string; check: string };
+
 export type OutreachRecord = {
   cardId: string;
   domain?: string;
@@ -190,6 +193,7 @@ export type OutreachRecord = {
   queue?: OutreachQueue;
   sendApproved?: SendApproved;
   draftSkipped?: DraftSkipped;
+  draftRejected?: DraftRejected;
   drafts?: Partial<Record<"1" | "2" | "3", OutreachDraft>>;
   events: OutreachEvent[];
 };
@@ -365,6 +369,7 @@ function asRecord(raw: unknown, cardId: string): OutreachRecord | null {
     queue: readQueue(row.queue),
     sendApproved: readSendApproved(row.sendApproved),
     draftSkipped: readDraftSkipped(row.draftSkipped),
+    draftRejected: readDraftRejected(row.draftRejected),
     drafts: row.drafts && typeof row.drafts === "object" ? row.drafts : undefined,
     events: row.events.filter((event) => event && typeof event === "object" && typeof event.eventId === "string"),
   };
@@ -393,6 +398,14 @@ function readDraftSkipped(value: unknown): DraftSkipped | undefined {
   if (typeof row.reason !== "string" || !row.reason || typeof row.at !== "string") return undefined;
   if (row.touch !== 1 && row.touch !== 2 && row.touch !== 3) return undefined;
   return { reason: row.reason, touch: row.touch, at: row.at };
+}
+
+function readDraftRejected(value: unknown): DraftRejected | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as { at?: unknown; check?: unknown };
+  if (typeof row.at !== "string" || !row.at || typeof row.check !== "string") return undefined;
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(row.check)) return undefined;
+  return { at: row.at, check: row.check };
 }
 
 function stringOrUndefined(value: unknown) {
@@ -437,6 +450,26 @@ async function writeOutreachRecord(redis: LeadsRedis, record: OutreachRecord) {
   if (!redis.hset) throw new Error("Redis hash writes are unavailable");
   // @upstash/redis hset is (key, fields). A third argument is ignored, so the card id has to be the field name.
   await redis.hset(HUNTER_OUTREACH_KEY, { [record.cardId]: JSON.stringify(record) });
+}
+
+/** Remember a rejected write-back by time and check code. The draft text is not written. */
+async function rememberDraftRejection(cardId: string, check: string) {
+  if (!logSafe(cardId) || !/^[A-Za-z0-9_-]{1,40}$/.test(check)) return;
+  try {
+    const redis = await getRedisClient();
+    if (!redis) return;
+    const loaded = await loadBook();
+    if (loaded.storage !== "redis") return;
+    if (!loaded.book.companies.some((company) => company.id === cardId)) return;
+    await withOutreachLock(redis, cardId, async () => {
+      const existing = await readOutreachRecord(redis, cardId);
+      if (!existing) return;
+      existing.draftRejected = { at: new Date().toISOString(), check };
+      await writeOutreachRecord(redis, existing);
+    });
+  } catch {
+    // The 400 still goes back. A missed stamp leaves the previous one.
+  }
 }
 
 export async function withOutreachLock<T>(redis: LeadsRedis, cardId: string, fn: () => Promise<T>): Promise<T | null> {
@@ -489,6 +522,25 @@ function logSafe(value: unknown) {
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 80 || /[\s@]/.test(trimmed)) return "";
   return trimmed;
+}
+
+/** A short check name. The subject, body, and header values never become the name. */
+function formatCheck(field: string, value: unknown) {
+  const row = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  if (field === "eventId") return "eventId-not-uuidv4";
+  if (field === "touch") return "missing-touch";
+  if (field === "experimentId") return "experimentId";
+  if (field === "variantId") return "variantId";
+  if (field === "subject" && typeof row?.subject === "string") {
+    if (/[\r\n]/.test(row.subject)) return "subject-multiline";
+    if (row.subject.length > 200) return "subject-too-long";
+  }
+  if (field === "body" && typeof row?.body === "string") {
+    if (Buffer.byteLength(row.body, "utf8") > 4096) return "body-too-long";
+    if (row.body.includes("\u2014")) return "em-dash";
+    if (draftHasPrice(row.body)) return "price";
+  }
+  return /^[A-Za-z0-9_-]{1,40}$/.test(field) ? field : "unknown-field";
 }
 
 function uuidV4(value: string) {
@@ -918,6 +970,7 @@ async function applyCocoEvent(
     };
     record.drafts = drafts;
     if (record.draftSkipped?.touch === touch) record.draftSkipped = undefined;
+    delete record.draftRejected;
     record.events.push(toStoredEvent(event));
     await writeOutreachRecord(redis, record);
     return { ok: true, duplicate: false, record, lift: false };
@@ -959,8 +1012,13 @@ export async function handleOutreach(request: Request) {
   let eventId = "";
   let cardId = "";
   let type = "";
-  const finish = (status: number, body: unknown) => {
-    console.info(JSON.stringify({ eventId, cardId, type, status, ms: Date.now() - started }));
+  const finish = (status: number, body: unknown, check = "") => {
+    const ms = Date.now() - started;
+    const line =
+      status === 400 && check
+        ? { eventId, cardId, type, status, check, ms }
+        : { eventId, cardId, type, status, ms };
+    console.info(JSON.stringify(line));
     return json(body, status);
   };
   try {
@@ -977,7 +1035,7 @@ export async function handleOutreach(request: Request) {
     try {
       payload = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
-      return finish(400, { error: "invalid", field: "body" });
+      return finish(400, { error: "invalid", field: "body" }, "body");
     }
     if (payload && typeof payload === "object" && !Array.isArray(payload)) {
       const row = payload as Record<string, unknown>;
@@ -986,7 +1044,11 @@ export async function handleOutreach(request: Request) {
       type = logSafe(row.type);
     }
     const parsed = parseEvent(payload, Date.now());
-    if (!parsed.ok) return finish(400, { error: "invalid", field: parsed.field });
+    if (!parsed.ok) {
+      const check = formatCheck(parsed.field, payload);
+      if (cardId) await rememberDraftRejection(cardId, check);
+      return finish(400, { error: "invalid", field: parsed.field }, check);
+    }
     eventId = parsed.event.eventId;
     cardId = parsed.event.cardId;
     type = parsed.event.type;
@@ -1319,6 +1381,7 @@ export type CocoJoin = {
   problems: string[];
   blocked: string[];
   skipNote: string;
+  draftRejected: { at: string; check: string } | null;
   canApproveDraft: boolean;
   canApproveWording: boolean;
   canWithdraw: boolean;
@@ -1332,9 +1395,7 @@ function statusFor(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "draft-ready") return "Read the draft, then approve the wording.";
   if (stage === "wording-approved") return "Waiting for your Send in Coco's chat.";
   if (stage === "sent") return `Sent, ${record?.touches ?? 0} of 3.`;
-  if (stage === "draft-skipped") {
-    return record?.draftSkipped?.reason ? `Coco skipped this draft. ${record.draftSkipped.reason}` : "Coco skipped this draft.";
-  }
+  if (stage === "draft-skipped") return "";
   return "";
 }
 
@@ -1358,6 +1419,7 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     problems: draft?.problems ?? [],
     blocked,
     skipNote: record?.draftSkipped?.reason ?? "",
+    draftRejected: record?.draftRejected ?? null,
     canApproveDraft:
       emailableLead(company, blocked) &&
       blocked.length === 0 &&
@@ -1586,10 +1648,10 @@ export async function wakeCocoDraft(cardId: string, fetchImpl?: WakeFetch) {
       body: JSON.stringify({ cardId }),
       signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
     });
-    console.info(JSON.stringify({ webhook: "coco-draft", status: response.status }));
+    console.info(JSON.stringify({ webhook: "coco-draft", cardId, status: response.status }));
     return { called: true, status: response.status };
   } catch {
-    console.info(JSON.stringify({ webhook: "coco-draft", status: 0 }));
+    console.info(JSON.stringify({ webhook: "coco-draft", cardId, status: 0 }));
     return { called: true, status: 0 };
   }
 }

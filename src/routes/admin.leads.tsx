@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useDesk } from "@/lib/desk-store";
 import {
   cocoAwaitingDraft,
+  draftPanelKind,
   COCO_DRAFT_POLL_MS,
   companiesOnDesk,
   leadOnDesk,
@@ -504,6 +505,7 @@ function CompanyPanel({
   const onCocoRef = useRef(onCoco);
   onCocoRef.current = onCoco;
   const awaitingDraft = cocoAwaitingDraft(coco);
+  const draftPanel = draftPanelKind(coco, draftLate);
 
   useEffect(() => {
     setSubject(coco.subject);
@@ -853,7 +855,7 @@ function CompanyPanel({
         onRefresh={() => {
           void refreshCoco();
         }}
-        draftWait={awaitingDraft ? (draftLate ? "late" : "writing") : undefined}
+        draftWait={draftPanel ?? undefined}
         onHandFile={() => {
           void onMutate(company.id, () => {
             const result = useDesk.getState().fileCompany(company.id);
