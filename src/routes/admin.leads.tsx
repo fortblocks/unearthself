@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDesk } from "@/lib/desk-store";
-import { emptyCoco, LeadCardActions } from "@/lib/lead-card-view";
+import { cocoAwaitingDraft, COCO_DRAFT_POLL_MS, draftPollDecision, emptyCoco, LeadCardActions } from "@/lib/lead-card-view";
 import type { CocoJoin } from "@/lib/hunter-outreach";
 import {
   clampMorningCount,
@@ -486,6 +486,10 @@ function CompanyPanel({
   const [email, setEmail] = useState(company.email);
   const [emailSource, setEmailSource] = useState(company.emailSource);
   const [sourceUrl, setSourceUrl] = useState(company.sourceUrl);
+  const [draftLate, setDraftLate] = useState(false);
+  const onCocoRef = useRef(onCoco);
+  onCocoRef.current = onCoco;
+  const awaitingDraft = cocoAwaitingDraft(coco);
 
   useEffect(() => {
     setSubject(coco.subject);
@@ -501,19 +505,37 @@ function CompanyPanel({
   }, [company]);
 
   useEffect(() => {
-    if (coco.stage !== "queued" && coco.stage !== "drafting") return;
+    if (!awaitingDraft) {
+      setDraftLate(false);
+      return;
+    }
     const started = Date.now();
+    let cancelled = false;
+    let inFlight = false;
     const timer = setInterval(() => {
-      if (Date.now() - started > 10 * 60 * 1000) {
+      if (draftPollDecision({ awaiting: true, elapsedMs: Date.now() - started }) === "stop-timeout") {
         clearInterval(timer);
+        setDraftLate(true);
         return;
       }
-      void getCocoCard({ data: { cardId: company.id } }).then((next) => {
-        if (next) onCoco(company.id, next);
-      });
-    }, 20000);
-    return () => clearInterval(timer);
-  }, [coco.stage, company.id, onCoco]);
+      if (inFlight) return;
+      inFlight = true;
+      void getCocoCard({ data: { cardId: company.id } })
+        .then((next) => {
+          if (!cancelled && next) onCocoRef.current(company.id, next);
+        })
+        .catch(() => {
+          // A missed poll leaves the panel up. The next interval tries again.
+        })
+        .finally(() => {
+          inFlight = false;
+        });
+    }, COCO_DRAFT_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [awaitingDraft, company.id]);
 
   async function refreshCoco() {
     const next = await getCocoCard({ data: { cardId: company.id } });
@@ -817,6 +839,7 @@ function CompanyPanel({
         onRefresh={() => {
           void refreshCoco();
         }}
+        draftWait={awaitingDraft ? (draftLate ? "late" : "writing") : undefined}
         onHandFile={() => {
           void onMutate(company.id, () => {
             const result = useDesk.getState().fileCompany(company.id);

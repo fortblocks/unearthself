@@ -22,6 +22,33 @@ const buttonClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs border border-line-strong px-4 text-sm font-semibold text-coal";
 const primaryClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs bg-ember px-4 text-sm font-semibold text-paper";
 
+/** How often an open card asks whether Coco's draft has landed. */
+export const COCO_DRAFT_POLL_MS = 12_000;
+
+/** Stop asking after this long and leave the card for Coco's next sweep. */
+export const COCO_DRAFT_WAIT_MS = 20 * 60 * 1000;
+
+/** Queued or drafting, with no subject or email for the current touch. */
+export function cocoAwaitingDraft(coco: Pick<CocoJoin, "stage" | "subject" | "body">) {
+  if (coco.stage !== "queued" && coco.stage !== "drafting") return false;
+  return coco.subject.trim() === "" && coco.body.trim() === "";
+}
+
+export type DraftPoll = "poll" | "stop-ready" | "stop-left" | "stop-timeout";
+
+/** Whether the open card should ask again. A failed ask stays on poll and tries later. */
+export function draftPollDecision(input: {
+  awaiting: boolean;
+  elapsedMs: number;
+  waitMs?: number;
+  closed?: boolean;
+}): DraftPoll {
+  if (input.closed) return "stop-left";
+  if (!input.awaiting) return "stop-ready";
+  if (input.elapsedMs >= (input.waitMs ?? COCO_DRAFT_WAIT_MS)) return "stop-timeout";
+  return "poll";
+}
+
 export type LeadCardActionsProps = {
   cardId: string;
   coco: CocoJoin;
@@ -41,6 +68,8 @@ export type LeadCardActionsProps = {
   onWithdraw?: () => void;
   onRefresh?: () => void;
   onHandFile?: () => void;
+  /** Set once the wait has run out. The stage still decides whether the panel shows. */
+  draftWait?: "writing" | "late";
 };
 
 function menu(title: string, open: boolean, children: ReactNode) {
@@ -79,10 +108,13 @@ export function LeadCardActions({
   onWithdraw,
   onRefresh,
   onHandFile,
+  draftWait,
 }: LeadCardActionsProps) {
   const warnings = draftEditWarnings(subject, body);
   const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved";
   const words = body.trim() ? `${wordCount(body)} words` : "No draft yet.";
+  const awaiting = cocoAwaitingDraft(coco);
+  const wait = awaiting ? (draftWait ?? "writing") : null;
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
@@ -137,6 +169,8 @@ export function LeadCardActions({
         ],
       ),
     ),
+    wait === "writing" ? draftingPanel(false) : null,
+    wait === "late" ? draftingPanel(true) : null,
     coco.blocked.length > 0
       ? createElement(
           "ul",
@@ -144,7 +178,9 @@ export function LeadCardActions({
           coco.blocked.map((reason) => createElement("li", { key: reason, className: "text-sm text-coal" }, reason)),
         )
       : null,
-    createElement(
+    wait
+      ? null
+      : createElement(
       "div",
       null,
       createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Draft"),
@@ -183,6 +219,56 @@ export function LeadCardActions({
       warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
       editable ? actionButton("Save copy", onSaveCopy) : null,
     ),
+  );
+}
+
+function draftingPanel(late: boolean) {
+  return createElement(
+    "div",
+    {
+      className: "border border-line bg-fossil p-4",
+      role: "status",
+      "data-draft-wait": late ? "late" : "writing",
+    },
+    createElement(
+      "div",
+      { className: "flex items-center gap-3" },
+      late ? null : spinner(),
+      createElement("p", { className: "text-sm font-semibold text-coal" }, "Coco drafting"),
+    ),
+    createElement(
+      "p",
+      { className: "mt-2 text-sm text-shale" },
+      late
+        ? "The draft has not arrived yet. Coco's next sweep will pick it up."
+        : "This usually takes a few minutes. You can leave this page.",
+    ),
+  );
+}
+
+function spinner() {
+  return createElement(
+    "svg",
+    {
+      className: "size-4 shrink-0 animate-spin text-sandstone",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      "aria-hidden": "true",
+    },
+    createElement("circle", {
+      cx: "12",
+      cy: "12",
+      r: "9",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      opacity: "0.25",
+    }),
+    createElement("path", {
+      d: "M12 3a9 9 0 0 1 9 9",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+    }),
   );
 }
 
