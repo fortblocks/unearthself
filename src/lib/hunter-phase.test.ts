@@ -4,6 +4,7 @@ import { classifyApolloReveal, classifyApolloSearch } from "./apollo.ts";
 import { dryRunFixtures } from "./hunter-dry-run.ts";
 import {
   HUNTER_CALLS_PER_RUN_DEFAULT,
+  HUNTER_FUNCTION_MAX_SECONDS,
   HUNTER_LOCK_TTL_SECONDS,
   HUNTER_MODEL_ID,
   HUNTER_QUALITY_FLOOR_DEFAULT,
@@ -124,11 +125,11 @@ test("the nightly sweep runs at 4am Edmonton once, in both standard time and day
   assert.equal(nightlyDue(winterDue, "2026-01-15"), false);
 });
 
-test("a 30 minute working day can reach the 55 call budget", () => {
+test("a working day is 24 runs and 72 always-on calls, with no daily call cap", () => {
   assert.equal(runsPerWorkingDay(7, 19), 24);
   assert.equal(HUNTER_CALLS_PER_RUN_DEFAULT, 3);
   assert.equal(callsAvailablePerDay(HUNTER_CALLS_PER_RUN_DEFAULT, 7, 19), 72);
-  assert.ok(callsAvailablePerDay(HUNTER_CALLS_PER_RUN_DEFAULT, 7, 19) >= 55);
+  assert.equal(HUNTER_FUNCTION_MAX_SECONDS, 300);
 });
 
 test("an xAI error, a deprecation, or a missing search is not zero results", () => {
@@ -216,7 +217,7 @@ test("retries back off and then abandon the run", async () => {
       },
     });
     assert.equal(calls, 0);
-    if ("error" in blocked) assert.match(blocked.error, /budget/);
+    if ("error" in blocked) assert.match(blocked.error, /Stopped for time/);
     calls = 0;
     globalThis.fetch = async () => {
       calls += 1;

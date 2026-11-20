@@ -345,6 +345,13 @@ export function ticksToDollars(ticks: number) {
   return ticks / XAI_USD_TICKS;
 }
 
+/** Counts one model call. There is no daily cap. The monthly dollar cap is checked separately. */
+export async function countCall(client: CounterClient, key: string) {
+  const used = await client.incr(key);
+  await client.expire?.(key, 10 * 24 * 60 * 60);
+  return used;
+}
+
 /** Increments first. Gives the count back when the cap would be passed, and does not make the call. */
 export async function reserveCounter(client: CounterClient, key: string, cap: number) {
   const used = await client.incr(key);

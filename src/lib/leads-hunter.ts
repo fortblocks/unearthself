@@ -10,12 +10,9 @@ import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts
 import {
   applyHunterWork,
   assignEnrichment,
-  capacityOnBudgetStop,
   countContactReadyGain,
   countsForToday,
-  hunterCallBudget,
   hunterStop,
-  type CapacityProblem,
 } from "./hunter-cap.ts";
 import { appendHunterRun, clearRunStarted, hunterRunEntry, logHunterRunLine, markRunStarted, readHunterRuns, readUnfinishedRun, type HunterRunOutcome } from "./hunter-runs.ts";
 import { getRedisClient, loadBook, saveBook } from "./leads-book.ts";
@@ -73,6 +70,7 @@ import {
   bookedThisMonth,
   BOOKING_LINK_HOOK,
   callCounterKey,
+  countCall,
   cardDedupeKey,
   caslBasis,
   clearEmailWhenUnsolicited,
@@ -134,8 +132,6 @@ export type HunterState = {
   filedToday: number;
   callsOn: string;
   callsToday: number;
-  /** Set when the model-call budget runs out before the card target. Rex reads this. */
-  capacity: CapacityProblem | null;
   cursor: number;
   lockedUntil: number;
   /** Edmonton date the Apollo reveal counter belongs to. */
@@ -200,7 +196,6 @@ export function freshHunterState(): HunterState {
     filedToday: 0,
     callsOn: "",
     callsToday: 0,
-    capacity: null,
     cursor: 0,
     lockedUntil: 0,
     apolloOn: "",
@@ -222,7 +217,6 @@ export function parseHunterState(raw: unknown): HunterState {
     filedToday: numberOrZero(row.filedToday),
     callsOn: typeof row.callsOn === "string" ? row.callsOn : "",
     callsToday: numberOrZero(row.callsToday),
-    capacity: parseCapacity(row.capacity),
     cursor: numberOrZero(row.cursor),
     lockedUntil: numberOrZero(row.lockedUntil),
     apolloOn: typeof row.apolloOn === "string" ? row.apolloOn : "",
@@ -232,35 +226,14 @@ export function parseHunterState(raw: unknown): HunterState {
   };
 }
 
-function parseCapacity(value: unknown): CapacityProblem | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as Partial<CapacityProblem>;
-  if (typeof row.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) return null;
-  return {
-    date: row.date,
-    cardsFiled: numberAtLeastZero(row.cardsFiled),
-    callsUsed: numberAtLeastZero(row.callsUsed),
-  };
-}
-
-function numberAtLeastZero(value: unknown) {
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
-}
-
 function numberOrZero(value: unknown) {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
-export function hunterMayCall(
-  state: HunterState,
-  today: string,
-  callBudget = hunterCallBudget(),
-  cardTarget = HUNTER_DAILY_CARD_TARGET,
-) {
+export function hunterMayCall(state: HunterState, today: string, cardTarget = HUNTER_DAILY_CARD_TARGET) {
   if (state.paused) return false;
-  return hunterStop(state, today, callBudget, cardTarget) === null;
+  return hunterStop(state, today, cardTarget) === null;
 }
 
 export type HunterSlot = {
@@ -1162,21 +1135,18 @@ export async function publishHunterAlarms(alarms: string[], at: string, run: str
   await publishAlarms(redis, alarms, at, run);
 }
 
-function dayStopCopy(stop: "cards" | "budget", state: HunterState, today: string, budget: number) {
-  const counts = countsForToday(state, today);
-  if (stop === "cards") return `Daily ceiling of ${HUNTER_CARD_CEILING} contact-ready cards filed.`;
-  return `Capacity problem. Model-call budget of ${budget} ran out. Filed ${counts.filedToday} of ${HUNTER_CARD_CEILING} contact-ready cards.`;
+function dayStopCopy() {
+  return `Daily ceiling of ${HUNTER_CARD_CEILING} contact-ready cards filed.`;
 }
 
 export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => number }): Promise<
-  | { ok: true; skipped: "paused" | "cards" | "budget" | "busy" | "killed" | "hours"; callsToday: number; filedToday: number }
+  | { ok: true; skipped: "paused" | "cards" | "busy" | "killed" | "hours"; callsToday: number; filedToday: number }
   | { ok: true; filed: number; contactReady: number; updated: number; callsToday: number; filedToday: number; slot: string }
   | { ok: false; error: string }
 > {
   const redis = (await getRedisClient()) as HunterRedis | null;
   if (!redis) return { ok: false, error: "Redis is not configured" };
   const today = edmontonToday(now);
-  const budget = hunterCallBudget();
   let state = await loadHunterState();
   const counts = countsForToday(state, today);
   const blank = {
@@ -1227,21 +1197,20 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
   }
   const callsUsed = await seedCounter(redis, callCounterKey(today), counts.callsToday);
   state = { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday };
-  const stop = hunterStop(state, today, budget);
+  const stop = hunterStop(state, today);
   if (stop) {
     state = {
       ...state,
-      capacity: stop === "budget" ? capacityOnBudgetStop(state, today, budget) : state.capacity,
       lastRunAt: now.toISOString(),
-      lastRunResult: dayStopCopy(stop, state, today, budget),
+      lastRunResult: dayStopCopy(),
     };
     await saveHunterState(state);
     await rememberRun({
       ...blank,
-      outcome: stop === "cards" ? "skipped-target-met" : "capped-budget",
+      outcome: "skipped-target-met",
       error: runNote(),
     });
-    logSkip(stop === "cards" ? "skipped-target-met" : "capped-budget", callsUsed);
+    logSkip("skipped-target-met", callsUsed);
     return { ok: true, skipped: stop, callsToday: callsUsed, filedToday: counts.filedToday };
   }
 
@@ -1281,7 +1250,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     let abandoned = false;
     let xaiFailed = false;
     let timedOut = false;
-    let stopReason: "" | "budget" | "spend" = "";
+    let stopReason: "" | "spend" = "";
     let inputTokens = 0;
     let outputTokens = 0;
     let actualDollars = 0;
@@ -1311,7 +1280,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         state = { ...state, paused: true };
         break;
       }
-      if (hunterStop(state, today, budget)) break;
+      if (hunterStop(state, today)) break;
       if (companies.filter((company) => company.filedOn === today).length >= hunterDailyFiledCap()) break;
       const spent = await readMonthSpend(redis, month);
       if (monthlyCapState(capSpend(spent)) === "stop") {
@@ -1338,9 +1307,8 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         maxRetries: retries,
         beforeAttempt: async () => {
           if (runClock.out()) return { allowed: false, reason: "time" as const };
-          const reserved = await reserveCounter(redis, callCounterKey(today), budget);
-          if (!reserved.allowed) return { allowed: false, reason: "budget" as const };
-          state = { ...state, callsOn: today, callsToday: reserved.used };
+          const used = await countCall(redis, callCounterKey(today));
+          state = { ...state, callsOn: today, callsToday: used };
           return { allowed: true };
         },
         timeoutForAttempt: () => runClock.clip(90_000),
@@ -1349,11 +1317,6 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         if (research.timedOut) {
           timedOut = true;
           lastError = "Stopped for time.";
-          break;
-        }
-        if (research.error === "Model-call budget reached") {
-          stopReason = "budget";
-          lastError = research.error;
           break;
         }
         lastError = research.error;
@@ -1449,7 +1412,6 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday },
       today,
       { calls: Math.max(0, state.callsToday - callsUsed), contactReady },
-      budget,
     );
     const history = await readHunterRuns(400);
     const hour = edmontonClock(now).hour;
@@ -1498,9 +1460,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         ? "error"
         : stopReason === "spend"
           ? "capped-spend"
-          : stopReason === "budget" && funnel.searched === 0
-            ? "capped-budget"
-            : "fired";
+          : "fired";
     await rememberRun({
       run: "always-on",
       outcome,
@@ -1549,7 +1509,6 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       { ...state, callsOn: today, callsToday: callsUsed, filedToday: counts.filedToday, filedOn: today },
       today,
       { calls: Math.max(0, state.callsToday - callsUsed), contactReady: 0 },
-      budget,
     );
     await saveHunterState(await keepRunFlags({
       ...settled,
@@ -1636,30 +1595,28 @@ function filedOnPreviousDays(runs: { at: string; cardsFiled: number }[], today: 
   return previous;
 }
 
-/** Shared by both runs. A stop here means no model call. A budget stop is stored for Rex. */
+/** Shared by both runs. A stop here means no model call. */
 export async function holdHunterForDay(): Promise<
   | { ok: true; proceed: true }
-  | { ok: true; proceed: false; skipped: "paused" | "cards" | "budget" | "killed" }
+  | { ok: true; proceed: false; skipped: "paused" | "cards" | "killed" }
   | { ok: false; error: string }
 > {
   const redis = await getRedisClient();
   if (!redis) return { ok: false, error: "Redis is not configured" };
   if (hunterKilled()) return { ok: true, proceed: false, skipped: "killed" };
   const today = edmontonToday();
-  const budget = hunterCallBudget();
   let state = await loadHunterState();
   if (state.paused) {
     state = { ...state, lastRunAt: new Date().toISOString(), lastRunResult: "Paused. No search." };
     await saveHunterState(state);
     return { ok: true, proceed: false, skipped: "paused" };
   }
-  const stop = hunterStop(state, today, budget);
+  const stop = hunterStop(state, today);
   if (!stop) return { ok: true, proceed: true };
   state = {
     ...state,
-    capacity: stop === "budget" ? capacityOnBudgetStop(state, today, budget) : state.capacity,
     lastRunAt: new Date().toISOString(),
-    lastRunResult: dayStopCopy(stop, state, today, budget),
+    lastRunResult: dayStopCopy(),
   };
   await saveHunterState(state);
   return { ok: true, proceed: false, skipped: stop };
@@ -1668,7 +1625,7 @@ export async function holdHunterForDay(): Promise<
 /** Nightly only. Working hours do not apply. The kill switch does. */
 export async function gateNightly(now = new Date()): Promise<
   | { ok: true; proceed: true }
-  | { ok: true; proceed: false; skipped: "paused" | "cards" | "budget" | "killed" | "not-4am" | "already-swept" }
+  | { ok: true; proceed: false; skipped: "paused" | "cards" | "killed" | "not-4am" | "already-swept" }
   | { ok: false; error: string }
 > {
   if (hunterKilled()) return { ok: true, proceed: false, skipped: "killed" };
@@ -1696,7 +1653,6 @@ export async function recordHunterEffort(input: { calls: number; contactReady: n
     { ...state, callsOn: today, callsToday: Number.isFinite(used) ? used : base.callsToday },
     today,
     { calls: 0, contactReady: input.contactReady },
-    hunterCallBudget(),
   );
   await saveHunterState({
     ...settled,
@@ -1749,11 +1705,8 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
     fileCap: hunterDailyFiledCap(),
     cardTarget: HUNTER_CARD_CEILING,
     callsToday: counts.callsToday,
-    callBudget: hunterCallBudget(),
     apolloRevealsToday: revealsOn(state, today),
     apolloCreditCap: apolloCreditCap(),
-    capacity: state.capacity,
-    capacityActive: state.capacity?.date === today,
     recentRuns,
     today,
     heartbeatLate: beat.late,

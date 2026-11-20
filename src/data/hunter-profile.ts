@@ -236,17 +236,17 @@ export function regionWeightForPlace(place: string, regionId: string) {
 /** Contact-ready cards filed per Edmonton day. Both runs count together. */
 export const HUNTER_DAILY_CARD_TARGET = 48;
 
-/**
- * Default daily model-call budget. Override with HUNTER_DAILY_CALL_BUDGET.
- * Chris set 55 on 19th November 2026. The budget is the hard stop.
- */
-export const HUNTER_DAILY_CALL_BUDGET_DEFAULT = 55;
-
 export const HUNTER_ROSTER = {
   name: "Hunter",
   job: "Two runs, one bot. Nightly local sweep at 4am Edmonton: Calgary, Edmonton, and Red Deer, any headcount, any industry. Always-on hunt every 30 minutes in working hours. Region weights are a soft priority, reviewed monthly. 48 contact-ready cards is a ceiling, not a target. Never sends.",
   trigger: "Nightly at 4am Edmonton, and every 30 minutes from 7am to 7pm Edmonton",
   owner: "christopher" as const,
   escalate: "A company that cannot be confirmed on a public page.",
-  limits: ["Never sends", "Never invents a fact", "No new paid source without approval", "Pause and the kill switch stop both runs"],
+  limits: [
+    "Never sends",
+    "Never invents a fact",
+    "No new paid source without approval",
+    "No daily call cap. The monthly dollar cap still stops both runs",
+    "Pause and the kill switch stop both runs",
+  ],
 };

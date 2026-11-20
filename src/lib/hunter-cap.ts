@@ -1,10 +1,11 @@
 /**
- * Hunter's daily output is contact-ready cards. Model calls are a separate budget.
+ * Hunter's daily output is contact-ready cards. There is no daily model-call cap.
+ * The monthly dollar cap is the spend guardrail.
  * A contact-ready card has a name, a title, an email, and an Enriched mark with a sourced fact.
  * A no-signal card, and a contact flagged Stale, are not contact-ready.
  */
 
-import { HUNTER_DAILY_CALL_BUDGET_DEFAULT, HUNTER_DAILY_CARD_TARGET } from "../data/hunter-profile.ts";
+import { HUNTER_DAILY_CARD_TARGET } from "../data/hunter-profile.ts";
 import type { Company, EnrichmentState } from "./lead-score.ts";
 
 const ROLE_NAMES = new Set([
@@ -17,27 +18,12 @@ const ROLE_NAMES = new Set([
   "people and culture",
 ]);
 
-export type CapacityProblem = {
-  date: string;
-  cardsFiled: number;
-  callsUsed: number;
-};
-
 export type HunterDayCounts = {
   filedOn: string;
   filedToday: number;
   callsOn: string;
   callsToday: number;
-  capacity: CapacityProblem | null;
 };
-
-export function hunterCallBudget(raw?: string | null) {
-  const text = (raw ?? process.env.HUNTER_DAILY_CALL_BUDGET ?? "").trim();
-  if (!text) return HUNTER_DAILY_CALL_BUDGET_DEFAULT;
-  const n = Number(text);
-  if (!Number.isInteger(n) || n < 1) return HUNTER_DAILY_CALL_BUDGET_DEFAULT;
-  return n;
-}
 
 export function countsForToday(state: HunterDayCounts, today: string) {
   return {
@@ -46,16 +32,14 @@ export function countsForToday(state: HunterDayCounts, today: string) {
   };
 }
 
-/** Cards target first. A spent budget with fewer cards is a capacity problem, not a normal stop. */
+/** The day stops when the contact-ready ceiling is filed. Model calls do not stop it. */
 export function hunterStop(
   state: HunterDayCounts,
   today: string,
-  callBudget = hunterCallBudget(),
   cardTarget = HUNTER_DAILY_CARD_TARGET,
-): "cards" | "budget" | null {
+): "cards" | null {
   const counts = countsForToday(state, today);
   if (counts.filedToday >= cardTarget) return "cards";
-  if (counts.callsToday >= callBudget) return "budget";
   return null;
 }
 
@@ -63,40 +47,15 @@ export function applyHunterWork<T extends HunterDayCounts>(
   state: T,
   today: string,
   added: { calls: number; contactReady: number },
-  callBudget = hunterCallBudget(),
-  cardTarget = HUNTER_DAILY_CARD_TARGET,
 ): T {
   const counts = countsForToday(state, today);
-  const next: T = {
+  return {
     ...state,
     filedOn: today,
     filedToday: counts.filedToday + Math.max(0, added.contactReady),
     callsOn: today,
     callsToday: counts.callsToday + Math.max(0, added.calls),
   };
-  if (hunterStop(next, today, callBudget, cardTarget) !== "budget") return next;
-  if (next.capacity?.date === today) return next;
-  return {
-    ...next,
-    capacity: {
-      date: today,
-      cardsFiled: next.filedToday,
-      callsUsed: next.callsToday,
-    },
-  };
-}
-
-/** Keep the first capacity record for the day. A later card target clears nothing already stored. */
-export function capacityOnBudgetStop(
-  state: HunterDayCounts,
-  today: string,
-  callBudget = hunterCallBudget(),
-  cardTarget = HUNTER_DAILY_CARD_TARGET,
-): CapacityProblem | null {
-  if (hunterStop(state, today, callBudget, cardTarget) !== "budget") return state.capacity;
-  if (state.capacity?.date === today) return state.capacity;
-  const counts = countsForToday(state, today);
-  return { date: today, cardsFiled: counts.filedToday, callsUsed: counts.callsToday };
 }
 
 function httpUrl(url: string | undefined) {

@@ -172,8 +172,7 @@ export async function researchCompanies(
   | { error: string; attempts: number; timedOut?: boolean }
 > {
   const { searchWithRetries } = await import("./xai-search.ts");
-  const { monthlyCapState, reserveCounter, callCounterKey, spendCounterKey, spendTicksKey, spendEstimateKey, monthSpendFromCounts, capSpend, noteModelSpend, ticksToDollars } = await import("./hunter-phase.ts");
-  const { hunterCallBudget } = await import("./hunter-cap.ts");
+  const { monthlyCapState, countCall, callCounterKey, spendCounterKey, spendTicksKey, spendEstimateKey, monthSpendFromCounts, capSpend, noteModelSpend, ticksToDollars } = await import("./hunter-phase.ts");
   const { hunterMaxRetries } = await import("./hunter-config.ts");
   const { getRedisClient } = await import("./leads-book.ts");
   const { edmontonToday } = await import("./lead-score.ts");
@@ -186,7 +185,6 @@ export async function researchCompanies(
   const estimate = Number(await redis.get<string>(spendEstimateKey(month)));
   const spent = monthSpendFromCounts(Number.isFinite(cents) ? cents : 0, Number.isFinite(ticks) ? ticks : 0, Number.isFinite(estimate) ? estimate : 0);
   if (monthlyCapState(capSpend(spent)) === "stop") return { error: "Monthly dollar cap reached.", attempts: 0 };
-  const budget = hunterCallBudget();
   const research = await searchWithRetries({
     system: "You research public web pages and return JSON. You never invent names, emails, dates, or companies. Every claim needs a source URL.",
     prompt: scoutPrompt(knownDomains),
@@ -194,8 +192,8 @@ export async function researchCompanies(
     maxRetries: hunterMaxRetries(),
     beforeAttempt: async () => {
       if (timeLeft && timeLeft() < 1_000) return { allowed: false, reason: "time" };
-      const reserved = await reserveCounter(redis, callCounterKey(today), budget);
-      return { allowed: reserved.allowed, reason: reserved.allowed ? undefined : "budget" as const };
+      await countCall(redis, callCounterKey(today));
+      return { allowed: true };
     },
     timeoutForAttempt: () => (timeLeft ? timeLeft() : 90_000),
   });

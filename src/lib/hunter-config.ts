@@ -3,7 +3,7 @@
  * Nothing here is a price. Dollar amounts come from the model response, or they stay unknown.
  */
 
-import { HUNTER_DAILY_CALL_BUDGET_DEFAULT, HUNTER_DAILY_CARD_TARGET } from "../data/hunter-profile.ts";
+import { HUNTER_DAILY_CARD_TARGET } from "../data/hunter-profile.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 
 /** Pinned model for Hunter web search. Minutes keep their own model id. */
@@ -51,9 +51,6 @@ export const HUNTER_ESTIMATED_CALL_DOLLARS = 0.25;
 /** Skip-list in the prompt. Domains past this are still filtered after the search. */
 export const HUNTER_PROMPT_DOMAIN_CHARS = 12_000;
 
-/** Default daily model-call budget. Env HUNTER_DAILY_CALL_BUDGET overrides it. */
-export const HUNTER_CALL_BUDGET_DEFAULT = HUNTER_DAILY_CALL_BUDGET_DEFAULT;
-
 /**
  * Working window in America/Edmonton, inclusive start, exclusive end.
  * 7 and 19 means 7:00am through 6:59pm. Env HUNTER_WORK_START_HOUR and HUNTER_WORK_END_HOUR.
@@ -63,8 +60,8 @@ export const HUNTER_WORK_END_HOUR_DEFAULT = 19;
 
 /**
  * Calls inside one always-on run.
- * 12 hours, every 30 minutes, is 24 runs. 3 calls a run is 72 calls, so the 55-call budget can be reached.
- * The budget counter is still the hard stop. The cron schedule is unchanged.
+ * 12 hours, every 30 minutes, is 24 runs. 3 calls a run is 72, plus one nightly search.
+ * There is no daily call cap. A run still stops at the function limit, and the monthly dollar cap still stops both runs.
  * Env HUNTER_CALLS_PER_RUN.
  */
 export const HUNTER_CALLS_PER_RUN_DEFAULT = 3;

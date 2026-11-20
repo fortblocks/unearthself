@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   HUNTER_AFFORDABILITY_SIGNAL_IDS,
-  HUNTER_DAILY_CALL_BUDGET_DEFAULT,
   HUNTER_DAILY_CARD_TARGET,
   HUNTER_REGIONS,
   HUNTER_REGION_WEIGHTS,
@@ -16,7 +15,6 @@ import {
   applyHunterWork,
   assignEnrichment,
   hasBuyerContact,
-  hunterCallBudget,
   hunterStop,
   isContactReady,
 } from "./hunter-cap.ts";
@@ -277,54 +275,44 @@ test("the batch cursor walks signal and region, then wraps", () => {
   assert.notEqual(slotAt(1).slot.regionId, slotAt(0).slot.regionId);
 });
 
-test("the daily stop is contact-ready cards, and the call budget is separate", () => {
+test("the daily stop is the contact-ready ceiling, and calls do not stop the day", () => {
   const state = freshHunterState();
   const today = "2026-11-18";
   assert.equal(HUNTER_DAILY_CARD_TARGET, 48);
-  assert.equal(HUNTER_DAILY_CALL_BUDGET_DEFAULT, 55);
-  assert.equal(hunterCallBudget(""), 55);
-  assert.equal(hunterCallBudget(null), 55);
-  assert.equal(hunterCallBudget("60"), 60);
-  assert.equal(hunterCallBudget("0"), 55);
-  assert.equal(hunterCallBudget("nope"), 55);
   assert.equal(state.paused, false);
-  assert.equal(hunterMayCall(state, today, 48), true);
-  assert.equal(hunterMayCall({ ...state, paused: true }, today, 60), false);
+  assert.equal(hunterMayCall(state, today), true);
+  assert.equal(hunterMayCall({ ...state, paused: true }, today), false);
   assert.equal(
-    hunterMayCall({ ...state, filedOn: today, filedToday: HUNTER_DAILY_CARD_TARGET, callsToday: 3, callsOn: today }, today, 60),
+    hunterMayCall({ ...state, filedOn: today, filedToday: HUNTER_DAILY_CARD_TARGET, callsToday: 3, callsOn: today }, today),
     false,
   );
-  assert.equal(hunterStop({ ...state, filedOn: today, filedToday: 48 }, today, 60), "cards");
-  assert.equal(hunterMayCall({ ...state, callsOn: today, callsToday: 48 }, today, 48), false);
-  assert.equal(hunterMayCall({ ...state, callsOn: today, callsToday: 48, filedToday: 10, filedOn: today }, today, 60), true);
-  assert.equal(hunterMayCall({ ...state, callsOn: "2026-11-17", callsToday: 48, filedOn: "2026-11-17", filedToday: 48 }, today, 48), true);
-  assert.equal(hunterStop({ ...state, callsOn: today, callsToday: 48, filedOn: today, filedToday: 10 }, today, 48), "budget");
+  assert.equal(hunterStop({ ...state, filedOn: today, filedToday: 48 }, today), "cards");
+  assert.equal(hunterMayCall({ ...state, callsOn: today, callsToday: 200, filedOn: today, filedToday: 10 }, today), true);
+  assert.equal(hunterStop({ ...state, callsOn: today, callsToday: 200, filedOn: today, filedToday: 10 }, today), null);
+  assert.equal(hunterMayCall({ ...state, callsOn: "2026-11-17", callsToday: 200, filedOn: "2026-11-17", filedToday: 48 }, today), true);
 });
 
-test("a spent call budget before 48 cards records a capacity problem", () => {
+test("calls are counted, and a high call count does not file a capacity problem", () => {
   const today = "2026-11-18";
   const state = freshHunterState();
   const short = applyHunterWork(
-    { ...state, filedOn: today, filedToday: 10, callsOn: today, callsToday: 47 },
+    { ...state, filedOn: today, filedToday: 10, callsOn: today, callsToday: 70 },
     today,
-    { calls: 1, contactReady: 0 },
-    48,
+    { calls: 3, contactReady: 0 },
   );
-  assert.equal(short.callsToday, 48);
+  assert.equal(short.callsToday, 73);
   assert.equal(short.filedToday, 10);
-  assert.deepEqual(short.capacity, { date: today, cardsFiled: 10, callsUsed: 48 });
-  const again = applyHunterWork(short, today, { calls: 0, contactReady: 0 }, 48);
-  assert.deepEqual(again.capacity, short.capacity);
+  assert.equal("capacity" in short, false);
+  assert.equal(hunterMayCall(short, today), true);
 
   const filled = applyHunterWork(
-    { ...state, filedOn: today, filedToday: 47, callsOn: today, callsToday: 47 },
+    { ...state, filedOn: today, filedToday: 47, callsOn: today, callsToday: 70 },
     today,
     { calls: 1, contactReady: 1 },
-    48,
   );
   assert.equal(filled.filedToday, 48);
-  assert.equal(filled.capacity, null);
-  assert.equal(hunterStop(filled, today, 48), "cards");
+  assert.equal(hunterStop(filled, today), "cards");
+  assert.equal(hunterMayCall(filled, today), false);
 });
 
 test("only an Enriched card with a sourced fact, a name, a title, and an email is contact-ready", () => {

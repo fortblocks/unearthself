@@ -177,7 +177,7 @@ function BotsPage() {
                 Contact-ready today: {hunter.filedToday} of {hunter.cardTarget} ceiling.
               </p>
               <p className="mt-1 text-sm text-muted">
-                Model calls today: {hunter.callsToday} of {hunter.callBudget}. Model {hunter.model}.
+                Model calls today: {hunter.callsToday}. No daily cap. Model {hunter.model}.
               </p>
               <p className="mt-1 text-sm text-muted">
                 Apollo reveals today: {hunter.apolloRevealsToday} of {hunter.apolloCreditCap}. Search is not counted.
@@ -263,17 +263,6 @@ function BotsPage() {
                   </ol>
                 )}
               </div>
-              {hunter.capacityActive && hunter.capacity ? (
-                <p className="mt-2 border border-ember bg-paper p-3 text-sm text-coal" role="status">
-                  Capacity problem. The model-call budget ran out before 48 contact-ready cards were filed.
-                  Filed {hunter.capacity.cardsFiled} of {hunter.cardTarget}. Calls used {hunter.capacity.callsUsed}.
-                </p>
-              ) : hunter.capacity ? (
-                <p className="mt-2 text-sm text-muted">
-                  Last capacity problem, {hunter.capacity.date}: filed {hunter.capacity.cardsFiled} of {hunter.cardTarget},
-                  calls used {hunter.capacity.callsUsed}.
-                </p>
-              ) : null}
               {hunter.storage === "browser" ? (
                 <p className="mt-2 text-sm text-shale">Redis is not connected. Pause cannot be saved.</p>
               ) : null}

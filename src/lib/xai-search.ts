@@ -227,7 +227,7 @@ export async function searchWithRetries(input: {
   prompt: string;
   timeoutMs: number;
   maxRetries: number;
-  beforeAttempt: () => Promise<{ allowed: boolean; reason?: "budget" | "time" }>;
+  beforeAttempt: () => Promise<{ allowed: boolean; reason?: "time" }>;
   timeoutForAttempt?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }): Promise<
@@ -240,8 +240,7 @@ export async function searchWithRetries(input: {
   for (let attempt = 0; attempt <= input.maxRetries; attempt += 1) {
     const gate = await input.beforeAttempt();
     if (!gate.allowed) {
-      const timedOut = gate.reason === "time";
-      return { error: timedOut ? "Stopped for time." : "Model-call budget reached", attempts: attempt, abandoned: true, timedOut };
+      return { error: "Stopped for time.", attempts: attempt, abandoned: true, timedOut: true };
     }
     const timeoutMs = input.timeoutForAttempt?.() ?? input.timeoutMs;
     if (timeoutMs < 1_000) return { error: "Stopped for time.", attempts: attempt, abandoned: true, timedOut: true };

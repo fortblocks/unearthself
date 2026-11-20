@@ -64,9 +64,7 @@ export async function runNightlyCron(request: Request, now = new Date()) {
             ? "skipped-killed"
             : gate.skipped === "not-4am"
               ? "skipped-not-4am"
-              : gate.skipped === "already-swept"
-                ? "skipped-already-swept"
-                : "capped-budget";
+              : "skipped-already-swept";
     await appendHunterRun(
       hunterRunEntry({
         run: "nightly",
