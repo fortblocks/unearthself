@@ -17,7 +17,7 @@ import { dncBlocks, type DncEntry, type DncReason, type PipelineMark } from "./h
 import { draftHasPrice, draftProblems } from "./lead-copy.ts";
 import {
   edmontonToday,
-  isSendable,
+  hasAccess,
   normalizeDomain,
   scoreCompany,
   type Company,
@@ -1262,9 +1262,7 @@ export function stageLabel(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "opted-out") return "Opted out";
   if (stage === "bounced") return "Bounced";
   if (stage === "blocked") return "Blocked";
-  if (stage === "draft-skipped") {
-    return record?.draftSkipped?.reason ? `Draft skipped: ${record.draftSkipped.reason}` : "Draft skipped";
-  }
+  if (stage === "draft-skipped") return "Draft skipped";
   return "Unreviewed";
 }
 
@@ -1287,7 +1285,6 @@ const BLOCK_COPY: Record<string, string> = {
   "email-blank": "There is no email address.",
   "bounced-email": "Mail to this address bounced.",
   "no-unsubscribe-link": "The unsubscribe link is not available.",
-  "below-sendable": "This card is below the sendable score.",
 };
 
 /** Block copy that means the card cannot be emailed. Do-not-contact and a bounce are only known after the outreach join. */
@@ -1300,6 +1297,17 @@ export const SEND_IMPOSSIBLE_COPY = [
   "email-blank",
   "bounced-email",
 ].map((rule) => BLOCK_COPY[rule] ?? rule);
+
+const CARD_SEND_BLOCKS = ["No unsolicited email", "Stale", "Apollo email not verified"];
+
+/** Named person, verified or published email, source URL, not stopped, and no send block. Score band is not a gate. */
+export function emailableLead(company: Company, blocked: readonly string[] = []) {
+  if (company.status === "stopped") return false;
+  if (!hasAccess(company)) return false;
+  if (company.emailMx === false) return false;
+  if (company.cardFlags?.some((flag) => CARD_SEND_BLOCKS.includes(flag))) return false;
+  return !blocked.some((line) => SEND_IMPOSSIBLE_COPY.includes(line));
+}
 
 export type CocoJoin = {
   stage: CocoStage;
@@ -1351,7 +1359,7 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     blocked,
     skipNote: record?.draftSkipped?.reason ?? "",
     canApproveDraft:
-      isSendable(company, scoreCompany({ ...company, today })) &&
+      emailableLead(company, blocked) &&
       blocked.length === 0 &&
       (stage === "new" || stage === "approved") &&
       company.review !== "skipped",
@@ -1606,8 +1614,12 @@ export async function approveAndQueueForCoco(input: {
   const existing = await readOutreachRecord(redis, company.id);
   const reasons = cocoBlockReasons(company, existing, dnc, today);
   if (reasons.length > 0) return { ok: false, error: "blocked", reasons };
-  if (!isSendable(company, scoreCompany({ ...company, today }))) {
-    return { ok: false, error: "blocked", reasons: [BLOCK_COPY["below-sendable"] ?? "below-sendable"] };
+  if (!emailableLead(company)) {
+    return {
+      ok: false,
+      error: "blocked",
+      reasons: [company.status === "stopped" ? "This card is stopped." : "This card cannot be emailed."],
+    };
   }
   const reviewedOn = today;
   const nextBook = {

@@ -14,10 +14,11 @@ import {
   apolloRevealParams,
   apolloSearchParams,
   applyApolloContact,
+  apolloFailureCode,
   enrichHunterContacts,
 } from "./apollo.ts";
 import { hasBuyerContact, isContactReady } from "./hunter-cap.ts";
-import { APOLLO_CASL_STATEMENT } from "./hunter-phase.ts";
+import { APOLLO_CASL_STATEMENT, titleFitsBuyerRole } from "./hunter-phase.ts";
 import type { Company } from "./lead-score.ts";
 
 const KEY = "test-key-should-not-leak";
@@ -121,6 +122,7 @@ test("a verified Apollo email can count, and an unverified one cannot", () => {
   assert.equal(verified.casl?.publishedOn, "Apollo");
   assert.equal(verified.casl?.statement, APOLLO_CASL_STATEMENT);
   assert.equal(verified.casl?.pulledOn, "2026-11-18");
+  assert.equal(verified.casl?.roleFit, true);
   assert.equal(/^https?:\/\//i.test(verified.emailSource), false);
   assert.equal(/^https?:\/\//i.test(verified.casl?.publishedOn ?? ""), false);
   assert.equal(verified.emailSource, APOLLO_SOURCE);
@@ -149,6 +151,41 @@ test("a verified Apollo email can count, and an unverified one cannot", () => {
     assert.equal(isContactReady(card), false, status);
     assert.equal(apolloEmailIsVerified(status), false);
   }
+});
+
+test("Apollo role fit follows the buyer title", () => {
+  assert.equal(titleFitsBuyerRole("Head of People"), true);
+  assert.equal(titleFitsBuyerRole("People & Culture Lead"), true);
+  assert.equal(titleFitsBuyerRole("HR Director"), true);
+  assert.equal(titleFitsBuyerRole("Head of Learning and Development"), true);
+  assert.equal(titleFitsBuyerRole("Chief Operating Officer"), true);
+  assert.equal(titleFitsBuyerRole("CEO"), true);
+  assert.equal(titleFitsBuyerRole("Software Engineer"), false);
+  assert.equal(titleFitsBuyerRole("  "), false);
+  const fit = applyApolloContact(company(), {
+    id: "person-1",
+    name: "Jordan Blake",
+    title: "Head of People",
+    email: "jordan.blake@acme.example",
+    emailStatus: "verified",
+    updatedOn: "2026-06-01",
+    organizationName: "Acme Alpine",
+    organizationDomain: "acme.example",
+  }, "2026-11-20");
+  assert.equal(fit.casl?.roleFit, true);
+  const miss = applyApolloContact(company(), {
+    id: "person-2",
+    name: "Jordan Blake",
+    title: "Software Engineer",
+    email: "jordan.blake@acme.example",
+    emailStatus: "verified",
+    updatedOn: "2026-06-01",
+    organizationName: "Acme Alpine",
+    organizationDomain: "acme.example",
+  }, "2026-11-20");
+  assert.equal(miss.casl?.roleFit, false);
+  assert.equal(apolloFailureCode("Apollo HTTP 429"), "http-429");
+  assert.equal(apolloFailureCode("Apollo returned an unexpected shape"), "unexpected-shape");
 });
 
 test("a public-page contact still counts without an Apollo person id", () => {
@@ -228,6 +265,9 @@ test("the reveal ceiling stops a second reveal and the key never enters the URL"
   });
   assert.equal(result.reveals, 1);
   assert.equal(result.searches, 1);
+  assert.equal(result.verifiedEmails, 1);
+  assert.equal(result.failures.ceiling, 1);
+  assert.equal(JSON.stringify(result.failures).includes("@"), false);
   assert.equal(urls.filter((url) => url.includes("/people/match")).length, 1);
   assert.equal(result.note, APOLLO_CEILING);
   assert.equal(result.companies.filter((card) => card.email).length, 1);

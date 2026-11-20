@@ -1,7 +1,7 @@
 import { createElement, type ReactNode } from "react";
-import { draftEditWarnings, SEND_IMPOSSIBLE_COPY, type CocoJoin } from "./hunter-outreach.ts";
+import { draftEditWarnings, emailableLead, type CocoJoin } from "./hunter-outreach.ts";
 import { wordCount } from "./lead-copy.ts";
-import { isSendable, scoreCompany, type Company, type ScoreBreak } from "./lead-score.ts";
+import type { Company } from "./lead-score.ts";
 
 export const SKIP_REASONS = [
   ["wrong-size", "Wrong size"],
@@ -28,30 +28,30 @@ export function hasPublishedEmail(company: { email?: string | null }) {
   return typeof company.email === "string" && company.email.trim().length > 0;
 }
 
-const CARD_SEND_BLOCKS = ["No unsolicited email", "Stale", "Apollo email not verified"] as const;
-
 /**
- * A card the desk may list. Sendable is the gate: score band sequence or pursue, not stopped, and access
- * (named person, published email, http source). Flags and a failed mail check are on the card.
- * Do-not-contact and a bounce are only in the outreach join, passed in as blocked copy.
+ * A card the desk may list. Named person, verified or published email, source URL, and no send block.
+ * Score band is not a gate. Do-not-contact and a bounce come from the outreach join.
  */
-export function leadOnDesk(company: Company, score: ScoreBreak, blocked: readonly string[] = []) {
-  if (!isSendable(company, score)) return false;
-  if (!hasPublishedEmail(company)) return false;
-  if (company.emailMx === false) return false;
-  if (company.cardFlags?.some((flag) => (CARD_SEND_BLOCKS as readonly string[]).includes(flag))) return false;
-  return !blocked.some((line) => SEND_IMPOSSIBLE_COPY.includes(line));
+export function leadOnDesk(company: Company, blocked: readonly string[] = []) {
+  return hasPublishedEmail(company) && emailableLead(company, blocked);
 }
 
 /** Display list only. The stored book is not changed. */
 export function companiesOnDesk<T extends Company>(
   companies: readonly T[],
-  today?: string,
   blockedById?: Readonly<Record<string, readonly string[] | undefined>>,
 ): T[] {
-  return companies.filter((company) =>
-    leadOnDesk(company, scoreCompany({ ...company, today }), blockedById?.[company.id] ?? []),
-  );
+  return companies.filter((company) => leadOnDesk(company, blockedById?.[company.id] ?? []));
+}
+
+/** Stage, status, and the skip note should not each repeat Coco's reason. */
+export function skipReasonLines(coco: { stage: string; stageLabel: string; status: string; skipNote: string }) {
+  const reason = coco.skipNote.trim();
+  if (coco.stage !== "draft-skipped" || !reason) return { stage: coco.stageLabel, status: coco.status, note: "" };
+  const stage = coco.stageLabel.includes(reason) ? "Draft skipped" : coco.stageLabel;
+  if (coco.status.includes(reason)) return { stage, status: coco.status, note: "" };
+  if (stage.includes(reason)) return { stage: "Draft skipped", status: coco.status, note: reason };
+  return { stage, status: coco.status, note: reason };
 }
 
 /** How often an open card asks whether Coco's draft has landed. */
@@ -147,6 +147,7 @@ export function LeadCardActions({
   const words = body.trim() ? `${wordCount(body)} words` : "No draft yet.";
   const awaiting = cocoAwaitingDraft(coco);
   const wait = awaiting ? (draftWait ?? "writing") : null;
+  const skip = skipReasonLines(coco);
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
@@ -154,11 +155,9 @@ export function LeadCardActions({
       "div",
       null,
       createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Stage"),
-      createElement("p", { className: "mt-1 text-sm text-coal" }, coco.stageLabel),
-      coco.status ? createElement("p", { className: "mt-1 text-sm text-shale" }, coco.status) : null,
-      coco.skipNote && coco.stage === "draft-skipped"
-        ? createElement("p", { className: "mt-1 text-sm text-coal" }, coco.skipNote)
-        : null,
+      createElement("p", { className: "mt-1 text-sm text-coal" }, skip.stage),
+      skip.status ? createElement("p", { className: "mt-1 text-sm text-shale" }, skip.status) : null,
+      skip.note ? createElement("p", { className: "mt-1 text-sm text-coal" }, skip.note) : null,
     ),
     createElement(
       "div",

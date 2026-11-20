@@ -148,6 +148,15 @@ export async function clearRunStarted(id: string) {
   await redis.del?.(HUNTER_RUN_OPEN_KEY);
 }
 
+/** Counts for the run summary. No names, emails, or response bodies. */
+export type HunterApolloSummary = {
+  searches: number;
+  reveals: number;
+  verifiedEmails: number;
+  contactReady: number;
+  failures: Record<string, number>;
+};
+
 /** One line in the Vercel runtime log. No secrets, no webhook URL, no key. */
 export function logHunterRunLine(line: {
   runId: string;
@@ -162,6 +171,7 @@ export function logHunterRunLine(line: {
   spendEstimated: number;
   alarms: string[];
   outcome: string;
+  apollo?: HunterApolloSummary;
 }) {
   console.log(JSON.stringify({ hunterRun: line }));
 }

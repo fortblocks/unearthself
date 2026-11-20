@@ -121,11 +121,56 @@ export type CaslBasis = {
 
 export const APOLLO_CASL_STATEMENT = "Under Apollo's terms its data comes from public sources.";
 
+/** Titles Apollo searches for. Role fit uses this list. */
+export const BUYER_ROLE_TITLES = [
+  "marketing director",
+  "sales director",
+  "hr director",
+  "people director",
+  "people and culture lead",
+  "head of people",
+  "office manager",
+  "operations manager",
+  "executive assistant to the CEO",
+  "chief people officer",
+  "head of culture",
+  "director of people and culture",
+];
+
+/** Close titles in the same lanes: people, HR, culture, learning, operations, and executive leaders. */
+const EXTRA_ROLE_TITLES = [
+  "human resources",
+  "people and culture",
+  "people lead",
+  "head of talent",
+  "vp people",
+  "vice president of people",
+  "learning and development",
+  "l and d",
+  "head of learning",
+  "head of operations",
+  "chief operating",
+  "chief executive",
+];
+
+/** True when the title is one Hunter already treats as a buyer role. A blank title is not a fit. */
+export function titleFitsBuyerRole(title: string) {
+  const normalized = title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (normalized.length < 2) return false;
+  if ([...BUYER_ROLE_TITLES, ...EXTRA_ROLE_TITLES].some((term) => normalized.includes(term))) return true;
+  return /\b(ceo|coo|cpo|chro)\b/.test(normalized);
+}
+
 /** Apollo is the basis. The pull date is the day the row was retrieved. No page URL is created. */
-export function apolloCaslBasis(pulledOn: string): CaslBasis {
+export function apolloCaslBasis(pulledOn: string, title = ""): CaslBasis {
   return {
     publishedOn: "Apollo",
-    roleFit: false,
+    roleFit: titleFitsBuyerRole(title),
     noUnsolicitedNotice: true,
     provider: "Apollo",
     pulledOn,

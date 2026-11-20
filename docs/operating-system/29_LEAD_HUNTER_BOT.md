@@ -4,7 +4,7 @@
 
 **Status:** Spec. Live on main as of 19th November 2026.  
 **Date:** 18th November 2026  
-**Updated:** 19th November 2026, from Christopher's strategy. There is no daily model-call cap. The monthly xAI cap of 60 dollars is the spending guardrail. 48 filed cards and 48 contact-ready cards are ceilings, not targets.  
+**Updated:** 20th November 2026, on Christopher's approval. 48 contact-ready cards a day is the target. The run still stops at 48, so the day does not go past it. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. There is no daily model-call cap.  
 **Owner:** Christopher  
 **Builds on:** `07_WS_SALES_MARKETING.md`, `26_LEADS_PRODUCT_EVOLUTION.md`, `27_LEADS_SAMPLE_EMAILS.md`, `28_LEADS_OPEN_ITEMS.md`  
 **Code this spec describes, and does not change:** `src/lib/leads-scout.ts` (Hunter's nightly run; the file name stays), `src/lib/leads-hunter.ts`, `src/lib/lead-score.ts`, `src/lib/leads-book.ts`, `src/routes/admin.leads.tsx`, `src/routes/admin.bots.tsx`, `src/data/bots.ts`
@@ -28,7 +28,7 @@ Hunter is one bot with two runs. There is no separate local bot.
 
 (a) Nightly local sweep, formerly its own bot. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`. Two UTC hours are scheduled, `0 10 * * *` and `0 11 * * *`, because 4am Edmonton is 10:00 UTC in daylight time and 11:00 UTC in standard time. The route runs only when America/Edmonton local time is 4am, and only once per Edmonton date. It searches Calgary, Edmonton, and Red Deer first, and it keeps and files companies from anywhere it finds them. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Headcount and industry are not filters. Any size and any industry can be filed. Size is a score, not a reason to drop a company. The score on the Leads table is the existing one in `lead-score.ts`.
 
-(b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards is a ceiling, not a target. Hunter stops at the ceiling. It does not pad the day with weak cards. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched with a sourced fact (section 9). No-signal is not contact-ready. Both runs count toward the same ceiling. A separate daily file cap, default 48 (`HUNTER_DAILY_FILED_CAP`), counts every card filed that day, research cards included. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
+(b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards a day is the target. Hunter still stops at 48, so the day does not go past it, and it does not file cards under the quality floor to get there. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched with a sourced fact (section 9). No-signal is not contact-ready. Both runs count toward the same target and the same daily stop. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. A separate daily file cap, default 48 (`HUNTER_DAILY_FILED_CAP`), counts every card filed that day, research cards included. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
 
 There is no daily model-call cap. Each always-on run makes 3 model calls. The spending guardrail is the monthly xAI dollar cap, `HUNTER_MONTHLY_DOLLAR_CAP`, default 60 dollars. At that cap Hunter stops calling until the next month. Calls are still counted, and the Bots page shows the count with no daily cap.
 
@@ -81,7 +81,9 @@ A missing public email never stops a company being filed. If no email is publish
 
 ## 4. Score against the ideal profile
 
-The Leads page shows one score. It is the score in `lead-score.ts`, out of 100.
+The Leads page shows a score. Changed 20th November 2026 on Christopher's approval. The desk lists a card when it has a named person, a verified or published email, a source URL, and no block flag (stale, no unsolicited email, an unverified Apollo email, a failed mail check, do-not-contact, or a bounce). A stopped card stays off the desk. Score bands are not a gate, and the card does not show a hold-band label. A research card with no email stays in the book and is hidden from the desk. The list sorts by the Hunter fit score stored when the card was filed. A card without that score uses the lead-score fit, then the lead-score total. The score stays visible.
+
+The lead score in `lead-score.ts` is still out of 100. It is no longer the desk gate.
 
 | Part | Points | Reads |
 |---|---|---|
@@ -89,9 +91,9 @@ The Leads page shows one score. It is the score in `lead-score.ts`, out of 100.
 | Access | 25 | named person, published email, and a source URL |
 | Timing | 15 | dated public signals, and last touch |
 
-The companies table is Company, Place, Size, and Score. There is no second Hunter score on the card.
+The companies table is Company, Place, Size, and Score. The score on the table is the Hunter fit score when the card has one.
 
-Hunter still uses the weights below while it searches and checks a candidate. Those weights are not stored on the lead and are not a column. The morning list ranks by the single score above. Contact-ready still depends on a name, a title, an email, and an Enriched mark with a sourced fact. No-signal is not contact-ready.
+Hunter still uses the weights below while it searches and checks a candidate. That Hunter score is stored on the lead and is what the desk sorts by. Contact-ready still depends on a name, a title, an email, and an Enriched mark with a sourced fact. No-signal is not contact-ready.
 
 | Part | Points | Reads |
 |---|---|---|
@@ -102,7 +104,7 @@ Hunter still uses the weights below while it searches and checks a candidate. Th
 
 The 25 access points do not decide whether a company is kept. They measure how ready it is to contact. A company with no email can still be filed.
 
-The Leads table still shows the score in `lead-score.ts`. The Hunter score used while searching is the table above.
+The Hunter score used while searching is the table above. The desk sorts by that stored total. It does not hide a card for a low lead-score band.
 
 ## 5. Partnership and collaboration flag
 
@@ -118,8 +120,8 @@ De-duplication: a company already on the book by domain is updated, not filed tw
 
 ### How results surface
 
-- `/admin/leads` shows Company, Place, Size, and Score. It filters by All, Hunter nightly, Hunter, and Hand. That filter is where the card came from, and Hand stays its own filter. Stored source values are not rewritten. The page does not show a Hunter score or a Partner column.
-- New Hunter cards land as research cards. Nothing moves to a sendable state without a named person, a published email, and Approve.
+- `/admin/leads` shows Company, Place, Size, and Score. It filters by All, Hunter nightly, Hunter, and Hand. That filter is where the card came from, and Hand stays its own filter. Stored source values are not rewritten. The page does not show a Partner column. Changed 20th November 2026 on Christopher's approval: the score shown is the Hunter fit score when the card has one, and the list is sorted by it. A card with no email stays in the book and is hidden here.
+- New Hunter cards land as research cards. Nothing is offered for Approve and draft without a named person, a verified or published email, a source URL, and a clear block list. Approve is still required before a send.
 - A short daily count of new Hunter cards can join the Morning Brief once it is live.
 
 ### The bot section today
@@ -242,11 +244,11 @@ Every signal carries its source URL. A signal not on a cited page is not used.
 
 ### 4. Ranking and daily sequence
 
-Each day, the highest-converting cards surface first, up to 48 contact-ready cards. That 48 is a ceiling, not a target. There is no daily model-call cap. The monthly xAI dollar cap of 60 dollars is the spending guardrail.
+Each day, the aim is 48 contact-ready cards, highest-converting first. The run still stops at 48, so it does not go past the target. There is no daily model-call cap. The monthly xAI dollar cap of 60 dollars is unchanged, pending a budget decision.
 
 1. Spend the day's model calls where they are most likely to pay off. Enrich the strongest filed cards before searching for new ones, until today's top cards are ready for Coco.
 2. Rank ready cards by the single lead score, then by visible existing spend. A dated signal from the last ninety days ranks above an older one.
-3. Put cards with a named person and a published email above cards that still need a contact. A no-email card stays on the list and keeps its fit rank.
+3. Show cards with a named person and a verified or published email. A no-email research card stays in the book and is hidden from the desk. The desk sorts by the Hunter fit score. There is no score band gate. Changed 20th November 2026 on Christopher's approval.
 4. Rotate across industries and regions so one sector cannot fill the day.
 5. Show Chris a short ranked list each day, best first. Nothing is contacted from the list.
 
@@ -275,7 +277,7 @@ Each day, the highest-converting cards surface first, up to 48 contact-ready car
 - Hunter's nightly local sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. The Leads table score stays the one in `lead-score.ts`.
 - The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead stores the Hunter score and the card lineage. It does not store a Partner value, and the Partner column stays off the table.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
-- Both runs stop for the Edmonton day once 48 contact-ready cards are filed. That 48 is a ceiling. Hunter does not fill up to it with cards under the quality floor. A contact-ready card has a name, a title, and an email, and is Enriched with a sourced fact. No-signal is not contact-ready. Every card filed that day, research cards included, also stops at the daily file cap, default 48.
+- Both runs aim for 48 contact-ready cards in an Edmonton day and stop once that number is filed, so the day does not go past the target. Hunter does not file cards under the quality floor to get there. A contact-ready card has a name, a title, and an email, and is Enriched with a sourced fact. No-signal is not contact-ready. Every card filed that day, research cards included, also stops at the daily file cap, default 48. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision.
 - There is no daily model-call cap. The spending guardrail is `HUNTER_MONTHLY_DOLLAR_CAP`, default 60 dollars. Reaching it stops calling until the next month. This is live on main as of 19th November 2026.
 - No card reaches Coco until its enrichment state is Enriched and a sourced fact is on the card. Every fact shows a source URL, the date it was fetched, and a quote. An Apollo email logs Apollo as its CASL basis, with the statement that under Apollo's terms the data comes from public sources, and the date the row was pulled. No source page URL is invented for that email. A public-page email keeps that page. This is live on main as of 19th November 2026.
 
@@ -324,7 +326,7 @@ Settings Chris has not set, with the defaults in code:
 | `HUNTER_TRIAL_SHARE` | 0.2 |
 | `HUNTER_QUALITY_FLOOR` | 20, plus one verified fit signal |
 | `HUNTER_MONTHLY_DOLLAR_CAP` | 60 US dollars of known xAI cost |
-| `HUNTER_DAILY_FILED_CAP` | 48, a ceiling, not a target |
+| `HUNTER_DAILY_FILED_CAP` | 48. The aim is 48 contact-ready cards. This cap is the daily stop, so the day does not go past 48. |
 | `HUNTER_ALARM_WEBHOOK_URL` | unset. Rex, primary |
 | `HUNTER_ALARM_WEBHOOK_KEY` | unset. Authorization for Rex only. A bare key is sent as Bearer. |
 | `HUNTER_ALARM_CC_WEBHOOK_URLS` | unset. Bo and Derek are copied by Rex's routine, so this stays unset. |
@@ -352,6 +354,7 @@ Settings Chris has not set, with the defaults in code:
 - 19th November 2026. Tonight's settings merged to main and live on production (0297d04): call budget 55, three calls a run, monthly xAI cap of 60 US dollars, a fit signal required, moved-on contacts excluded from contact-ready, 48 total cards a day, alarms to Rex then Bo and Derek, and an Apollo email logs Apollo as its CASL basis.
 - 19th November 2026. Strategy aligned the same day. There is no daily model-call cap. The 60 dollar monthly xAI cap is the spending guardrail. 48 filed cards and 48 contact-ready cards are ceilings. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Public LinkedIn posts are a second source. Region priority is soft and reviewed monthly. A moved-on contact is replaced from the same page, or the contact is blanked. There is no partnership lane. Coco owns the writing. The Apollo CASL basis lines above are unchanged.
 - 20th November 2026. Christopher approved the nightly sweep wording. The sweep searches Calgary, Edmonton, and Red Deer first, keeps and files companies from anywhere, with any headcount and any industry, and weights Calgary, Edmonton, and Red Deer highest in the score. No company is dropped for location.
+- 20th November 2026. Christopher approved the desk rule and the daily aim. 48 contact-ready cards is the target. The day still stops at 48. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. The desk lists a card with a named person, a verified or published email, a source URL, and no block flag. It hides a card with no email. It sorts by the Hunter fit score. Score bands are not a gate.
 
 `GET /api/hunter/read` returns JSON:
 
@@ -372,12 +375,12 @@ Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, and travel weights can change without editing the prompt. There is no partnership lane in that profile.
 - `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`. A known domain is updated. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. `lead-score.ts` still supplies the Leads table score. The lead stores the Hunter score and lineage, and no Partner value.
-- The always-on cron is `/api/cron/leads-hunter`, scheduled every 30 minutes in the Nitro config, and gated to working hours in America/Edmonton. The run stops at the 48 contact-ready ceiling, or at 48 total cards filed, or when the quality floor drops a weak card, or when the monthly dollar cap is reached. There is no daily model-call cap. The nightly route stays `/api/cron/leads-scout`, scheduled at `0 10 * * *` and `0 11 * * *`, and runs only at 4am Edmonton, once per Edmonton day, searching Calgary, Edmonton, and Red Deer first and keeping companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Pause and the kill switch stop both. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`. The Hunter score and lineage are stored on the card. The Partner column stays off.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every 30 minutes in the Nitro config, and gated to working hours in America/Edmonton. The aim is 48 contact-ready cards. The run still stops at 48 contact-ready cards, or at 48 total cards filed, or when the quality floor drops a weak card, or when the monthly dollar cap is reached. The 60 dollar cap is unchanged, pending a budget decision. There is no daily model-call cap. The nightly route stays `/api/cron/leads-scout`, scheduled at `0 10 * * *` and `0 11 * * *`, and runs only at 4am Edmonton, once per Edmonton day, searching Calgary, Edmonton, and Red Deer first and keeping companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Pause and the kill switch stop both. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`. The Hunter score and lineage are stored on the card. The Partner column stays off.
 
 Left:
 
 - The partners have not ranked the signals. The points in the profile file are the draft weights from this spec.
-- The monthly xAI cap is 60 dollars and is the spending guardrail. There is no daily model-call cap. The 48 card counts are ceilings, not targets.
+- The monthly xAI cap is 60 dollars and is unchanged, pending a budget decision. There is no daily model-call cap. 48 contact-ready cards is the target, and the daily stop still holds the day at 48. Changed 20th November 2026 on Christopher's approval.
 - The Morning Brief does not yet count new Hunter cards.
 - Apollo enrichment is wired and stays off until `APOLLO_API_KEY` is set. It reveals one contact for a filed company that has no public name, title, or email, and it will not spend past the daily reveal ceiling. The one true thing, the likely team, the rewrite layer, and the humanizer from `26` are not a separate pass. A Hunter card stays a research card until a person writes a draft, passes the access gate, and approves. The run log is `unearth:hunter:runs:v1`, shown on the Hunter card.
 - Europe mail, and lodging for a team that flies in, are still open in this spec.

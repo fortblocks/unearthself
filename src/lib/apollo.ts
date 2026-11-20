@@ -6,7 +6,7 @@
  */
 
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
-import { apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
+import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
 
 export const APOLLO_DAILY_CREDIT_CAP_DEFAULT = 48;
@@ -19,20 +19,7 @@ export const APOLLO_SOURCE = "Apollo";
 const APOLLO_ORIGIN = "https://api.apollo.io/api/v1";
 
 /** Decision-makers for a team of six to twenty-four. Similar titles are requested as well. */
-export const APOLLO_TARGET_TITLES = [
-  "marketing director",
-  "sales director",
-  "hr director",
-  "people director",
-  "people and culture lead",
-  "head of people",
-  "office manager",
-  "operations manager",
-  "executive assistant to the CEO",
-  "chief people officer",
-  "head of culture",
-  "director of people and culture",
-];
+export const APOLLO_TARGET_TITLES = BUYER_ROLE_TITLES;
 
 export type ApolloFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -286,7 +273,7 @@ export function applyApolloContact(company: Company, person: ApolloReveal | null
     apolloCheckedOn: today,
     cardFlags: [...flags],
     caslStatus: usableEmail ? "recorded" : company.caslStatus,
-    casl: usableEmail ? apolloCaslBasis(today) : company.casl,
+    casl: usableEmail ? apolloCaslBasis(today, person.title) : company.casl,
   };
   return assignEnrichment(next, today);
 }
@@ -318,15 +305,25 @@ export async function enrichHunterContacts(input: {
   sleep?: (ms: number) => Promise<void>;
   /** Milliseconds left for the next Apollo call. 0 means stop. */
   timeLeft?: () => number;
-}): Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed: boolean; timedOut?: boolean }> {
+}): Promise<{
+  companies: Company[];
+  searches: number;
+  reveals: number;
+  verifiedEmails: number;
+  failures: Record<string, number>;
+  note: string;
+  failed: boolean;
+  timedOut?: boolean;
+}> {
   const companies = input.companies.map((company) => markPublicContact(company, input.today));
+  const empty = { verifiedEmails: 0, failures: {} as Record<string, number> };
   if (!input.apiKey) {
-    return { companies, searches: 0, reveals: 0, note: APOLLO_OFF, failed: false };
+    return { companies, searches: 0, reveals: 0, note: APOLLO_OFF, failed: false, ...empty };
   }
   const queue = apolloQueue(companies, input.domains, input.limit);
-  if (queue.length === 0) return { companies, searches: 0, reveals: 0, note: "", failed: false };
+  if (queue.length === 0) return { companies, searches: 0, reveals: 0, note: "", failed: false, ...empty };
   if (input.revealsUsed >= input.cap) {
-    return { companies, searches: 0, reveals: 0, note: APOLLO_CEILING, failed: false };
+    return { companies, searches: 0, reveals: 0, note: APOLLO_CEILING, failed: false, ...empty, failures: { ceiling: 1 } };
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -335,6 +332,12 @@ export async function enrichHunterContacts(input: {
   let revealsUsed = input.revealsUsed;
   let searches = 0;
   let reveals = 0;
+  let verifiedEmails = 0;
+  const failures: Record<string, number> = {};
+  const countFailure = (reason: string) => {
+    const code = apolloFailureCode(reason);
+    failures[code] = (failures[code] ?? 0) + 1;
+  };
   let note = "";
   let hitCeiling = false;
   let failed = false;
@@ -360,6 +363,7 @@ export async function enrichHunterContacts(input: {
     const searchedAttempt = await apolloCall(fetchImpl, searchUrl, key, retries, sleep, budget);
     if ("failure" in searchedAttempt) {
       note = searchedAttempt.failure;
+      countFailure(searchedAttempt.failure);
       failed = true;
       serviceFailures += 1;
       break;
@@ -369,6 +373,7 @@ export async function enrichHunterContacts(input: {
     const searchClass = classifyApolloSearch(searchedAttempt.response.status, searched.body, searchedAttempt.response.headers);
     if ("failure" in searchClass) {
       note = `${searchClass.failure}: ${searched.snippet}`;
+      countFailure(searchClass.failure);
       failed = true;
       serviceFailures += 1;
       break;
@@ -401,6 +406,7 @@ export async function enrichHunterContacts(input: {
     const revealAttempt = await apolloCall(fetchImpl, revealUrl, key, retries, sleep, revealBudget);
     if ("failure" in revealAttempt) {
       note = revealAttempt.failure;
+      countFailure(revealAttempt.failure);
       failed = true;
       serviceFailures += 1;
       break;
@@ -409,24 +415,44 @@ export async function enrichHunterContacts(input: {
     const revealClass = classifyApolloReveal(revealAttempt.response.status, revealed.body, revealAttempt.response.headers);
     if ("failure" in revealClass) {
       note = `${revealClass.failure}: ${revealed.snippet}`;
+      countFailure(revealClass.failure);
       failed = true;
       serviceFailures += 1;
       break;
     }
     const person = revealClass.empty ? null : readApolloReveal(revealed.body);
     const current = byDomain.get(company.domain) ?? company;
-    byDomain.set(company.domain, applyApolloContact(current, person, input.today));
+    const next = applyApolloContact(current, person, input.today);
+    if (next.email.trim() && apolloEmailIsVerified(next.apolloEmailStatus ?? "")) verifiedEmails += 1;
+    if (next.cardFlags?.includes(APOLLO_STALE)) countFailure("stale");
+    if (next.cardFlags?.includes(APOLLO_EMAIL_NOT_VERIFIED)) countFailure("unverified");
+    byDomain.set(company.domain, next);
   }
 
-  if (hitCeiling) note = note ? `${note} ${APOLLO_CEILING}` : APOLLO_CEILING;
+  if (hitCeiling) {
+    note = note ? `${note} ${APOLLO_CEILING}` : APOLLO_CEILING;
+    failures.ceiling = (failures.ceiling ?? 0) + 1;
+  }
   return {
     companies: companies.map((company) => byDomain.get(company.domain) ?? company),
     searches,
     reveals,
+    verifiedEmails,
+    failures,
     note,
     failed,
     timedOut,
   };
+}
+
+/** A short reason code. The Apollo body is not included. */
+export function apolloFailureCode(reason: string) {
+  if (/deprecated/i.test(reason)) return "deprecated";
+  if (/unexpected shape/i.test(reason)) return "unexpected-shape";
+  if (/timeout|timed out|aborted/i.test(reason)) return "timeout";
+  const http = /HTTP (\d+)/.exec(reason);
+  if (http) return `http-${http[1]}`;
+  return "request-failed";
 }
 
 function apolloRetryable(status: number) {

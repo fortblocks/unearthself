@@ -15,9 +15,20 @@ type SortableLead = {
     city: string;
     place?: string;
     sizeBand: string;
+    hunterScore?: number | null;
   };
-  score: { total: number };
+  score: { total: number; fit?: number };
 };
+
+export type DeskScoreField = "hunterScore" | "fit" | "total";
+
+/** Hunter's filed score first. A card without one uses the lead-score fit, then the lead-score total. */
+export function deskScoreRank(row: SortableLead): { value: number; field: DeskScoreField } {
+  const hunter = row.company.hunterScore;
+  if (typeof hunter === "number" && Number.isFinite(hunter)) return { value: hunter, field: "hunterScore" };
+  if (typeof row.score.fit === "number" && Number.isFinite(row.score.fit)) return { value: row.score.fit, field: "fit" };
+  return { value: row.score.total, field: "total" };
+}
 
 /** First number in a size band. "80-800" is 80. "1500+" is 1500. Unknown has no bound. */
 export function sizeLowerBound(sizeBand: string): number | null {
@@ -58,7 +69,7 @@ export function sortLeadRows<T extends SortableLead>(rows: T[], sort: LeadSort):
           ? textCompare(a.company.org, b.company.org)
           : sort.key === "place"
             ? textCompare(leadPlace(a.company), leadPlace(b.company))
-            : a.score.total - b.score.total;
+            : deskScoreRank(a).value - deskScoreRank(b).value;
       if (diff !== 0) return diff * factor;
     }
     return textCompare(a.company.org, b.company.org) || a.company.id.localeCompare(b.company.id);

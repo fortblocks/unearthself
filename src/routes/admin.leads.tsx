@@ -10,6 +10,7 @@ import {
   cocoAwaitingDraft,
   COCO_DRAFT_POLL_MS,
   companiesOnDesk,
+  leadOnDesk,
   draftPollDecision,
   emptyCoco,
   LeadCardActions,
@@ -25,13 +26,12 @@ import {
 import { getLeadsBook, importLeadsCompanies, saveLeadsCompany, setLeadsMorningCount } from "@/lib/leads-api";
 import { addDoNotContact, approveAndQueueForCoco, approveWording, getCocoCard, saveCocoDraftEdit, withdrawWording } from "@/lib/leads-hunter-api";
 import { cardSource } from "@/lib/leads-hunter";
-import { DEFAULT_LEAD_SORT, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
+import { DEFAULT_LEAD_SORT, deskScoreRank, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
 import {
   bandLabel,
   daysBetween,
   edmontonToday,
   hasAccess,
-  isSendable,
   scoreCompany,
   signalContribution,
   type Company,
@@ -169,10 +169,9 @@ function LeadsPage() {
     () =>
       companiesOnDesk(
         rows ?? [],
-        today,
         Object.fromEntries(Object.entries(cocoById).map(([id, card]) => [id, card.blocked])),
       ),
-    [rows, today, cocoById],
+    [rows, cocoById],
   );
 
   const scored = useMemo(() => {
@@ -432,10 +431,8 @@ function CompanyList({
       </li>
       {ordered.map(({ company, score }) => {
         const open = openId === company.id;
-        const sendable =
-          company.source === "hunter"
-            ? company.status !== "stopped" && hasAccess(company)
-            : isSendable(company, score);
+        const sendable = leadOnDesk(company, cocoById[company.id]?.blocked ?? []);
+        const rank = deskScoreRank({ company, score });
         const place = company.place?.trim() || company.city;
         return (
           <li key={company.id}>
@@ -459,7 +456,7 @@ function CompanyList({
               <span className="hidden w-24 shrink-0 text-sm text-shale sm:block">
                 {company.sizeBand === "unknown" ? "not stated" : company.sizeBand}
               </span>
-              <span className="w-14 shrink-0 text-right text-sm tabular-nums">{score.total}</span>
+              <span className="w-14 shrink-0 text-right text-sm tabular-nums">{rank.value}</span>
             </button>
             {open ? (
               <CompanyPanel
@@ -591,7 +588,7 @@ function CompanyPanel({
           )}
           <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Status</p>
           <p className="mt-1 text-sm text-coal">
-            {company.status} · {bandLabel(score.band)}
+            {company.status}
             {hasAccess(company) ? "" : " · access incomplete"}
           </p>
           <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Review</p>

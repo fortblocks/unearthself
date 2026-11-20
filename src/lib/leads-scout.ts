@@ -249,7 +249,16 @@ export type NightlyEnrichment = (
   companies: Company[],
   domains: string[],
   today: string,
-) => Promise<{ companies: Company[]; searches: number; reveals: number; note: string; failed?: boolean; timedOut?: boolean }>;
+) => Promise<{
+  companies: Company[];
+  searches: number;
+  reveals: number;
+  verifiedEmails?: number;
+  failures?: Record<string, number>;
+  note: string;
+  failed?: boolean;
+  timedOut?: boolean;
+}>;
 
 export async function runNightlyScout(opts?: {
   enrich?: NightlyEnrichment;
@@ -267,6 +276,8 @@ export async function runNightlyScout(opts?: {
       contactReady: number;
       apolloSearches: number;
       apolloReveals: number;
+      apolloVerified: number;
+      apolloFailures: Record<string, number>;
       apolloNote: string;
       attempts: number;
       dollars: number | null;
@@ -323,6 +334,8 @@ export async function runNightlyScout(opts?: {
     contactReady,
     apolloSearches: enriched.searches,
     apolloReveals: enriched.reveals,
+    apolloVerified: enriched.verifiedEmails ?? 0,
+    apolloFailures: enriched.failures ?? {},
     apolloNote: enriched.note,
     dollars: research.dollars,
     estimatedDollars: research.estimatedDollars,

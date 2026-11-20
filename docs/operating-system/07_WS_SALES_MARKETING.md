@@ -39,9 +39,8 @@ Pricing is still an open decision (`17` + `14`). Until locked, the site collects
 
 - CRM live (even if it is HubSpot free + spreadsheet). **D04 stays open.** The house book is the working CRM until a partner closes it.
 - Enquiry forms write to the house book. `/spring` files a live lead; a matching research-card domain promotes the company.
-- `/admin/leads` is a long list of Alberta first-wave companies. Not the pipeline. The table is Company, Place, Size, and Score. Score 100 = Fit 60 + Access 25 + Timing 15 (Calgary / Edmonton / Red Deer, headcount 80–800, first-wave industries, named buyer, published email). There is no Hunter column and no Partner column.
-- Bands: 90+ pursue · 70–89 sequence if sendable · 50–69 watch · <50 do not email.
-- Access gate: no named person + published email + source URL = draft allowed, send blocked. Do not invent emails.
+- `/admin/leads` is the lead list, not the pipeline. The table is Company, Place, Size, and Score. Changed 20th November 2026 on Christopher's approval. A card is listed when it has a named person, a verified or published email, a source URL, and no block flag. A stopped card stays off the list. A card with no email stays in the book and is hidden. The list sorts by the Hunter fit score. Score bands are not a sending gate, and the card does not show a hold-band label. There is no Partner column.
+- Approve and draft needs that same rule. Do not invent emails.
 - Licensed, published directories such as Apollo, ZoomInfo, and similar are allowed as sources for names, titles, and email addresses (Chris, 18th November; see `29`). The database each name and address came from is logged on the card, and unverified or stale rows are flagged, never silently used. Anything not from a licensed database or a cited public page is never guessed: no address built from a pattern or inferred. Chris accepts the subscription costs, the staleness risk, and the Canadian anti-spam (CASL) obligations. Rex keeps oversight as part of ongoing performance review. Buying or connecting a subscription is still spend and needs approval first.
 - Grok Bot: qualify, answer FAQs, propose three dates, book a call
 - One-pager PDF for corporate

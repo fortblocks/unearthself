@@ -25,7 +25,7 @@ This file is the next sales spec. `07` remains the workstream. Do not treat this
 
 ## What already exists
 
-`/admin/leads` is the research list, not the pipeline. The companies table shows Company, Place, Size, and Score. Score is 100: Fit 60, Access 25, Timing 15. There is no second Hunter score and no Partner column. Bands are the ones in `07`: 90 and above pursue, 70 to 89 sequence if sendable, 50 to 69 watch, under 50 do not email.
+`/admin/leads` is the research list, not the pipeline. The companies table shows Company, Place, Size, and Score. Changed 20th November 2026 on Christopher's approval. The desk lists a card with a named person, a verified or published email, a source URL, and no block flag. It hides a card with no email, and it hides a stopped card. It sorts by the Hunter fit score stored at filing, then the lead-score fit, then the lead-score total. Score bands are not a sending or desk gate, and the card does not show a hold-band label. There is no Partner column.
 
 Fit today is geo plus size plus industry. Access is 12 for a named person (two real name tokens, not "hr", "people", or "team"), 10 for an email that is valid and has an http(s) source, and 3 for an http(s) company source. Timing is computed from dated signals with source URLs and a last-touch adjustment. It is not typed in.
 

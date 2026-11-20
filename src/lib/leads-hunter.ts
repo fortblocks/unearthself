@@ -1390,7 +1390,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     }
 
     const apollo = timedOut
-      ? { companies, searches: 0, reveals: 0, note: "Stopped for time.", failed: false, timedOut: true }
+      ? { companies, searches: 0, reveals: 0, verifiedEmails: 0, failures: { timeout: 1 }, note: "Stopped for time.", failed: false, timedOut: true }
       : await enrichUnderApolloCap({
           companies,
           domains: companies.filter((company) => company.filedOn === today).map((company) => company.domain),
@@ -1486,6 +1486,13 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       spendEstimated: estimatedDollars,
       alarms,
       outcome,
+      apollo: {
+        searches: apollo.searches,
+        reveals: apollo.reveals,
+        verifiedEmails: apollo.verifiedEmails,
+        contactReady,
+        failures: apollo.failures,
+      },
     });
     if (abandoned && lastError) return { ok: false, error: lastError };
     return {

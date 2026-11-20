@@ -11,9 +11,11 @@ import {
   emptyCoco,
   leadOnDesk,
   LeadCardActions,
+  skipReasonLines,
 } from "./lead-card-view.ts";
 import type { CocoJoin, CocoStage } from "./hunter-outreach.ts";
-import { bandFor, scoreCompany, type Company } from "./lead-score.ts";
+import { scoreCompany, type Company } from "./lead-score.ts";
+import { deskScoreRank } from "./leads-table.ts";
 
 const stages: CocoJoin[] = [
   emptyCoco({ stage: "new", stageLabel: "Unreviewed", canApproveDraft: true }),
@@ -76,39 +78,60 @@ function deskCard(partial: Partial<Company> & { id: string }): Company {
     scoutBatch: "",
     emailMx: partial.emailMx,
     cardFlags: partial.cardFlags,
+    hunterScore: partial.hunterScore,
   };
 }
 
-test("only a sendable lead is listed", () => {
-  assert.equal(bandFor(49), "hold");
-  assert.equal(bandFor(50), "watch");
-  assert.equal(bandFor(69), "watch");
-  assert.equal(bandFor(70), "sequence");
-  assert.equal(bandFor(90), "pursue");
-
-  const hold = deskCard({ id: "hold", city: "Elsewhere", sizeBand: "unknown", industry: "other" });
-  const watch = deskCard({ id: "watch", city: "Calgary", sizeBand: "80-800", industry: "other" });
-  const sendable = deskCard({ id: "sendable", city: "Calgary", sizeBand: "unknown", industry: "energy" });
+test("a card with a person and a verified email is listed below 70, and a blocked card is not", () => {
+  const hold = deskCard({ id: "hold", city: "Elsewhere", sizeBand: "unknown", industry: "other", hunterScore: 12 });
+  const watch = deskCard({ id: "watch", city: "Calgary", sizeBand: "80-800", industry: "other", hunterScore: 40 });
+  const higher = deskCard({ id: "higher", city: "Calgary", sizeBand: "unknown", industry: "energy", hunterScore: 80 });
   const blank = deskCard({ id: "blank", email: "   " });
   const missing = deskCard({ id: "missing", email: "" });
   const flagged = deskCard({ id: "stale", cardFlags: ["Stale"] });
+  const stopped = deskCard({ id: "stopped", status: "stopped" });
   assert.equal(scoreCompany(hold).band, "hold");
   assert.ok(scoreCompany(hold).total < 50);
   assert.equal(scoreCompany(watch).band, "watch");
   assert.ok(scoreCompany(watch).total >= 50 && scoreCompany(watch).total <= 69);
-  assert.equal(scoreCompany(sendable).band, "sequence");
-  assert.ok(scoreCompany(sendable).total >= 70);
 
-  const visible = companiesOnDesk([hold, watch, sendable, blank, missing, flagged]);
+  const visible = companiesOnDesk([hold, watch, higher, blank, missing, flagged, stopped]);
   assert.deepEqual(
     visible.map((row) => row.id),
-    ["sendable"],
+    ["hold", "watch", "higher"],
   );
-  assert.equal(leadOnDesk(sendable, scoreCompany(sendable), ["This contact is on the do-not-contact list."]), false);
-  assert.equal(leadOnDesk(sendable, scoreCompany(sendable), ["Mail to this address bounced."]), false);
-  const query = "hold";
-  const filtered = visible.filter((row) => row.org.toLowerCase().includes(query) || row.id.includes(query));
-  assert.deepEqual(filtered, []);
+  assert.equal(leadOnDesk(higher, ["This contact is on the do-not-contact list."]), false);
+  assert.equal(leadOnDesk(higher, ["Mail to this address bounced."]), false);
+  assert.equal(leadOnDesk(flagged), false);
+  assert.equal(leadOnDesk(blank), false);
+
+  const ranked = [...visible].sort((a, b) => deskScoreRank({ company: b, score: scoreCompany(b) }).value - deskScoreRank({ company: a, score: scoreCompany(a) }).value);
+  assert.deepEqual(
+    ranked.map((row) => row.id),
+    ["higher", "watch", "hold"],
+  );
+  assert.equal(deskScoreRank({ company: higher, score: scoreCompany(higher) }).field, "hunterScore");
+  const unscored = deskCard({ id: "plain" });
+  delete unscored.hunterScore;
+  const plainScore = scoreCompany(unscored);
+  assert.equal(deskScoreRank({ company: unscored, score: plainScore }).field, "fit");
+  assert.equal(deskScoreRank({ company: unscored, score: { total: plainScore.total } }).field, "total");
+});
+
+test("Coco's skip reason is shown once", () => {
+  const coco = emptyCoco({
+    stage: "draft-skipped",
+    stageLabel: "Draft skipped: No retreat fit",
+    status: "Coco skipped this draft. No retreat fit",
+    skipNote: "No retreat fit",
+  });
+  const lines = skipReasonLines(coco);
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, { cardId: "skipped", coco, subject: "", body: "" }),
+  );
+  assert.equal(lines.note, "");
+  assert.equal(html.split("No retreat fit").length - 1, 1);
+  assert.equal(html.includes("Draft skipped"), true);
 });
 
 test("Approve and draft is not offered when the card is not sendable", () => {

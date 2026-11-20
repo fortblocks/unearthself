@@ -166,6 +166,13 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       spendEstimated: result.ok ? result.estimatedDollars : 0,
       alarms,
       outcome,
+      apollo: {
+        searches: result.ok ? result.apolloSearches : 0,
+        reveals: result.ok ? result.apolloReveals : 0,
+        verifiedEmails: result.ok ? result.apolloVerified : 0,
+        contactReady: result.ok ? result.contactReady : 0,
+        failures: result.ok ? result.apolloFailures : {},
+      },
     });
     return Response.json(result, { status: result.ok ? 200 : 500 });
   } catch (error) {

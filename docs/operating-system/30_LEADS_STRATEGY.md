@@ -16,7 +16,7 @@ The whole leads system exists for one thing: retreat bookings. That means people
 
 ### 1. Find
 
-Hunter finds the leads. At most 48 cards are filed a day, and at most 48 of those are contact-ready. That is a ceiling, not a target. The day is not padded to reach it.
+Hunter finds the leads. The aim is 48 contact-ready cards a day. The day still stops at 48 filed cards and at 48 contact-ready cards, so it does not go past the target. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. Changed 20th November 2026 on Christopher's approval.
 
 ### 2. Enrich and write
 
@@ -49,7 +49,7 @@ Chris stated these on the call.
 5. **CASL basis for Apollo emails.** Log Apollo itself as the basis (data from public sources, per Apollo's terms) plus the date the data was pulled. Never invent a source page.
 6. **Alarms.** Rex receives them first, with Bo and Derek copied.
 7. **No daily call cap.** There is no daily model-call cap. The spending guardrail is the monthly xAI dollar cap in decision 3.
-8. **Quality floor.** A card needs at least one verified fit signal. A named person, an email and a source alone (a score of 25) are not enough. If the named contact has moved on, find who holds the role now from the same public page. Never guess. Cap the cards filed in a day at 48, and the contact-ready cards at 48. Both are ceilings, not targets.
+8. **Quality floor.** A card needs at least one verified fit signal. A named person, an email and a source alone (a score of 25) are not enough. If the named contact has moved on, find who holds the role now from the same public page. Never guess. The aim is 48 contact-ready cards a day. The cards filed in a day still stop at 48, and the contact-ready cards stop at 48. The monthly cost cap is unchanged, pending a budget decision.
 
 Execution follows strategy. No task is built without a clear strategy, and the purpose is retreat bookings.
 
@@ -75,7 +75,7 @@ This file covers the enrich and write step. It does not run the hunt, and it doe
 
 ### 29, Hunter
 
-`29_LEAD_HUNTER_BOT.md` is the Find spec. Hunter files the leads. The count in that file is 48 cards filed and 48 contact-ready cards in an Edmonton day. A contact-ready card has a name, a title, and an email. Both counts are ceilings, not targets. There is no daily model-call cap. The monthly xAI dollar cap of 60 dollars is the spending guardrail.
+`29_LEAD_HUNTER_BOT.md` is the Find spec. Hunter files the leads. The count in that file is 48 cards filed and 48 contact-ready cards in an Edmonton day. A contact-ready card has a name, a title, and an email. 48 contact-ready cards is the target, and both counts remain the daily stop. There is no daily model-call cap. The monthly xAI dollar cap of 60 dollars is unchanged, pending a budget decision.
 
 Section 9 of `29` makes enrichment phase two of Hunter's own job, including the one true thing, the profile signals, and the right person. This frame keeps that research as its own step. Section 9 names Coco as the writer and Nova as the sender. Coco owns the writing. Nova remains the named sender in section 9. The enrichment difference stays logged in `28`.
 
@@ -83,13 +83,13 @@ Section 10 of `29` is Hunter's search strategy for the Find step. It sits under 
 
 ### Hunter branch
 
-The Find step is on main. 48 contact-ready cards is a ceiling, and the day is not padded to reach 48. No booking-link service is connected. Booked is still a desk tap. The tool choice and the connection stay open, as logged in `28`.
+The Find step is on main. 48 contact-ready cards is the target, and the day still stops at 48. The monthly cost cap is unchanged, pending a budget decision. No booking-link service is connected. Booked is still a desk tap. The tool choice and the connection stay open, as logged in `28`.
 
 Applied on main and live on production as of 19th November 2026:
 
 - There is no daily model-call cap. The always-on run is every 30 minutes from 7am to 7pm Edmonton, with 3 model calls a run, plus one nightly sweep at 4am Edmonton, searching Calgary, Edmonton, and Red Deer first and keeping companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. The cron is unchanged.
 - `HUNTER_MONTHLY_DOLLAR_CAP` defaults to 60. It counts known xAI cost for the calendar month. Apollo credits are separate. At 60 dollars Hunter stops calling until the next month. That monthly cap is the spending guardrail.
-- A new card needs a verified fit signal. A score of 25 with no fit signal is rejected. A stale or unverified database row is flagged, not used silently. If the named contact has left, Hunter looks on that same public page for who holds the role now, and never guesses. Total cards filed in a day stop at 48, and contact-ready cards stop at 48. Both are ceilings.
+- A new card needs a verified fit signal. A score of 25 with no fit signal is rejected. A stale or unverified database row is flagged, not used silently. If the named contact has left, Hunter looks on that same public page for who holds the role now, and never guesses. The aim is 48 contact-ready cards. Total cards filed in a day still stop at 48, and contact-ready cards stop at 48. The monthly cost cap is unchanged, pending a budget decision.
 - Alarms are stored in Redis. Delivery order is Rex, then Bo, then Derek, through `HUNTER_ALARM_WEBHOOK_URL` and `HUNTER_ALARM_CC_WEBHOOK_URLS`. Both are unset.
 - An Apollo email logs Apollo as the CASL basis, with the statement that under Apollo's terms the data comes from public sources, and the date the row was pulled. The desk shows that basis and date. No source page is invented. A public-page email keeps that page.
 
@@ -107,3 +107,4 @@ Not applied. Still open:
 - 19th November 2026. The settings listed under the Hunter branch heading are on main and live on production (0297d04): call budget 55, three calls a run with the cron unchanged, monthly xAI cap of 60 US dollars, a verified fit signal, moved-on contacts not contact-ready, 48 cards a day, alarms to Rex then Bo and Derek, and the Apollo email CASL basis.
 - 19th November 2026. Strategy aligned the same day. There is no daily model-call cap. 48 filed cards and 48 contact-ready cards are ceilings. The 60 dollar monthly xAI cap is the spending guardrail. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Public LinkedIn posts are a second source. A moved-on contact is replaced from the same page, or left blank. There is no partnership lane. Coco owns the writing. Decision 5 is unchanged.
 - 20th November 2026. Christopher approved the nightly sweep wording. The sweep searches Calgary, Edmonton, and Red Deer first, keeps and files companies from anywhere, with any headcount and any industry, and weights Calgary, Edmonton, and Red Deer highest in the score. No company is dropped for location.
+- 20th November 2026. Christopher approved the desk rule and the daily aim. 48 contact-ready cards is the target. The day still stops at 48. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. The desk lists a card with a named person, a verified or published email, a source URL, and no block flag. It hides a card with no email. It sorts by the Hunter fit score. Score bands are not a gate.
