@@ -34,7 +34,7 @@ function LoginPage() {
         },
       });
       if (!result.ok) {
-        setError("That is not the desk.");
+        setError(result.error);
         setBusy(false);
         return;
       }
