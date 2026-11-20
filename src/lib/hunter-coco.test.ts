@@ -323,6 +323,137 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(text.includes("webhook down"), false);
   });
 
+  test("a draft gains the plain unsubscribe link once, and a missing token is refused", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "lupio" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    const secret = "BODY-SECRET-DRAFT";
+    try {
+      const missing = await post(letter(card.id, "drafted", { body: secret }));
+      assert.equal(missing.status, 200);
+      const present = await post(letter(card.id, "drafted", { body: `Already linked.\n\n${link}` }));
+      assert.equal(present.status, 200);
+    } finally {
+      console.info = original;
+    }
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string; unsubscribeAppended?: boolean } };
+    };
+    assert.equal(stored.drafts["1"].body, `Already linked.\n\n${link}`);
+    assert.equal(stored.drafts["1"].body.split(link).length - 1, 1);
+    assert.equal(stored.drafts["1"].unsubscribeAppended, undefined);
+    const added = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line) as { coco?: string; cardId?: string; appended?: boolean };
+        } catch {
+          return null;
+        }
+      })
+      .filter((item) => item?.coco === "draft-missing-unsubscribe");
+    assert.equal(added.length, 1);
+    assert.deepEqual(added[0], { coco: "draft-missing-unsubscribe", cardId: card.id, appended: true });
+    assert.equal(lines.join("\n").includes(secret), false);
+
+    const edited = await saveCocoDraftEdit({ cardId: card.id, touch: 1, subject: "Newer", body: "Edited letter" });
+    assert.equal(edited.ok, true);
+    const afterEdit = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { editedBody?: string; unsubscribeAppended?: boolean } };
+    };
+    assert.equal(afterEdit.drafts["1"].editedBody, `Edited letter\n\n${link}`);
+    assert.equal(afterEdit.drafts["1"].unsubscribeAppended, true);
+    const again = await saveCocoDraftEdit({
+      cardId: card.id,
+      touch: 1,
+      subject: "Newer",
+      body: afterEdit.drafts["1"].editedBody ?? "",
+    });
+    assert.equal(again.ok, true);
+    const kept = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { editedBody?: string } };
+    };
+    assert.equal(kept.drafts["1"].editedBody, `Edited letter\n\n${link}`);
+
+    const view = await readCocoCard(card.id);
+    assert.equal(view?.body, `Edited letter\n\n${link}`);
+    assert.equal(view?.canApproveWording, true);
+    assert.equal(view?.unsubscribeAppended, true);
+    assert.equal(view?.wordingNote, "");
+
+    await redis.hset(
+      HUNTER_OUTREACH_KEY,
+      card.id,
+      JSON.stringify({
+        cardId: card.id,
+        touches: 0,
+        events: [],
+        drafts: { "1": { subject: "Old", body: "Stored without a link." } },
+      }),
+    );
+    const backfillLines: string[] = [];
+    console.info = (line?: unknown) => {
+      backfillLines.push(String(line ?? ""));
+    };
+    let filled: Awaited<ReturnType<typeof readCocoCard>> = null;
+    try {
+      filled = await readCocoCard(card.id);
+      const second = await readCocoCard(card.id);
+      assert.equal(second?.body, `Stored without a link.\n\n${link}`);
+    } finally {
+      console.info = original;
+    }
+    assert.equal(filled?.body, `Stored without a link.\n\n${link}`);
+    assert.equal(filled?.canApproveWording, true);
+    assert.equal(filled?.unsubscribeAppended, true);
+    const fills = backfillLines.filter((line) => line.includes("draft-missing-unsubscribe"));
+    assert.equal(fills.length, 1);
+    const backed = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string } };
+    };
+    assert.equal(backed.drafts["1"].body.split(link).length - 1, 1);
+
+    assert.equal(unsubscribeUrl(card.id, ""), null);
+    delete process.env.HUNTER_WRITE_TOKEN;
+    const refusedLines: string[] = [];
+    console.info = (line?: unknown) => {
+      refusedLines.push(String(line ?? ""));
+    };
+    let refused: Awaited<ReturnType<typeof saveCocoDraftEdit>>;
+    try {
+      refused = await saveCocoDraftEdit({ cardId: card.id, touch: 1, subject: "Newer", body: "TOKEN-SECRET-BODY" });
+    } finally {
+      console.info = original;
+    }
+    assert.equal(refused.ok, false);
+    if (!refused.ok) assert.equal(refused.error, "no-unsubscribe");
+    const reason = refusedLines
+      .map((line) => {
+        try {
+          return JSON.parse(line) as { coco?: string; cardId?: string; error?: string; status?: number };
+        } catch {
+          return null;
+        }
+      })
+      .find((item) => item?.coco === "rejected");
+    assert.deepEqual(reason, { coco: "rejected", cardId: card.id, error: "no-unsubscribe", status: 409 });
+    assert.equal(refusedLines.join("\n").includes("TOKEN-SECRET-BODY"), false);
+    const quiet = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string; editedBody?: string } };
+    };
+    assert.equal(quiet.drafts["1"].body.includes("TOKEN-SECRET-BODY"), false);
+    assert.equal(quiet.drafts["1"].editedBody ?? "", "");
+    process.env.HUNTER_WRITE_TOKEN = WRITE;
+  });
+
   test("approve leaves the card queued when Redis hset stores a field map", async () => {
     const redis = upstashRedis();
     useRedisClientForTests(redis as unknown as LeadsRedis);

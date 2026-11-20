@@ -77,6 +77,8 @@ export function draftPanelKind(
 
 export const DRAFT_REJECTED_COPY = "Coco's draft was rejected, retrying";
 
+export const UNSUBSCRIBE_ADDED_COPY = "The unsubscribe link was added automatically.";
+
 export type DraftPoll = "poll" | "stop-ready" | "stop-left" | "stop-timeout";
 
 /** Whether the open card should ask again. A failed ask stays on poll and tries later. */
@@ -228,6 +230,9 @@ export function LeadCardActions({
       createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Draft"),
       coco.touch ? createElement("p", { className: "mt-2 text-sm text-shale" }, `Touch ${coco.touch} of 3.`) : null,
       createElement("p", { className: "mt-1 text-sm text-shale" }, "The letter goes from chris@badlandsbootcamp.com after Christopher approves it in Coco's chat."),
+      coco.unsubscribeAppended
+        ? createElement("p", { className: "mt-1 text-sm text-coal" }, UNSUBSCRIBE_ADDED_COPY)
+        : null,
       createElement(
         "label",
         { className: "mt-3 block", htmlFor: `${cardId}-subject` },
@@ -334,6 +339,7 @@ export function emptyCoco(partial: Partial<CocoJoin> = {}): CocoJoin {
     blocked: [],
     skipNote: "",
     draftRejected: null,
+    unsubscribeAppended: false,
     canApproveDraft: true,
     canApproveWording: false,
     canWithdraw: false,

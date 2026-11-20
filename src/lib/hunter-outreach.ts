@@ -152,6 +152,8 @@ type OutreachDraft = {
   problems?: string[];
   claim?: DraftClaim;
   sent?: SentCopy;
+  /** True when this desk added the plain-text unsubscribe URL to the draft. */
+  unsubscribeAppended?: boolean;
 };
 
 type OutreachQueue = { queuedAt: string; queuedBy: string };
@@ -265,6 +267,17 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
   const token = unsubscribeToken(cardId, writeToken);
   if (!token) return null;
   return `${UNSUBSCRIBE_ORIGIN}/u/${token}`;
+}
+
+/**
+ * The plain-text unsubscribe link send approval already requires.
+ * The same URL as unsubscribeUrl. No extra words.
+ */
+export function ensureUnsubscribeLink(body: string, link: string): { body: string; appended: boolean } {
+  if (body.includes(link)) return { body, appended: false };
+  const trimmed = body.replace(/\s+$/g, "");
+  if (!trimmed) return { body: link, appended: true };
+  return { body: `${trimmed}\n\n${link}`, appended: true };
 }
 
 function verificationKeys(): Buffer[] {
@@ -959,14 +972,21 @@ async function applyCocoEvent(
     if (prior.claim && claimLive(prior.claim, now) && prior.claim.eventId !== event.eventId && !record.events.some((item) => item.eventId === prior.claim?.eventId && item.type === "drafting")) {
       return reject("claimed");
     }
+    const link = unsubscribeUrl(company.id);
+    if (!link) return reject("no-unsubscribe");
+    const ensured = ensureUnsubscribeLink(event.body ?? "", link);
+    if (ensured.appended) {
+      console.info(JSON.stringify({ coco: "draft-missing-unsubscribe", cardId: company.id, appended: true }));
+    }
     drafts[key] = {
       subject: event.subject,
-      body: event.body,
+      body: ensured.body,
       variantId: event.variantId,
       experimentId: event.experimentId,
       draftedAt: event.at,
-      problems: draftProblems(event.body ?? ""),
+      problems: draftProblems(ensured.body),
       sent: prior.sent,
+      unsubscribeAppended: ensured.appended ? true : undefined,
     };
     record.drafts = drafts;
     if (record.draftSkipped?.touch === touch) record.draftSkipped = undefined;
@@ -1382,6 +1402,7 @@ export type CocoJoin = {
   blocked: string[];
   skipNote: string;
   draftRejected: { at: string; check: string } | null;
+  unsubscribeAppended: boolean;
   canApproveDraft: boolean;
   canApproveWording: boolean;
   canWithdraw: boolean;
@@ -1404,11 +1425,19 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
   const touch = nextTouchNumber(record);
   const draft = touch != null ? draftAt(record, touch) : undefined;
   const subject = draft?.editedSubject ?? draft?.subject ?? "";
-  const body = draft?.editedBody ?? draft?.body ?? "";
-  const blocked = cocoBlockReasons(company, record, dnc, today).map((rule) => BLOCK_COPY[rule] ?? rule);
+  const storedBody = draft?.editedBody ?? draft?.body ?? "";
   const link = unsubscribeUrl(company.id);
-  const hasDraft = Boolean(draft?.subject || draft?.body);
-  const wordingNote = hasDraft && link && !body.includes(link) ? "Approve wording needs the unsubscribe link in the email." : "";
+  const shown = link && storedBody.trim() && !storedBody.includes(link) ? ensureUnsubscribeLink(storedBody, link) : { body: storedBody, appended: false };
+  const body = shown.body;
+  const blocked = cocoBlockReasons(company, record, dnc, today).map((rule) => BLOCK_COPY[rule] ?? rule);
+  const hasDraft = Boolean(draft?.subject || draft?.body || draft?.editedBody);
+  const wordingNote = !hasDraft
+    ? ""
+    : !link
+      ? "The unsubscribe link is not available."
+      : !body.includes(link)
+        ? "Approve wording needs the unsubscribe link in the email."
+        : "";
   return {
     stage,
     stageLabel: stageLabel(stage, record),
@@ -1420,12 +1449,13 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     blocked,
     skipNote: record?.draftSkipped?.reason ?? "",
     draftRejected: record?.draftRejected ?? null,
+    unsubscribeAppended: draft?.unsubscribeAppended === true || shown.appended,
     canApproveDraft:
       emailableLead(company, blocked) &&
       blocked.length === 0 &&
       (stage === "new" || stage === "approved") &&
       company.review !== "skipped",
-    canApproveWording: stage === "draft-ready" && wordingNote === "" && hasDraft,
+    canApproveWording: stage === "draft-ready" && wordingNote === "" && hasDraft && link !== null && body.includes(link),
     canWithdraw: stage === "wording-approved",
     wordingNote,
     unsubscribeUrl: link,
@@ -1729,6 +1759,15 @@ export async function saveCocoDraftEdit(input: {
   const redis = await getRedisClient();
   if (!redis) return { ok: false, error: "unavailable" };
   const warnings = draftEditWarnings(input.subject, input.body);
+  const link = unsubscribeUrl(input.cardId);
+  if (!link) {
+    console.info(JSON.stringify({ coco: "rejected", cardId: input.cardId, error: "no-unsubscribe", status: 409 }));
+    return { ok: false, error: "no-unsubscribe" };
+  }
+  const ensured = ensureUnsubscribeLink(input.body, link);
+  if (ensured.appended) {
+    console.info(JSON.stringify({ coco: "draft-missing-unsubscribe", cardId: input.cardId, appended: true }));
+  }
   let failed: DeskCocoResult | null = null;
   const stored = await withOutreachLock(redis, input.cardId, async () => {
     const record = await readOutreachRecord(redis, input.cardId);
@@ -1743,7 +1782,12 @@ export async function saveCocoDraftEdit(input: {
       return record;
     }
     const drafts = { ...(record.drafts ?? {}) };
-    drafts[key] = { ...draft, editedSubject: input.subject, editedBody: input.body };
+    drafts[key] = {
+      ...draft,
+      editedSubject: input.subject,
+      editedBody: ensured.body,
+      unsubscribeAppended: ensured.appended ? true : draft.unsubscribeAppended,
+    };
     record.drafts = drafts;
     await writeOutreachRecord(redis, record);
     return record;
@@ -1830,6 +1874,48 @@ export async function withdrawWording(input: { cardId: string }): Promise<DeskCo
   return { ok: true, stage: cocoStage(company, outcome.record, Date.now(), dnc, edmontonToday()) };
 }
 
+function applyUnsubscribeToRecord(record: OutreachRecord, link: string) {
+  if (!record.drafts) return false;
+  let appended = false;
+  const drafts = { ...record.drafts };
+  for (const key of ["1", "2", "3"] as const) {
+    const draft = drafts[key];
+    if (!draft) continue;
+    const next = { ...draft };
+    let changed = false;
+    if (typeof next.body === "string" && next.body.trim() && !next.body.includes(link)) {
+      next.body = ensureUnsubscribeLink(next.body, link).body;
+      changed = true;
+    }
+    if (typeof next.editedBody === "string" && next.editedBody.trim() && !next.editedBody.includes(link)) {
+      next.editedBody = ensureUnsubscribeLink(next.editedBody, link).body;
+      changed = true;
+    }
+    if (!changed) continue;
+    next.unsubscribeAppended = true;
+    next.problems = draftProblems(next.editedBody ?? next.body ?? "");
+    drafts[key] = next;
+    appended = true;
+  }
+  if (!appended) return false;
+  record.drafts = drafts;
+  return true;
+}
+
+/** On read, add the plain-text unsubscribe URL to a stored draft that lacks it. A second read does not write again. */
+async function persistUnsubscribe(redis: LeadsRedis, cardId: string, record: OutreachRecord): Promise<OutreachRecord> {
+  const link = unsubscribeUrl(cardId);
+  if (!link || !applyUnsubscribeToRecord({ ...record, drafts: record.drafts ? { ...record.drafts } : undefined }, link)) return record;
+  const stored = await withOutreachLock(redis, cardId, async () => {
+    const fresh = (await readOutreachRecord(redis, cardId)) ?? record;
+    if (!applyUnsubscribeToRecord(fresh, link)) return fresh;
+    await writeOutreachRecord(redis, fresh);
+    console.info(JSON.stringify({ coco: "draft-missing-unsubscribe", cardId, appended: true }));
+    return fresh;
+  });
+  return stored ?? record;
+}
+
 export async function readCocoDesk(companies: Company[]) {
   const empty: Record<string, CocoJoin> = {};
   const redis = await getRedisClient();
@@ -1839,7 +1925,9 @@ export async function readCocoDesk(companies: Company[]) {
   const today = edmontonToday();
   const now = Date.now();
   for (const company of companies) {
-    empty[company.id] = cocoJoin(company, records.get(company.id) ?? null, dnc, today, now);
+    const current = records.get(company.id) ?? null;
+    const record = current ? await persistUnsubscribe(redis, company.id, current) : null;
+    empty[company.id] = cocoJoin(company, record, dnc, today, now);
   }
   return empty;
 }
@@ -1851,7 +1939,8 @@ export async function readCocoCard(cardId: string): Promise<CocoJoin | null> {
   if (!company) return null;
   const redis = await getRedisClient();
   if (!redis) return null;
-  const record = await readOutreachRecord(redis, cardId);
+  const existing = await readOutreachRecord(redis, cardId);
+  const record = existing ? await persistUnsubscribe(redis, cardId, existing) : null;
   const dnc = await loadDoNotContact(redis);
   return cocoJoin(company, record, dnc, edmontonToday(), Date.now());
 }

@@ -183,6 +183,28 @@ test("a rejected write-back says Coco is retrying, and the skip reason stays one
   assert.equal(ready.includes("A week in Drumheller"), true);
 });
 
+test("the card notes when the unsubscribe link was added", () => {
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "lupio",
+      coco: emptyCoco({
+        stage: "draft-ready",
+        stageLabel: "Draft ready",
+        touch: 1,
+        subject: "Hello",
+        body: "Stored without a link.",
+        canApproveWording: true,
+        unsubscribeAppended: true,
+      }),
+      subject: "Hello",
+      body: "Stored without a link.",
+    }),
+  );
+  assert.equal(html.split("The unsubscribe link was added automatically.").length - 1, 1);
+  assert.equal(controlLabels(html).includes("Approve wording"), true);
+  assert.equal(html.includes("\u2014"), false);
+});
+
 test("Approve and draft is not offered when the card is not sendable", () => {
   const hidden = renderToStaticMarkup(
     createElement(LeadCardActions, {
