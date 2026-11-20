@@ -297,6 +297,7 @@ test("subject and email stay hidden until a draft exists", () => {
     assert.equal(html.includes('id="much-better-body"'), false, item.name);
     assert.equal(html.includes(">Subject<"), false, item.name);
     assert.equal(html.includes(">Email<"), false, item.name);
+    assert.equal(html.includes(">Sources<"), false, item.name);
     assert.equal(controlLabels(html).includes("Save copy"), false, item.name);
     assert.equal(html.includes("\u2014"), false, item.name);
   }
@@ -343,6 +344,39 @@ test("subject and email stay hidden until a draft exists", () => {
   assert.equal(shown.includes(">Email<"), true);
   assert.equal(shown.includes("A week in Drumheller"), true);
   assert.equal(controlLabels(shown).includes("Save copy"), true);
+  assert.equal(shown.includes(">Sources<"), false);
+
+  const cited = "https://northwind.example/offsite";
+  const withSources = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: emptyCoco({ ...drafted, sources: [{ url: cited, note: "Leadership offsite" }] }),
+      subject: drafted.subject,
+      body: drafted.body,
+    }),
+  );
+  assert.equal(withSources.includes(">Sources<"), true);
+  assert.equal(withSources.includes(`href="${cited}"`), true);
+  assert.equal(withSources.includes("Leadership offsite"), true);
+  const email = withSources.slice(withSources.indexOf('id="much-better-body"'), withSources.indexOf("</textarea>"));
+  assert.equal(email.includes(cited), false);
+  assert.equal(email.includes("Leadership offsite"), false);
+
+  const beforeDraft = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: emptyCoco({
+        stage: "queued",
+        stageLabel: "Queued",
+        touch: 1,
+        sources: [{ url: cited, note: "Leadership offsite" }],
+      }),
+      subject: "",
+      body: "",
+    }),
+  );
+  assert.equal(beforeDraft.includes(">Sources<"), false);
+  assert.equal(beforeDraft.includes(cited), false);
 
   const edited = renderToStaticMarkup(
     createElement(LeadCardActions, {

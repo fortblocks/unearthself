@@ -296,6 +296,155 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(ready?.body.includes("Hello from Drumheller."), true);
   });
 
+  test("draft sources are stored beside the letter and stay out of the email", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "sourced" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const link = unsubscribeUrl(card.id) ?? "";
+    const page = "https://northwind.example/offsite";
+    const later = "https://northwind.example/news";
+
+    const plain = await post(letter(card.id, "drafted", { subject: "A short note", body: "Hello from Drumheller." }));
+    assert.equal(plain.status, 200);
+    const bare = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string; sources?: unknown } };
+    };
+    assert.equal(bare.drafts["1"].sources, undefined);
+    assert.equal(bare.drafts["1"].body.includes(page), false);
+    assert.equal(bare.drafts["1"].body.includes(link), true);
+
+    const cited = await post(letter(card.id, "drafted", {
+      subject: "A short note",
+      body: "Hello from Drumheller.",
+      sources: [{ url: page, note: "Leadership offsite" }, { url: `${page}/team` }],
+    }));
+    assert.equal(cited.status, 200);
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { subject: string; body: string; sources?: Array<{ url: string; note?: string }> } };
+      events: Array<Record<string, unknown>>;
+    };
+    assert.deepEqual(stored.drafts["1"].sources, [
+      { url: page, note: "Leadership offsite" },
+      { url: `${page}/team` },
+    ]);
+    assert.equal(stored.drafts["1"].body.includes(page), false);
+    assert.equal(stored.drafts["1"].body.includes(link), true);
+    assert.equal(stored.events.some((event) => "sources" in event), false);
+    const joined = await readCocoCard(card.id);
+    assert.deepEqual(joined?.sources, stored.drafts["1"].sources);
+    assert.equal(joined?.body.includes(page), false);
+
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    const junk: Array<{ sources: unknown; label: string }> = [
+      { label: "http", sources: [{ url: "http://northwind.example/offsite" }] },
+      { label: "script", sources: [{ url: "javascript:alert(1)" }] },
+      { label: "extra", sources: [{ url: page, label: "nope" }] },
+      { label: "note", sources: [{ url: page, note: 4 }] },
+      { label: "shape", sources: "https://northwind.example/offsite" },
+      { label: "missing-url", sources: [{ note: "Leadership offsite" }] },
+      { label: "cap", sources: Array.from({ length: 11 }, (_, index) => ({ url: `https://northwind.example/p${index}` })) },
+    ];
+    try {
+      for (const item of junk) {
+        const response = await post(letter(card.id, "drafted", { sources: item.sources }));
+        assert.equal(response.status, 400, item.label);
+        assert.deepEqual(await response.json(), { error: "invalid", field: "sources" });
+      }
+      const onSend = await post(letter(card.id, "send_approved", { body: `Hello from Drumheller.\n${link}`, sources: [{ url: page }] }));
+      assert.equal(onSend.status, 400);
+      assert.deepEqual(await onSend.json(), { error: "invalid", field: "sources" });
+    } finally {
+      console.info = original;
+    }
+    const logged = lines.map((line) => JSON.parse(line) as { cardId?: string; type?: string; status?: number; check?: string; field?: string });
+    const rejected = logged.filter((item) => item.check === "sources");
+    assert.equal(rejected.length, junk.length + 1);
+    for (const line of rejected) {
+      assert.equal(line.cardId, card.id);
+      assert.equal(line.status, 400);
+    }
+    assert.equal(lines.join("\n").includes(page), false);
+    const kept = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { sources?: Array<{ url: string }> } };
+      sendApproved?: unknown;
+    };
+    assert.deepEqual(kept.drafts["1"].sources, stored.drafts["1"].sources);
+    assert.equal(kept.sendApproved, undefined);
+
+    const ten = Array.from({ length: 10 }, (_, index) => ({ url: `https://northwind.example/p${index}` }));
+    assert.equal((await post(letter(card.id, "drafted", { sources: ten }))).status, 200);
+    const capped = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { sources?: unknown[] } };
+    };
+    assert.equal(capped.drafts["1"].sources?.length, 10);
+
+    const edited = await saveCocoDraftEdit({
+      cardId: card.id,
+      touch: 1,
+      subject: "Edited subject",
+      body: "Edited letter.",
+    });
+    assert.equal(edited.ok, true);
+    const afterEdit = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { editedSubject?: string; editedBody?: string; sources?: Array<{ url: string }> } };
+    };
+    assert.equal(afterEdit.drafts["1"].editedSubject, "Edited subject");
+    assert.equal(afterEdit.drafts["1"].editedBody?.includes(page), false);
+    assert.equal(afterEdit.drafts["1"].editedBody?.includes("https://northwind.example/p0"), false);
+    assert.equal(afterEdit.drafts["1"].editedBody?.includes(link), true);
+    assert.deepEqual(afterEdit.drafts["1"].sources, ten);
+
+    const replaced = await post(letter(card.id, "drafted", {
+      body: "The latest letter.",
+      sources: [{ url: later, note: "A later page" }],
+    }));
+    assert.equal(replaced.status, 200);
+    const next = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string; sources?: Array<{ url: string; note?: string }> } };
+    };
+    assert.deepEqual(next.drafts["1"].sources, [{ url: later, note: "A later page" }]);
+    assert.equal(next.drafts["1"].body.includes(later), false);
+    assert.equal(next.drafts["1"].body.includes("https://northwind.example/p0"), false);
+
+    const cleared = await post(letter(card.id, "drafted", { body: "No citations." }));
+    assert.equal(cleared.status, 200);
+    const gone = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { sources?: unknown } };
+    };
+    assert.equal(gone.drafts["1"].sources, undefined);
+
+    const restored = await post(letter(card.id, "drafted", {
+      body: "Hello from Drumheller.",
+      sources: [{ url: page, note: "Leadership offsite" }],
+    }));
+    assert.equal(restored.status, 200);
+    const approved = await approveWording({ cardId: card.id, subject: "Final", body: `Final copy.\n${link}` });
+    assert.equal(approved.ok, true);
+    const sent = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      sendApproved?: Record<string, unknown>;
+      drafts: { "1": { sources?: Array<{ url: string }> } };
+    };
+    assert.deepEqual(Object.keys(sent.sendApproved ?? {}).sort(), ["at", "body", "eventId", "subject", "touch"]);
+    assert.equal(String(sent.sendApproved?.body).includes(page), false);
+    assert.equal(JSON.stringify(sent.sendApproved).includes("sources"), false);
+    assert.deepEqual(sent.drafts["1"].sources, [{ url: page, note: "Leadership offsite" }]);
+
+    const cardView = await handleHunterRead(
+      new Request(`https://www.unearthself.xyz/api/hunter/read?view=card&id=${card.id}`, {
+        headers: { authorization: `Bearer ${CARDS}` },
+      }),
+    );
+    const cardBody = (await cardView.json()) as { card: { sendApproved: Record<string, unknown> | null } };
+    assert.equal(JSON.stringify(cardBody.card.sendApproved).includes(page), false);
+    assert.equal(JSON.stringify(cardBody.card.sendApproved).includes("sources"), false);
+  });
+
   test("the coco wake log names the card and not the key", async () => {
     process.env.COCO_DRAFT_WEBHOOK_URL = "https://coco.example/hook";
     process.env.COCO_DRAFT_WEBHOOK_KEY = "secret-key";

@@ -80,6 +80,7 @@ const KNOWN_FIELDS = new Set([
   "emailSource",
   "subject",
   "body",
+  "sources",
   "note",
   "reason",
 ]);
@@ -92,7 +93,7 @@ const FIELDS_FOR: Record<EventType, string[]> = {
   bounced: ["messageId", "note"],
   booked: ["messageId", "note"],
   drafting: ["touch"],
-  drafted: ["touch", "subject", "body", "variantId", "experimentId"],
+  drafted: ["touch", "subject", "body", "variantId", "experimentId", "sources"],
   send_approved: ["touch", "subject", "body"],
   draft_skipped: ["touch", "reason"],
   send_withdrawn: ["touch"],
@@ -141,6 +142,13 @@ export type OutreachEvent = {
 type SentCopy = { subject: string; body: string; at: string };
 type DraftClaim = { eventId: string; at: string };
 
+/** A page Coco cited for this draft. It is not part of the email. */
+export type DraftSource = { url: string; note?: string };
+
+const MAX_DRAFT_SOURCES = 10;
+const MAX_SOURCE_URL = 500;
+const MAX_SOURCE_NOTE = 200;
+
 type OutreachDraft = {
   subject?: string;
   body?: string;
@@ -154,6 +162,8 @@ type OutreachDraft = {
   sent?: SentCopy;
   /** True when this desk added the plain-text unsubscribe URL to the draft. */
   unsubscribeAppended?: boolean;
+  /** Replaced wholesale by the next drafted event. A desk edit does not change it. */
+  sources?: DraftSource[];
 };
 
 type OutreachQueue = { queuedAt: string; queuedBy: string };
@@ -218,6 +228,7 @@ type ParsedEvent = {
   emailSource?: string;
   subject?: string;
   body?: string;
+  sources?: DraftSource[];
   note?: string;
   reason?: string;
 };
@@ -578,6 +589,41 @@ function oneLine(value: string, max: number) {
   return value;
 }
 
+function httpsSourceUrl(value: string) {
+  if (!value || value.length > MAX_SOURCE_URL || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && url.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** https pages only, ten at most. A bad entry fails the whole list. */
+function parseDraftSources(value: unknown): { ok: true; sources: DraftSource[] } | { ok: false } {
+  if (!Array.isArray(value) || value.length > MAX_DRAFT_SOURCES) return { ok: false };
+  const sources: DraftSource[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { ok: false };
+    const row = item as Record<string, unknown>;
+    for (const key of Object.keys(row)) {
+      if (key !== "url" && key !== "note") return { ok: false };
+    }
+    if (typeof row.url !== "string") return { ok: false };
+    const url = row.url.trim();
+    if (!httpsSourceUrl(url)) return { ok: false };
+    const source: DraftSource = { url };
+    if ("note" in row) {
+      if (typeof row.note !== "string" || /[\r\n]/.test(row.note)) return { ok: false };
+      const note = row.note.trim();
+      if (note.length > MAX_SOURCE_NOTE) return { ok: false };
+      if (note) source.note = note;
+    }
+    sources.push(source);
+  }
+  return { ok: true, sources };
+}
+
 function parseEvent(value: unknown, now: number): { ok: true; event: ParsedEvent } | { ok: false; field: string } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, field: "body" };
   const row = value as Record<string, unknown>;
@@ -702,6 +748,11 @@ function parseEvent(value: unknown, now: number): { ok: true; event: ParsedEvent
     event.experimentId = row.experimentId;
     if (typeof row.variantId !== "string" || !slug(row.variantId, 64)) return { ok: false, field: "variantId" };
     event.variantId = row.variantId;
+    if ("sources" in row) {
+      const sources = parseDraftSources(row.sources);
+      if (!sources.ok) return { ok: false, field: "sources" };
+      event.sources = sources.sources;
+    }
   }
   if (type === "draft_skipped") {
     if (typeof row.reason !== "string") return { ok: false, field: "reason" };
@@ -987,6 +1038,7 @@ async function applyCocoEvent(
       problems: draftProblems(ensured.body),
       sent: prior.sent,
       unsubscribeAppended: ensured.appended ? true : undefined,
+      ...(event.sources ? { sources: event.sources } : {}),
     };
     record.drafts = drafts;
     if (record.draftSkipped?.touch === touch) record.draftSkipped = undefined;
@@ -1406,12 +1458,19 @@ export type CocoJoin = {
   skipNote: string;
   draftRejected: { at: string; check: string } | null;
   unsubscribeAppended: boolean;
+  sources: DraftSource[];
   canApproveDraft: boolean;
   canApproveWording: boolean;
   canWithdraw: boolean;
   wordingNote: string;
   unsubscribeUrl: string | null;
 };
+
+function shownDraftSources(draft: OutreachDraft | undefined): DraftSource[] {
+  if (!draft?.sources) return [];
+  const parsed = parseDraftSources(draft.sources);
+  return parsed.ok ? parsed.sources : [];
+}
 
 function statusFor(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "queued") return "Approved, waiting for Coco.";
@@ -1453,6 +1512,7 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     skipNote: record?.draftSkipped?.reason ?? "",
     draftRejected: record?.draftRejected ?? null,
     unsubscribeAppended: draft?.unsubscribeAppended === true || shown.appended,
+    sources: shownDraftSources(draft),
     canApproveDraft:
       emailableLead(company, blocked) &&
       blocked.length === 0 &&

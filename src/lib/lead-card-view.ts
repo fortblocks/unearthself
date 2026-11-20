@@ -1,7 +1,7 @@
 import { createElement, type ReactNode } from "react";
 import { isPhaseOneCompany } from "../data/hunter-profile.ts";
 import { isClearBuyer, isStoredJudgment } from "./buyer-judgment.ts";
-import { draftEditWarnings, emailableLead, type CocoJoin } from "./hunter-outreach.ts";
+import { draftEditWarnings, emailableLead, type CocoJoin, type DraftSource } from "./hunter-outreach.ts";
 import { wordCount } from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
 
@@ -184,6 +184,7 @@ export function LeadCardActions({
   const wait = !awaiting ? null : rejected ? "rejected" : draftWait === "late" ? "late" : "writing";
   const skip = skipReasonLines(coco);
   const hasDraft = hasDraftCopy(subject, body, coco.subject, coco.body);
+  const sources = hasDraft ? (coco.sources ?? []) : [];
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
@@ -288,6 +289,35 @@ export function LeadCardActions({
       editable ? actionButton("Save copy", onSaveCopy) : null,
     )
       : null,
+    sources.length > 0 ? draftSourceList(sources) : null,
+  );
+}
+
+function draftSourceList(sources: DraftSource[]) {
+  return createElement(
+    "div",
+    null,
+    createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Sources"),
+    createElement(
+      "ul",
+      { className: "mt-2 space-y-1" },
+      sources.map((source, index) =>
+        createElement(
+          "li",
+          { key: `${source.url}-${index}` },
+          createElement(
+            "a",
+            {
+              className: "text-sm font-semibold text-ember hover:underline",
+              href: source.url,
+              rel: "noopener noreferrer",
+            },
+            source.url,
+          ),
+          source.note ? createElement("span", { className: "mt-1 block text-sm text-shale" }, source.note) : null,
+        ),
+      ),
+    ),
   );
 }
 
@@ -362,6 +392,7 @@ export function emptyCoco(partial: Partial<CocoJoin> = {}): CocoJoin {
     skipNote: "",
     draftRejected: null,
     unsubscribeAppended: false,
+    sources: [],
     canApproveDraft: true,
     canApproveWording: false,
     canWithdraw: false,
