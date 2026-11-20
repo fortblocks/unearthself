@@ -101,7 +101,7 @@ function InventoryPage() {
         <Stat
           label="Canalta hold"
           value={canalta.length ? `${canalta[0].rooms} rooms` : "None"}
-          hint={canalta[0] ? canalta[0].forLead : "No overflow live"}
+          hint={canalta[0] ? canalta[0].forLead : "No Canalta rooms live"}
         />
       </section>
 
@@ -270,7 +270,7 @@ function InventoryPage() {
           </ul>
         </Section>
         <div className="grid gap-8">
-          <Section kicker="Overflow">
+          <Section kicker="Canalta">
             {canalta.map((c) => (
               <div key={c.id} className="border border-line bg-paper p-4">
                 <p className="font-semibold">{c.forLead}</p>
@@ -278,7 +278,7 @@ function InventoryPage() {
                   {c.rooms} rooms at Canalta · {c.checkIn} → {c.checkOut}
                 </p>
                 <p className="mt-3 text-sm text-pretty text-muted">
-                  Haven takes the lead rooms. Overflow is held, not confirmed until D12.
+                  Haven takes the lead rooms. Canalta rooms are held, not confirmed until D12.
                 </p>
               </div>
             ))}

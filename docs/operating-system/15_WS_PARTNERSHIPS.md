@@ -6,7 +6,7 @@
 
 | Partner | Why | Status |
 |---|---|---|
-| Canalta | Overflow rooms for 50–150 pax | In conversation / terms to file |
+| Canalta | Rooms in town alongside the suites; capacity depends on room sharing | In conversation / terms to file |
 | Town businesses | Connection quest | Not yet briefed as a set |
 | Wayne’s fossil shop | Experience day | Concept only |
 | Last Chance Saloon | Possible close | Concept only |

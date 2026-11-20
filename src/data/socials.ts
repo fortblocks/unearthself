@@ -50,7 +50,7 @@ export const SEED_POSTS: SocialPost[] = [
     channel: "instagram",
     status: "queued",
     title: "Haven is four rooms",
-    body: "Elowen, Hidden Hollow, River Blossom, Water Mark. That is the house. Overflow is a conversation with Lisa, not a second lodge we pretend to own.",
+    body: "Elowen, Hidden Hollow, River Blossom, Water Mark. That is the house. Bigger groups are a conversation with Lisa, not a second lodge we pretend to own.",
     when: "2026-09-11",
     impressions: 0,
     likes: 0,

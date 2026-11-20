@@ -20,7 +20,7 @@ export const POSTS: JournalPost[] = [
       "Seven thousand people. A river. A museum that holds the bones of the place. One hundred and seventy-six short-lets already fighting for the same weekend visitor. If you treat Drumheller as a hospitality problem you lose on amenities. The rooms are not the point.",
       "The town sits on deep time made visible. Coulees drop away from the highway. Hoodoos stand in the valley like something unfinished. Winter means it. Summer is short and loud with tourists who came for a dinosaur and leave with an ice cream. In between, the land is still there, and so are the people who live with it.",
       "We did not pick it as a backdrop. A conventional gym, spa and four-room guesthouse cannot win this market on towels. The move is to give someone a reason to come that does not currently exist — and to give locals a house they can use without pretending they are on holiday.",
-      "Basecamp is on the block. Haven is four suites in a heritage house. Canalta takes the overflow when a group is larger than the four keys. Ninety minutes from Calgary. Edmonton is longer. There is no useful passenger rail. You drive. That is part of the work.",
+      "Basecamp is on the block. Haven is four suites in a heritage house. When a group is larger than the four keys, we arrange rooms at Canalta in town. Ninety minutes from Calgary. Edmonton is longer. There is no useful passenger rail. You drive. That is part of the work.",
       "If you want the mountain-resort version of wellness, keep driving west. If you want a town that will not flatter the itinerary, this is the stop.",
     ],
   },

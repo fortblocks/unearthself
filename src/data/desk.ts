@@ -308,7 +308,7 @@ export const SEED_CANALTA: CanaltaHold[] = [
 ];
 
 export const SUPPLIERS: { name: string; job: string; status: string; owner: string }[] = [
-  { name: "Canalta Drumheller", job: "Overflow rooms", status: "Hold live for Apex. Terms unsigned (D12).", owner: "Lisa" },
+  { name: "Canalta Drumheller", job: "Rooms in town", status: "Hold live for Apex. Terms unsigned (D12).", owner: "Lisa" },
   { name: "Canyon operator", job: "Abseil / cliff", status: "Seat open. Do not sell.", owner: "Lisa" },
   { name: "Royal Tyrrell", job: "Fossil day", status: "Conversation, not a contract.", owner: "Tess" },
   { name: "Darcie", job: "RMT", status: "Thu–Sat. 140 / 55 min.", owner: "Norah" },

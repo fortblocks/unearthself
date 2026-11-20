@@ -31,7 +31,7 @@ Looking-as is a view label, not a login. Switch partner and **Today** rewrites t
 | `/admin/leads` | **Leads.** Company, Place, Size, Score. Not the pipeline | Christopher | Rank, draft, Access, Hunter nightly and hunt, promote |
 | `/admin/bots` | **Bots** — Grok roster, threads, send queue | Christopher | Draft / send / log reply. Hunter's runs are on Leads |
 | `/admin/socials` | **Socials** — ideas, queue, logged performance | Christopher | File copy, mark posted, log numbers |
-| `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta overflow | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
+| `/admin/inventory` | **Inventory** — Haven nights, treatment slots, Canalta rooms | Lisa (rooms) + Norah (treatments) | Hold a suite, add a slot |
 | `/admin/money` | **Money** — deposits due, invoices sent, refunds | Norah | Mark paid, file a line |
 | `/admin/risk` | **Risk** — unsigned waivers, weather flags, under-staffed days | Lisa (Tess on programme days) | Close / reopen / flag |
 | `/admin/friday` | **Friday pack** — occupancy, hours, pipeline, cash, issues | Norah | One page + reset demo |

@@ -9,8 +9,8 @@
 
 | Role | Name | Why they matter | Contact in source |
 |---|---|---|---|
-| Overflow rooms | Canalta / Ramada | Large Bootcamp nights | ramadadrumheller@canalra.com |
-| Overflow | Jurassic Inn | Canalta family | canaltajurassic@canalta.com |
+| Rooms in town | Canalta / Ramada | Large Bootcamp nights | ramadadrumheller@canalra.com |
+| Rooms in town | Jurassic Inn | Canalta family | canaltajurassic@canalta.com |
 | Land / fossils | Royal Tyrrell | Experience-day option | tyrrell.info@gov.ab.ca |
 | Land | Atlas Coal Mine | Story, not a gym | info@atlascoalmine.ab.ca |
 | Land | The Fossil Shop | Walk-over after Rosedale | miles@thefossilshop.com |
@@ -31,7 +31,7 @@ The Chamber roster, churches, dealerships, liquor stores. Useful civic list. Not
 
 ## Terms that must exist as files
 
-- Canalta overflow (D12)
+- Canalta rooms (D12)
 - Each contractor: rate, insurance, cancellation
 - Tyrrell / Atlas: if we promise a slot, a written hold
 

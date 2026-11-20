@@ -43,7 +43,7 @@ function FriendsLander() {
         },
         {
           title: "A close that is quiet on purpose.",
-          body: "Name what you will carry, then eat together. Nights are at Haven, four suites on the block, with Canalta for overflow, and Basecamp has heat, cold and hands.",
+          body: "Name what you will carry, then eat together. Nights are at Haven, four suites on the block, with rooms at Canalta arranged for bigger groups, and Basecamp has heat, cold and hands.",
           image: "/images/haven/elowen/elowen-01.jpg",
         },
       ]}

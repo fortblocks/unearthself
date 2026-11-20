@@ -7,7 +7,7 @@ export const Route = createFileRoute("/visit")({
       { title: "Visit - Unearth Self" },
       {
         name: "description",
-        content: "How to reach Basecamp and Haven in Drumheller, Alberta. Seasons, packing, overflow.",
+        content: "How to reach Basecamp and Haven in Drumheller, Alberta. Seasons, packing, where to stay.",
       },
     ],
   }),
@@ -56,15 +56,14 @@ function VisitPage() {
         <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2">
           <div>
             <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-sandstone uppercase">Sleep</p>
-            <h2 className="font-display mb-4 text-3xl uppercase">Haven first, then Canalta if you overflow.</h2>
+            <h2 className="font-display mb-4 text-3xl uppercase">Haven on the block, Canalta in town.</h2>
             <p className="mb-4 text-fossil/75">
               Four suites sit on the same block as Basecamp: Elowen, Hidden Hollow, River Blossom and Water
               Mark. They have kitchens, and the place next door has heat and cold. Direct rates start from
               $165 a night.
             </p>
             <p className="text-fossil/75">
-              Groups larger than the four suites go to Canalta. We hold those rooms; you do not book them
-              as a separate holiday.
+              For bigger groups we arrange rooms at Canalta in town, alongside the suites. You do not book them separately.
             </p>
             <Link to="/haven" className="mt-6 inline-block text-sandstone hover:text-fossil">
               See the suites →

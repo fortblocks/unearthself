@@ -23,7 +23,7 @@ Build a proper rate card with:
 
 - Per-person versus whole-team pricing
 - Facilitator day rate baked in
-- Canalta overflow pass-through
+- Canalta rooms pass-through
 - Shoulder-season versus peak
 - Local treatment menu
 - Haven BAR and package rate

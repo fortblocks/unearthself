@@ -258,7 +258,7 @@ function BootcampPage() {
             </div>
             <p className="mt-5 text-[0.7rem] tracking-[0.18em] text-sandstone uppercase">Sleep</p>
             <h3 className="font-display mt-1 text-3xl uppercase">The Haven</h3>
-            <p className="mt-2 text-fossil/65">Four suites on the block, with overflow held when a group reaches 30.</p>
+            <p className="mt-2 text-fossil/65">Four suites on the block, with rooms arranged at Canalta in town for bigger groups.</p>
             <p className="mt-1 text-fossil/50">Haven, then Canalta</p>
             <span className="mt-4 inline-block text-[0.85rem] font-semibold text-ember">Explore Haven</span>
           </Link>

@@ -66,7 +66,7 @@ Team-shareable files:
 - Retreat: **Badlands Bootcamp**
 - HQ: **Basecamp**
 - Hotel: **Haven** (Elowen, Hidden Hollow, River Blossom, Water Mark)
-- Overflow rooms: **Canalta** partnership
+- Rooms in town: **Canalta** partnership
 - App: **Trail Quest**
 - Reflection tool in the MVP: **Echo Mirror**
 - Deep model: **Echo System** and **HAM (Human Adaptation Model)**

@@ -29,7 +29,7 @@ const SUGGESTIONS: { channel: SocialChannel; title: string; body: string }[] = [
   {
     channel: "x",
     title: "Four rooms",
-    body: "Haven is four suites on the coulee. That is the house. Lisa handles overflow.",
+    body: "Haven is four suites on the coulee. That is the house. Lisa arranges rooms for bigger groups.",
   },
   {
     channel: "instagram",

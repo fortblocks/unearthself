@@ -16,7 +16,7 @@ The move is not “capture more of the existing visitor”. The move is **create
 
 ## The stack
 
-1. **Place** — Basecamp (HQ + spa + gathering rooms) and Haven (four suite apartments in downtown Drumheller), with Canalta as overflow for 50–150 person events.
+1. **Place** — Basecamp (HQ + spa + gathering rooms) and Haven (four suite apartments in downtown Drumheller), with Canalta as an accommodation partner in town, used alongside the suites; how many people it covers depends on room sharing (Christopher, 19th November 2026).
 2. **Experience** — Badlands Bootcamp. A 2–5 day cumulative expedition through PACE. Corporate teams first. Stag/hen, sports clubs, family and local cohorts next.
 3. **Companion** — Trail Quest. Offline-capable, GPS-aware, quiet. Reveals Runes, holds Echo Mirror prompts, never steals the landscape.
 4. **Modality** — Echo System + HAM. Forged in the field, then packaged as an online course and a language people can keep using after they leave.

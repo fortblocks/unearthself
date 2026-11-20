@@ -28,7 +28,7 @@ Direct BAR is on `/haven` from the house card (10 Sep 2026). Four seasons, clean
 
 Current booking pattern: request dates → email confirmation of rates → no charge at request. Form now shows an indicative total from the BAR. Still not a PMS.
 
-**Canalta** — overflow for larger parties. Commercial terms must live in `15_WS_PARTNERSHIPS.md` once signed.
+**Canalta** — accommodation partner in town, used alongside the suites for larger parties. Commercial terms must live in `15_WS_PARTNERSHIPS.md` once signed.
 
 ## Jobs before early November
 
