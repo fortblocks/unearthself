@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { clampMorningCount, morningCompanies, parseBook, readLocalCompanies } from "./leads-book.ts";
-import { applyVerifiedContacts, buildMorningBatch, contactIfPresent, selectScoutRows } from "./leads-scout.ts";
+import { applyVerifiedContacts, buildMorningBatch, contactIfPresent, scoutOutOfRegion, selectScoutRows } from "./leads-scout.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
 
 const page = "Our people team is led by Laura Starchuk. Write to reddeer@scottbuilders.com for work.";
@@ -66,6 +66,14 @@ test("selectScoutRows keeps any headcount, industry, and city", () => {
         sourceUrl: "https://huge.example",
       },
       {
+        org: "Berlin Works",
+        domain: "berlin.example",
+        city: "Berlin",
+        industry: "other",
+        sizeBand: "80-800",
+        sourceUrl: "https://berlin.example",
+      },
+      {
         org: "Geolab Studio",
         domain: "studio.example",
         city: "Calgary",
@@ -86,7 +94,18 @@ test("selectScoutRows keeps any headcount, industry, and city", () => {
   assert.equal(rows[1]?.sizeBand, "1-49");
   assert.equal(rows[2]?.city, "Elsewhere");
   assert.equal(rows[4]?.sizeBand, "1500+");
+  assert.equal(rows.some((row) => row.domain === "berlin.example"), false);
   assert.equal(rows[0]?.buyer?.email, "pat.lee@northline.example");
+  assert.equal(
+    scoutOutOfRegion({
+      companies: [
+        { org: "Berlin Works", domain: "berlin.example", city: "Berlin", sourceUrl: "https://berlin.example" },
+        { org: "Northline", domain: "northline.example", city: "Calgary", sourceUrl: "https://northline.example" },
+        { org: "Quiet", domain: "quiet.example", city: "", sourceUrl: "https://quiet.example" },
+      ],
+    }),
+    2,
+  );
   const scored = {
     industry: "other" as const,
     sizeBand: "unknown" as const,

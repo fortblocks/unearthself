@@ -14,6 +14,7 @@ export const DROP_LABELS: Record<DropReason, string> = {
   "below-quality-floor": "below the quality floor",
   "no-mx": "no MX record",
   unverified: "email not verified",
+  outOfRegion: "outside Canada and the United States",
 };
 
 /**

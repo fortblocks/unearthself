@@ -280,6 +280,9 @@ test("an empty credit cap setting falls back to 48, and the search asks for the 
   const params = apolloSearchParams({ domain: "https://www.acme.example/team", org: "Acme Alpine" });
   assert.equal(params.getAll("person_titles[]").includes("head of people"), true);
   assert.equal(params.getAll("q_organization_domains_list[]")[0], "acme.example");
+  assert.deepEqual(params.getAll("person_locations[]"), ["Canada", "United States"]);
+  assert.deepEqual(params.getAll("organization_locations[]"), ["Canada", "United States"]);
+  assert.equal(params.getAll("person_locations[]").includes("Germany"), false);
   assert.equal(params.get("include_similar_titles"), "true");
   const reveal = apolloRequestUrl("people/match", apolloRevealParams("person-1"));
   assert.equal(reveal.startsWith("https://api.apollo.io/api/v1/people/match?"), true);

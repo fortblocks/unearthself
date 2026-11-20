@@ -26,7 +26,7 @@ The job has two phases. Phase one is finding and filing. Phase two is enrichment
 
 Hunter is one bot with two runs. There is no separate local bot.
 
-(a) Nightly local sweep, formerly its own bot. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`. Two UTC hours are scheduled, `0 10 * * *` and `0 11 * * *`, because 4am Edmonton is 10:00 UTC in daylight time and 11:00 UTC in standard time. The route runs only when America/Edmonton local time is 4am, and only once per Edmonton date. It searches Calgary, Edmonton, and Red Deer first, and it keeps and files companies from anywhere it finds them. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Headcount and industry are not filters. Any size and any industry can be filed. Size is a score, not a reason to drop a company. The score on the Leads table is the existing one in `lead-score.ts`.
+(a) Nightly local sweep, formerly its own bot. The route stays `/api/cron/leads-scout` and the code stays in `leads-scout.ts`. Two UTC hours are scheduled, `0 10 * * *` and `0 11 * * *`, because 4am Edmonton is 10:00 UTC in daylight time and 11:00 UTC in standard time. The route runs only when America/Edmonton local time is 4am, and only once per Edmonton date. It searches Calgary, Edmonton, and Red Deer first, and it files a company only when the country is Canada. Calgary, Edmonton, and Red Deer are weighted highest in the score. A company outside Canada and the United States is not filed. Headcount and industry are not filters. Any size and any industry can be filed. Size is a score, not a reason to drop a company. The score on the Leads table is the existing one in `lead-score.ts`.
 
 (b) Always-on ideal-customer hunt. Cron every 30 minutes (`*/30 * * * *`). Working hours are gated in code on the America/Edmonton clock, default 7am to 7pm, so a daylight-saving change does not move them. 48 contact-ready cards a day is the target. Hunter still stops at 48, so the day does not go past it, and it does not file cards under the quality floor to get there. A contact-ready card has a name, a title, and an email on file, and its enrichment state is Enriched with a sourced fact (section 9). No-signal is not contact-ready. Both runs count toward the same target and the same daily stop. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. A separate daily file cap, default 48 (`HUNTER_DAILY_FILED_CAP`), counts every card filed that day, research cards included. It works everywhere, by ideal-customer fit, with no headcount filter. The goal is one team of six to twenty-four, including inside a company a team would fly to. A quality floor on the Hunter score, default 20 (`HUNTER_QUALITY_FLOOR`), drops a card that does not clear it.
 
@@ -47,20 +47,24 @@ Before hunting, hold a written profile the partners can read and edit. Working v
 - similar signals: a public offsite or culture programme, a stated leadership-development budget, recent growth, a new leader of people or culture
 - affordability signals: a technology company, recent funding, hiring for events or learning and development, and a travel tie-up
 
-Big technology companies are a target. Any company in North America can be filed, in any industry and at any size. There is no headcount filter. Size is a score, not a filter.
+Big technology companies are a target. Phase one files a company in Canada or the United States only, in any industry and at any size. Canada is the majority. There is no headcount filter. Size is a score, not a filter.
 
 There is no master recipient list, no blacklist, and no no-call list. The only standing exclusions are the do-not-contact list, opt-outs, and keeping Geolab Studio out.
 
-Each signal is something a public page can show. The profile is stored as data, not buried in a prompt, so a partner can change it without code. The region weights are a soft priority, reviewed monthly.
+Each signal is something a public page can show. The profile is stored as data, not buried in a prompt, so a partner can change it without code. The search split is Canada 70 and the United States 30, Canada first. Travel weights inside a filed card stay a soft score, reviewed monthly.
 
 ### Open questions
 
 - Which signals carry the most weight. Partners to rank.
 - Any industries or company types the partners will not work with.
 
-## 2. Geography is a soft weight
+## 2. Geography
 
-The lion's share goes to Canadian companies: Alberta first, then Vancouver. Then California and Washington, then the rest of the United States. Europe and Mexico are low priority and stay searchable. Geography is a soft weight inside the score, reviewed monthly, never a filter. Travel likelihood is never zero.
+Phase one, changed 20th November 2026 on Christopher's approval. Hunter searches and files Canada and the United States only. Canada is the majority: 70 percent of the search slots are Canadian and those slots run first, and 30 percent are the United States. The split is `HUNTER_REGION_SPLIT` in `src/data/hunter-profile.ts`. Apollo people search is limited to those two countries as well.
+
+A company whose country is not Canada or the United States is not filed. If the country is missing, Hunter uses the headquarters or location text. If it is still unknown, the card is not filed. Each of those skips is counted as outOfRegion on the run summary. Cards already stored outside Canada and the United States stay in storage and are hidden from the desk and the lists.
+
+Travel weights still score a filed card. Alberta scores highest, then the rest of Canada, then the United States. Travel likelihood on a filed card is never zero. Europe and Mexico are not searched and not filed.
 
 There is no headcount filter. Group size stays six to twenty-four, so for a large company the target is one team inside it, led by a named person.
 
@@ -100,7 +104,7 @@ Hunter still uses the weights below while it searches and checks a candidate. Th
 | Profile match | 50 | how many profile signals are shown, each with a source URL |
 | Access | 25 | same rules as the nightly run: named person, published email, source |
 | Timing | 15 | dated public signals, same as the nightly run |
-| Travel likelihood | 10 | Alberta first, then Vancouver, then California and Washington, then the rest of the United States. Europe and Mexico lower. Never zero |
+| Travel likelihood | 10 | Alberta first, then the rest of Canada, then the United States. Europe and Mexico are not searched. Never zero on a filed card |
 
 The 25 access points do not decide whether a company is kept. They measure how ready it is to contact. A company with no email can still be filed.
 
@@ -217,7 +221,7 @@ Per Chris, 18th November. The Hunter follows this strategy and proposes the best
 ### 1. All industries, weighted by place
 
 - Hunt across all industries. Do not narrow to a short list. Industry is never a filter, only a note on the card. Any company in North America can be filed, at any size. Big technology companies are a target.
-- The lion's share goes to Canadian companies: Alberta first, then Vancouver. Then California and Washington, then the rest of the United States. Europe and Mexico stay searchable at low priority. Geography stays a soft weight, as in section 2, and the weights are reviewed monthly.
+- Phase one searches and files Canada and the United States only. Canada is 70 percent of the search slots and runs first. The United States is 30 percent. Europe and Mexico are not searched. Travel weights inside a filed card are reviewed monthly, as in section 2.
 
 ### 2. Existing budgets first
 
@@ -272,9 +276,9 @@ Each day, the aim is 48 contact-ready cards, highest-converting first. The run s
 - The Hunter never sends mail, and Send for its cards is blocked by the same gate as every other card.
 - Every filled field on a Hunter card shows the URL of the page it came from, or the licensed database it came from.
 - No card enters the approval queue without a name, title, and email on file, and no email on a card was built from a pattern.
-- A company in the United States, Europe, or Mexico is filed and scored, not dropped.
+- A company in Canada or the United States is filed and scored. A company outside those two countries, or with no country after the headquarters text is checked, is not filed and is counted as outOfRegion.
 - Stale or unverified database rows are flagged on the card, not used silently.
-- Hunter's nightly local sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. The Leads table score stays the one in `lead-score.ts`.
+- Hunter's nightly local sweep searches Calgary, Edmonton, and Red Deer first, and files a company in Canada, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score. A company outside Canada and the United States is not filed. The Leads table score stays the one in `lead-score.ts`.
 - The Leads table shows Company, Place, Size, and Score. Score is the `lead-score.ts` total. The lead stores the Hunter score and the card lineage. It does not store a Partner value, and the Partner column stays off the table.
 - Pausing Hunter on `/admin/bots` stops new always-on batches and the nightly sweep.
 - Both runs aim for 48 contact-ready cards in an Edmonton day and stop once that number is filed, so the day does not go past the target. Hunter does not file cards under the quality floor to get there. A contact-ready card has a name, a title, and an email, and is Enriched with a sourced fact. No-signal is not contact-ready. Every card filed that day, research cards included, also stops at the daily file cap, default 48. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision.
@@ -284,7 +288,7 @@ Each day, the aim is 48 contact-ready cards, highest-converting first. The run s
 ## Open questions for partners
 
 - Rank the profile signals, and name any companies or industries we will not work with.
-- Is Europe worth an email now, before a first season has run?
+- Europe is outside phase one. Hunter does not search or file it. Changed 20th November 2026 on Christopher's approval.
 - How a team flying in is hosted: travel, transfers, and Haven or other lodging. Not in this folder, so the Hunter cannot promise any of it.
 - Apollo is the chosen licensed database. The integration is in progress and gated on `APOLLO_API_KEY`. The reveal ceiling defaults to 48 (`APOLLO_DAILY_CREDIT_CAP`). Phone numbers are not requested.
 
@@ -302,7 +306,7 @@ Christopher approved a robustness pass. The strategy above is the search. The fo
 - Do-not-contact lives at `unearth:hunter:dnc:v1` as a hash, so two adds at once cannot drop one. Each add writes its own hash field. A book reset replaces `unearth:leads:v1` and `unearth:hunter:v1` only. Unsubscribe and don't-contact never expire, and a later one of those replaces a Skip or Lost entry for the same domain or email, including a card with no email. Lost and skipped keep the 90-day cooldown (`HUNTER_DNC_COOLDOWN_DAYS`) only while no permanent reason has been written. The nightly sweep and Apollo enrichment both check the list. The desk writes the list.
 - Model calls are counted in Redis and do not stop for a daily cap. Apollo credit counters increment before the reveal and stop at the credit cap. Both reset by the Edmonton date in the key. A retry counts as another call. After the allowed retries the run stops. `HUNTER_MAX_RETRIES` defaults to 2, so three tries, with backoff and jitter.
 - Dollars come from xAI `usage.cost_in_usd_ticks` at 10,000,000,000 ticks to one dollar, then `cost_in_usd`, then `cost`. Token counts are always stored. A call with no cost field adds a stand-in of 0.25 US dollars (`HUNTER_ESTIMATED_CALL_DOLLARS` in `hunter-config.ts`). That stand-in is not an xAI price, it is stored apart from actual ticks, and the run log marks it estimated. It still counts toward the monthly cap, so one missing cost cannot leave the cap open. Ticks are stored whole, not rounded to cents. Older cents already stored are still read. Apollo credits are not part of the dollar cap. The nightly sweep's xAI cost counts toward the same cap. `HUNTER_MONTHLY_DOLLAR_CAP` defaults to 60 US dollars. At 80 percent Hunter warns. At 60 dollars Hunter stops calling, raises an alarm, and the next month's counter starts empty so calling resumes.
-- A dropped company gets a reason: page empty, fetch failed, blocked, timed out, name missing, domain mismatch, place mismatch, do-not-contact, duplicate, below the quality floor, no MX, or unverified. A failed page fetch is tried once more. If it still fails, the company is held as unverified, logged, and not filed.
+- A dropped company gets a reason: page empty, fetch failed, blocked, timed out, name missing, domain mismatch, place mismatch, do-not-contact, duplicate, below the quality floor, no MX, unverified, or outside Canada and the United States (outOfRegion). A failed page fetch is tried once more. If it still fails, the company is held as unverified, logged, and not filed.
 - Each run logs a funnel: searched, candidates, verified, contact found, filed, and drops by reason. The Bots page shows the latest one.
 - A fact keeps its source URL, the fetch date, and a quoted snippet. An email from a public page keeps a CASL note: the page it was published on, whether the title fits a role, and whether that page shows a notice against unsolicited email. If the notice is there, the email is left off the card. An email from Apollo logs Apollo itself as the basis, the statement that under Apollo's terms its data comes from public sources, and the date the row was pulled. The desk shows that basis and date. No page URL is created for an Apollo email. The email domain is checked for MX records with DNS only. A mailbox is never probed and SMTP is never opened. The date the contact was last seen is stored. This Apollo basis is live on main as of 19th November 2026.
 - A filed card keeps its Hunter score, the query, the prompt version `2026-11-19.1`, the model, the score version, the signals, and the source. The lineage uses the experiment fields from spec 26 section 3 (`experimentId`, `axis`, `variants`, `assignments`, `sampleFloor`). No experiment is running. `sampleFloor` on the card is 30 reviewed cards, which is the method-results floor, not the unset experiment-winner proposal in spec 26.
@@ -355,6 +359,7 @@ Settings Chris has not set, with the defaults in code:
 - 19th November 2026. Strategy aligned the same day. There is no daily model-call cap. The 60 dollar monthly xAI cap is the spending guardrail. 48 filed cards and 48 contact-ready cards are ceilings. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Public LinkedIn posts are a second source. Region priority is soft and reviewed monthly. A moved-on contact is replaced from the same page, or the contact is blanked. There is no partnership lane. Coco owns the writing. The Apollo CASL basis lines above are unchanged.
 - 20th November 2026. Christopher approved the nightly sweep wording. The sweep searches Calgary, Edmonton, and Red Deer first, keeps and files companies from anywhere, with any headcount and any industry, and weights Calgary, Edmonton, and Red Deer highest in the score. No company is dropped for location.
 - 20th November 2026. Christopher approved the desk rule and the daily aim. 48 contact-ready cards is the target. The day still stops at 48. The monthly xAI cap of 60 dollars is unchanged, pending a budget decision. The desk lists a card with a named person, a verified or published email, a source URL, and no block flag. It hides a card with no email. It sorts by the Hunter fit score. Score bands are not a gate.
+- 20th November 2026. Christopher approved phase one geography. Hunter searches and files Canada and the United States only. Canada is 70 percent of the search slots and those slots run first. The United States is 30 percent. The split is `HUNTER_REGION_SPLIT` in `src/data/hunter-profile.ts`. A company outside those two countries, or with no country after the headquarters text is checked, is not filed and is counted as outOfRegion. Cards already stored outside Canada and the United States stay in storage and are hidden from the desk and the lists. Changed 20th November 2026 on Christopher's approval.
 
 `GET /api/hunter/read` returns JSON:
 
@@ -374,8 +379,8 @@ Settings Chris has not set, with the defaults in code:
 Built 18th November 2026 on main, after Chris asked for it on the call.
 
 - The profile is data in `src/data/hunter-profile.ts`. Signals, regions, and travel weights can change without editing the prompt. There is no partnership lane in that profile.
-- `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`. A known domain is updated. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and keeps and files companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. `lead-score.ts` still supplies the Leads table score. The lead stores the Hunter score and lineage, and no Partner value.
-- The always-on cron is `/api/cron/leads-hunter`, scheduled every 30 minutes in the Nitro config, and gated to working hours in America/Edmonton. The aim is 48 contact-ready cards. The run still stops at 48 contact-ready cards, or at 48 total cards filed, or when the quality floor drops a weak card, or when the monthly dollar cap is reached. The 60 dollar cap is unchanged, pending a budget decision. There is no daily model-call cap. The nightly route stays `/api/cron/leads-scout`, scheduled at `0 10 * * *` and `0 11 * * *`, and runs only at 4am Edmonton, once per Edmonton day, searching Calgary, Edmonton, and Red Deer first and keeping companies from anywhere, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score, and no company is dropped for location. Pause and the kill switch stop both. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`. The Hunter score and lineage are stored on the card. The Partner column stays off.
+- `src/lib/leads-hunter.ts` searches with xAI, the same model the nightly run uses. It verifies a name, title, and email with `contactIfPresent` from `leads-scout.ts` plus a title check against the fetched page. Anything not on that page is left blank. It files into the same lead book with `source: "hunter"`. A known domain is updated. The nightly sweep searches Calgary, Edmonton, and Red Deer first, and files a company in Canada, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score. A company outside Canada and the United States is not filed. `lead-score.ts` still supplies the Leads table score. The lead stores the Hunter score and lineage, and no Partner value.
+- The always-on cron is `/api/cron/leads-hunter`, scheduled every 30 minutes in the Nitro config, and gated to working hours in America/Edmonton. The aim is 48 contact-ready cards. The run still stops at 48 contact-ready cards, or at 48 total cards filed, or when the quality floor drops a weak card, or when the monthly dollar cap is reached. The 60 dollar cap is unchanged, pending a budget decision. There is no daily model-call cap. The nightly route stays `/api/cron/leads-scout`, scheduled at `0 10 * * *` and `0 11 * * *`, and runs only at 4am Edmonton, once per Edmonton day, searching Calgary, Edmonton, and Red Deer first and filing a company in Canada, with any headcount and any industry. Calgary, Edmonton, and Red Deer are weighted highest in the score. A company outside Canada and the United States is not filed. The always-on search is 70 percent Canada and 30 percent the United States. Pause and the kill switch stop both. `/admin/leads` shows Company, Place, Size, and Score, and filters by All, Hunter nightly, Hunter, or Hand. The stored source value for a nightly card stays `scout`. The Hunter score and lineage are stored on the card. The Partner column stays off.
 
 Left:
 

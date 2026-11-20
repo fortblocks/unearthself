@@ -3,7 +3,7 @@ import { acquireHunterLock, releaseHunterLock } from "./hunter-lock.ts";
 import { HUNTER_MODEL_ID } from "./hunter-config.ts";
 import { appendHunterRun, clearRunStarted, hunterRunEntry, logHunterRunLine, markRunStarted, readUnfinishedRun, type HunterRunOutcome } from "./hunter-runs.ts";
 import { enrichUnderApolloCap, gateNightly, loadDoNotContact, markNightlySwept, publishHunterAlarms, recordHunterEffort } from "./leads-hunter.ts";
-import { dncBlocks, makeRunClock } from "./hunter-phase.ts";
+import { dncBlocks, emptyFunnel, makeRunClock } from "./hunter-phase.ts";
 import { getRedisClient } from "./leads-book.ts";
 import { edmontonToday } from "./lead-score.ts";
 import { runNightlyScout } from "./leads-scout.ts";
@@ -153,6 +153,9 @@ export async function runNightlyCron(request: Request, now = new Date()) {
         estimatedDollars: result.ok ? result.estimatedDollars : 0,
       }),
     );
+    const nightlyFunnel = result.ok
+      ? { ...emptyFunnel(), searched: 1, candidates: result.candidates, filed: result.stored, drops: { outOfRegion: result.outOfRegion } }
+      : null;
     logHunterRunLine({
       runId: token,
       run: "nightly",
@@ -160,7 +163,7 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       endedAt: new Date().toISOString(),
       passes: result.attempts,
       calls: result.attempts,
-      funnel: null,
+      funnel: nightlyFunnel,
       cardsFiled: result.ok ? result.stored : 0,
       spendActual: result.ok && result.dollars != null ? result.dollars : 0,
       spendEstimated: result.ok ? result.estimatedDollars : 0,

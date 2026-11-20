@@ -12,6 +12,7 @@ import {
   draftPollDecision,
   emptyCoco,
   hasDraftCopy,
+  leadInPhaseOne,
   leadOnDesk,
   LeadCardActions,
   skipReasonLines,
@@ -82,11 +83,12 @@ function deskCard(partial: Partial<Company> & { id: string }): Company {
     emailMx: partial.emailMx,
     cardFlags: partial.cardFlags,
     hunterScore: partial.hunterScore,
+    place: partial.place,
   };
 }
 
 test("a card with a person and a verified email is listed below 70, and a blocked card is not", () => {
-  const hold = deskCard({ id: "hold", city: "Elsewhere", sizeBand: "unknown", industry: "other", hunterScore: 12 });
+  const hold = deskCard({ id: "hold", city: "Elsewhere", place: "Halifax, Nova Scotia", sizeBand: "unknown", industry: "other", hunterScore: 12 });
   const watch = deskCard({ id: "watch", city: "Calgary", sizeBand: "80-800", industry: "other", hunterScore: 40 });
   const higher = deskCard({ id: "higher", city: "Calgary", sizeBand: "unknown", industry: "energy", hunterScore: 80 });
   const blank = deskCard({ id: "blank", email: "   " });
@@ -119,6 +121,28 @@ test("a card with a person and a verified email is listed below 70, and a blocke
   const plainScore = scoreCompany(unscored);
   assert.equal(deskScoreRank({ company: unscored, score: plainScore }).field, "fit");
   assert.equal(deskScoreRank({ company: unscored, score: { total: plainScore.total } }).field, "total");
+});
+
+test("cards outside Canada and the United States stay stored and leave the lists", () => {
+  const calgary = deskCard({ id: "calgary", city: "Calgary" });
+  const denver = deskCard({ id: "denver", city: "Elsewhere", place: "Denver, United States" });
+  const berlin = deskCard({ id: "berlin", city: "Elsewhere", place: "Berlin, Germany" });
+  const unknown = deskCard({ id: "unknown", city: "Elsewhere", place: "  " });
+  const book = [calgary, denver, berlin, unknown];
+  assert.equal(leadInPhaseOne(calgary), true);
+  assert.equal(leadInPhaseOne(denver), true);
+  assert.equal(leadInPhaseOne(berlin), false);
+  assert.equal(leadInPhaseOne(unknown), false);
+  assert.deepEqual(
+    companiesOnDesk(book).map((row) => row.id),
+    ["calgary", "denver"],
+  );
+  assert.equal(book.length, 4);
+  assert.equal(book[2], berlin);
+  assert.equal(berlin.place, "Berlin, Germany");
+  assert.equal(berlin.org, "Northwind Example");
+  assert.equal(leadOnDesk(berlin), false);
+  assert.equal(leadOnDesk(denver), true);
 });
 
 test("Coco's skip reason is shown once", () => {

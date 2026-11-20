@@ -47,7 +47,7 @@ export function dryRunFixtures(floor: number, dnc: DncEntry[] = [], today = "202
   }
   const cards = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today });
   funnel.verified = cards.length;
-  const filed = fileHunterCards([], cards, { today, floor, dnc });
+  const filed = fileHunterCards([], cards, { today, floor, dnc, pages });
   funnel.contactFound = filed.companies.filter((company) => company.email).length;
   funnel.filed = filed.filed;
   for (const [reason, count] of Object.entries(filed.drops)) {

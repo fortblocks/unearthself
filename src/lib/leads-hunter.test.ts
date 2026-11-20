@@ -4,12 +4,15 @@ import test from "node:test";
 import {
   HUNTER_AFFORDABILITY_SIGNAL_IDS,
   HUNTER_DAILY_CARD_TARGET,
-  HUNTER_REGIONS,
+  HUNTER_REGION_SPLIT,
   HUNTER_REGION_WEIGHTS,
   HUNTER_SIGNALS,
   HUNTER_STRATEGY_REVIEW,
+  companyCountry,
   regionWeightForPlace,
+  searchRegionCycle,
 } from "../data/hunter-profile.ts";
+import { formatFunnelDrops } from "./hunter-drops.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
 import {
   applyHunterWork,
@@ -273,7 +276,8 @@ test("travel points stay above zero", () => {
 });
 
 test("a known domain is updated and a new domain is filed once", () => {
-  const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18" });
+  const calgaryPage = page.replace("Berlin, Germany", "Calgary, Canada");
+  const [card] = verifyHunterDrafts([draft({ place: "Calgary, Canada" })], { [url]: calgaryPage }, { regionId: "canada", today: "2026-11-18" });
   assert.ok(card);
   const first = fileHunterCards([company()], [card], { today: "2026-11-18" });
   assert.equal(first.companies.length, 1);
@@ -319,14 +323,25 @@ test("a blank name and title on a known card are filled from the verified page",
   assert.equal(filed.companies[0]?.why, "Scout card. Leave this sentence.");
 });
 
-test("the batch cursor walks signal and region, then wraps", () => {
+test("the batch cursor walks Canada first, then the United States, at 70/30", () => {
+  assert.equal(HUNTER_REGION_SPLIT.canada, 70);
+  assert.equal(HUNTER_REGION_SPLIT.us, 30);
+  const cycle = searchRegionCycle();
+  assert.equal(cycle[0], "canada");
+  assert.equal(cycle.filter((id) => id === "canada").length, 7);
+  assert.equal(cycle.filter((id) => id === "us").length, 3);
+  assert.ok(cycle.filter((id) => id === "canada").length / cycle.length > 0.5);
   const slots = hunterSlots();
-  assert.equal(slots.length, HUNTER_SIGNALS.length * HUNTER_REGIONS.length + HUNTER_REGIONS.length);
-  assert.equal(slots.filter((slot) => slot.source === "public-linkedin").length, HUNTER_REGIONS.length);
+  assert.equal(slots.length, (HUNTER_SIGNALS.length + 1) * cycle.length);
+  assert.equal(slots.some((slot) => slot.regionId === "europe" || slot.regionId === "latin-america" || slot.regionId === "anywhere"), false);
+  assert.equal(slots.filter((slot) => slot.source === "public-linkedin" && slot.regionId === "canada").length, 7);
   assert.equal(slotAt(0).slot.signalId, HUNTER_SIGNALS[0]?.id);
   assert.equal(slotAt(0).slot.regionId, "canada");
   assert.equal(advanceCursor(slots.length - 1), 0);
-  assert.notEqual(slotAt(1).slot.regionId, slotAt(0).slot.regionId);
+  const canada = slots.filter((slot) => slot.regionId === "canada").length;
+  const us = slots.filter((slot) => slot.regionId === "us").length;
+  assert.equal(canada + us, slots.length);
+  assert.equal(canada / slots.length, 0.7);
 });
 
 test("the daily stop is the contact-ready ceiling, and calls do not stop the day", () => {
@@ -410,7 +425,12 @@ test("the hunter prompt is driven by the profile and does not name a data vendor
   const prompt = hunterPrompt(slotAt(0).slot, ["kept.example"]);
   assert.match(prompt, new RegExp(HUNTER_SIGNALS[0]?.search ?? "missing"));
   assert.match(prompt, /kept\.example/);
+  assert.match(prompt, /headquartered in Canada/);
+  assert.match(prompt, /Canada and the United States only/);
+  assert.equal(/Europe and Mexico stay/i.test(prompt), false);
   assert.equal(/apollo|clay|geolab/i.test(prompt), false);
+  const usPrompt = hunterPrompt({ ...slotAt(0).slot, regionId: "us", regionLabel: "United States" }, []);
+  assert.match(usPrompt, /headquartered in the United States/);
 });
 
 test("the hunter module has no send path", () => {
@@ -439,7 +459,7 @@ test("region weights are a soft monthly priority, and Europe matches Mexico", ()
   assert.ok(HUNTER_REGION_WEIGHTS.unitedStates > HUNTER_REGION_WEIGHTS.europe);
 });
 
-test("Europe and Mexico stay searchable", () => {
+test("a company outside Canada and the United States is scored, then refused at filing", () => {
   const mexico = "Casa Norte is in Mexico City, Mexico. casa.example. We are a software company.";
   const source = "https://casa.example/about";
   const cards = verifyHunterDrafts(
@@ -460,6 +480,17 @@ test("Europe and Mexico stay searchable", () => {
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.hunterBreak.travel, HUNTER_REGION_WEIGHTS.mexico);
   assert.deepEqual(cards[0]?.profileHits.map((hit) => hit.id), ["big-tech"]);
+  const refused = fileHunterCards([], cards, { today: "2026-11-18", floor: 0 });
+  assert.equal(refused.filed, 0);
+  assert.equal(refused.companies.length, 0);
+  assert.equal(refused.drops.outOfRegion, 1);
+  assert.equal(formatFunnelDrops({ drops: refused.drops }), "Dropped: 1 outside Canada and the United States");
+  const keep = company({ id: "keep", org: "Keep Co", domain: "keep.example", place: "Calgary, Canada", city: "Calgary" });
+  const untouched = fileHunterCards([keep], cards, { today: "2026-11-18", floor: 0 });
+  assert.equal(untouched.companies.length, 1);
+  assert.equal(untouched.companies[0], keep);
+  assert.equal(keep.org, "Keep Co");
+  assert.equal(untouched.drops.outOfRegion, 1);
 });
 
 test("an affordability signal counts only when the phrase is on the page", () => {
@@ -559,6 +590,57 @@ test("public LinkedIn posts are a source, and profiles are not", () => {
   assert.match(prompt, /\/posts\//);
   assert.match(prompt, /Do not log in/);
   assert.equal(/apollo|clay|geolab/i.test(prompt), false);
+});
+
+test("filing keeps Canada and the United States and counts a missing country", () => {
+  assert.equal(companyCountry({ place: "Halifax, NS" }), "Canada");
+  assert.equal(companyCountry({ place: "Seattle, WA" }), "United States");
+  assert.equal(companyCountry({ place: "Vancouver, Washington" }), "United States");
+  assert.equal(companyCountry({ place: "Vancouver, British Columbia" }), "Canada");
+  assert.equal(companyCountry({ place: "Albuquerque, New Mexico" }), "United States");
+  assert.equal(companyCountry({ place: "Berlin, Germany" }), "other");
+  assert.equal(companyCountry({ place: "Mexico City, Mexico" }), "other");
+  assert.equal(companyCountry({ place: "" }), "unknown");
+  assert.equal(companyCountry({ city: "Calgary" }), "Canada");
+  assert.equal(companyCountry({ city: "Elsewhere", place: "" }), "unknown");
+  assert.equal(companyCountry({ place: "", page: "Headquartered in Austin, Texas. We build software." }), "United States");
+
+  const buyer = { name: "", title: "", email: "", emailSource: "" };
+  const source = "https://range.example/about";
+  const [us] = verifyHunterDrafts(
+    [draft({ domain: "range.example", org: "Range Co", place: "Denver, United States", sourceUrl: source, signals: [], profileSignals: [{ id: "big-tech", sourceUrl: source }], buyer })],
+    { [source]: "Range Co is in Denver, United States. We are a software company." },
+    { regionId: "us", today: "2026-11-18" },
+  );
+  assert.ok(us);
+  const filedUs = fileHunterCards([], [us], { today: "2026-11-18", floor: 0 });
+  assert.equal(filedUs.filed, 1);
+  assert.equal(filedUs.drops.outOfRegion, undefined);
+
+  const blankSource = "https://quiet.example/about";
+  const [unknown] = verifyHunterDrafts(
+    [draft({ domain: "quiet.example", org: "Quiet Co", place: "", sourceUrl: blankSource, signals: [], profileSignals: [{ id: "big-tech", sourceUrl: blankSource }], buyer })],
+    { [blankSource]: "Quiet Co is a software company." },
+    { regionId: "canada", today: "2026-11-18" },
+  );
+  assert.ok(unknown);
+  const filedUnknown = fileHunterCards([], [unknown], { today: "2026-11-18", floor: 0 });
+  assert.equal(filedUnknown.filed, 0);
+  assert.equal(filedUnknown.companies.length, 0);
+  assert.equal(filedUnknown.drops.outOfRegion, 1);
+
+  const hqSource = "https://austin.example/about";
+  const hqPage = "Austin Co is a software company. Headquartered in Austin, Texas.";
+  const [fromHq] = verifyHunterDrafts(
+    [draft({ domain: "austin.example", org: "Austin Co", place: "", sourceUrl: hqSource, signals: [], profileSignals: [{ id: "big-tech", sourceUrl: hqSource }], buyer })],
+    { [hqSource]: hqPage },
+    { regionId: "us", today: "2026-11-18" },
+  );
+  assert.ok(fromHq);
+  assert.equal(fromHq.place, "");
+  const filedHq = fileHunterCards([], [fromHq], { today: "2026-11-18", floor: 0, pages: { [hqSource]: hqPage } });
+  assert.equal(filedHq.filed, 1);
+  assert.equal(filedHq.companies[0]?.org, "Austin Co");
 });
 
 test("another studio is skipped without being named in the prompt", () => {

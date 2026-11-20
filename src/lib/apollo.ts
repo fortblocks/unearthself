@@ -5,6 +5,7 @@
  * Phone numbers are never requested. Waterfall enrichment stays off.
  */
 
+import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
@@ -56,6 +57,10 @@ export function apolloSearchParams(input: { domain: string; org: string }) {
   const domain = normalizeDomain(input.domain);
   if (domain) params.append("q_organization_domains_list[]", domain);
   else if (input.org.trim()) params.set("q_keywords", input.org.trim());
+  for (const country of HUNTER_PHASE_ONE_COUNTRIES) {
+    params.append("person_locations[]", country);
+    params.append("organization_locations[]", country);
+  }
   return params;
 }
 

@@ -335,18 +335,20 @@ test("drop reasons, the quality floor, and the fixture dry run", () => {
         sourceUrl: source,
       },
     ],
-    { [source]: "Weak Example sells paper." },
+    { [source]: "Weak Example sells paper. Headquarters in Calgary, Canada." },
     { regionId: "anywhere", today: "2026-11-19" },
   );
   assert.equal(cards.length, 1);
   assert.ok((cards[0]?.hunterScore ?? 100) < HUNTER_QUALITY_FLOOR_DEFAULT);
-  const dropped = fileHunterCards([], cards, { today: "2026-11-19" });
+  const dropped = fileHunterCards([], cards, { today: "2026-11-19", pages: { [source]: "Weak Example sells paper. Headquarters in Calgary, Canada." } });
   assert.equal(dropped.filed, 0);
   assert.equal(dropped.drops["below-quality-floor"], 1);
-  const kept = fileHunterCards([], cards, { today: "2026-11-19", floor: 0 });
+  const kept = fileHunterCards([], cards, { today: "2026-11-19", floor: 0, pages: { [source]: "Weak Example sells paper. Headquarters in Calgary, Canada." } });
   assert.equal(kept.filed, 0);
   const withHit = cards.map((card) => ({
     ...card,
+    place: "Calgary, Canada",
+    city: "Calgary" as const,
     profileHits: [{ id: "outdoor", label: "Outdoor", sourceUrl: card.sourceUrl }],
   }));
   const filedThin = fileHunterCards([], withHit, { today: "2026-11-19", floor: 0 });
@@ -444,7 +446,7 @@ test("a 25-point card with no fit signal is rejected, and the daily file cap sta
       {
         domain: "paper.example",
         org: "Paper Example",
-        place: "",
+        place: "Calgary, Canada",
         industry: "other",
         sizeBand: "",
         sourceUrl: source,
@@ -458,7 +460,7 @@ test("a 25-point card with no fit signal is rejected, and the daily file cap sta
         },
       },
     ],
-    { [source]: "Paper Example. Ada North, Head of People, ada@paper.example." },
+    { [source]: "Paper Example in Calgary, Canada. Ada North, Head of People, ada@paper.example." },
     { regionId: "anywhere", today: "2026-11-19" },
   );
   assert.equal(cards.length, 1);

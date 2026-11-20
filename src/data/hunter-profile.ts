@@ -2,7 +2,9 @@
  * Ideal-customer profile for the Lead Hunter.
  * Edit this file to change who we look for. The search prompt reads it.
  * Profile points are capped at 50 when a card is scored, so the raw points below may add up to more.
- * Travel points are out of 10 and must stay above zero. Region weights are a soft priority, not a filter.
+ * Travel points are out of 10 and must stay above zero.
+ * Phase one searches and files Canada and the United States only. Canada is the majority of the search slots.
+ * Travel weights still score a card. They are not a second country filter.
  */
 
 export type HunterSignal = {
@@ -168,9 +170,246 @@ export const HUNTER_REGIONS: HunterRegion[] = [
 ];
 
 /**
- * Soft regional priority. Not a filter, and not fixed: review it each month.
+ * Phase one search share. Canada runs first and is the majority of each cycle.
+ * 70 Canadian slots and 30 United States slots. The greatest common divisor keeps the cycle at 7 and 3.
+ */
+export const HUNTER_REGION_SPLIT = {
+  canada: 70,
+  us: 30,
+} as const;
+
+/** Countries Apollo may search, and the only countries Hunter may file. */
+export const HUNTER_PHASE_ONE_COUNTRIES = ["Canada", "United States"] as const;
+
+export type PhaseOneCountry = "Canada" | "United States" | "other" | "unknown";
+
+function gcd(left: number, right: number): number {
+  return right === 0 ? left : gcd(right, left % right);
+}
+
+/** Canada first, then the United States, in the configured ratio. */
+export function searchRegionCycle(split: { canada: number; us: number } = HUNTER_REGION_SPLIT): string[] {
+  const canada = Math.max(0, Math.round(split.canada));
+  const us = Math.max(0, Math.round(split.us));
+  const divisor = gcd(canada, us) || 1;
+  return [...Array(canada / divisor).fill("canada"), ...Array(us / divisor).fill("us")];
+}
+
+const CANADA_PLACE_TERMS = [
+  "canada",
+  "canadian",
+  "calgary",
+  "edmonton",
+  "red deer",
+  "lethbridge",
+  "medicine hat",
+  "fort mcmurray",
+  "grande prairie",
+  "canmore",
+  "banff",
+  "jasper",
+  "toronto",
+  "ottawa",
+  "montreal",
+  "montréal",
+  "vancouver",
+  "winnipeg",
+  "halifax",
+  "victoria",
+  "regina",
+  "saskatoon",
+  "hamilton",
+  "mississauga",
+  "alberta",
+  "british columbia",
+  "ontario",
+  "quebec",
+  "québec",
+  "manitoba",
+  "saskatchewan",
+  "nova scotia",
+  "new brunswick",
+  "newfoundland",
+  "prince edward island",
+  "northwest territories",
+  "nunavut",
+  "yukon",
+];
+
+const US_PLACE_TERMS = [
+  "united states",
+  "usa",
+  "u.s.",
+  "u.s.a",
+  "seattle",
+  "san francisco",
+  "los angeles",
+  "san diego",
+  "denver",
+  "chicago",
+  "boston",
+  "new york",
+  "austin",
+  "dallas",
+  "houston",
+  "atlanta",
+  "miami",
+  "portland",
+  "phoenix",
+  "philadelphia",
+  "minneapolis",
+  "detroit",
+  "nashville",
+  "silicon valley",
+  "bay area",
+  "alabama",
+  "alaska",
+  "arizona",
+  "arkansas",
+  "california",
+  "colorado",
+  "connecticut",
+  "delaware",
+  "florida",
+  "hawaii",
+  "idaho",
+  "illinois",
+  "indiana",
+  "iowa",
+  "kansas",
+  "kentucky",
+  "louisiana",
+  "maine",
+  "maryland",
+  "massachusetts",
+  "michigan",
+  "minnesota",
+  "mississippi",
+  "missouri",
+  "montana",
+  "nebraska",
+  "nevada",
+  "new hampshire",
+  "new jersey",
+  "new mexico",
+  "north carolina",
+  "north dakota",
+  "ohio",
+  "oklahoma",
+  "oregon",
+  "pennsylvania",
+  "rhode island",
+  "south carolina",
+  "south dakota",
+  "tennessee",
+  "texas",
+  "utah",
+  "vermont",
+  "virginia",
+  "washington",
+  "west virginia",
+  "wisconsin",
+  "wyoming",
+  "district of columbia",
+];
+
+const OTHER_PLACE_TERMS = [
+  "united kingdom",
+  "england",
+  "scotland",
+  "wales",
+  "ireland",
+  "germany",
+  "france",
+  "netherlands",
+  "sweden",
+  "norway",
+  "denmark",
+  "spain",
+  "italy",
+  "portugal",
+  "belgium",
+  "switzerland",
+  "austria",
+  "finland",
+  "poland",
+  "mexico",
+  "brazil",
+  "australia",
+  "new zealand",
+  "japan",
+  "singapore",
+  "korea",
+  "india",
+  "china",
+  "europe",
+  "berlin",
+  "paris",
+  "amsterdam",
+  "dublin",
+  "tbilisi",
+  "london",
+];
+
+const PLACE_ABBREV = /,\s*(ab|bc|sk|mb|qc|ns|nb|pe|nl|yt|nt|nu|al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|ia|ks|ky|la|md|ma|mi|mn|ms|mo|mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc)\b/;
+
+function hasTerm(hay: string, terms: readonly string[]) {
+  return terms.some((term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^a-z])${escaped}(?:[^a-z]|$)`).test(hay);
+  });
+}
+
+/** Country named by a place string. Unknown when the text does not say. */
+export function countryFromPlace(place: string): PhaseOneCountry {
+  const hay = place.toLowerCase();
+  if (!hay.trim()) return "unknown";
+  if (/\bvancouver\b/.test(hay) && /\bwashington\b/.test(hay) && !/\b(canada|british columbia)\b/.test(hay)) return "United States";
+  if (/\b(canada|canadian)\b/.test(hay)) return "Canada";
+  if (/\b(united states|usa|u\.s\.a|u\.s\.)\b/.test(hay)) return "United States";
+  if (/\bnew mexico\b/.test(hay)) return "United States";
+  if (/\blondon\b/.test(hay) && /\b(ontario|canada)\b/.test(hay)) return "Canada";
+  if (hasTerm(hay, OTHER_PLACE_TERMS)) return "other";
+  if (hasTerm(hay, CANADA_PLACE_TERMS) || PLACE_ABBREV.test(hay)) {
+    if (/\b(ns|nb|nl|yt|nt|nu|ab|bc|sk|mb|qc|pe)\b/.test(hay) || hasTerm(hay, CANADA_PLACE_TERMS)) return "Canada";
+  }
+  if (hasTerm(hay, US_PLACE_TERMS)) return "United States";
+  if (PLACE_ABBREV.test(hay)) return "United States";
+  if (hay === "calgary" || hay === "edmonton" || hay === "red deer" || hay === "alberta") return "Canada";
+  return "unknown";
+}
+
+/** Headquarters or location sentence, when the place field is blank. */
+export function headquartersText(page: string) {
+  const match = page.match(/(?:headquarters|headquartered|head office|based|located|offices?)\s+(?:in|at)\s*:?\s*([A-Za-z][^.\n]{0,80})/i);
+  return match?.[1]?.trim() ?? "";
+}
+
+/**
+ * Canada or the United States, or other, or unknown.
+ * Place text first, then the stored city, then a headquarters sentence on the page.
+ */
+export function companyCountry(input: { place?: string | null; city?: string | null; page?: string | null }): PhaseOneCountry {
+  const fromPlace = countryFromPlace(input.place ?? "");
+  if (fromPlace !== "unknown") return fromPlace;
+  const city = (input.city ?? "").trim();
+  const fromCity = countryFromPlace(city);
+  if (fromCity !== "unknown") return fromCity;
+  if (city === "Calgary" || city === "Edmonton" || city === "Red Deer" || city === "Alberta") return "Canada";
+  const headquarters = headquartersText(input.page ?? "");
+  if (headquarters) return countryFromPlace(headquarters);
+  return "unknown";
+}
+
+export function isPhaseOneCompany(input: { place?: string | null; city?: string | null; page?: string | null }) {
+  const country = companyCountry(input);
+  return country === "Canada" || country === "United States";
+}
+
+/**
+ * Soft regional priority inside a filed card. Review it each month.
  * Alberta and the rest of Canada come first, then Vancouver, then California and Washington.
- * Europe and Mexico share the same low weight and stay searchable.
+ * Europe and Mexico keep a low score for old cards. Phase one does not search or file them.
  */
 export const HUNTER_REGION_WEIGHTS = {
   fixed: false,
@@ -189,7 +428,7 @@ export const HUNTER_STRATEGY_REVIEW = {
   fixed: false,
   cadence: "monthly",
   decidedOn: "19th November 2026",
-  note: "Region weights and affordability signals are hypotheses. Review them each month. They are not filters. A forward-thinking technology company is a strong positive signal.",
+  note: "Region weights and affordability signals are hypotheses. Review them each month. The weights are not a country filter. Phase one files Canada and the United States only, with Canada as the majority of the search. A forward-thinking technology company is a strong positive signal.",
   affordabilitySignalIds: HUNTER_AFFORDABILITY_SIGNAL_IDS,
   regionWeights: HUNTER_REGION_WEIGHTS,
 } as const;
@@ -236,7 +475,7 @@ export const HUNTER_DAILY_CARD_TARGET = 48;
 
 export const HUNTER_ROSTER = {
   name: "Hunter",
-  job: "Two runs, one bot. Nightly local sweep at 4am Edmonton: Calgary, Edmonton, and Red Deer, any headcount, any industry. Always-on hunt every 30 minutes in working hours. Region weights are a soft priority, reviewed monthly. 48 contact-ready cards is a ceiling, not a target. Never sends.",
+  job: "Two runs, one bot. Nightly local sweep at 4am Edmonton: Calgary, Edmonton, and Red Deer, any headcount, any industry. Always-on hunt every 30 minutes in working hours. Phase one searches Canada and the United States only. Canada is 70 percent of the search slots and runs first. 48 contact-ready cards is a ceiling, not a target. Never sends.",
   trigger: "Nightly at 4am Edmonton, and every 30 minutes from 7am to 7pm Edmonton",
   owner: "christopher" as const,
   escalate: "A company that cannot be confirmed on a public page.",

@@ -49,6 +49,7 @@ export const DROP_REASONS = [
   "below-quality-floor",
   "no-mx",
   "unverified",
+  "outOfRegion",
 ] as const;
 
 export type DropReason = (typeof DROP_REASONS)[number];
@@ -1059,7 +1060,7 @@ export const HUNTER_KNOWN_GOOD: DryCompany[] = [
     org: "Northwind Example",
     email: "ada@northwind.example",
     sourceUrl: "https://northwind.example/about",
-    page: "Northwind Example builds outdoor gear. Ada North, Head of People, ada@northwind.example.",
+    page: "Northwind Example builds outdoor gear. Headquarters in Calgary, Canada. Ada North, Head of People, ada@northwind.example.",
     score: 40,
     expect: "file",
   },
@@ -1081,7 +1082,7 @@ export const HUNTER_KNOWN_BAD: DryCompany[] = [
     org: "Weak Example",
     email: "",
     sourceUrl: "https://weak.example",
-    page: "Weak Example sells paper.",
+    page: "Weak Example sells paper. Headquarters in Calgary, Canada.",
     score: 4,
     expect: "drop",
     reason: "below-quality-floor",

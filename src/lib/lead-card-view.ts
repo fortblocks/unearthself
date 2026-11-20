@@ -1,4 +1,5 @@
 import { createElement, type ReactNode } from "react";
+import { isPhaseOneCompany } from "../data/hunter-profile.ts";
 import { draftEditWarnings, emailableLead, type CocoJoin } from "./hunter-outreach.ts";
 import { wordCount } from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
@@ -28,12 +29,17 @@ export function hasPublishedEmail(company: { email?: string | null }) {
   return typeof company.email === "string" && company.email.trim().length > 0;
 }
 
+/** Display only. A card outside Canada and the United States, or with no country, stays stored and stays off the lists. */
+export function leadInPhaseOne(company: { place?: string | null; city?: string | null }) {
+  return isPhaseOneCompany({ place: company.place, city: company.city });
+}
+
 /**
- * A card the desk may list. Named person, verified or published email, source URL, and no send block.
+ * A card the desk may list. Canada or the United States, a named person, a verified or published email, a source URL, and no send block.
  * Score band is not a gate. Do-not-contact and a bounce come from the outreach join.
  */
 export function leadOnDesk(company: Company, blocked: readonly string[] = []) {
-  return hasPublishedEmail(company) && emailableLead(company, blocked);
+  return leadInPhaseOne(company) && hasPublishedEmail(company) && emailableLead(company, blocked);
 }
 
 /** Display list only. The stored book is not changed. */

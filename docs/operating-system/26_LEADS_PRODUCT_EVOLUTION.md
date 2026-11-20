@@ -417,7 +417,7 @@ Flow: customized letter (section 5), then two versions on one axis, then humaniz
 
 ## Geography, left open on purpose
 
-Leads are not only Calgary, Edmonton, and Red Deer. The Drumheller product has demand further afield in Canada and the United States. Hunter's nightly run and the Fit geo score still assume a local Alberta list. That should be revisited. It is an open question for the partners, not a change this spec makes.
+Leads are not only Calgary, Edmonton, and Red Deer. The Drumheller product has demand further afield in Canada and the United States. Phase one, changed 20th November 2026 on Christopher's approval, searches and files Canada and the United States only, with Canada as the majority. The Fit geo score still weights Alberta higher than the rest of Canada, and Canada higher than the United States.
 
 What the code does today, quoted from `src/lib/lead-score.ts`:
 

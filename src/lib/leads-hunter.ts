@@ -5,7 +5,7 @@
  * Apollo may add one licensed contact when APOLLO_API_KEY is set. The key is never logged.
  */
 
-import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, regionWeightForPlace } from "../data/hunter-profile.ts";
+import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, isPhaseOneCompany, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
 import {
   applyHunterWork,
@@ -244,27 +244,31 @@ export type HunterSlot = {
   source: HunterSource;
 };
 
+function slotFor(signalId: string, signalLabel: string, regionId: string, source: HunterSource): HunterSlot | null {
+  const region = HUNTER_REGIONS.find((item) => item.id === regionId);
+  if (!region) return null;
+  return {
+    signalId,
+    regionId: region.id,
+    signalLabel,
+    regionLabel: region.label,
+    source,
+  };
+}
+
+/** Canada first, then the United States, in the phase-one split. Other regions are not searched. */
 export function hunterSlots(): HunterSlot[] {
+  const cycle = searchRegionCycle();
   const slots: HunterSlot[] = [];
   for (const signal of HUNTER_SIGNALS) {
-    for (const region of HUNTER_REGIONS) {
-      slots.push({
-        signalId: signal.id,
-        regionId: region.id,
-        signalLabel: signal.label,
-        regionLabel: region.label,
-        source: "web",
-      });
+    for (const regionId of cycle) {
+      const slot = slotFor(signal.id, signal.label, regionId, "web");
+      if (slot) slots.push(slot);
     }
   }
-  for (const region of HUNTER_REGIONS) {
-    slots.push({
-      signalId: "public-linkedin",
-      regionId: region.id,
-      signalLabel: "Public LinkedIn post",
-      regionLabel: region.label,
-      source: "public-linkedin",
-    });
+  for (const regionId of cycle) {
+    const slot = slotFor("public-linkedin", "Public LinkedIn post", regionId, "public-linkedin");
+    if (slot) slots.push(slot);
   }
   return slots;
 }
@@ -392,7 +396,7 @@ function sourceUrlForRow(row: Record<string, unknown>, citations: string[]) {
   );
 }
 
-/** Keep every sourced company. Geography and headcount are not filters. */
+/** Keep every sourced company the model returned. Headcount is not a filter. Country is checked at filing. */
 export function selectHunterRows(raw: unknown): HunterDraft[] {
   const record = asRecord(raw);
   const list = Array.isArray(raw) ? raw : Array.isArray(record?.companies) ? record.companies : [];
@@ -698,7 +702,7 @@ function cardFacts(card: HunterCard, today: string) {
 export function fileHunterCards(
   companies: Company[],
   cards: HunterCard[],
-  opts: { today: string; dnc?: DncEntry[]; floor?: number },
+  opts: { today: string; dnc?: DncEntry[]; floor?: number; pages?: Record<string, string> },
 ): { companies: Company[]; filed: number; updated: number; contactReady: number; drops: HunterFunnel["drops"] } {
   const next = [...companies];
   let filed = 0;
@@ -719,6 +723,19 @@ export function fileHunterCards(
     if (index === -1 && isDuplicateCard(next, domain, card.email)) {
       noteDrop("duplicate");
       continue;
+    }
+    const inRegion = isPhaseOneCompany({
+      place: card.place,
+      city: card.city,
+      page: opts.pages?.[card.sourceUrl],
+    });
+    if (!inRegion) {
+      const stored = index === -1 ? null : next[index];
+      const existingInRegion = stored ? isPhaseOneCompany({ place: stored.place, city: stored.city }) : false;
+      if (!existingInRegion) {
+        noteDrop("outOfRegion");
+        continue;
+      }
     }
     if (index === -1 && (card.profileHits.length === 0 || !passesQualityFloor(card.hunterScore, floor))) {
       noteDrop("below-quality-floor");
@@ -787,7 +804,10 @@ export function hunterPrompt(slot: HunterSlot, knownDomains: string[]) {
   return `Find companies for Badlands Bootcamp at Unearth Self. One team of 6 to 24 people inside a company of any size. Any industry is allowed. A forward-thinking technology company is a strong lead. A small company is allowed. Return JSON only.
 
 This batch: ${signal?.label ?? slot.signalLabel}.
-Region: ${slot.regionLabel}. Do not drop a company for being outside Canada. Do not filter by headcount or industry. Europe and Mexico stay in the search.
+${slot.regionId === "canada"
+    ? "This batch is Canada. Return only a company headquartered in Canada."
+    : "This batch is the United States. Return only a company headquartered in the United States."}
+Phase one is Canada and the United States only. Do not return a company in Europe, Mexico, or any other country. Do not filter by headcount or industry.
 
 ${sourceRule}
 
@@ -1372,7 +1392,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       const limited = ready.slice(0, dailyFileRoom(companies.filter((company) => company.filedOn === today).length));
       funnel.verified += limited.length;
       funnel.contactFound += limited.filter((card) => card.email).length;
-      const filed = fileHunterCards(companies, limited, { today, dnc });
+      const filed = fileHunterCards(companies, limited, { today, dnc, pages });
       companies = filed.companies.map((company) => {
         const stamped = stampCard(company, limited, pages, today);
         return mxYes.has(company.domain) ? { ...stamped, emailMx: true } : stamped;

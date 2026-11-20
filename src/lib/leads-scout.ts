@@ -5,6 +5,7 @@
  * Apollo enrichment is optional and runs only when the cron passes it in.
  */
 
+import { isPhaseOneCompany } from "../data/hunter-profile.ts";
 import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
 import { markPublicContact } from "./apollo.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
@@ -51,7 +52,7 @@ function asRecord(row: unknown): Record<string, unknown> | null {
   return row as Record<string, unknown>;
 }
 
-/** Keep sourced rows from any city. Headcount and industry are not filters. Alberta still scores higher. */
+/** Keep a sourced row in Canada or the United States. Headcount and industry are not filters. Alberta still scores higher. */
 export function selectScoutRows(raw: unknown): ScoutIngest[] {
   const record = asRecord(raw);
   const list = Array.isArray(raw) ? raw : Array.isArray(record?.companies) ? record.companies : [];
@@ -63,6 +64,8 @@ export function selectScoutRows(raw: unknown): ScoutIngest[] {
     const domain = normalizeDomain(String(row.domain ?? ""));
     const org = String(row.org ?? "").trim();
     if (!domain || seen.has(domain) || isSeparateStudio(domain, org)) continue;
+    const located = String(row.place ?? row.city ?? "");
+    if (!isPhaseOneCompany({ place: located, city: String(row.city ?? "") })) continue;
     const city = coerceCity(String(row.city ?? ""), "Elsewhere");
     const rawSize = String(row.sizeBand ?? "").trim();
     const sizeBand = rawSize ? coerceSize(rawSize, "unknown") : "unknown";
@@ -93,6 +96,25 @@ export function selectScoutRows(raw: unknown): ScoutIngest[] {
     });
   }
   return rows;
+}
+
+/** Companies the nightly search returned that are not in Canada or the United States. */
+export function scoutOutOfRegion(raw: unknown) {
+  const record = asRecord(raw);
+  const list = Array.isArray(raw) ? raw : Array.isArray(record?.companies) ? record.companies : [];
+  const seen = new Set<string>();
+  let count = 0;
+  for (const item of list) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const domain = normalizeDomain(String(row.domain ?? ""));
+    const org = String(row.org ?? "").trim();
+    if (!domain || seen.has(domain) || isSeparateStudio(domain, org)) continue;
+    seen.add(domain);
+    const located = String(row.place ?? row.city ?? "");
+    if (!isPhaseOneCompany({ place: located, city: String(row.city ?? "") })) count += 1;
+  }
+  return count;
 }
 
 export function applyVerifiedContacts(rows: ScoutIngest[], pages: Record<string, string>): ScoutIngest[] {
@@ -144,7 +166,7 @@ export function scoutPrompt(knownDomains: string[]): string {
   const skip = knownDomains.slice(0, 200).join(", ");
   return `Find Alberta companies for a corporate retreat in Drumheller. Return JSON only.
 
-Cities: Calgary, Edmonton, Red Deer.
+Cities: Calgary, Edmonton, and Red Deer first. Only a company headquartered in Canada. Do not return a company outside Canada.
 Headcount: any. Record a size band only when the page prints a number. Do not skip a company for being small or large.
 Industries: any. Record the closest label, or "other".
 Skip these domains: ${skip || "none"}.
@@ -284,6 +306,7 @@ export async function runNightlyScout(opts?: {
       estimatedDollars: number;
       apolloFailed: boolean;
       timedOut: boolean;
+      outOfRegion: number;
     }
   | { ok: false; error: string; called: boolean; attempts: number; timedOut?: boolean }
 > {
@@ -302,6 +325,7 @@ export async function runNightlyScout(opts?: {
     return { ok: false, error: "Stopped for time.", called: true, attempts: research.attempts, timedOut: true };
   }
   const selected = selectScoutRows(research);
+  const outOfRegion = scoutOutOfRegion(research);
   const verified = await verifyRows(selected, opts?.timeLeft);
   const open = opts?.skip ? verified.filter((row) => !opts.skip?.({ domain: row.domain, email: row.buyer?.email })) : verified;
   const batch = buildMorningBatch(loaded.book.companies, open, {
@@ -337,6 +361,7 @@ export async function runNightlyScout(opts?: {
     apolloVerified: enriched.verifiedEmails ?? 0,
     apolloFailures: enriched.failures ?? {},
     apolloNote: enriched.note,
+    outOfRegion,
     dollars: research.dollars,
     estimatedDollars: research.estimatedDollars,
     apolloFailed: Boolean(enriched.failed),
