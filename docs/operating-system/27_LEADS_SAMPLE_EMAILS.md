@@ -10,7 +10,7 @@ Where each fact comes from:
 - Multi-day expedition in the Alberta badlands: live site (`/bootcamp`, `/for/teams`: two to five days).
 - Basecamp, our refurbished spa in downtown Drumheller, with infrared sauna, salt stone steam room, cold plunge and treatment table: live site (`/basecamp`, `src/data/basecampCopy.ts`).
 - Spring 2027 as the first season: `23_FINANCIAL_MODEL.md` ("First groups March 2027"). A planning figure, not a booked date.
-- About ninety minutes from Calgary: live site (`/find-us`: about 138 km, 1 hr 30 min). Not yet written into this folder.
+- About ninety minutes from Calgary: live site (`/find-us`: about 128 km from Calgary airport, 1 hr 30 min; about 135 km from downtown Calgary). Recorded in `20`.
 - "Some of the most beautiful in Canada" and "the dinosaurs got there first": Chris's own voice, written as his view.
 - "Canada's newest and most exciting corporate retreat concept": Chris's own voice, written as his view. Not a verified market claim.
 

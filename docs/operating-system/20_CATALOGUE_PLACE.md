@@ -19,6 +19,8 @@ All four: kitchen, fireplace, A/C, Wi-Fi, parking, laundry. Cottage, Gran Pacíf
 
 Address: 356 4 Street West, Drumheller. Downtown: restaurants and shops within a block, playground and green on the same stretch, Brew House two blocks.
 
+Drumheller is about 128 kilometres from Calgary airport, about 135 kilometres from downtown Calgary, and roughly an hour and a half's drive. Confirmed by Christopher on 19th November 2026.
+
 ## Seasonal rates (CAD) — house card
 
 Cleaning per stay: **$65** Hidden Hollow and Elowen. **$85** River Blossom and Water Mark.

@@ -97,7 +97,7 @@ function DrumhellerPage() {
 
       <Section label="Arrival" title="The valley below the prairie">
         <p>
-          Drive northeast from Calgary for about 110 kilometres and the land seems to run on forever: wheat, sky,
+          Drive northeast from Calgary airport for about 128 kilometres and the land seems to run on forever: wheat, sky,
           the odd grain elevator. Then the road tips over an edge and the prairie simply falls away. Below lies the
           Red Deer River, winding through a trench of banded grey, ochre and rust. This is Drumheller, a town on
           the river in the badlands of east-central Alberta.

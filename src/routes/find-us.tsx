@@ -128,7 +128,7 @@ function FindUs() {
 
       <section className="px-6 py-16">
         <div className="mx-auto max-w-3xl">
-          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-ember uppercase">From Calgary · about 138 km, 1 hr 30 min</p>
+          <p className="mb-3 text-[0.7rem] tracking-[0.22em] text-ember uppercase">From Calgary airport · about 128 km, 1 hr 30 min</p>
           <h2 className="font-display mb-6 text-4xl uppercase">Driving from Calgary</h2>
           <Steps
             items={[

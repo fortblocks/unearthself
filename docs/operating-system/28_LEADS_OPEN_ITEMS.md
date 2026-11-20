@@ -20,7 +20,6 @@ Logged 19th November 2026. Items (a), (b), and (d) are still open. Item (c) has 
 
 1. **Website copy Google Doc.** Under review. Site copy updates are in progress. Come back to it.
 2. **Signature, Chris or Christopher.** The sample email in `27` signs off as Chris, and `26` says Christopher. Chris is not bothered, since both names are used for him. Deprioritized.
-3. **Travel time and distance.** "About ninety minutes from Calgary" is still unconfirmed in the SoT. The site conflicts with itself: `/drumheller` says about 110 km, and `/find-us` says about 138 km.
 4. **Spring 2027.** Backed by `23_FINANCIAL_MODEL.md` ("First groups March 2027") but not yet written into the sales file, `07`.
 5. **"Not another hotel ballroom" wording.** Awaiting partner sign-off.
 6. **Rune names in first emails.** Tess to confirm whether first-touch emails leave out Rune names.
@@ -37,6 +36,7 @@ Logged 19th November 2026. Items (a), (b), and (d) are still open. Item (c) has 
 ## Closed
 
 - **Group size.** Settled at six to twenty-four, on the site and in `07` (18th November, Chris approved).
+- **Travel time and distance.** Resolved. Christopher confirmed on 19th November 2026: about 128 kilometres from Calgary airport, about 135 kilometres from downtown Calgary, roughly an hour and a half's drive. Site pages corrected: `/drumheller` and `/find-us`. Recorded in `20`.
 
 ## Changelog
 

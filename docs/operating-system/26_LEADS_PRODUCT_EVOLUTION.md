@@ -241,7 +241,7 @@ Lead with the land's offer, using only what this folder supports:
 
 **Pending partner confirmation, do not state these as fact:**
 
-- "About 90 minutes from Calgary," and the template's "ninety minutes from Calgary." Searched this folder, including `00`, `01`, `04`, `07`, `20`, and `24`. No travel time from Calgary, or from anywhere, is written down.
+- "About 90 minutes from Calgary," and the template's "ninety minutes from Calgary," are now confirmed and recorded in `20` (Christopher, 19th November 2026): about 128 kilometres from Calgary airport, about 135 kilometres from downtown Calgary, roughly an hour and a half.
 - "Cannot be replicated in a boardroom or resort." `07` says "not another hotel ballroom." It does not say boardroom, and it does not say resort. Use the ballroom line only if the sentence can live without a "not X" trick. Otherwise wait.
 - "Spring 2027" as the first window. It is in `lead-copy.ts` and not in this folder.
 
@@ -325,7 +325,7 @@ Warrant: the expedition is multi-day in the SoT, so "a week" is fair for the two
 ### Open questions
 
 - Tess reviews product language when a letter names PACE, a Rune, or the Echo Mirror (`25`). Most first-touch letters should not need those words. If one does, her pass is required before Approve. Confirm with Tess whether first-touch mail should avoid Rune names entirely.
-- The 90-minute line, the boardroom or resort line, and any "first season" date. Pending partner confirmation. Do not write them into `07` from this spec. A partner has to put them there.
+- The 90-minute line is now confirmed and recorded in `20` (Christopher, 19th November 2026). The boardroom or resort line, and any "first season" date, stay pending partner confirmation. Do not write them into `07` from this spec. A partner has to put them there.
 
 ## 5. Per-email customization
 
@@ -449,3 +449,4 @@ Do not quietly change the weights. A wider map needs a partner decision: which c
 - 18 November 2026. The companies table is Company, Place, Size, and Score. A separate Hunter score and a Partner value are not stored on a lead. Chris asked for this.
 - 18 November 2026. Added section 5, per-email customization from the `27` template, and section 6, A/B testing with a default threshold of 20 sends per version, pending Chris setting the real number.
 - 19th November 2026. File 30 named as the governing frame for leads work. Where this file differs, file 30 governs.
+- 19th November 2026. Calgary distance confirmed by Christopher and recorded in `20`: about 128 kilometres from Calgary airport, about 135 kilometres from downtown Calgary, roughly an hour and a half. The 90-minute line in this file now points there. Boardroom, resort, and Spring 2027 stay pending.
