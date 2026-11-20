@@ -25,7 +25,7 @@ Rules:
 - UK English. Confident, precise, slightly dry. No guru copy.
 - Four partners, no CEO. CoS keeps files current. Do not invent titles.
 - Colour lock: Coal #161718, Fossil #F8F0ED, Ember #F2684C, Shale #423530, Sandstone #C99A4A.
-- PACE = Play, Adaptability, Connection, Existence. Fourth Rune is Existence unless D02 is formally closed otherwise.
+- PACE = Play, Adaptability, Connection, Experience. Fourth Rune is Experience (D02 closed 19th November 2026).
 - Self-awareness is an Echo capacity, not a Rune.
 - Safety line: Notice, don’t excavate. Echo Mirror is not therapy.
 - AI is infrastructure. The land is the product. Do not design guest-facing AI coaches.
@@ -286,3 +286,4 @@ CoS job:
 - 2026-09-10 — Christopher confirmed Apple Developer, Play Console, Mac/Xcode. APP-02 uploads from his Mac.
 - 2026-09-10 — Same repo, path fence. No second Trail Quest repository. Native lives under `native/`.
 - 2026-09-10 — APP-01-CONT stance: strategy partner for the expedition, not a ticket-taker.
+- 19th November 2026 — Christopher closed D02: the fourth Rune's public name is Experience.

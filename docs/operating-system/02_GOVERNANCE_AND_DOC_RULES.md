@@ -60,7 +60,7 @@ A Bootcamp day needs all four. Tess designs what happens. Lisa makes the house a
 
 1. Project files in `docs/operating-system/` beat conversation history.
 2. The Master Index PDF is an archive. Quote a page if you must; do not treat the whole document as current.
-3. `Unearth Self MVP.pdf` pages 1–19 are the current retreat architecture. Later pages contain earlier drafts. Prefer the PACE + Existence version.
+3. `Unearth Self MVP.pdf` pages 1–19 are the current retreat architecture. Later pages contain earlier drafts. Prefer the PACE + Experience version.
 4. Seed rune names in `Badlands Bootcamp - Seeds.pdf` are retired. Keep the glyphs. Do not keep Super Empathy / Unbreakable Integrity etc. as public product names.
 5. When a fact changes, update the relevant file and add a dated line to the Changelog at the bottom of that file.
 6. Specialist chats may only edit their assigned file plus, if needed, a note in `17_OPEN_DECISIONS.md`.
@@ -89,3 +89,4 @@ Use the prompt in `16_CHAT_SPAWN_PROMPTS.md`. Every spawned chat must:
 - 2026-09-08 — Partner remits restated: Tess product/modality; Lisa site ops and guest relations; Norah finance and treatments; Christopher systems, brand, marketing and sales (with Tess).
 - 2026-09-08 — “CEO” removed from the operating system. Flat partnership. No public title.
 - 2026-09-10 — VOICE workstream added. Guest-facing copy runs through `skills/humanizer`.
+- 19th November 2026 — Christopher closed D02: the fourth Rune's public name is Experience.

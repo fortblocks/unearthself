@@ -5,7 +5,6 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | ID | Decision | Options / notes | Blocks | Owner |
 |---|---|---|---|---|
 | D01 | Public prices for Haven, spa, Bootcamp | Haven BAR is now the house card (four seasons, suite cleaning) as of 10 Sep 2026 — Christopher confirmed. Spa and Bootcamp package prices still unpublished. Norah still signs the rest. | Website, bots, one-pager | Norah + partners |
-| D02 | Fourth Rune public name | Existence is current in the PDF and `04`; `00_README` still says Experience. APP-01 stubbed the fourth day without printing a locked word. **Not closed.** | Copy, glyphs, app | Christopher / Tess |
 | D03 | Booking vendors | PMS + spa tool + Stripe vs all-in-one | Website v1 | Christopher |
 | D04 | CRM choice | HubSpot speed vs Attio taste. House book is the working CRM until a partner closes this. `/admin/leads` is the research list; pipeline is live files. **Not closed.** | Bots, pipeline | Christopher |
 | D05 | Domain strategy | xyz only vs add .com/.ca. APP-01 working host `quest.unearthself.xyz` is a PWA URL, not a close. APP-02 working bundle id `xyz.unearthself.quest` is a recommendation, not a close. | Print, ads, app | Christopher |
@@ -36,6 +35,7 @@ Anything listed here is **not settled**. Specialist chats may recommend. Only a 
 | C06 | Source of Truth is this folder, not the 1,248-page index | 2026-09-08 |
 | C07 | Friday numbers owned by Norah | 2026-09-08 |
 | C08 | Partner remits restated (Tess product; Lisa ops/guests; Norah finance/treatments; Christopher systems/brand/market) | 2026-09-08 |
+| C09 | D02 closed: fourth Rune public name = Experience (Christopher, call of 19th November 2026). Replaces Existence in C01. | 19th November 2026 |
 
 APP-02 (10 Sep) wraps the C05 PWA for TestFlight and Play Internal. It does not reopen or close C05. Bundle id and public store listings stay unset (D05).
 

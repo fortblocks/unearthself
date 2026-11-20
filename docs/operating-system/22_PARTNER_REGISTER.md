@@ -11,13 +11,13 @@
 |---|---|---|---|
 | Overflow rooms | Canalta / Ramada | Large Bootcamp nights | ramadadrumheller@canalra.com |
 | Overflow | Jurassic Inn | Canalta family | canaltajurassic@canalta.com |
-| Land / fossils | Royal Tyrrell | Existence-day option | tyrrell.info@gov.ab.ca |
+| Land / fossils | Royal Tyrrell | Experience-day option | tyrrell.info@gov.ab.ca |
 | Land | Atlas Coal Mine | Story, not a gym | info@atlascoalmine.ab.ca |
 | Land | The Fossil Shop | Walk-over after Rosedale | miles@thefossilshop.com |
 | Table | Heller Good | Decent food, walkable | hello@hellergood.ca |
 | Coffee | Black Mountain Roasters | Morning fuel | blackmountainroasters@outlook.com |
 | Evening | Valley Brewing | If D08 allows alcohol | info@valleybrewing.ca |
-| Last night | Last Chance Saloon | Wayne / Existence lore | lastchancesaloonmail@gmail.com |
+| Last night | Last Chance Saloon | Wayne / Experience lore | lastchancesaloonmail@gmail.com |
 | River | Badlands Fishing Boat Tours | Summer water | 403-813-3079 |
 | Practitioner | Karmic Kneads | RMT + yoga | Karmic.kneads@gmail.com |
 | Practitioner | Artisan Health | Local bodywork | Amy.artisanhealth@gmail.com |
