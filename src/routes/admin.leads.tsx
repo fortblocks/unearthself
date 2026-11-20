@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDesk } from "@/lib/desk-store";
-import { cocoAwaitingDraft, COCO_DRAFT_POLL_MS, draftPollDecision, emptyCoco, LeadCardActions } from "@/lib/lead-card-view";
+import {
+  cocoAwaitingDraft,
+  COCO_DRAFT_POLL_MS,
+  companiesWithPublishedEmail,
+  draftPollDecision,
+  emptyCoco,
+  LeadCardActions,
+} from "@/lib/lead-card-view";
 import type { CocoJoin } from "@/lib/hunter-outreach";
 import {
   clampMorningCount,
@@ -158,12 +165,14 @@ function LeadsPage() {
     };
   }, [loaded]);
 
+  const listed = useMemo(() => companiesWithPublishedEmail(rows ?? []), [rows]);
+
   const scored = useMemo(() => {
-    return (rows ?? []).map((company) => ({
+    return listed.map((company) => ({
       company,
       score: scoreCompany({ ...company, today }),
     }));
-  }, [rows, today]);
+  }, [listed, today]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -183,10 +192,10 @@ function LeadsPage() {
   const morningRows = useMemo(() => {
     if (!rows || !morning) return [];
     const ids = new Set(
-      morningCompanies({ companies: rows, morningCount, morning, draftRevision: 0 }, today).map((company) => company.id),
+      morningCompanies({ companies: listed, morningCount, morning, draftRevision: 0 }, today).map((company) => company.id),
     );
     return filtered.filter(({ company }) => ids.has(company.id));
-  }, [rows, morning, morningCount, today, filtered]);
+  }, [rows, morning, morningCount, today, filtered, listed]);
 
   async function persistCard(id: string) {
     const company = useDesk.getState().companies.find((item) => item.id === id);

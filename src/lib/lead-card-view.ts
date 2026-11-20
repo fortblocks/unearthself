@@ -22,6 +22,16 @@ const buttonClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs border border-line-strong px-4 text-sm font-semibold text-coal";
 const primaryClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs bg-ember px-4 text-sm font-semibold text-paper";
 
+/** The named contact's published email. Blank and whitespace count as none. */
+export function hasPublishedEmail(company: { email?: string | null }) {
+  return typeof company.email === "string" && company.email.trim().length > 0;
+}
+
+/** Cards the leads lists may show. This does not change the stored book. */
+export function companiesWithPublishedEmail<T extends { email?: string | null }>(companies: readonly T[]): T[] {
+  return companies.filter(hasPublishedEmail);
+}
+
 /** How often an open card asks whether Coco's draft has landed. */
 export const COCO_DRAFT_POLL_MS = 12_000;
 

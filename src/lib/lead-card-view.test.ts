@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import test from "node:test";
-import { cocoAwaitingDraft, COCO_DRAFT_POLL_MS, COCO_DRAFT_WAIT_MS, draftPollDecision, emptyCoco, LeadCardActions } from "./lead-card-view.ts";
+import {
+  cocoAwaitingDraft,
+  COCO_DRAFT_POLL_MS,
+  COCO_DRAFT_WAIT_MS,
+  companiesWithPublishedEmail,
+  draftPollDecision,
+  emptyCoco,
+  hasPublishedEmail,
+  LeadCardActions,
+} from "./lead-card-view.ts";
 import type { CocoJoin, CocoStage } from "./hunter-outreach.ts";
 
 const stages: CocoJoin[] = [
@@ -41,6 +50,36 @@ function controlLabels(html: string) {
     match[2]?.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() ?? "",
   );
 }
+
+test("a lead without a published email stays off the list", () => {
+  assert.equal(hasPublishedEmail({ email: "ada@northwind.example" }), true);
+  assert.equal(hasPublishedEmail({ email: "  ada@northwind.example  " }), true);
+  assert.equal(hasPublishedEmail({ email: "" }), false);
+  assert.equal(hasPublishedEmail({ email: "   " }), false);
+  assert.equal(hasPublishedEmail({ email: "\n\t" }), false);
+  assert.equal(hasPublishedEmail({}), false);
+  assert.equal(hasPublishedEmail({ email: null }), false);
+
+  const rows = [
+    { id: "shown", org: "Northwind", email: "ada@northwind.example" },
+    { id: "missing", org: "Missing", email: "" },
+    { id: "blank", org: "Blank", email: "   " },
+    { id: "spaced", org: "Spaced", email: "  ada@campfire.example  " },
+  ];
+  const visible = companiesWithPublishedEmail(rows);
+  assert.deepEqual(
+    visible.map((row) => row.id),
+    ["shown", "spaced"],
+  );
+  const city = "all";
+  const query = "missing";
+  const filtered = visible.filter((row) => {
+    if (city !== "all") return false;
+    if (!query) return true;
+    return [row.org, row.email].join(" ").toLowerCase().includes(query);
+  });
+  assert.deepEqual(filtered, []);
+});
 
 test("the card page has no Send control and no mail link in any stage", () => {
   const seen = new Set<CocoStage>();
