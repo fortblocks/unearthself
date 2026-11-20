@@ -220,10 +220,12 @@ export function geoPoints(city: LeadCity): number {
   return 6;
 }
 
+/** Headcount is a soft guide. A very small company and a very large company still score. */
 export function sizePoints(band: SizeBand): number {
   if (band === "80-800") return 22;
   if (band === "50-79" || band === "801-1500") return 10;
-  return 0;
+  if (band === "1-49" || band === "1500+") return 10;
+  return 8;
 }
 
 export function industryPoints(industry: Industry): number {

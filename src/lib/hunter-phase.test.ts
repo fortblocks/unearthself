@@ -27,6 +27,7 @@ import {
   bookedThisMonth,
   cardDedupeKey,
   caslBasis,
+  clearEmailWhenUnsolicited,
   classifyPageResponse,
   dailyFileRoom,
   deliverAlarmWebhooks,
@@ -45,6 +46,7 @@ import {
   monthSpendFromCounts,
   noteModelSpend,
   pageShowsMovedOn,
+  successorOnPage,
   methodStats,
   monthlyCapLabel,
   monthlyCapState,
@@ -378,6 +380,12 @@ test("facts, CASL, and MX stay on the card without probing a mailbox", async () 
   assert.equal(basis?.publishedOn, "https://northwind.example/about");
   const refused = caslBasis(`${page} Please do not email us.`, "ada@northwind.example", "Head of People", "https://northwind.example/about");
   assert.equal(refused?.noUnsolicitedNotice, false);
+  const company = { org: "Northwind", email: "ada@northwind.example", cardFlags: [] as string[] };
+  const held = clearEmailWhenUnsolicited(company, `${page} Please do not email us.`);
+  assert.equal(held.org, "Northwind");
+  assert.equal(held.email, "");
+  assert.deepEqual(held.cardFlags, ["No unsolicited email"]);
+  assert.equal(clearEmailWhenUnsolicited(company, page).email, "ada@northwind.example");
   assert.match(quoteSnippet(page, "Ada North"), /Ada North/);
   let looked = 0;
   const fixture = await emailDomainHasMx("ada@northwind.example", async () => {
@@ -499,6 +507,17 @@ test("a public page that shows a new employer is not filed as contact-ready", ()
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.email, "");
   assert.equal(cards[0]?.buyerName, "");
+  assert.equal(
+    successorOnPage(
+      "Ada North is now at Other Co. Alex Reid, Head of People, alex@northwind.example.",
+      "Ada North",
+      "Head of People",
+      "Northwind Example",
+      "ada@northwind.example",
+    )?.name,
+    "Alex Reid",
+  );
+  assert.equal(successorOnPage("Ada North is now at Other Co.", "Ada North", "Head of People", "Northwind Example", "ada@northwind.example"), null);
   const filed = fileHunterCards([], cards, { today: "2026-11-19", floor: 0 });
   assert.equal(filed.companies[0]?.email ?? "", "");
   assert.equal(isContactReady(filed.companies[0] ?? { buyerName: "", buyerTitle: "", email: "", emailSource: "" }), false);

@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { HUNTER_DAILY_CALL_BUDGET_DEFAULT, HUNTER_DAILY_CARD_TARGET, HUNTER_SIGNALS } from "../data/hunter-profile.ts";
+import {
+  HUNTER_AFFORDABILITY_SIGNAL_IDS,
+  HUNTER_DAILY_CALL_BUDGET_DEFAULT,
+  HUNTER_DAILY_CARD_TARGET,
+  HUNTER_REGIONS,
+  HUNTER_REGION_WEIGHTS,
+  HUNTER_SIGNALS,
+  HUNTER_STRATEGY_REVIEW,
+  regionWeightForPlace,
+} from "../data/hunter-profile.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
 import {
   applyHunterWork,
@@ -14,12 +23,14 @@ import {
 import {
   advanceCursor,
   cardSource,
+  draftDropReason,
   fileHunterCards,
   freshHunterState,
   hunterAccessPoints,
   hunterMayCall,
   hunterPrompt,
   hunterSlots,
+  isPublicLinkedInPost,
   scoreHunter,
   selectHunterRows,
   slotAt,
@@ -139,9 +150,7 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
     card.profileHits.map((hit) => hit.id),
     ["distributed", "leadership"],
   );
-  assert.equal(card.partnerFlag.flagged, true);
-  assert.match(card.partnerFlag.reason, /Outdoor or adventure brand/);
-  assert.equal(card.partnerFlag.sourceUrl, url);
+  assert.equal("partnerFlag" in card, false);
   const other = "https://otherco.example/about";
   const [own] = verifyHunterDrafts(
     [draft()],
@@ -151,9 +160,10 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
     },
     { regionId: "europe", today: "2026-11-18" },
   );
-  assert.equal(own?.partnerFlag.flagged, false);
+  assert.ok(own);
+  assert.equal("partnerFlag" in (own ?? {}), false);
   assert.equal(card.signals.length, 1);
-  assert.equal(card.hunterBreak.travel, 5);
+  assert.equal(card.hunterBreak.travel, 3);
   assert.equal(card.hunterBreak.profile, 14);
   assert.equal(card.hunterBreak.access, 15);
   assert.ok(card.hunterScore > 0);
@@ -179,7 +189,7 @@ test("a United States company is scored, not dropped", () => {
     { regionId: "us", today: "2026-11-18" },
   );
   assert.equal(cards.length, 1);
-  assert.equal(cards[0]?.hunterBreak.travel, 8);
+  assert.equal(cards[0]?.hunterBreak.travel, HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(cards[0]?.sizeBand, "unknown");
 });
 
@@ -205,7 +215,7 @@ test("hunter access uses the scout access rules", () => {
 test("travel points stay above zero", () => {
   assert.equal(travelPoints("canada"), 10);
   assert.equal(travelPoints("us"), 8);
-  assert.equal(travelPoints("europe"), 5);
+  assert.equal(travelPoints("europe"), 3);
   assert.equal(travelPoints("anywhere"), 2);
   assert.ok(travelPoints("missing") >= 1);
   const score = scoreHunter({
@@ -259,7 +269,8 @@ test("a known domain is updated and a new domain is filed once", () => {
 
 test("the batch cursor walks signal and region, then wraps", () => {
   const slots = hunterSlots();
-  assert.equal(slots.length, HUNTER_SIGNALS.length * 6);
+  assert.equal(slots.length, HUNTER_SIGNALS.length * HUNTER_REGIONS.length + HUNTER_REGIONS.length);
+  assert.equal(slots.filter((slot) => slot.source === "public-linkedin").length, HUNTER_REGIONS.length);
   assert.equal(slotAt(0).slot.signalId, HUNTER_SIGNALS[0]?.id);
   assert.equal(slotAt(0).slot.regionId, "canada");
   assert.equal(advanceCursor(slots.length - 1), 0);
@@ -364,4 +375,155 @@ test("the hunter module has no send path", () => {
   const source = readFileSync(new URL("./leads-hunter.ts", import.meta.url), "utf8");
   assert.equal(/sendMail|mailto:|resend|clay/i.test(source), false);
   assert.equal(/api_key=|APOLLO_API_KEY\s*[:=]\s*["'][^"']+["']/i.test(source), false);
+});
+
+test("region weights are a soft monthly priority, and Europe matches Mexico", () => {
+  assert.equal(HUNTER_STRATEGY_REVIEW.fixed, false);
+  assert.equal(HUNTER_STRATEGY_REVIEW.cadence, "monthly");
+  assert.equal(HUNTER_REGION_WEIGHTS.europe, HUNTER_REGION_WEIGHTS.mexico);
+  assert.equal(regionWeightForPlace("Calgary, Alberta", "canada"), HUNTER_REGION_WEIGHTS.alberta);
+  assert.equal(regionWeightForPlace("Toronto, Canada", "canada"), HUNTER_REGION_WEIGHTS.canada);
+  assert.equal(regionWeightForPlace("Vancouver, Canada", "canada"), HUNTER_REGION_WEIGHTS.vancouver);
+  assert.equal(regionWeightForPlace("San Francisco, California, United States", "us"), HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(regionWeightForPlace("Seattle, Washington, United States", "us"), HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(regionWeightForPlace("Washington, DC, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.equal(regionWeightForPlace("Albuquerque, New Mexico, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.equal(regionWeightForPlace("Berlin, Germany", "europe"), HUNTER_REGION_WEIGHTS.europe);
+  assert.equal(regionWeightForPlace("Mexico City, Mexico", "latin-america"), HUNTER_REGION_WEIGHTS.mexico);
+  assert.ok(HUNTER_REGION_WEIGHTS.alberta > HUNTER_REGION_WEIGHTS.canada);
+  assert.ok(HUNTER_REGION_WEIGHTS.canada > HUNTER_REGION_WEIGHTS.vancouver);
+  assert.ok(HUNTER_REGION_WEIGHTS.vancouver > HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.ok(HUNTER_REGION_WEIGHTS.californiaWashington > HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.ok(HUNTER_REGION_WEIGHTS.unitedStates > HUNTER_REGION_WEIGHTS.europe);
+});
+
+test("Europe and Mexico stay searchable", () => {
+  const mexico = "Casa Norte is in Mexico City, Mexico. casa.example. We are a software company.";
+  const source = "https://casa.example/about";
+  const cards = verifyHunterDrafts(
+    [
+      draft({
+        domain: "casa.example",
+        org: "Casa Norte",
+        place: "Mexico City, Mexico",
+        sourceUrl: source,
+        signals: [],
+        profileSignals: [{ id: "big-tech", sourceUrl: source }],
+        buyer: { name: "", title: "", email: "", emailSource: "" },
+      }),
+    ],
+    { [source]: mexico },
+    { regionId: "latin-america", today: "2026-11-18" },
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.hunterBreak.travel, HUNTER_REGION_WEIGHTS.mexico);
+  assert.deepEqual(cards[0]?.profileHits.map((hit) => hit.id), ["big-tech"]);
+});
+
+test("an affordability signal counts only when the phrase is on the page", () => {
+  const source = "https://soft.example/about";
+  const base = {
+    domain: "soft.example",
+    org: "Soft Co",
+    place: "Calgary, Canada",
+    sourceUrl: source,
+    signals: [],
+    profileSignals: [{ id: "big-tech", sourceUrl: source }],
+    buyer: { name: "", title: "", email: "", emailSource: "" },
+  };
+  const [missed] = verifyHunterDrafts([draft(base)], { [source]: "Soft Co in Calgary, Canada. soft.example." }, { regionId: "canada", today: "2026-11-18" });
+  assert.equal(missed?.profileHits.length, 0);
+  const [hit] = verifyHunterDrafts(
+    [draft(base)],
+    { [source]: "Soft Co in Calgary, Canada. soft.example. We are a software company." },
+    { regionId: "canada", today: "2026-11-18" },
+  );
+  assert.deepEqual(hit?.profileHits.map((item) => item.id), ["big-tech"]);
+  assert.deepEqual(
+    HUNTER_AFFORDABILITY_SIGNAL_IDS.map((id) => HUNTER_SIGNALS.find((signal) => signal.id === id)?.id),
+    ["big-tech", "funding", "events-hiring", "travel-tieup"],
+  );
+});
+
+test("a departed contact is replaced only by a successor on the same page", () => {
+  const moved = `
+Acme Alpine builds outdoor apparel in Berlin, Germany.
+We run a distributed team.
+Laura Starchuk is now at Other Co.
+Alex Reid, Head of People. Write to alex@acmealpine.example.
+`;
+  const [kept] = verifyHunterDrafts(
+    [draft({ buyer: { name: "Laura Starchuk", title: "Head of People", email: "laura@acmealpine.example", emailSource: url } })],
+    { [url]: moved },
+    { regionId: "europe", today: "2026-11-18" },
+  );
+  assert.ok(kept);
+  assert.equal(kept?.buyerName, "Alex Reid");
+  assert.equal(kept?.buyerTitle, "Head of People");
+  assert.equal(kept?.email, "alex@acmealpine.example");
+  assert.equal(kept?.email.includes("laura@"), false);
+
+  const gone = moved.replace("Alex Reid, Head of People. Write to alex@acmealpine.example.", "The role is open.");
+  const [open] = verifyHunterDrafts(
+    [draft({ buyer: { name: "Laura Starchuk", title: "Head of People", email: "laura@acmealpine.example", emailSource: url } })],
+    { [url]: gone },
+    { regionId: "europe", today: "2026-11-18" },
+  );
+  assert.ok(open);
+  assert.equal(open?.org, "Acme Alpine");
+  assert.equal(open?.buyerName, "");
+  assert.equal(open?.email, "");
+});
+
+test("public LinkedIn posts are a source, and profiles are not", () => {
+  const post = "https://www.linkedin.com/posts/acme_team-offsite";
+  const text = "Acme Alpine in Calgary, Canada. acmealpine.example. Our team offsite is next month. Alex Reid, Head of People. alex@acmealpine.example.";
+  const cards = verifyHunterDrafts(
+    [
+      draft({
+        place: "Calgary, Canada",
+        sourceUrl: post,
+        sourceKind: "public-linkedin",
+        signals: [],
+        profileSignals: [{ id: "offsite", sourceUrl: post }],
+        buyer: { name: "Alex Reid", title: "Head of People", email: "alex@acmealpine.example", emailSource: post },
+      }),
+    ],
+    { [post]: text },
+    { regionId: "canada", today: "2026-11-18" },
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.buyerName, "Alex Reid");
+  assert.equal(cards[0]?.email, "alex@acmealpine.example");
+  assert.deepEqual(cards[0]?.profileHits.map((hit) => hit.id), ["offsite"]);
+  const filed = fileHunterCards([], cards, { today: "2026-11-18", floor: 0 });
+  assert.equal(filed.companies[0]?.lineage?.method, "public-linkedin-post");
+
+  const profile = "https://www.linkedin.com/in/alex-reid";
+  assert.equal(isPublicLinkedInPost(post), true);
+  assert.equal(isPublicLinkedInPost(profile), false);
+  assert.equal(isPublicLinkedInPost("https://www.linkedin.com/login"), false);
+  const rejected = verifyHunterDrafts(
+    [draft({ sourceUrl: profile, sourceKind: "public-linkedin", place: "Calgary, Canada", buyer: { name: "", title: "", email: "", emailSource: "" } })],
+    { [profile]: text },
+    { regionId: "canada", today: "2026-11-18" },
+  );
+  assert.equal(rejected.length, 0);
+  assert.equal(draftDropReason(draft({ sourceUrl: profile, sourceKind: "public-linkedin" }), text, "canada"), "unverified");
+
+  const linkedin = hunterSlots().find((slot) => slot.source === "public-linkedin");
+  assert.ok(linkedin);
+  const prompt = hunterPrompt(linkedin ?? slotAt(0).slot, []);
+  assert.match(prompt, /\/posts\//);
+  assert.match(prompt, /Do not log in/);
+  assert.equal(/apollo|clay|geolab/i.test(prompt), false);
+});
+
+test("another studio is skipped without being named in the prompt", () => {
+  const rows = selectHunterRows({
+    companies: [draft({ domain: "studio.example", org: "Geolab Studio", sourceUrl: "https://studio.example" }), draft()],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.org, "Acme Alpine");
+  assert.equal(/geolab/i.test(hunterPrompt(slotAt(0).slot, [])), false);
 });

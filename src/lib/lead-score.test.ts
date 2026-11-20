@@ -11,6 +11,7 @@ import {
   parseScoutBatch,
   recencyFactor,
   scoreCompany,
+  sizePoints,
   sourcedEmail,
   timingFromSignals,
   type Company,
@@ -26,6 +27,15 @@ const base = {
   emailSource: "",
   timingScore: 11,
 };
+
+test("headcount scores a tiny company and a very large company", () => {
+  assert.equal(sizePoints("80-800"), 22);
+  assert.equal(sizePoints("50-79"), 10);
+  assert.equal(sizePoints("801-1500"), 10);
+  assert.equal(sizePoints("1-49"), 10);
+  assert.equal(sizePoints("1500+"), 10);
+  assert.equal(sizePoints("unknown"), 8);
+});
 
 test("Calgary first-wave mid-size with no access tops out at Fit 60", () => {
   const s = scoreCompany(base);

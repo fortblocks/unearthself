@@ -87,7 +87,7 @@ export type ReviewState = "unreviewed" | "approved" | "skipped" | "expired-unrev
 export type PipelineMark = "" | "sent" | "replied" | "booked" | "won" | "lost";
 
 export type CardLineage = {
-  method: typeof HUNTER_METHOD_ID;
+  method: typeof HUNTER_METHOD_ID | "public-linkedin-post";
   query: string;
   promptVersion: string;
   model: string;
@@ -441,6 +441,50 @@ export function pageShowsMovedOn(page: string, person = "", currentOrg = "") {
   return true;
 }
 
+const SUCCESSOR_STOP = new Set(["co", "inc", "ltd", "llc", "corp", "company", "group", "limited", "the", "and"]);
+
+/**
+ * The person named on the page has left. Look on that same page for whoever holds the title now.
+ * The successor is kept only when the name, the title, and the email are all on the page.
+ * No extra search. If nobody qualifies, the caller drops the person who left and keeps the company.
+ */
+export function successorOnPage(page: string, departedName: string, title: string, currentOrg: string, departedEmail = "") {
+  const role = title.trim();
+  if (role.length < 3 || !page) return null;
+  const roleAt = page.toLowerCase().indexOf(role.toLowerCase());
+  if (roleAt < 0) return null;
+  const window = page.slice(Math.max(0, roleAt - 240), Math.min(page.length, roleAt + role.length + 240));
+  const departed = departedName.trim().toLowerCase();
+  const org = currentOrg.trim().toLowerCase();
+  const leftEmail = departedEmail.trim().toLowerCase();
+  const names = window.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b/g) ?? [];
+  const emails = window.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
+  for (const name of names) {
+    const lower = name.toLowerCase();
+    if (lower === departed || (org && (lower === org || lower.includes(org) || org.includes(lower)))) continue;
+    if (name.toLowerCase().split(/\s+/).some((word) => SUCCESSOR_STOP.has(word))) continue;
+    if (pageShowsMovedOn(page, name, currentOrg)) continue;
+    const nameAt = window.indexOf(name);
+    const titleAt = window.toLowerCase().indexOf(role.toLowerCase());
+    if (nameAt < 0 || titleAt < 0 || Math.abs(nameAt - titleAt) > role.length + name.length + 40) continue;
+    const email = emails.find((item) => {
+      if (item.toLowerCase() === leftEmail) return false;
+      const at = window.toLowerCase().indexOf(item.toLowerCase());
+      return at >= 0 && Math.abs(at - nameAt) < 180;
+    });
+    if (!email) continue;
+    if (!page.toLowerCase().includes(name.toLowerCase()) || !page.toLowerCase().includes(email.toLowerCase())) continue;
+    return { name, email: email.toLowerCase() };
+  }
+  return null;
+}
+
+/** Other-studio domains and names stay out of this book. The check is not a search prompt. */
+export function isSeparateStudio(domain: string, org: string) {
+  const hay = `${domain} ${org}`.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return hay.includes("geolab");
+}
+
 export type RunClock = {
   elapsed: () => number;
   remaining: () => number;
@@ -581,6 +625,23 @@ export function quoteSnippet(page: string, needle: string, radius = 70) {
   return hay.slice(start, end).trim();
 }
 
+/**
+ * Don't-send rule. When a page already fetched says the company does not want unsolicited email,
+ * clear the email and keep the company. This does not search again and it does not drop the company.
+ */
+export function clearEmailWhenUnsolicited<T extends { email?: string; cardFlags?: string[] }>(company: T, page: string): T {
+  const email = company.email?.trim() ?? "";
+  if (!email || !page.toLowerCase().includes(email.toLowerCase())) return company;
+  const basis = caslBasis(page, email, "", "");
+  if (!basis || basis.noUnsolicitedNotice) return company;
+  const flags = company.cardFlags ?? [];
+  return {
+    ...company,
+    email: "",
+    cardFlags: flags.includes("No unsolicited email") ? flags : [...flags, "No unsolicited email"],
+  };
+}
+
 export function caslBasis(page: string, email: string, title: string, sourceUrl: string): CaslBasis | null {
   if (!email.trim() || !page.toLowerCase().includes(email.trim().toLowerCase())) return null;
   const lower = page.toLowerCase();
@@ -631,9 +692,16 @@ export async function checkEmailMx(email: string, lookup: (host: string) => Prom
   }
 }
 
-export function makeLineage(input: { query: string; signals: string[]; sourceUrl: string; cardId?: string; exploration?: boolean }): CardLineage {
+export function makeLineage(input: {
+  query: string;
+  signals: string[];
+  sourceUrl: string;
+  cardId?: string;
+  exploration?: boolean;
+  method?: CardLineage["method"];
+}): CardLineage {
   return {
-    method: HUNTER_METHOD_ID,
+    method: input.method ?? HUNTER_METHOD_ID,
     query: input.query,
     promptVersion: HUNTER_PROMPT_VERSION,
     model: HUNTER_MODEL_ID,
@@ -814,7 +882,10 @@ export type FindingMethod = {
   share: number;
 };
 
-/** The only method. It is on. The trial share stays unassigned until a second method exists. */
+/**
+ * Two sources, one web search call. Public LinkedIn posts are a second source inside that call.
+ * They do not add a vendor, a login, or a separate spend. The trial share stays unassigned.
+ */
 export function findingMethods(trialShare = hunterTrialShare()): FindingMethod[] {
   return [
     {
@@ -823,6 +894,13 @@ export function findingMethods(trialShare = hunterTrialShare()): FindingMethod[]
       enabled: true,
       trial: false,
       share: Number((1 - trialShare).toFixed(2)),
+    },
+    {
+      id: "public-linkedin-post",
+      label: "Public LinkedIn posts",
+      enabled: true,
+      trial: false,
+      share: 0,
     },
   ];
 }
@@ -851,7 +929,10 @@ export function methodStats(
   sampleFloor = HUNTER_SAMPLE_FLOOR,
 ): MethodStats[] {
   return findingMethods().map((method) => {
-    const mine = rows.filter((row) => (row.lineage?.method ?? (row.source === "hunter" || row.source === "scout" ? method.id : "")) === method.id);
+    const mine = rows.filter((row) => {
+      const recorded = row.lineage?.method ?? (row.source === "hunter" || row.source === "scout" ? HUNTER_METHOD_ID : "");
+      return recorded === method.id;
+    });
     const filed = mine.length;
     const reviewed = mine.filter((row) => row.review === "approved" || row.review === "skipped").length;
     const approved = mine.filter((row) => row.review === "approved").length;

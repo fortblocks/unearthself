@@ -8,8 +8,8 @@
 import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
 import { markPublicContact } from "./apollo.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
+import { isSeparateStudio } from "./hunter-phase.ts";
 import {
-  FIRST_WAVE,
   coerceCity,
   coerceIndustry,
   coerceSize,
@@ -18,7 +18,6 @@ import {
   normalizeDomain,
   scoreCompany,
   type Company,
-  type Industry,
   type ScoutIngest,
 } from "./lead-score.ts";
 
@@ -54,7 +53,7 @@ function asRecord(row: unknown): Record<string, unknown> | null {
   return row as Record<string, unknown>;
 }
 
-/** Keep only in-wave Alberta rows the model actually sourced. */
+/** Keep sourced Calgary, Edmonton, and Red Deer rows. Headcount and industry are not filters. */
 export function selectScoutRows(raw: unknown): ScoutIngest[] {
   const record = asRecord(raw);
   const list = Array.isArray(raw) ? raw : Array.isArray(record?.companies) ? record.companies : [];
@@ -64,15 +63,14 @@ export function selectScoutRows(raw: unknown): ScoutIngest[] {
     const row = asRecord(item);
     if (!row) continue;
     const domain = normalizeDomain(String(row.domain ?? ""));
-    if (!domain || seen.has(domain)) continue;
+    const org = String(row.org ?? "").trim();
+    if (!domain || seen.has(domain) || isSeparateStudio(domain, org)) continue;
     const city = coerceCity(String(row.city ?? ""), "Alberta");
     if (!TARGET_CITIES.has(city)) continue;
-    if (!row.sizeBand) continue;
-    const sizeBand = coerceSize(String(row.sizeBand), "1-49");
-    if (sizeBand !== "80-800") continue;
-    if (!row.industry) continue;
-    const industry = coerceIndustry(String(row.industry), "other");
-    if (!FIRST_WAVE.includes(industry as Industry)) continue;
+    const rawSize = String(row.sizeBand ?? "").trim();
+    const sizeBand = rawSize ? coerceSize(rawSize, "unknown") : "unknown";
+    const rawIndustry = String(row.industry ?? "").trim();
+    const industry = rawIndustry ? coerceIndustry(rawIndustry, "other") : "other";
     const sourceUrl = String(row.sourceUrl ?? "").trim();
     if (!/^https?:\/\//i.test(sourceUrl)) continue;
     const buyer = asRecord(row.buyer);
@@ -150,11 +148,11 @@ export function scoutPrompt(knownDomains: string[]): string {
   return `Find Alberta companies for a corporate retreat in Drumheller. Return JSON only.
 
 Cities: Calgary, Edmonton, Red Deer.
-Headcount: 80 to 800.
-Industries: energy, construction, professional services, healthcare, engineering, logistics, education, civic.
+Headcount: any. Record a size band only when the page prints a number. Do not skip a company for being small or large.
+Industries: any. Record the closest label, or "other".
 Skip these domains: ${skip || "none"}.
 
-For each company include org, domain, city, industry, sizeBand ("80-800"), sourceUrl, why, whySources (url and label), signals, and buyer.
+For each company include org, domain, city, industry, sizeBand ("1-49", "50-79", "80-800", "801-1500", "1500+", or "unknown"), sourceUrl, why, whySources (url and label), signals, and buyer.
 
 Signals are public dated events only: hiring, office, expansion, win, year-end. Each signal needs kind, date as YYYY-MM-DD, sourceUrl, and a short note. Omit a signal when you do not have both a date and a page URL.
 

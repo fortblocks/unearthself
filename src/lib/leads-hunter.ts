@@ -5,7 +5,7 @@
  * Apollo may add one licensed contact when APOLLO_API_KEY is set. The key is never logged.
  */
 
-import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, PARTNER_KINDS } from "../data/hunter-profile.ts";
+import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, regionWeightForPlace } from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
 import {
   applyHunterWork,
@@ -39,6 +39,7 @@ import { contactIfPresent } from "./leads-scout.ts";
 import {
   HUNTER_CARD_CEILING,
   HUNTER_ALARM_KEY,
+  HUNTER_LINKEDIN_METHOD_ID,
   HUNTER_MODEL_ID,
   hunterCallsPerRun,
   hunterKilled,
@@ -74,11 +75,14 @@ import {
   callCounterKey,
   cardDedupeKey,
   caslBasis,
+  clearEmailWhenUnsolicited,
   dncBlocks,
   dncUpsertPlan,
   doNotContactKey,
   mergeHunterCompanies,
+  isSeparateStudio,
   pageShowsMovedOn,
+  successorOnPage,
   parseDncValue,
   emptyFunnel,
   findingMethods,
@@ -146,9 +150,9 @@ export type HunterState = {
 
 export type ProfileHit = { id: string; label: string; sourceUrl: string; snippet?: string; fetchedOn?: string };
 
-export type PartnerFlag = { flagged: boolean; reason: string; sourceUrl: string };
-
 export type HunterBreak = { profile: number; access: number; timing: number; travel: number; total: number };
+
+export type HunterSource = "web" | "public-linkedin";
 
 export type HunterDraft = {
   domain: string;
@@ -160,6 +164,7 @@ export type HunterDraft = {
   signals: unknown;
   profileSignals: { id: string; sourceUrl: string }[];
   buyer: { name: string; title: string; email: string; emailSource: string };
+  sourceKind?: HunterSource;
 };
 
 export type HunterCard = {
@@ -178,8 +183,8 @@ export type HunterCard = {
   email: string;
   emailSource: string;
   profileHits: ProfileHit[];
-  partnerFlag: PartnerFlag;
   hunterRegion: string;
+  sourceKind?: HunterSource;
   hunterBreak: HunterBreak;
   hunterScore: number;
   query?: string;
@@ -258,7 +263,13 @@ export function hunterMayCall(
   return hunterStop(state, today, callBudget, cardTarget) === null;
 }
 
-export type HunterSlot = { signalId: string; regionId: string; signalLabel: string; regionLabel: string };
+export type HunterSlot = {
+  signalId: string;
+  regionId: string;
+  signalLabel: string;
+  regionLabel: string;
+  source: HunterSource;
+};
 
 export function hunterSlots(): HunterSlot[] {
   const slots: HunterSlot[] = [];
@@ -269,10 +280,34 @@ export function hunterSlots(): HunterSlot[] {
         regionId: region.id,
         signalLabel: signal.label,
         regionLabel: region.label,
+        source: "web",
       });
     }
   }
+  for (const region of HUNTER_REGIONS) {
+    slots.push({
+      signalId: "public-linkedin",
+      regionId: region.id,
+      signalLabel: "Public LinkedIn post",
+      regionLabel: region.label,
+      source: "public-linkedin",
+    });
+  }
   return slots;
+}
+
+/** A public post URL. Profiles, login pages, and any other host are refused. */
+export function isPublicLinkedInPost(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) return false;
+    const path = parsed.pathname.toLowerCase();
+    if (path.startsWith("/in/") || path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/authwall")) return false;
+    return path.includes("/posts/") || path.includes("/pulse/") || path.includes("/feed/update/");
+  } catch {
+    return false;
+  }
 }
 
 export function slotAt(cursor: number): { index: number; slot: HunterSlot } {
@@ -343,6 +378,7 @@ export function scoreHunter(input: {
   lastTouch?: string;
   today: string;
   regionId: string;
+  place?: string;
 }): HunterBreak {
   const profile = profilePoints(input.hitIds);
   const access = hunterAccessPoints(input);
@@ -351,7 +387,7 @@ export function scoreHunter(input: {
     lastTouch: input.lastTouch,
     today: input.today,
   }).timing;
-  const travel = travelPoints(input.regionId);
+  const travel = regionWeightForPlace(input.place ?? "", input.regionId);
   return { profile, access, timing, travel, total: profile + access + timing + travel };
 }
 
@@ -393,7 +429,8 @@ export function selectHunterRows(raw: unknown): HunterDraft[] {
     const row = asRecord(item);
     if (!row) continue;
     const domain = normalizeDomain(String(row.domain ?? ""));
-    if (!domain || seen.has(domain)) continue;
+    const org = String(row.org ?? "").trim();
+    if (!domain || seen.has(domain) || isSeparateStudio(domain, org)) continue;
     const sourceUrl = sourceUrlForRow(row, citationsFrom(record));
     if (!sourceUrl) continue;
     const buyer = asRecord(row.buyer);
@@ -410,7 +447,7 @@ export function selectHunterRows(raw: unknown): HunterDraft[] {
     seen.add(domain);
     rows.push({
       domain,
-      org: String(row.org ?? "").trim(),
+      org,
       place: String(row.place ?? row.city ?? "").trim(),
       industry: String(row.industry ?? "").trim(),
       sizeBand: String(row.sizeBand ?? "").trim(),
@@ -508,47 +545,6 @@ function verifiedHits(draft: HunterDraft, pages: Record<string, string>, today: 
   return hits;
 }
 
-function urlsForCompany(draft: HunterDraft) {
-  const urls = new Set<string>();
-  const add = (url: string) => {
-    if (/^https?:\/\//i.test(url)) urls.add(url);
-  };
-  add(draft.sourceUrl);
-  add(draft.buyer.emailSource);
-  for (const hit of draft.profileSignals) add(hit.sourceUrl);
-  for (const signal of normalizeSignals(draft.signals)) add(signal.sourceUrl);
-  return urls;
-}
-
-function hostOnDomain(url: string, domain: string) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    const root = normalizeDomain(domain);
-    return host === root || host.endsWith(`.${root}`);
-  } catch {
-    return false;
-  }
-}
-
-function partnerFromPages(draft: HunterDraft, pages: Record<string, string>): PartnerFlag {
-  const empty = { flagged: false, reason: "", sourceUrl: "" };
-  const owned = urlsForCompany(draft);
-  for (const [url, page] of Object.entries(pages)) {
-    if (!page || !/^https?:\/\//i.test(url)) continue;
-    if (!owned.has(url) && !hostOnDomain(url, draft.domain)) continue;
-    for (const kind of PARTNER_KINDS) {
-      const term = kind.terms.find((item) => pageHas(page, item));
-      if (!term) continue;
-      return {
-        flagged: true,
-        reason: `${kind.label}. The page contains "${term}".`,
-        sourceUrl: url,
-      };
-    }
-  }
-  return empty;
-}
-
 function sizeFromPage(raw: string, page: string): SizeBand {
   const digits = raw.replace(/[^\d]/g, "");
   if (!digits || !page.includes(digits)) return "unknown";
@@ -572,6 +568,7 @@ export function verifyHunterDrafts(
 ): HunterCard[] {
   const cards: HunterCard[] = [];
   for (const draft of drafts) {
+    if (draft.sourceKind === "public-linkedin" && !isPublicLinkedInPost(draft.sourceUrl)) continue;
     const page = pages[draft.sourceUrl] ?? "";
     if (!page) continue;
     if (!pageHas(page, draft.org)) continue;
@@ -581,15 +578,28 @@ export function verifyHunterDrafts(
     if (!placeMatchesRegion(place || city, city, opts.regionId)) continue;
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
-    const movedOn = pageShowsMovedOn(contactPage, draft.buyer.name, draft.org) || pageShowsMovedOn(page, draft.buyer.name, draft.org);
-    const contact = contactPage && !movedOn
+    const movedOnContact = pageShowsMovedOn(contactPage, draft.buyer.name, draft.org);
+    const movedOnCompany = pageShowsMovedOn(page, draft.buyer.name, draft.org);
+    const movedOn = movedOnContact || movedOnCompany;
+    let contact = contactPage && !movedOn
       ? contactIfPresent(contactPage, draft.buyer.name, draft.buyer.email, contactPageUrl)
       : { name: "", title: "", email: "", emailSource: "" };
+    if (movedOn) {
+      const rolePage = movedOnContact ? contactPage : page;
+      const roleUrl = movedOnContact ? contactPageUrl : draft.sourceUrl;
+      const successor = successorOnPage(rolePage, draft.buyer.name, draft.buyer.title, draft.org, draft.buyer.email);
+      contact = successor
+        ? contactIfPresent(rolePage, successor.name, successor.email, roleUrl)
+        : { name: "", title: "", email: "", emailSource: "" };
+    }
+    if (draft.sourceKind === "public-linkedin" && contact.emailSource && !isPublicLinkedInPost(contact.emailSource)) {
+      contact = { name: "", title: "", email: "", emailSource: "" };
+    }
     const buyerName = usableName(contact.name);
-    const buyerTitle = titleOnPage(contactPage, draft.buyer.title, Boolean(buyerName));
+    const titlePage = contact.emailSource ? (pages[contact.emailSource] ?? "") : contactPage;
+    const buyerTitle = titleOnPage(titlePage || contactPage, draft.buyer.title, Boolean(buyerName));
     const hits = verifiedHits(draft, pages, opts.today);
     const signals = verifiedSignals(draft.signals, pages, `H-${cards.length + 1}`);
-    const partnerFlag = partnerFromPages(draft, pages);
     const hunterBreak = scoreHunter({
       hitIds: hits.map((hit) => hit.id),
       buyerName,
@@ -599,6 +609,7 @@ export function verifyHunterDrafts(
       signals,
       today: opts.today,
       regionId: opts.regionId,
+      place,
     });
     const why = hits.length
       ? `Research card from Hunter. Public pages show: ${hits.map((hit) => hit.label).join("; ")}.`
@@ -619,8 +630,8 @@ export function verifyHunterDrafts(
       email: contact.email,
       emailSource: contact.emailSource,
       profileHits: hits,
-      partnerFlag,
       hunterRegion: opts.regionId,
+      sourceKind: draft.sourceKind,
       hunterBreak,
       hunterScore: hunterBreak.total,
     });
@@ -695,6 +706,7 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
       sourceUrl: card.sourceUrl,
       cardId: id,
       exploration: card.exploration,
+      method: card.sourceKind === "public-linkedin" ? HUNTER_LINKEDIN_METHOD_ID : undefined,
     }),
     facts: cardFacts(card, today),
   });
@@ -799,10 +811,15 @@ export function hunterPrompt(slot: HunterSlot, knownDomains: string[]) {
   const signal = HUNTER_SIGNALS.find((item) => item.id === slot.signalId);
   const skip = domainsForPrompt(knownDomains);
   const signalList = HUNTER_SIGNALS.map((item) => `${item.id}: ${item.search}`).join("\n");
-  return `Find companies for Badlands Bootcamp at Unearth Self. One team of 6 to 24 people inside a company of any size. Return JSON only.
+  const sourceRule = slot.source === "public-linkedin"
+    ? "Source: a public LinkedIn post only. sourceUrl must be an https://www.linkedin.com URL whose path contains /posts/, /pulse/, or /feed/update/. Do not use a profile URL, a login page, or a page that asks you to sign in. Do not log in. Keep a field only when its exact text is on that public post."
+    : "Source: a public web page. Do not use a login page.";
+  return `Find companies for Badlands Bootcamp at Unearth Self. One team of 6 to 24 people inside a company of any size. Any industry is allowed. A forward-thinking technology company is a strong lead. A small company is allowed. Return JSON only.
 
 This batch: ${signal?.label ?? slot.signalLabel}.
-Region: ${slot.regionLabel}. Do not drop a company for being outside Canada. Do not filter by headcount.
+Region: ${slot.regionLabel}. Do not drop a company for being outside Canada. Do not filter by headcount or industry. Europe and Mexico stay in the search.
+
+${sourceRule}
 
 Skip these domains: ${skip || "none"}.
 
@@ -893,7 +910,9 @@ export function draftDropReason(
   page: string,
   regionId: string,
   fetchReason?: import("./hunter-phase.ts").PageRead["reason"],
+  source?: HunterSource,
 ): import("./hunter-phase.ts").DropReason | null {
+  if ((source ?? draft.sourceKind) === "public-linkedin" && !isPublicLinkedInPost(draft.sourceUrl)) return "unverified";
   if (!page) {
     if (fetchReason === "blocked" || fetchReason === "timed-out" || fetchReason === "fetch-failed") return fetchReason;
     return "page-empty";
@@ -1350,7 +1369,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       const noted = await noteModelSpend(redis, month, research.usage.dollars);
       if (research.usage.dollars == null) estimatedDollars += ticksToDollars(noted.estimatedTicks);
       else actualDollars += research.usage.dollars;
-      const drafts = selectHunterRows(research).filter((draft) => {
+      const drafts = selectHunterRows(research).map((draft) => ({ ...draft, sourceKind: picked.slot.source })).filter((draft) => {
         if (!known.has(normalizeDomain(draft.domain))) return true;
         addDrop(funnel, "duplicate");
         return false;
@@ -1366,7 +1385,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       for (const [url, page] of Object.entries(fetched)) pages[url] = page.text;
       const kept = drafts.filter((draft) => {
         const page = fetched[draft.sourceUrl] ?? { text: "", reason: "fetch-failed" as const };
-        const reason = draftDropReason(draft, page.text, picked.slot.regionId, page.reason);
+        const reason = draftDropReason(draft, page.text, picked.slot.regionId, page.reason, picked.slot.source);
         if (!reason) return true;
         addDrop(funnel, reason);
         if (reason === "fetch-failed" || reason === "blocked" || reason === "timed-out") held.push(`${draft.org} (${reason})`);
@@ -1574,14 +1593,12 @@ function stampCard(company: Company, ready: HunterCard[], pages: Record<string, 
   if (!card || company.casl || company.contactSource === "Apollo" || company.emailSource === "Apollo") return company;
   const page = pages[card.emailSource] || pages[card.sourceUrl] || "";
   const basis = caslBasis(page, card.email, card.buyerTitle, card.emailSource || card.sourceUrl);
-  const blocked = Boolean(card.email) && basis != null && !basis.noUnsolicitedNotice;
+  const held = clearEmailWhenUnsolicited(company, page);
   const snippet = quoteSnippet(page, card.org) || company.facts?.[0]?.snippet || "";
   return {
-    ...company,
-    email: blocked ? "" : company.email,
+    ...held,
     emailMx: company.emailMx,
     caslStatus: basis ? "recorded" : company.caslStatus,
-    cardFlags: blocked ? [...(company.cardFlags ?? []), "No unsolicited email"] : company.cardFlags,
     casl: basis
       ? { publishedOn: basis.publishedOn, roleFit: basis.roleFit, noUnsolicitedNotice: basis.noUnsolicitedNotice }
       : company.casl,

@@ -20,7 +20,7 @@ test("contactIfPresent keeps a name and email only when the page contains them",
   assert.equal(noUrl.email, "");
 });
 
-test("selectScoutRows keeps the first-wave Alberta band and drops the rest", () => {
+test("selectScoutRows keeps any headcount and industry in the three cities", () => {
   const rows = selectScoutRows({
     companies: [
       {
@@ -57,11 +57,28 @@ test("selectScoutRows keeps the first-wave Alberta band and drops the rest", () 
         sizeBand: "80-800",
         sourceUrl: "https://software.example",
       },
+      {
+        org: "Huge Tech",
+        domain: "huge.example",
+        city: "Red Deer",
+        industry: "other",
+        sizeBand: "5000",
+        sourceUrl: "https://huge.example",
+      },
+      {
+        org: "Geolab Studio",
+        domain: "studio.example",
+        city: "Calgary",
+        industry: "tech",
+        sizeBand: "200",
+        sourceUrl: "https://studio.example",
+      },
     ],
   });
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.domain, "northline.example");
+  assert.deepEqual(rows.map((row) => row.domain), ["northline.example", "small.example", "software.example", "huge.example"]);
   assert.equal(rows[0]?.sizeBand, "80-800");
+  assert.equal(rows[1]?.sizeBand, "1-49");
+  assert.equal(rows[3]?.sizeBand, "1500+");
   assert.equal(rows[0]?.buyer?.email, "pat.lee@northline.example");
 });
 

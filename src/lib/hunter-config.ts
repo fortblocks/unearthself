@@ -9,9 +9,11 @@ import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 /** Pinned model for Hunter web search. Minutes keep their own model id. */
 export const HUNTER_MODEL_ID = HUNTER_SEARCH_MODEL;
 
-export const HUNTER_PROMPT_VERSION = "2026-11-19.1";
-export const HUNTER_SCORE_VERSION = "hunter-profile-v1";
+export const HUNTER_PROMPT_VERSION = "2026-11-19.2";
+export const HUNTER_SCORE_VERSION = "hunter-profile-v2";
 export const HUNTER_METHOD_ID = "xai-web-search";
+/** Public LinkedIn posts found by the same web search. Not a separate paid source. */
+export const HUNTER_LINKEDIN_METHOD_ID = "public-linkedin-post";
 
 /** 48 is a ceiling. Hunter does not pad the day up to this number. */
 export const HUNTER_CARD_CEILING = HUNTER_DAILY_CARD_TARGET;
