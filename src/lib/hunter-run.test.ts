@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { LEADS_KEY, emptyBook, useRedisClientForTests } from "./leads-book.ts";
 import { HUNTER_ALARM_KEY, HUNTER_RUN_OPEN_KEY } from "./hunter-config.ts";
+import { useBuyerJudgeForTests } from "./buyer-judgment.ts";
+import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 import { HUNTER_KEY, appendDoNotContact, enrichUnderApolloCap, readHunterDesk, runHunterBatch, useMxLookupForTests } from "./leads-hunter.ts";
 import { runNightlyCron } from "./hunter-nightly.ts";
 import type { Company } from "./lead-score.ts";
@@ -136,12 +138,23 @@ function install(redis: ReturnType<typeof memoryRedis>) {
     if (host === "northwind.test") return [{ exchange: "mail.northwind.test" }];
     return [];
   });
+  useBuyerJudgeForTests(async () => ({
+    ok: true,
+    usage: { inputTokens: 0, outputTokens: 0, dollars: null },
+    judgment: {
+      buyer: true,
+      confidence: "high",
+      reason: "The company context and the role fit a team retreat.",
+      model: HUNTER_SEARCH_MODEL,
+    },
+  }));
 }
 
 async function restore(previousFetch: typeof fetch, env: Record<string, string | undefined>) {
   globalThis.fetch = previousFetch;
   useRedisClientForTests(null);
   useMxLookupForTests(null);
+  useBuyerJudgeForTests(null);
   for (const [key, value] of Object.entries(env)) {
     if (value == null) delete process.env[key];
     else process.env[key] = value;

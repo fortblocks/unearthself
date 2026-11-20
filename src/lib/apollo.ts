@@ -6,6 +6,7 @@
  */
 
 import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
+import { isClearBuyer, type BuyerJudgment } from "./buyer-judgment.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
@@ -19,7 +20,10 @@ export const APOLLO_SOURCE = "Apollo";
 
 const APOLLO_ORIGIN = "https://api.apollo.io/api/v1";
 
-/** Decision-makers for a team of six to twenty-four. Similar titles are requested as well. */
+/**
+ * Titles sent to Apollo's people search. Apollo's API searches by title.
+ * This list does not decide filing or role fit. Hunter judges the person after the reveal.
+ */
 export const APOLLO_TARGET_TITLES = BUYER_ROLE_TITLES;
 
 export type ApolloFetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -310,6 +314,20 @@ export async function enrichHunterContacts(input: {
   sleep?: (ms: number) => Promise<void>;
   /** Milliseconds left for the next Apollo call. 0 means stop. */
   timeLeft?: () => number;
+  /**
+   * When set, a revealed person is written only if this says they are a clear buyer.
+   * A no, or a failed call, leaves the contact off the card.
+   */
+  judgeContact?: (input: {
+    org: string;
+    domain: string;
+    place: string;
+    city: string;
+    industry: string;
+    sizeBand: string;
+    signals: string;
+    role: string;
+  }) => Promise<{ ok: true; judgment: BuyerJudgment } | { ok: false }>;
 }): Promise<{
   companies: Company[];
   searches: number;
@@ -427,6 +445,41 @@ export async function enrichHunterContacts(input: {
     }
     const person = revealClass.empty ? null : readApolloReveal(revealed.body);
     const current = byDomain.get(company.domain) ?? company;
+    if (input.judgeContact && person) {
+      const decision = await input.judgeContact({
+        org: current.org,
+        domain: current.domain,
+        place: current.place ?? "",
+        city: current.city,
+        industry: current.industry,
+        sizeBand: current.sizeBand,
+        signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
+        role: person.title,
+      });
+      const clear = decision.ok && isClearBuyer(decision.judgment);
+      console.info(
+        JSON.stringify(
+          decision.ok
+            ? { hunter: "buyer-judgment", outcome: clear ? "buyer" : "notBuyerJudged", confidence: decision.judgment.confidence, reason: decision.judgment.reason }
+            : { hunter: "buyer-judgment", outcome: "judgmentUnavailable" },
+        ),
+      );
+      if (!clear) {
+        byDomain.set(company.domain, { ...current, apolloCheckedOn: input.today });
+        continue;
+      }
+      const accepted = applyApolloContact(current, person, input.today);
+      const withFit: Company = {
+        ...accepted,
+        buyerJudgment: decision.judgment,
+        casl: accepted.casl ? { ...accepted.casl, roleFit: true } : accepted.casl,
+      };
+      if (withFit.email.trim() && apolloEmailIsVerified(withFit.apolloEmailStatus ?? "")) verifiedEmails += 1;
+      if (withFit.cardFlags?.includes(APOLLO_STALE)) countFailure("stale");
+      if (withFit.cardFlags?.includes(APOLLO_EMAIL_NOT_VERIFIED)) countFailure("unverified");
+      byDomain.set(company.domain, withFit);
+      continue;
+    }
     const next = applyApolloContact(current, person, input.today);
     if (next.email.trim() && apolloEmailIsVerified(next.apolloEmailStatus ?? "")) verifiedEmails += 1;
     if (next.cardFlags?.includes(APOLLO_STALE)) countFailure("stale");

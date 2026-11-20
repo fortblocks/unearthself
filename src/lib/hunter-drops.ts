@@ -15,6 +15,8 @@ export const DROP_LABELS: Record<DropReason, string> = {
   "no-mx": "no MX record",
   unverified: "email not verified",
   outOfRegion: "outside Canada and the United States",
+  notBuyerJudged: "not judged a buyer",
+  judgmentUnavailable: "buyer judgement unavailable",
 };
 
 /**

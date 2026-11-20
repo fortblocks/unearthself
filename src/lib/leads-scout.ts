@@ -6,6 +6,7 @@
  */
 
 import { isPhaseOneCompany } from "../data/hunter-profile.ts";
+import { isClearBuyer, judgeBuyerFit } from "./buyer-judgment.ts";
 import { assignEnrichment, countContactReadyGain } from "./hunter-cap.ts";
 import { markPublicContact } from "./apollo.ts";
 import { loadBook, saveBook } from "./leads-book.ts";
@@ -177,6 +178,8 @@ Signals are public dated events only: hiring, office, expansion, win, year-end. 
 
 buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@.
 
+Choose the contact by judging whether that person would buy a hotel spa team retreat in Drumheller, Alberta for their company. Reason from the company's size, industry, location, and how the team is set up, and from the person's role. There is no fixed list of job titles.
+
 why is two or three sentences on why the company fits, and whySources lists the pages you used.
 
 Return at most 15 companies. Return a company when you have its name, domain, and a page URL, even if the buyer or a signal is blank. Use an empty companies array only when the search found no organisation.
@@ -282,6 +285,53 @@ export type NightlyEnrichment = (
   timedOut?: boolean;
 }>;
 
+/** A named contact is filed only when the model calls them a clear buyer. No contact stays a research row. */
+async function judgeScoutContacts(rows: ScoutIngest[], timeLeft?: () => number) {
+  const kept: ScoutIngest[] = [];
+  let notBuyerJudged = 0;
+  let judgmentUnavailable = 0;
+  for (const row of rows) {
+    const role = row.buyer?.title?.trim() ?? "";
+    const name = row.buyer?.name?.trim() ?? "";
+    if (!role && !name) {
+      kept.push(row);
+      continue;
+    }
+    const left = timeLeft ? timeLeft() : 20_000;
+    if (left < 1_000) {
+      judgmentUnavailable += 1;
+      console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "judgmentUnavailable" }));
+      continue;
+    }
+    const result = await judgeBuyerFit(
+      {
+        org: row.org ?? "",
+        domain: row.domain,
+        place: row.city ?? "",
+        city: row.city ?? "",
+        industry: row.industry ?? "",
+        sizeBand: row.sizeBand ?? "",
+        signals: "",
+        role,
+      },
+      { timeoutMs: Math.min(20_000, left) },
+    );
+    if (!result.ok) {
+      judgmentUnavailable += 1;
+      console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "judgmentUnavailable" }));
+      continue;
+    }
+    if (!isClearBuyer(result.judgment)) {
+      notBuyerJudged += 1;
+      console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "notBuyerJudged", reason: result.judgment.reason }));
+      continue;
+    }
+    console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "buyer", confidence: result.judgment.confidence, reason: result.judgment.reason }));
+    kept.push({ ...row, buyerJudgment: result.judgment });
+  }
+  return { rows: kept, notBuyerJudged, judgmentUnavailable };
+}
+
 export async function runNightlyScout(opts?: {
   enrich?: NightlyEnrichment;
   now?: Date;
@@ -307,6 +357,8 @@ export async function runNightlyScout(opts?: {
       apolloFailed: boolean;
       timedOut: boolean;
       outOfRegion: number;
+      notBuyerJudged: number;
+      judgmentUnavailable: number;
     }
   | { ok: false; error: string; called: boolean; attempts: number; timedOut?: boolean }
 > {
@@ -328,7 +380,8 @@ export async function runNightlyScout(opts?: {
   const outOfRegion = scoutOutOfRegion(research);
   const verified = await verifyRows(selected, opts?.timeLeft);
   const open = opts?.skip ? verified.filter((row) => !opts.skip?.({ domain: row.domain, email: row.buyer?.email })) : verified;
-  const batch = buildMorningBatch(loaded.book.companies, open, {
+  const judged = await judgeScoutContacts(open, opts?.timeLeft);
+  const batch = buildMorningBatch(loaded.book.companies, judged.rows, {
     today,
     limit: loaded.book.morningCount,
   });
@@ -362,6 +415,8 @@ export async function runNightlyScout(opts?: {
     apolloFailures: enriched.failures ?? {},
     apolloNote: enriched.note,
     outOfRegion,
+    notBuyerJudged: judged.notBuyerJudged,
+    judgmentUnavailable: judged.judgmentUnavailable,
     dollars: research.dollars,
     estimatedDollars: research.estimatedDollars,
     apolloFailed: Boolean(enriched.failed),

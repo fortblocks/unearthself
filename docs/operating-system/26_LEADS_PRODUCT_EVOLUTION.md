@@ -72,7 +72,7 @@ Flow:
 5. `scoreCompany` runs on the enriched card.
 6. The panel shows each filled field beside its source link, as it already does for the published email.
 
-`buyerName` of "HR" or "People team" does not count as a named person. That rule already exists. Enrichment must not write those strings back to look busy.
+`buyerName` of "HR" or "People team" does not count as a named person. That rule already exists. Enrichment must not write those strings back to look busy. Hunter judges buyer fit by reasoning about the company and the person's role for a Drumheller hotel spa team retreat; no fixed title list. Changed 20th November 2026 on Christopher's approval.
 
 ### Acceptance criteria
 

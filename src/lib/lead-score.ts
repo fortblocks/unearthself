@@ -130,6 +130,13 @@ export type Company = {
   emailMx?: boolean;
   contactLastSeenOn?: string;
   facts?: { sourceUrl: string; fetchedOn: string; snippet: string }[];
+  /** Stored buyer-fit judgement. Absent on older cards. The desk hides a card only when this says not a buyer. */
+  buyerJudgment?: {
+    buyer: boolean;
+    confidence: "low" | "medium" | "high";
+    reason: string;
+    model: string;
+  };
 };
 
 export type ScoutIngest = {
@@ -146,6 +153,7 @@ export type ScoutIngest = {
     email?: string;
     emailSource?: string;
   };
+  buyerJudgment?: Company["buyerJudgment"];
   signals?: unknown;
   whySources?: unknown;
 };
@@ -547,6 +555,7 @@ export function mergeScoutRows(
         whySources: incomingWhy.length ? incomingWhy : existing.whySources,
         lastTouch: opts.today,
         scoutBatch: opts.batch,
+        buyerJudgment: existing.buyerJudgment ?? row.buyerJudgment,
       };
       if (Array.isArray(next[idx].signals)) {
         next[idx].timingScore = timingFromSignals({
@@ -582,6 +591,7 @@ export function mergeScoutRows(
       draftBody: "",
       lastTouch: opts.today,
       scoutBatch: opts.batch,
+      buyerJudgment: row.buyerJudgment,
     };
     next.unshift(created);
     added += 1;

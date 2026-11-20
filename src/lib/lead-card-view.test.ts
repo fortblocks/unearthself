@@ -14,6 +14,7 @@ import {
   hasDraftCopy,
   leadInPhaseOne,
   leadOnDesk,
+  storedJudgmentHides,
   LeadCardActions,
   skipReasonLines,
 } from "./lead-card-view.ts";
@@ -84,6 +85,7 @@ function deskCard(partial: Partial<Company> & { id: string }): Company {
     cardFlags: partial.cardFlags,
     hunterScore: partial.hunterScore,
     place: partial.place,
+    buyerJudgment: partial.buyerJudgment,
   };
 }
 
@@ -143,6 +145,51 @@ test("cards outside Canada and the United States stay stored and leave the lists
   assert.equal(berlin.org, "Northwind Example");
   assert.equal(leadOnDesk(berlin), false);
   assert.equal(leadOnDesk(denver), true);
+});
+
+test("the desk hides a card only when the stored judgement says not a buyer", () => {
+  const open = deskCard({ id: "open" });
+  const buyer = deskCard({
+    id: "buyer",
+    buyerJudgment: {
+      buyer: true,
+      confidence: "high",
+      reason: "The company context and the role fit a team retreat.",
+      model: "grok-4.20-0309-non-reasoning",
+    },
+  });
+  const declined = deskCard({
+    id: "declined",
+    buyerJudgment: {
+      buyer: false,
+      confidence: "high",
+      reason: "The role does not buy team retreats for this company.",
+      model: "grok-4.20-0309-non-reasoning",
+    },
+  });
+  const unsure = deskCard({
+    id: "unsure",
+    buyerJudgment: {
+      buyer: true,
+      confidence: "low",
+      reason: "The role might buy a retreat, and the company context is thin.",
+      model: "grok-4.20-0309-non-reasoning",
+    },
+  });
+  const book = [open, buyer, declined, unsure];
+  assert.equal(storedJudgmentHides(open), false);
+  assert.equal(storedJudgmentHides(buyer), false);
+  assert.equal(storedJudgmentHides(declined), true);
+  assert.deepEqual(
+    companiesOnDesk(book).map((row) => row.id),
+    ["open", "buyer"],
+  );
+  assert.equal(book.length, 4);
+  assert.equal(book[2], declined);
+  assert.equal(declined.buyerName, "Ada North");
+  assert.equal(declined.buyerJudgment?.buyer, false);
+  assert.equal(leadOnDesk(open), true);
+  assert.equal(leadOnDesk(declined), false);
 });
 
 test("Coco's skip reason is shown once", () => {

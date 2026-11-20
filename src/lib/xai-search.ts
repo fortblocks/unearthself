@@ -180,6 +180,53 @@ export function xaiRetryable(status: number | null, message: string) {
   return false;
 }
 
+/**
+ * Same model and endpoint as web search, with no search tool.
+ * Used when Hunter already has the facts and only needs a JSON judgement.
+ */
+export async function callXaiJson(
+  system: string,
+  prompt: string,
+  timeoutMs: number,
+): Promise<{ json: unknown; usage: XaiUsage } | { error: string }> {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) return { error: "XAI_API_KEY not configured" };
+  let response: Response;
+  try {
+    response = await fetch(XAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: HUNTER_SEARCH_MODEL,
+        input: [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    return { error: timedOut ? "xAI judgement timed out" : "xAI judgement failed" };
+  }
+  const detail = await response.text();
+  if (!response.ok || xaiDeprecationSignal(response.status, response.headers, detail)) {
+    return { error: formatXaiHttpError(response.status, detail, apiKey) };
+  }
+  try {
+    const payload = JSON.parse(detail) as Record<string, unknown>;
+    const text = outputText(payload).trim();
+    const json = extractJsonObject(text);
+    if (!json || typeof json !== "object" || Array.isArray(json)) return { error: "xAI judgement was not JSON" };
+    return { json, usage: readXaiUsage(payload) };
+  } catch {
+    return { error: "xAI returned an unexpected shape" };
+  }
+}
+
 export async function callXaiWebSearch(system: string, prompt: string, timeoutMs: number): Promise<XaiCallResult> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { error: "XAI_API_KEY not configured", retryable: false };

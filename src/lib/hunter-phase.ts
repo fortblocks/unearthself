@@ -50,6 +50,8 @@ export const DROP_REASONS = [
   "no-mx",
   "unverified",
   "outOfRegion",
+  "notBuyerJudged",
+  "judgmentUnavailable",
 ] as const;
 
 export type DropReason = (typeof DROP_REASONS)[number];

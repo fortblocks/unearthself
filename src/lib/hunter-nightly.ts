@@ -154,7 +154,17 @@ export async function runNightlyCron(request: Request, now = new Date()) {
       }),
     );
     const nightlyFunnel = result.ok
-      ? { ...emptyFunnel(), searched: 1, candidates: result.candidates, filed: result.stored, drops: { outOfRegion: result.outOfRegion } }
+      ? {
+          ...emptyFunnel(),
+          searched: 1,
+          candidates: result.candidates,
+          filed: result.stored,
+          drops: {
+            outOfRegion: result.outOfRegion,
+            notBuyerJudged: result.notBuyerJudged,
+            judgmentUnavailable: result.judgmentUnavailable,
+          },
+        }
       : null;
     logHunterRunLine({
       runId: token,

@@ -1,5 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { isPhaseOneCompany } from "../data/hunter-profile.ts";
+import { isClearBuyer, isStoredJudgment } from "./buyer-judgment.ts";
 import { draftEditWarnings, emailableLead, type CocoJoin } from "./hunter-outreach.ts";
 import { wordCount } from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
@@ -35,11 +36,20 @@ export function leadInPhaseOne(company: { place?: string | null; city?: string |
 }
 
 /**
+ * A stored judgement hides a card only when it says this contact is not a clear buyer.
+ * A card with no stored judgement stays. Nothing here re-judges or rewrites the book.
+ */
+export function storedJudgmentHides(company: { buyerJudgment?: unknown }) {
+  if (!isStoredJudgment(company.buyerJudgment)) return false;
+  return !isClearBuyer(company.buyerJudgment);
+}
+
+/**
  * A card the desk may list. Canada or the United States, a named person, a verified or published email, a source URL, and no send block.
- * Score band is not a gate. Do-not-contact and a bounce come from the outreach join.
+ * Score band is not a gate. A stored buyer judgement of no hides the card. Do-not-contact and a bounce come from the outreach join.
  */
 export function leadOnDesk(company: Company, blocked: readonly string[] = []) {
-  return leadInPhaseOne(company) && hasPublishedEmail(company) && emailableLead(company, blocked);
+  return leadInPhaseOne(company) && hasPublishedEmail(company) && emailableLead(company, blocked) && !storedJudgmentHides(company);
 }
 
 /** Display list only. The stored book is not changed. */

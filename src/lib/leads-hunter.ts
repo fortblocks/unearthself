@@ -7,6 +7,7 @@
 
 import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, isPhaseOneCompany, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, enrichHunterContacts } from "./apollo.ts";
+import { isClearBuyer, isStoredJudgment, judgeBuyerFit, type BuyerJudgment, type BuyerJudgmentInput } from "./buyer-judgment.ts";
 import {
   applyHunterWork,
   assignEnrichment,
@@ -185,6 +186,8 @@ export type HunterCard = {
   hunterScore: number;
   query?: string;
   exploration?: boolean;
+  /** Set before filing. "unavailable" means the judgement call failed and the card must not be filed. */
+  buyerJudgment?: BuyerJudgment | "unavailable";
 };
 
 export function freshHunterState(): HunterState {
@@ -667,6 +670,7 @@ function blankCompany(card: HunterCard, id: string, today: string): Company {
     filedOn: today,
     dedupeKey: cardDedupeKey(card.domain, card.email),
     contactLastSeenOn: card.email ? today : "",
+    buyerJudgment: isStoredJudgment(card.buyerJudgment) ? card.buyerJudgment : undefined,
     lineage: makeLineage({
       query: card.query || card.hunterRegion,
       signals: card.profileHits.map((hit) => hit.id),
@@ -741,6 +745,22 @@ export function fileHunterCards(
       noteDrop("below-quality-floor");
       continue;
     }
+    const existingContact = index === -1 ? undefined : next[index];
+    const writingContact = Boolean(card.buyerName.trim() || card.buyerTitle.trim()) && !existingContact?.buyerName.trim();
+    if (writingContact) {
+      const judgment = card.buyerJudgment;
+      if (!isStoredJudgment(judgment)) {
+        noteDrop("judgmentUnavailable");
+        console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "judgmentUnavailable" }));
+        continue;
+      }
+      if (!isClearBuyer(judgment)) {
+        noteDrop("notBuyerJudged");
+        console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "notBuyerJudged", reason: judgment.reason }));
+        continue;
+      }
+      console.info(JSON.stringify({ hunter: "buyer-judgment", outcome: "buyer", confidence: judgment.confidence, reason: judgment.reason }));
+    }
     if (index === -1) {
       next.unshift(assignEnrichment(blankCompany({ ...card, domain }, nextCompanyId(next), opts.today), opts.today));
       filed += 1;
@@ -759,6 +779,11 @@ export function fileHunterCards(
         place: existing.place || card.place,
         buyerName: existing.buyerName.trim() ? existing.buyerName : card.buyerName,
         buyerTitle: existing.buyerTitle.trim() ? existing.buyerTitle : card.buyerTitle,
+        buyerJudgment: existing.buyerName.trim()
+          ? existing.buyerJudgment
+          : isStoredJudgment(card.buyerJudgment)
+            ? card.buyerJudgment
+            : existing.buyerJudgment,
         email: existing.email.trim() ? existing.email : card.email,
         emailSource: existing.emailSource.trim() ? existing.emailSource : card.emailSource,
         contactLastSeenOn:
@@ -823,6 +848,8 @@ signals are public dated events only: hiring, office, expansion, win, year-end. 
 profileSignals is a list of { id, sourceUrl }. Use only the ids above. Include one only when that page shows the signal.
 
 buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name, title, or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@. Never use a department name as a person.
+
+Choose the contact by judging whether that person would buy a hotel spa team retreat in Drumheller, Alberta for their company. Reason from the company's size, industry, location, and how the team is set up, and from the person's role. There is no fixed list of job titles.
 
 Do not invent a price, a date, a partner, a building, or a programme. Do not mention any company other than the one on the page.
 
@@ -1067,6 +1094,12 @@ export async function enrichUnderApolloCap(input: {
       : undefined,
     skip: (company) => dncBlocks(dnc, company.domain, company.email, input.today),
     timeLeft: input.timeLeft,
+    judgeContact: async (contact) => {
+      const left = input.timeLeft ? input.timeLeft() : 20_000;
+      if (left < 1_000) return { ok: false };
+      const result = await judgeBuyerFit(contact, { timeoutMs: Math.min(20_000, left) });
+      return result.ok ? { ok: true, judgment: result.judgment } : { ok: false };
+    },
   });
   result.companies = await Promise.all(
     result.companies.map((company) => {
@@ -1392,7 +1425,13 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       const limited = ready.slice(0, dailyFileRoom(companies.filter((company) => company.filedOn === today).length));
       funnel.verified += limited.length;
       funnel.contactFound += limited.filter((card) => card.email).length;
-      const filed = fileHunterCards(companies, limited, { today, dnc, pages });
+      const judged = await attachBuyerJudgments(limited, () => runClock.clip(20_000), async (usage) => {
+        inputTokens += usage.inputTokens;
+        outputTokens += usage.outputTokens;
+        if (usage.dollars == null) return;
+        actualDollars += usage.dollars;
+      });
+      const filed = fileHunterCards(companies, judged, { today, dnc, pages });
       companies = filed.companies.map((company) => {
         const stamped = stampCard(company, limited, pages, today);
         return mxYes.has(company.domain) ? { ...stamped, emailMx: true } : stamped;
@@ -1562,13 +1601,50 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
   }
 }
 
+function judgmentInput(card: HunterCard): BuyerJudgmentInput {
+  return {
+    org: card.org,
+    domain: card.domain,
+    place: card.place,
+    city: card.city,
+    industry: card.industry,
+    sizeBand: card.sizeBand,
+    signals: card.signals.map((signal) => signal.kind).filter(Boolean).join(", "),
+    role: card.buyerTitle,
+  };
+}
+
+/** Judge a named contact before filing. A card with no name and no title stays a research card. */
+async function attachBuyerJudgments(
+  cards: HunterCard[],
+  timeoutFor: () => number,
+  noteUsage: (usage: { inputTokens: number; outputTokens: number; dollars: number | null }) => Promise<void>,
+): Promise<HunterCard[]> {
+  const next: HunterCard[] = [];
+  for (const card of cards) {
+    if (!card.buyerName.trim() && !card.buyerTitle.trim()) {
+      next.push(card);
+      continue;
+    }
+    const timeoutMs = timeoutFor();
+    if (timeoutMs < 1_000) {
+      next.push({ ...card, buyerJudgment: "unavailable" });
+      continue;
+    }
+    const result = await judgeBuyerFit(judgmentInput(card), { timeoutMs });
+    await noteUsage(result.usage);
+    next.push(result.ok ? { ...card, buyerJudgment: result.judgment } : { ...card, buyerJudgment: "unavailable" });
+  }
+  return next;
+}
+
 function publicFailure(error: unknown) {
   const message = error instanceof Error ? error.message : "Hunter batch failed";
   const cleaned = message.replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
   return cleaned.slice(0, 180) || "Hunter batch failed";
 }
 
-function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
+export function stampCard(company: Company, ready: HunterCard[], pages: Record<string, string>, today: string): Company {
   const card = ready.find((row) => normalizeDomain(row.domain) === company.domain && company.filedOn === today);
   if (!card || company.casl || company.contactSource === "Apollo" || company.emailSource === "Apollo") return company;
   const page = pages[card.emailSource] || pages[card.sourceUrl] || "";
@@ -1580,7 +1656,11 @@ function stampCard(company: Company, ready: HunterCard[], pages: Record<string, 
     emailMx: company.emailMx,
     caslStatus: basis ? "recorded" : company.caslStatus,
     casl: basis
-      ? { publishedOn: basis.publishedOn, roleFit: basis.roleFit, noUnsolicitedNotice: basis.noUnsolicitedNotice }
+      ? {
+          publishedOn: basis.publishedOn,
+          roleFit: company.buyerJudgment ? isClearBuyer(company.buyerJudgment) : basis.roleFit,
+          noUnsolicitedNotice: basis.noUnsolicitedNotice,
+        }
       : company.casl,
     facts: company.facts?.length
       ? company.facts

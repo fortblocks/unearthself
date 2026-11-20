@@ -4,6 +4,7 @@
  * Live mode verifies and scores. It never files and never sends.
  */
 
+import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 import { hunterQualityFloor } from "./hunter-config.ts";
 import { addDrop, emptyFunnel, HUNTER_KNOWN_BAD, HUNTER_KNOWN_GOOD, HUNTER_LIVE_LIST, type DryCompany, type DncEntry } from "./hunter-phase.ts";
 import { fileHunterCards, readPages, selectHunterRows, urlsForDrafts, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
@@ -45,7 +46,20 @@ export function dryRunFixtures(floor: number, dnc: DncEntry[] = [], today = "202
     drafts.push(fixtureDraft(row));
     pages[row.sourceUrl] = row.page;
   }
-  const cards = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today });
+  const verified = verifyHunterDrafts(drafts, pages, { regionId: "anywhere", today });
+  const cards = verified.map((card) =>
+    card.buyerName.trim() || card.buyerTitle.trim()
+      ? {
+          ...card,
+          buyerJudgment: {
+            buyer: true as const,
+            confidence: "high" as const,
+            reason: "The company context and the role fit a team retreat.",
+            model: HUNTER_SEARCH_MODEL,
+          },
+        }
+      : card,
+  );
   funnel.verified = cards.length;
   const filed = fileHunterCards([], cards, { today, floor, dnc, pages });
   funnel.contactFound = filed.companies.filter((company) => company.email).length;

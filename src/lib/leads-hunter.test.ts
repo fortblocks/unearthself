@@ -13,6 +13,8 @@ import {
   searchRegionCycle,
 } from "../data/hunter-profile.ts";
 import { formatFunnelDrops } from "./hunter-drops.ts";
+import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
+import type { HunterCard } from "./leads-hunter.ts";
 import { scoreCompany, type Company } from "./lead-score.ts";
 import {
   applyHunterWork,
@@ -49,6 +51,18 @@ Employees: 4000. Noted on 2026-11-01: hiring a guide.
 `;
 
 const url = "https://acmealpine.example/about";
+
+function acceptBuyer(card: HunterCard): HunterCard {
+  return {
+    ...card,
+    buyerJudgment: {
+      buyer: true,
+      confidence: "high",
+      reason: "The company context and the role fit a team retreat.",
+      model: HUNTER_SEARCH_MODEL,
+    },
+  };
+}
 
 function draft(over: Partial<HunterDraft> = {}): HunterDraft {
   return {
@@ -291,7 +305,7 @@ test("a known domain is updated and a new domain is filed once", () => {
   assert.ok((first.companies[0]?.signals?.length ?? 0) >= 1);
   assert.equal("partnerFlag" in (first.companies[0] ?? {}), false);
 
-  const second = fileHunterCards([], [card], { today: "2026-11-18" });
+  const second = fileHunterCards([], [acceptBuyer(card)], { today: "2026-11-18" });
   assert.equal(second.filed, 1);
   assert.equal(second.companies.length, 1);
   assert.equal(second.companies[0]?.source, "hunter");
@@ -315,7 +329,7 @@ test("a blank name and title on a known card are filled from the verified page",
   const [card] = verifyHunterDrafts([draft()], { [url]: page }, { regionId: "europe", today: "2026-11-18" });
   assert.ok(card);
   const blank = company({ buyerName: "", buyerTitle: "", email: "" });
-  const filed = fileHunterCards([blank], [card], { today: "2026-11-18" });
+  const filed = fileHunterCards([blank], [acceptBuyer(card)], { today: "2026-11-18" });
   assert.equal(filed.updated, 1);
   assert.equal(filed.companies[0]?.buyerName, "Laura Starchuk");
   assert.equal(filed.companies[0]?.buyerTitle, "Head of People");
@@ -569,7 +583,7 @@ test("public LinkedIn posts are a source, and profiles are not", () => {
   assert.equal(cards[0]?.buyerName, "Alex Reid");
   assert.equal(cards[0]?.email, "alex@acmealpine.example");
   assert.deepEqual(cards[0]?.profileHits.map((hit) => hit.id), ["offsite"]);
-  const filed = fileHunterCards([], cards, { today: "2026-11-18", floor: 0 });
+  const filed = fileHunterCards([], cards.map(acceptBuyer), { today: "2026-11-18", floor: 0 });
   assert.equal(filed.companies[0]?.lineage?.method, "public-linkedin-post");
 
   const profile = "https://www.linkedin.com/in/alex-reid";
