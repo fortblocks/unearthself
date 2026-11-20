@@ -434,7 +434,8 @@ async function readOutreachRecord(redis: LeadsRedis, cardId: string): Promise<Ou
 
 async function writeOutreachRecord(redis: LeadsRedis, record: OutreachRecord) {
   if (!redis.hset) throw new Error("Redis hash writes are unavailable");
-  await redis.hset(HUNTER_OUTREACH_KEY, record.cardId, JSON.stringify(record));
+  // @upstash/redis hset is (key, fields). A third argument is ignored, so the card id has to be the field name.
+  await redis.hset(HUNTER_OUTREACH_KEY, { [record.cardId]: JSON.stringify(record) });
 }
 
 export async function withOutreachLock<T>(redis: LeadsRedis, cardId: string, fn: () => Promise<T>): Promise<T | null> {
@@ -872,18 +873,22 @@ async function applyCocoEvent(
 ): Promise<ApplyResult> {
   const touch = event.touch ?? 0;
   const key = touchKey(touch);
+  const reject = (error: string, status = 409, reasons?: string[]): ApplyResult => {
+    console.info(JSON.stringify({ coco: "rejected", cardId: company.id, error, status }));
+    return reasons ? { ok: false, status, error, reasons } : { ok: false, status, error };
+  };
   if (event.type === "drafting") {
     const reasons = cocoBlockReasons(company, record, dnc, today).filter((rule) => touch === 1 || rule !== "already-sent");
-    if (reasons.length > 0) return { ok: false, status: 409, error: "blocked", reasons };
+    if (reasons.length > 0) return reject("blocked", 409, reasons);
     if (touch === 1) {
-      if (!record.queue?.queuedAt) return { ok: false, status: 409, error: "queue" };
+      if (!record.queue?.queuedAt) return reject("queue");
     } else if (record.touches !== touch - 1 || !sequenceOpen(record)) {
-      return { ok: false, status: 409, error: record.touches !== touch - 1 ? "touch" : "stopped" };
+      return reject(record.touches !== touch - 1 ? "touch" : "stopped");
     }
     const drafts = { ...(record.drafts ?? {}) };
     const prior = drafts[key] ?? {};
     if (prior.claim && prior.claim.eventId !== event.eventId && claimLive(prior.claim, now)) {
-      return { ok: false, status: 409, error: "claimed" };
+      return reject("claimed");
     }
     drafts[key] = { ...prior, claim: { eventId: event.eventId, at: event.at } };
     record.drafts = drafts;
@@ -892,14 +897,14 @@ async function applyCocoEvent(
     return { ok: true, duplicate: false, record, lift: false };
   }
   if (event.type === "drafted") {
-    if (touch === 1 && !record.queue?.queuedAt) return { ok: false, status: 409, error: "queue" };
+    if (touch === 1 && !record.queue?.queuedAt) return reject("queue");
     if (touch > 1 && (record.touches !== touch - 1 || !sequenceOpen(record))) {
-      return { ok: false, status: 409, error: record.touches === touch - 1 ? "stopped" : "touch" };
+      return reject(record.touches === touch - 1 ? "stopped" : "touch");
     }
     const drafts = { ...(record.drafts ?? {}) };
     const prior = drafts[key] ?? {};
     if (prior.claim && claimLive(prior.claim, now) && prior.claim.eventId !== event.eventId && !record.events.some((item) => item.eventId === prior.claim?.eventId && item.type === "drafting")) {
-      return { ok: false, status: 409, error: "claimed" };
+      return reject("claimed");
     }
     drafts[key] = {
       subject: event.subject,
@@ -918,10 +923,10 @@ async function applyCocoEvent(
   }
   if (event.type === "send_approved") {
     const link = unsubscribeUrl(company.id);
-    if (!link || !event.body?.includes(link)) return { ok: false, status: 409, error: "unsubscribe" };
-    if (record.touches >= touch) return { ok: false, status: 409, error: "touch" };
+    if (!link || !event.body?.includes(link)) return reject("unsubscribe");
+    if (record.touches >= touch) return reject("touch");
     if (record.sendApproved && record.sendApproved.touch === touch && record.touches < touch) {
-      return { ok: false, status: 409, error: "send-approved" };
+      return reject("send-approved");
     }
     record.sendApproved = {
       eventId: event.eventId,
@@ -940,8 +945,8 @@ async function applyCocoEvent(
     await writeOutreachRecord(redis, record);
     return { ok: true, duplicate: false, record, lift: false };
   }
-  if (!record.sendApproved || record.sendApproved.touch !== touch) return { ok: false, status: 409, error: "none" };
-  if (record.touches >= touch) return { ok: false, status: 409, error: "touch" };
+  if (!record.sendApproved || record.sendApproved.touch !== touch) return reject("none");
+  if (record.touches >= touch) return reject("touch");
   record.sendApproved = undefined;
   record.events.push(toStoredEvent(event));
   await writeOutreachRecord(redis, record);

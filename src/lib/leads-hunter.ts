@@ -957,7 +957,7 @@ type HunterRedis = {
   incrby: (key: string, amount: number) => Promise<number>;
   expire: (key: string, seconds: number) => Promise<unknown>;
   eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
-  hset?: (key: string, field: string, value: string) => Promise<unknown>;
+  hset?: (key: string, field: string | Record<string, string>, value?: string) => Promise<unknown>;
   hgetall?: (key: string) => Promise<Record<string, unknown> | null>;
   lpush?: (key: string, value: string) => Promise<unknown>;
   ltrim?: (key: string, start: number, stop: number) => Promise<unknown>;
@@ -1009,9 +1009,9 @@ export async function appendDoNotContact(input: {
     const legacy = await client.get<unknown>(doNotContactKey());
     if (Array.isArray(legacy)) {
       await client.del?.(doNotContactKey());
-      for (const row of entries) await client.hset(doNotContactKey(), dncField(row), JSON.stringify(row));
+      for (const row of entries) await client.hset(doNotContactKey(), { [dncField(row)]: JSON.stringify(row) });
     }
-    for (const row of writes) await client.hset(doNotContactKey(), dncField(row), JSON.stringify(row));
+    for (const row of writes) await client.hset(doNotContactKey(), { [dncField(row)]: JSON.stringify(row) });
     return loadDoNotContact(client);
   }
   const byField = new Map(entries.map((row) => [dncField(row), row]));

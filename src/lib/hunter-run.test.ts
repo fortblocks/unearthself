@@ -55,9 +55,13 @@ function memoryRedis() {
       }
       return 0;
     },
-    async hset(key: string, field: string, value: string) {
+    async hset(key: string, field: string | Record<string, string>, value?: string) {
       const hash = hashes.get(key) ?? {};
-      hash[field] = value;
+      if (field && typeof field === "object") {
+        for (const [name, item] of Object.entries(field)) hash[name] = item;
+      } else if (typeof field === "string" && typeof value === "string") {
+        hash[field] = value;
+      }
       hashes.set(key, hash);
       return 1;
     },

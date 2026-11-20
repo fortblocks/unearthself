@@ -10,6 +10,7 @@ import {
   approveWording,
   cocoStage,
   handleOutreach,
+  readCocoCard,
   saveCocoDraftEdit,
   unsubscribeUrl,
   withdrawWording,
@@ -58,10 +59,14 @@ function memoryRedis() {
       }
       return 0;
     },
-    async hset(key: string, field: string, value: string) {
+    async hset(key: string, field: string | Record<string, string>, value?: string) {
       if (failOutreach && key === HUNTER_OUTREACH_KEY) throw new Error("outreach down");
       const hash = hashes.get(key) ?? {};
-      hash[field] = value;
+      if (field && typeof field === "object") {
+        for (const [name, item] of Object.entries(field)) hash[name] = item;
+      } else if (typeof field === "string" && typeof value === "string") {
+        hash[field] = value;
+      }
       hashes.set(key, hash);
       return 1;
     },
@@ -115,6 +120,27 @@ function company(partial: Partial<Company> & { id: string }): Company {
     signals: partial.signals,
     profileHits: partial.profileHits,
   };
+}
+
+/**
+ * @upstash/redis 1.41 hset is (key, fields). The third argument is ignored.
+ * A string in the fields slot is stored as one character per index, not as a card.
+ */
+function upstashRedis() {
+  const redis = memoryRedis();
+  const hashes = redis.hashes;
+  redis.hset = async (key: string, fieldOrFields: string | Record<string, string>, value?: string) => {
+    const hash = hashes.get(key) ?? {};
+    if (fieldOrFields && typeof fieldOrFields === "object") {
+      for (const [field, item] of Object.entries(fieldOrFields)) hash[field] = item;
+    } else if (typeof fieldOrFields === "string") {
+      for (const [index, char] of Object.entries(fieldOrFields)) hash[index] = char;
+      void value;
+    }
+    hashes.set(key, hash);
+    return 1;
+  };
+  return redis;
 }
 
 async function seed(redis: ReturnType<typeof memoryRedis>, companies: Company[]) {
@@ -171,6 +197,52 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       if (value == null) delete process.env[key];
       else process.env[key] = value;
     }
+  });
+
+  test("a rejected coco event logs the card id and the reason code", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "campfire" });
+    await seed(redis, [card]);
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    try {
+      const drafting = await post(letter(card.id, "drafting"));
+      assert.equal(drafting.status, 409);
+    } finally {
+      console.info = original;
+    }
+    const reason = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line) as { coco?: string; cardId?: string; error?: string };
+        } catch {
+          return null;
+        }
+      })
+      .find((item) => item?.coco === "rejected");
+    assert.equal(reason?.error, "queue");
+    assert.equal(reason?.cardId, card.id);
+    assert.equal(JSON.stringify(reason).includes("@"), false);
+  });
+
+  test("approve leaves the card queued when Redis hset stores a field map", async () => {
+    const redis = upstashRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "campfire", org: "Campfire Company" });
+    await seed(redis, [card]);
+    const result = await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" });
+    assert.equal(result.ok, true);
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.campfire ?? "{}") as {
+      queue?: { queuedAt?: string; queuedBy?: string };
+    };
+    assert.equal(stored.queue?.queuedBy, "chris@unearthself.xyz");
+    assert.equal((await readCocoCard(card.id))?.stage, "queued");
+    const drafting = await post(letter(card.id, "drafting"));
+    assert.equal(drafting.status, 200);
   });
 
   test("blocked cards are refused with no write, and a second press queues once", async () => {
