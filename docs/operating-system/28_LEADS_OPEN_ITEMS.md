@@ -14,8 +14,6 @@ Logged 19th November 2026. Items (a), (b), and (d) are still open. Item (c) has 
 
 (c) **Booking link.** Direction recorded in `30_LEADS_STRATEGY.md`, Decisions, 19th November 2026. Meetings go through Calendly or Google Calendar, and the card updates automatically when a meeting is booked. The tool choice and the connection stay open. The new service needs Chris's yes before it is connected. On the Hunter branch `cursor/hunter-phase-one-hardening-1ff2`, booked is still a desk tap, and no booking-link service is connected.
 
-(d) **Revenue Swarm.** "Revenue Swarm" is not defined in the Source of Truth.
-
 ## Open
 
 1. **Website copy Google Doc.** Under review. Site copy updates are in progress. Come back to it.
@@ -42,3 +40,4 @@ Logged 19th November 2026. Items (a), (b), and (d) are still open. Item (c) has 
 
 - 19th November 2026. File 30 named as the governing frame. Four differences logged above and left open: the enrichment owner, Coco and Nova, the booking link, and Revenue Swarm.
 - 19th November 2026. Decisions in `30_LEADS_STRATEGY.md`, Decisions, 19th November 2026. No numbered open item was closed. Items (a), (b), and (d) stay open. Item (c) stays open: the direction is recorded, and the tool choice and the connection stay open.
+- 19th November 2026. Item (d) Revenue Swarm removed. Christopher confirmed it is not an Unearth Self item; it was an outside product shared only as a reference for outbound strategy.
