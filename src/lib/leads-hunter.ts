@@ -453,15 +453,6 @@ function cityFromPlace(place: string): LeadCity {
   return "Elsewhere";
 }
 
-function placeMatchesRegion(place: string, city: LeadCity, regionId: string) {
-  if (regionId === "anywhere") return true;
-  if (regionId === "canada" && city !== "Elsewhere") return true;
-  const region = HUNTER_REGIONS.find((item) => item.id === regionId);
-  if (!region) return false;
-  const hay = place.toLowerCase();
-  return region.placeTerms.some((term) => hay.includes(term));
-}
-
 function domainOnSource(domain: string, sourceUrl: string, page: string) {
   try {
     const host = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
@@ -532,7 +523,7 @@ function industryFromPage(raw: string, page: string): Industry {
 
 /**
  * Drop anything the fetched page does not show.
- * A company outside Canada is kept when its place is on the page.
+ * Place is recorded and scored. It never drops a company.
  */
 export function verifyHunterDrafts(
   drafts: HunterDraft[],
@@ -548,7 +539,6 @@ export function verifyHunterDrafts(
     if (!domainOnSource(draft.domain, draft.sourceUrl, page)) continue;
     const place = draft.place && pageHas(page, draft.place) ? draft.place : "";
     const city = place ? cityFromPlace(place) : "Elsewhere";
-    if (!placeMatchesRegion(place || city, city, opts.regionId)) continue;
     const contactPageUrl = /^https?:\/\//i.test(draft.buyer.emailSource) ? draft.buyer.emailSource : "";
     const contactPage = contactPageUrl ? (pages[contactPageUrl] ?? "") : "";
     const movedOnContact = pageShowsMovedOn(contactPage, draft.buyer.name, draft.org);
@@ -888,7 +878,7 @@ export async function readPages(urls: string[], timeLeft?: () => number) {
 export function draftDropReason(
   draft: HunterDraft,
   page: string,
-  regionId: string,
+  _regionId: string,
   fetchReason?: import("./hunter-phase.ts").PageRead["reason"],
   source?: HunterSource,
 ): import("./hunter-phase.ts").DropReason | null {
@@ -899,9 +889,6 @@ export function draftDropReason(
   }
   if (!pageHas(page, draft.org)) return "name-missing";
   if (!domainOnSource(draft.domain, draft.sourceUrl, page)) return "domain-mismatch";
-  const place = draft.place && pageHas(page, draft.place) ? draft.place : "";
-  const city = place ? cityFromPlace(place) : "Elsewhere";
-  if (!placeMatchesRegion(place || city, city, regionId)) return "place-mismatch";
   return null;
 }
 

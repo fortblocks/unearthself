@@ -212,13 +212,11 @@ const CANADA_TERMS = [
 ];
 const WEST_COAST_TERMS = ["california", "washington", "seattle", "san francisco", "los angeles", "silicon valley", "bay area"];
 
-function regionTravel(regionId: string) {
-  const region = HUNTER_REGIONS.find((item) => item.id === regionId);
-  return Math.max(1, Math.min(10, region?.travel ?? HUNTER_REGION_WEIGHTS.elsewhere));
-}
-
-/** Place-based travel weight. The region id is only the fallback when the place names nothing finer. */
-export function regionWeightForPlace(place: string, regionId: string) {
+/**
+ * Place-based travel weight. A blank place, or one with no matching word, scores at the
+ * lowest non-zero weight. The slot id is not a filter and does not raise that score.
+ */
+export function regionWeightForPlace(place: string, _regionId: string) {
   const hay = place.toLowerCase();
   const has = (terms: readonly string[]) => terms.some((term) => hay.includes(term));
   if (has(ALBERTA_TERMS)) return HUNTER_REGION_WEIGHTS.alberta;
@@ -230,7 +228,7 @@ export function regionWeightForPlace(place: string, regionId: string) {
   const europe = HUNTER_REGIONS.find((item) => item.id === "europe");
   if (europe && has(europe.placeTerms)) return HUNTER_REGION_WEIGHTS.europe;
   if (has(["united states", "u.s.", "usa"])) return HUNTER_REGION_WEIGHTS.unitedStates;
-  return regionTravel(regionId);
+  return HUNTER_REGION_WEIGHTS.elsewhere;
 }
 
 /** Contact-ready cards filed per Edmonton day. Both runs count together. */

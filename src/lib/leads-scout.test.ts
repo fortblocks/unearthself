@@ -20,7 +20,7 @@ test("contactIfPresent keeps a name and email only when the page contains them",
   assert.equal(noUrl.email, "");
 });
 
-test("selectScoutRows keeps any headcount and industry in the three cities", () => {
+test("selectScoutRows keeps any headcount, industry, and city", () => {
   const rows = selectScoutRows({
     companies: [
       {
@@ -75,11 +75,32 @@ test("selectScoutRows keeps any headcount and industry in the three cities", () 
       },
     ],
   });
-  assert.deepEqual(rows.map((row) => row.domain), ["northline.example", "small.example", "software.example", "huge.example"]);
+  assert.deepEqual(rows.map((row) => row.domain), [
+    "northline.example",
+    "small.example",
+    "lethbridge.example",
+    "software.example",
+    "huge.example",
+  ]);
   assert.equal(rows[0]?.sizeBand, "80-800");
   assert.equal(rows[1]?.sizeBand, "1-49");
-  assert.equal(rows[3]?.sizeBand, "1500+");
+  assert.equal(rows[2]?.city, "Elsewhere");
+  assert.equal(rows[4]?.sizeBand, "1500+");
   assert.equal(rows[0]?.buyer?.email, "pat.lee@northline.example");
+  const scored = {
+    industry: "other" as const,
+    sizeBand: "unknown" as const,
+    sourceUrl: "https://example.test",
+    buyerName: "",
+    email: "",
+    emailSource: "",
+    signals: [],
+    today: "2026-11-20",
+  };
+  const calgary = scoreCompany({ ...scored, city: "Calgary" });
+  const away = scoreCompany({ ...scored, city: "Elsewhere" });
+  assert.ok(calgary.geo > away.geo);
+  assert.ok(away.geo > 0);
 });
 
 test("applyVerifiedContacts blanks a buyer when the page does not contain the contact", () => {

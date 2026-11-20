@@ -21,8 +21,6 @@ import {
   type ScoutIngest,
 } from "./lead-score.ts";
 
-const TARGET_CITIES = new Set(["Calgary", "Edmonton", "Red Deer"]);
-
 export function contactIfPresent(
   pageText: string,
   name: string,
@@ -53,7 +51,7 @@ function asRecord(row: unknown): Record<string, unknown> | null {
   return row as Record<string, unknown>;
 }
 
-/** Keep sourced Calgary, Edmonton, and Red Deer rows. Headcount and industry are not filters. */
+/** Keep sourced rows from any city. Headcount and industry are not filters. Alberta still scores higher. */
 export function selectScoutRows(raw: unknown): ScoutIngest[] {
   const record = asRecord(raw);
   const list = Array.isArray(raw) ? raw : Array.isArray(record?.companies) ? record.companies : [];
@@ -65,8 +63,7 @@ export function selectScoutRows(raw: unknown): ScoutIngest[] {
     const domain = normalizeDomain(String(row.domain ?? ""));
     const org = String(row.org ?? "").trim();
     if (!domain || seen.has(domain) || isSeparateStudio(domain, org)) continue;
-    const city = coerceCity(String(row.city ?? ""), "Alberta");
-    if (!TARGET_CITIES.has(city)) continue;
+    const city = coerceCity(String(row.city ?? ""), "Elsewhere");
     const rawSize = String(row.sizeBand ?? "").trim();
     const sizeBand = rawSize ? coerceSize(rawSize, "unknown") : "unknown";
     const rawIndustry = String(row.industry ?? "").trim();

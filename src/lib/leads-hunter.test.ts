@@ -167,6 +167,48 @@ test("verifyHunterDrafts keeps only text that is on the page", () => {
   assert.ok(card.hunterScore > 0);
 });
 
+test("geography scores a company and never drops it", () => {
+  const calgaryPage = "Northwind Energy is in Calgary, Alberta. northwind.example.";
+  const seattlePage = "Harbor Software is in Seattle, WA. harbor.example.";
+  const halifaxPage = "Atlantic Mills is in Halifax, NS. atlantic.example.";
+  const blankPage = "Prairie Tools builds equipment. prairie.example.";
+  const buyer = { name: "", title: "", email: "", emailSource: "" };
+  const row = (org: string, domain: string, place: string, source: string) =>
+    draft({
+      org,
+      domain,
+      place,
+      sourceUrl: source,
+      signals: [],
+      profileSignals: [],
+      buyer,
+    });
+  const opts = { regionId: "canada", today: "2026-11-18" };
+  const [alberta] = verifyHunterDrafts([row("Northwind Energy", "northwind.example", "Calgary, Alberta", "https://northwind.example/about")], { "https://northwind.example/about": calgaryPage }, opts);
+  const [seattle] = verifyHunterDrafts([row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about")], { "https://harbor.example/about": seattlePage }, opts);
+  const [halifax] = verifyHunterDrafts([row("Atlantic Mills", "atlantic.example", "Halifax, NS", "https://atlantic.example/about")], { "https://atlantic.example/about": halifaxPage }, opts);
+  const [unprinted] = verifyHunterDrafts([row("Prairie Tools", "prairie.example", "Calgary, Alberta", "https://prairie.example/about")], { "https://prairie.example/about": blankPage }, opts);
+  assert.ok(alberta && seattle && halifax && unprinted);
+  assert.equal(alberta.place, "Calgary, Alberta");
+  assert.equal(alberta.city, "Calgary");
+  assert.equal(alberta.hunterBreak.travel, HUNTER_REGION_WEIGHTS.alberta);
+  assert.equal(seattle.place, "Seattle, WA");
+  assert.equal(seattle.hunterBreak.travel, HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(halifax.place, "Halifax, NS");
+  assert.equal(halifax.hunterBreak.travel, HUNTER_REGION_WEIGHTS.elsewhere);
+  assert.equal(unprinted.place, "");
+  assert.equal(unprinted.city, "Elsewhere");
+  assert.equal(unprinted.hunterBreak.travel, HUNTER_REGION_WEIGHTS.elsewhere);
+  assert.ok(alberta.hunterBreak.travel > seattle.hunterBreak.travel);
+  assert.ok(seattle.hunterBreak.travel > halifax.hunterBreak.travel);
+  assert.ok(halifax.hunterBreak.travel > 0);
+  assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), seattlePage, "canada", "ok"), null);
+  assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), "", "canada", "blocked"), "blocked");
+  assert.equal(regionWeightForPlace("Seattle, WA", "canada"), HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(regionWeightForPlace("Halifax, NS", "us"), HUNTER_REGION_WEIGHTS.elsewhere);
+  assert.equal(regionWeightForPlace("", "canada"), HUNTER_REGION_WEIGHTS.elsewhere);
+});
+
 test("a United States company is scored, not dropped", () => {
   const denver = "Range Co is in Denver, United States. We are a distributed team.";
   const source = "https://range.example/about";
