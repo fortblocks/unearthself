@@ -65,6 +65,11 @@ export function cocoAwaitingDraft(coco: Pick<CocoJoin, "stage" | "subject" | "bo
   return coco.subject.trim() === "" && coco.body.trim() === "";
 }
 
+/** A Coco draft or Christopher's edited copy. Blank text is not a draft. */
+export function hasDraftCopy(...texts: Array<string | null | undefined>) {
+  return texts.some((text) => (text ?? "").trim().length > 0);
+}
+
 /** The waiting panel. A rejected write-back replaces the blank wait until a draft is accepted. */
 export function draftPanelKind(
   coco: Pick<CocoJoin, "stage" | "subject" | "body" | "draftRejected">,
@@ -162,6 +167,7 @@ export function LeadCardActions({
   const rejected = awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check));
   const wait = !awaiting ? null : rejected ? "rejected" : draftWait === "late" ? "late" : "writing";
   const skip = skipReasonLines(coco);
+  const hasDraft = hasDraftCopy(subject, body, coco.subject, coco.body);
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
@@ -222,9 +228,8 @@ export function LeadCardActions({
           coco.blocked.map((reason) => createElement("li", { key: reason, className: "text-sm text-coal" }, reason)),
         )
       : null,
-    wait || coco.stage === "draft-skipped"
-      ? null
-      : createElement(
+    hasDraft
+      ? createElement(
       "div",
       null,
       createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Draft"),
@@ -265,7 +270,8 @@ export function LeadCardActions({
       ),
       warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
       editable ? actionButton("Save copy", onSaveCopy) : null,
-    ),
+    )
+      : null,
   );
 }
 

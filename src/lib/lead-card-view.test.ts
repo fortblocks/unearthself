@@ -11,6 +11,7 @@ import {
   draftPanelKind,
   draftPollDecision,
   emptyCoco,
+  hasDraftCopy,
   leadOnDesk,
   LeadCardActions,
   skipReasonLines,
@@ -181,6 +182,107 @@ test("a rejected write-back says Coco is retrying, and the skip reason stays one
   );
   assert.equal(ready.includes("draft was rejected, retrying"), false);
   assert.equal(ready.includes("A week in Drumheller"), true);
+});
+
+test("subject and email stay hidden until a draft exists", () => {
+  const hidden: Array<{ name: string; coco: CocoJoin; draftWait?: "rejected" }> = [
+    { name: "new", coco: emptyCoco({ stage: "new", stageLabel: "Unreviewed" }) },
+    { name: "approved", coco: emptyCoco({ stage: "approved", stageLabel: "Approved", status: "Approved." }) },
+    { name: "queued", coco: emptyCoco({ stage: "queued", stageLabel: "Queued", status: "Approved, waiting for Coco.", touch: 1 }) },
+    { name: "drafting", coco: emptyCoco({ stage: "drafting", stageLabel: "Drafting", status: "Coco is writing the draft.", touch: 1 }) },
+    {
+      name: "rejected",
+      coco: emptyCoco({
+        stage: "queued",
+        stageLabel: "Queued",
+        status: "Approved, waiting for Coco.",
+        touch: 1,
+        draftRejected: { at: "2026-11-20T20:11:00.000Z", check: "em-dash" },
+      }),
+      draftWait: "rejected",
+    },
+    {
+      name: "skipped",
+      coco: emptyCoco({
+        stage: "draft-skipped",
+        stageLabel: "Draft skipped",
+        skipNote: "No retreat fit",
+        status: "",
+      }),
+    },
+  ];
+  for (const item of hidden) {
+    assert.equal(hasDraftCopy(item.coco.subject, item.coco.body), false, item.name);
+    const html = renderToStaticMarkup(
+      createElement(LeadCardActions, {
+        cardId: "much-better",
+        coco: item.coco,
+        subject: "   ",
+        body: "",
+        draftWait: item.draftWait,
+      }),
+    );
+    assert.equal(html.includes('id="much-better-subject"'), false, item.name);
+    assert.equal(html.includes('id="much-better-body"'), false, item.name);
+    assert.equal(html.includes(">Subject<"), false, item.name);
+    assert.equal(html.includes(">Email<"), false, item.name);
+    assert.equal(controlLabels(html).includes("Save copy"), false, item.name);
+    assert.equal(html.includes("\u2014"), false, item.name);
+  }
+  const retrying = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: hidden[4]?.coco ?? emptyCoco(),
+      subject: "",
+      body: "",
+      draftWait: "rejected",
+    }),
+  );
+  assert.equal(retrying.includes("draft was rejected, retrying"), true);
+  const skipped = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: hidden[5]?.coco ?? emptyCoco(),
+      subject: "",
+      body: "",
+    }),
+  );
+  assert.equal(skipped.split("No retreat fit").length - 1, 1);
+
+  const drafted = emptyCoco({
+    stage: "draft-ready",
+    stageLabel: "Draft ready",
+    status: "Read the draft, then approve the wording.",
+    touch: 1,
+    subject: "A week in Drumheller",
+    body: "Hello from Drumheller.",
+    canApproveWording: true,
+  });
+  const shown = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: drafted,
+      subject: drafted.subject,
+      body: drafted.body,
+    }),
+  );
+  assert.equal(shown.includes('id="much-better-subject"'), true);
+  assert.equal(shown.includes('id="much-better-body"'), true);
+  assert.equal(shown.includes(">Subject<"), true);
+  assert.equal(shown.includes(">Email<"), true);
+  assert.equal(shown.includes("A week in Drumheller"), true);
+  assert.equal(controlLabels(shown).includes("Save copy"), true);
+
+  const edited = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "much-better",
+      coco: emptyCoco({ stage: "draft-ready", stageLabel: "Draft ready", touch: 1 }),
+      subject: "Edited subject",
+      body: "Edited letter.",
+    }),
+  );
+  assert.equal(edited.includes('id="much-better-subject"'), true);
+  assert.equal(edited.includes("Edited letter."), true);
 });
 
 test("the card notes when the unsubscribe link was added", () => {
