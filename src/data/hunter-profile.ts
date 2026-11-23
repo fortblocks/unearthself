@@ -407,17 +407,19 @@ export function isPhaseOneCompany(input: { place?: string | null; city?: string 
 }
 
 /**
- * Soft regional priority inside a filed card. Review it each month.
- * Alberta and the rest of Canada come first, then Vancouver, then California and Washington.
- * Europe and Mexico keep a low score for old cards. Phase one does not search or file them.
+ * Soft regional priority inside a filed card.
+ * Approved 23rd November 2026. Edmonton, Calgary, and Red Deer are 10.
+ * The rest of Alberta is 9. The rest of Canada is 7. The United States is 6.
+ * No Canadian or United States location is excluded. Europe and Mexico stay low for old cards.
  */
 export const HUNTER_REGION_WEIGHTS = {
   fixed: false,
   reviewed: "monthly",
-  alberta: 10,
-  canada: 9,
-  vancouver: 8,
-  californiaWashington: 7,
+  threeCities: 10,
+  alberta: 9,
+  canada: 7,
+  vancouver: 7,
+  californiaWashington: 6,
   unitedStates: 6,
   europe: 3,
   mexico: 3,
@@ -433,40 +435,23 @@ export const HUNTER_STRATEGY_REVIEW = {
   regionWeights: HUNTER_REGION_WEIGHTS,
 } as const;
 
-const ALBERTA_TERMS = ["calgary", "edmonton", "red deer", "alberta"];
-const CANADA_TERMS = [
-  "canada",
-  "toronto",
-  "ottawa",
-  "montreal",
-  "montréal",
-  "winnipeg",
-  "british columbia",
-  "quebec",
-  "québec",
-  "manitoba",
-  "saskatchewan",
-  "nova scotia",
-  "new brunswick",
-];
-const WEST_COAST_TERMS = ["california", "washington", "seattle", "san francisco", "los angeles", "silicon valley", "bay area"];
-
 /**
  * Place-based travel weight. A blank place, or one with no matching word, scores at the
  * lowest non-zero weight. The slot id is not a filter and does not raise that score.
+ * Edmonton, Calgary, and Red Deer are 10. The rest of Alberta is 9. The rest of Canada is 7.
+ * Every United States place is 6. Nothing inside those two countries is excluded.
  */
 export function regionWeightForPlace(place: string, _regionId: string) {
   const hay = place.toLowerCase();
   const has = (terms: readonly string[]) => terms.some((term) => hay.includes(term));
-  if (has(ALBERTA_TERMS)) return HUNTER_REGION_WEIGHTS.alberta;
-  if (hay.includes("vancouver")) return HUNTER_REGION_WEIGHTS.vancouver;
-  if (has(CANADA_TERMS)) return HUNTER_REGION_WEIGHTS.canada;
-  const district = hay.includes("washington, dc") || hay.includes("washington dc") || hay.includes("district of columbia");
-  if (!district && has(WEST_COAST_TERMS)) return HUNTER_REGION_WEIGHTS.californiaWashington;
+  if (has(["edmonton", "calgary", "red deer"])) return HUNTER_REGION_WEIGHTS.threeCities;
+  if (hay.includes("alberta")) return HUNTER_REGION_WEIGHTS.alberta;
   if (!hay.includes("new mexico") && hay.includes("mexico")) return HUNTER_REGION_WEIGHTS.mexico;
   const europe = HUNTER_REGIONS.find((item) => item.id === "europe");
   if (europe && has(europe.placeTerms)) return HUNTER_REGION_WEIGHTS.europe;
-  if (has(["united states", "u.s.", "usa"])) return HUNTER_REGION_WEIGHTS.unitedStates;
+  const country = countryFromPlace(place);
+  if (country === "Canada") return HUNTER_REGION_WEIGHTS.canada;
+  if (country === "United States") return HUNTER_REGION_WEIGHTS.unitedStates;
   return HUNTER_REGION_WEIGHTS.elsewhere;
 }
 

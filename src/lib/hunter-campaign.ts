@@ -18,6 +18,9 @@ export const HUNTER_COMPANY_SOURCE_DEFAULT = "campaign";
 export const APOLLO_BASIC_MONTHLY_CREDITS = 2500;
 export const APOLLO_CREDIT_ALARM_AT = 2000;
 export const CAMPAIGN_PAGES_PER_REGION = 10;
+/** Bump when a stored campaign must drop a stuck exhausted flag and pull again. */
+export const CAMPAIGN_STATE_VERSION = 2;
+export const THREE_CITY_LOCATIONS = ["Edmonton, Alberta, Canada", "Calgary, Alberta, Canada", "Red Deer, Alberta, Canada"] as const;
 export const CAMPAIGN_COMPANIES_PER_PASS = 4;
 
 export type CompanySource = "campaign" | "xai";
@@ -99,6 +102,7 @@ export type CampaignState = {
   queued: RankedCompany[];
   drawCursor: number;
   creditsMonth: string;
+  version: number;
 };
 
 const BUYER_TITLE_TERMS = ["head of people", "office manager", "executive assistant", "chief of staff", "people", "culture", "events", "learning"];
@@ -166,7 +170,69 @@ export function freshCampaign(today: string, segment = FIRST_SEGMENT): CampaignS
     queued: [],
     drawCursor: 0,
     creditsMonth: today.slice(0, 7),
+    version: CAMPAIGN_STATE_VERSION,
   };
+}
+
+function campaignFromRaw(raw: unknown): CampaignState | null {
+  const value = typeof raw === "string" ? safeCampaignJson(raw) : raw;
+  if (!value || typeof value !== "object") return null;
+  const row = value as Partial<CampaignState>;
+  if (!row.segmentId || !Array.isArray(row.queued) || !row.split) return null;
+  const today = "2026-11-20";
+  const base = freshCampaign(today);
+  return {
+    ...base,
+    ...row,
+    version: typeof row.version === "number" ? row.version : 1,
+    nextPage: row.nextPage ?? base.nextPage,
+    pagesPulled: row.pagesPulled ?? base.pagesPulled,
+    exhausted: row.exhausted ?? base.exhausted,
+    seenIds: row.seenIds ?? [],
+    queued: row.queued,
+    split: row.split,
+    weights: row.weights ?? base.weights,
+  };
+}
+
+function safeCampaignJson(raw: string) {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Clears a stuck exhausted list from an older stored campaign so the next run pulls again. */
+export function recoverStuckCampaign(state: CampaignState, today: string): CampaignState {
+  return {
+    ...state,
+    version: CAMPAIGN_STATE_VERSION,
+    exhausted: { canada: false, us: false },
+    pagesPulled: { canada: 0, us: 0 },
+    planNote: `${state.planNote} Recovered on ${today}. Canada and the United States pull again. The stuck exhausted flags are cleared.`,
+  };
+}
+
+/** The page cap is per Edmonton week. A new Monday clears exhausted flags and the week's page counts. */
+export function resetCampaignWeek(state: CampaignState, today: string): CampaignState {
+  const start = weekStartMonday(today);
+  if (state.weekStart === start) return state;
+  return {
+    ...state,
+    weekStart: start,
+    pagesPulled: { canada: 0, us: 0 },
+    exhausted: { canada: false, us: false },
+    suggestionReason: "",
+    planNote: `${state.planNote} New week ${start}. The weekly page cap and exhausted flags are reset.`,
+  };
+}
+
+export function loadCampaignState(raw: unknown, today: string): CampaignState {
+  const parsed = campaignFromRaw(raw);
+  if (!parsed) return freshCampaign(today);
+  const current = parsed.version === CAMPAIGN_STATE_VERSION ? parsed : recoverStuckCampaign(parsed, today);
+  return resetCampaignWeek(current, today);
 }
 
 export function suggestSegment(input: {
@@ -242,7 +308,7 @@ function headcountPoints(employees: number | null, weight: number) {
 
 export function rankOrganizations(orgs: ApolloOrganization[], region: "canada" | "us", weights: RankWeights, page: number): RankedCompany[] {
   const ranked = orgs
-    .filter((org) => phaseOneCountry(org.country, org.place))
+    .filter((org) => phaseOneCountry(org.country, org.place, region))
     .map((org) => {
       const inputs: string[] = [];
       let score = 0;
@@ -292,11 +358,36 @@ export function applyBuyerTitleBoost(ranked: RankedCompany[], titlesByDomain: Re
     .sort((a, b) => b.score - a.score || a.domain.localeCompare(b.domain));
 }
 
-function phaseOneCountry(country: string, place: string) {
-  const hay = `${country} ${place}`.toLowerCase();
+/** Blank or unknown stays when the search itself was Canada or the United States. A printed other country does not. */
+export function phaseOneCountry(country: string, place: string, searched?: "canada" | "us") {
+  const hay = `${country} ${place}`.toLowerCase().trim();
+  const blank = hay === "" || hay === "unknown" || hay === "elsewhere";
+  if (blank) return searched === "canada" || searched === "us";
   if (hay.includes("canada")) return true;
   if (hay.includes("united states") || hay.includes("usa") || hay.includes("u.s.")) return true;
   return false;
+}
+
+export type SearchDraw = {
+  region: "canada" | "us";
+  tier: "three-city" | "canada" | "us";
+  locations: string[];
+};
+
+/**
+ * 70/30 Canada/United States. Of each 7 Canadian draws, 3 search Edmonton, Calgary, and Red Deer.
+ * The other 4 search Canada. No location inside either country is excluded.
+ */
+export function searchDraw(cursor: number, split: { canada: number; us: number } = HUNTER_REGION_SPLIT): SearchDraw {
+  const cycle = searchRegionCycle({ canada: split.canada, us: split.us } as typeof HUNTER_REGION_SPLIT);
+  const index = cycle.length ? cursor % cycle.length : 0;
+  const slot = cycle[index] ?? "canada";
+  if (slot === "us") return { region: "us", tier: "us", locations: ["United States"] };
+  const canadaIndex = cycle.slice(0, index + 1).filter((item) => item === "canada").length - 1;
+  if (canadaIndex >= 0 && canadaIndex < 3) {
+    return { region: "canada", tier: "three-city", locations: [...THREE_CITY_LOCATIONS] };
+  }
+  return { region: "canada", tier: "canada", locations: ["Canada"] };
 }
 
 function fundingWithin18Months(iso: string, today = "2026-11-20") {
@@ -339,28 +430,67 @@ export function takeQueued(state: CampaignState, known: Set<string>, limit: numb
   return { state: { ...collected.state, drawCursor: state.drawCursor + 1 }, taken: collected.taken, region };
 }
 
-export function acceptPage(state: CampaignState, region: "canada" | "us", organizations: ApolloOrganization[], today: string): { state: CampaignState; added: number; stopPulls: boolean } {
-  const fresh = organizations.filter((org) => !state.seenIds.includes(org.id) && phaseOneCountry(org.country, org.place));
-  const stopPulls = organizations.length > 0 && fresh.length === 0;
-  if (stopPulls) {
-    return { state: { ...state, exhausted: { ...state.exhausted, [region]: true } }, added: 0, stopPulls: true };
+export type PageAccept = {
+  state: CampaignState;
+  added: number;
+  returned: number;
+  seen: number;
+  outOfRegion: number;
+  exhausted: boolean;
+  /** True only when Apollo returned no rows, the last page, or the weekly cap. A page of already-seen companies is not exhausted. */
+  stopPulls: boolean;
+};
+
+export function acceptPage(
+  state: CampaignState,
+  region: "canada" | "us",
+  organizations: ApolloOrganization[],
+  today: string,
+  totalPages?: number,
+): PageAccept {
+  const seenIds = new Set(state.seenIds);
+  let seen = 0;
+  let outOfRegion = 0;
+  const fresh: ApolloOrganization[] = [];
+  for (const org of organizations) {
+    if (seenIds.has(org.id)) {
+      seen += 1;
+      continue;
+    }
+    seenIds.add(org.id);
+    if (!phaseOneCountry(org.country, org.place, region)) {
+      outOfRegion += 1;
+      continue;
+    }
+    fresh.push(org);
   }
   const ranked = rankOrganizations(fresh, region, state.weights, state.nextPage[region]);
-  const knownIds = new Set(state.seenIds);
-  for (const row of ranked) knownIds.add(row.id);
+  const pagesPulled = state.pagesPulled[region] + 1;
+  const atEnd = typeof totalPages === "number" && totalPages > 0 && state.nextPage[region] >= totalPages;
+  const empty = organizations.length === 0;
+  const cap = pagesPulled >= CAMPAIGN_PAGES_PER_REGION;
+  const exhausted = empty || atEnd || cap;
   return {
     state: {
       ...state,
-      seenIds: [...knownIds],
+      seenIds: [...seenIds],
       queued: [...state.queued, ...ranked],
       nextPage: { ...state.nextPage, [region]: state.nextPage[region] + 1 },
-      pagesPulled: { ...state.pagesPulled, [region]: state.pagesPulled[region] + 1 },
-      exhausted: { ...state.exhausted, [region]: organizations.length === 0 },
+      pagesPulled: { ...state.pagesPulled, [region]: pagesPulled },
+      exhausted: { ...state.exhausted, [region]: exhausted },
       creditsMonth: today.slice(0, 7),
     },
     added: ranked.length,
-    stopPulls: false,
+    returned: organizations.length,
+    seen,
+    outOfRegion,
+    exhausted,
+    stopPulls: exhausted,
   };
+}
+
+export function pageDropNote(result: Pick<PageAccept, "returned" | "seen" | "outOfRegion" | "added">) {
+  return `Returned ${result.returned}. Already seen ${result.seen}. Outside Canada and the United States ${result.outOfRegion}. New ${result.added}.`;
 }
 
 export function needsAnotherPage(state: CampaignState, region: "canada" | "us") {

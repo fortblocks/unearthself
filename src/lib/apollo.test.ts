@@ -17,6 +17,7 @@ import {
   apolloFailureCode,
   enrichHunterContacts,
   companySearchParams,
+  readApolloOrganization,
   searchApolloCompanies,
 } from "./apollo.ts";
 import { hasBuyerContact, isContactReady } from "./hunter-cap.ts";
@@ -361,4 +362,32 @@ test("company search asks for a country and an industry, never a headcount range
   assert.equal(result.totalEntries, 440);
   assert.equal(result.organizations[0]?.employees, 18);
   assert.equal(result.organizations[0]?.country, "Canada");
+});
+
+test("a company search with no city still keeps the searched country", () => {
+  const org = readApolloOrganization(
+    { id: "org-blank", name: "Blank Place", primary_domain: "blank.example" },
+    "Canada",
+  );
+  assert.ok(org);
+  assert.equal(org?.country, "Canada");
+  assert.equal(org?.place, "Canada");
+  const printed = readApolloOrganization(
+    { id: "org-de", name: "Berlin Co", primary_domain: "berlin.example", country: "Germany", city: "Berlin" },
+    "Canada",
+  );
+  assert.equal(printed?.country, "Germany");
+  assert.equal(printed?.place, "Berlin, Germany");
+  const cities = companySearchParams({
+    locations: ["Edmonton, Alberta, Canada", "Calgary, Alberta, Canada", "Red Deer, Alberta, Canada"],
+    industries: ["information technology & services"],
+    page: 1,
+    perPage: 100,
+  });
+  assert.deepEqual(cities.getAll("organization_locations[]"), [
+    "Edmonton, Alberta, Canada",
+    "Calgary, Alberta, Canada",
+    "Red Deer, Alberta, Canada",
+  ]);
+  assert.equal(cities.has("organization_not_locations[]"), false);
 });

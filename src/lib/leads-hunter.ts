@@ -5,10 +5,11 @@
  * Apollo may add one licensed contact when APOLLO_API_KEY is set. The key is never logged.
  */
 
-import { HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, isPhaseOneCompany, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
+import { companyCountry, HUNTER_DAILY_CARD_TARGET, HUNTER_REGIONS, HUNTER_SIGNALS, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
 import { apolloApiKey, apolloCreditCap, buyerTitlesAtCompany, enrichHunterContacts, searchApolloCompanies } from "./apollo.ts";
 import {
   acceptPage,
+  CAMPAIGN_PAGES_PER_REGION,
   apolloCreditKey,
   apolloProfileSignals,
   applyBuyerTitleBoost,
@@ -19,11 +20,13 @@ import {
   freshCampaign,
   HUNTER_CAMPAIGN_KEY,
   keywordSignalsOnPage,
+  loadCampaignState,
   needsAnotherPage,
   nextWeights,
+  pageDropNote,
   profileSignalsOnPage,
+  searchDraw,
   signOffSuggestion,
-  regionForDraw,
   segmentById,
   signedSegment,
   withMondaySuggestion,
@@ -825,14 +828,17 @@ export function fileHunterCards(
       noteDrop("duplicate");
       continue;
     }
-    const inRegion = isPhaseOneCompany({
+    const country = companyCountry({
       place: card.place,
       city: card.city,
       page: opts.pages?.[card.sourceUrl],
     });
+    const searchedHere = card.hunterRegion === "canada" || card.hunterRegion === "us";
+    const inRegion = country === "Canada" || country === "United States" || (country === "unknown" && searchedHere);
     if (!inRegion) {
       const stored = index === -1 ? null : next[index];
-      const existingInRegion = stored ? isPhaseOneCompany({ place: stored.place, city: stored.city }) : false;
+      const storedCountry = stored ? companyCountry({ place: stored.place, city: stored.city }) : "other";
+      const existingInRegion = storedCountry === "Canada" || storedCountry === "United States";
       if (!existingInRegion) {
         noteDrop("outOfRegion");
         continue;
@@ -1290,19 +1296,7 @@ function dayStopCopy() {
 }
 
 function parseCampaign(raw: unknown, today: string): CampaignState {
-  const value = typeof raw === "string" ? safeJson(raw) : raw;
-  if (!value || typeof value !== "object") return freshCampaign(today);
-  const row = value as CampaignState;
-  if (!row.segmentId || !Array.isArray(row.queued) || !row.split) return freshCampaign(today);
-  return row;
-}
-
-function safeJson(raw: string) {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
+  return loadCampaignState(raw, today);
 }
 
 async function readCampaign(redis: { get<T>(key: string): Promise<T | null> }, today: string) {
@@ -1414,14 +1408,15 @@ async function prepareCampaignDrafts(
     }
     note = `${state.planNote} Canada list size ${state.canadaSize ?? "not sized"}. United States list size ${state.usSize ?? "not sized"}.`;
   }
-  const region = regionForDraw(state.drawCursor, state.split);
+  const draw = searchDraw(state.drawCursor, state.split);
+  const region = draw.region;
   let collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
   state = collected.state;
   let taken = collected.taken;
   if (taken.length === 0 && needsAnotherPage(state, region) && key && input.timeLeft() > 5_000) {
-    const country = region === "us" ? "United States" : "Canada";
     const searched = await searchApolloCompanies({
-      country,
+      country: region === "us" ? "United States" : "Canada",
+      locations: draw.locations,
       industries: segment.industries,
       page: state.nextPage[region],
       perPage: 100,
@@ -1438,8 +1433,11 @@ async function prepareCampaignDrafts(
       await redis.incrby(apolloCreditKey(month), searched.credits);
       await redis.incrby(apolloCreditKey(input.today), searched.credits);
     }
-    const accepted = acceptPage(state, region, searched.organizations, input.today);
+    const accepted = acceptPage(state, region, searched.organizations, input.today, searched.totalPages);
     state = accepted.state;
+    const dropNote = pageDropNote(accepted);
+    console.info(JSON.stringify({ hunter: "campaign-page", region, tier: draw.tier, returned: accepted.returned, seen: accepted.seen, outOfRegion: accepted.outOfRegion, added: accepted.added }));
+    note = `${note} ${dropNote}`;
     if (accepted.added > 0 && input.timeLeft() > 8_000) {
       const top = [...state.queued].filter((row) => row.region === region && row.page === state.nextPage[region] - 1).sort((a, b) => b.score - a.score).slice(0, 5);
       const titles: Record<string, string[]> = {};
@@ -1449,7 +1447,8 @@ async function prepareCampaignDrafts(
       }
       state = { ...state, queued: applyBuyerTitleBoost(state.queued, titles, state.weights) };
     }
-    if (accepted.stopPulls) note = `${note} A page added no new companies, so further pulls for ${region} are stopped.`;
+    if (accepted.exhausted && accepted.returned === 0) note = `${note} ${region} is out of Apollo results.`;
+    else if (accepted.exhausted && accepted.state.pagesPulled[region] >= CAMPAIGN_PAGES_PER_REGION) note = `${note} ${region} reached the weekly page cap of ${CAMPAIGN_PAGES_PER_REGION}.`;
     collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
     state = collected.state;
     taken = collected.taken;

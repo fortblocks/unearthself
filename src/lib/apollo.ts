@@ -571,13 +571,15 @@ export function companySearchUrl(params: URLSearchParams) {
 }
 
 export function companySearchParams(input: {
-  country: "Canada" | "United States";
+  country?: "Canada" | "United States";
+  locations?: string[];
   industries: string[];
   page: number;
   perPage: number;
 }) {
   const params = new URLSearchParams();
-  params.append("organization_locations[]", input.country);
+  const locations = input.locations?.length ? input.locations : input.country ? [input.country] : [];
+  for (const location of locations) params.append("organization_locations[]", location);
   for (const industry of input.industries) params.append("organization_industries[]", industry);
   params.set("page", String(input.page));
   params.set("per_page", String(input.perPage));
@@ -613,7 +615,7 @@ function stringList(value: unknown) {
   return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
 }
 
-export function readApolloOrganization(raw: unknown): ApolloOrganization | null {
+export function readApolloOrganization(raw: unknown, searchedCountry?: "Canada" | "United States"): ApolloOrganization | null {
   const row = asRecord(raw);
   if (!row) return null;
   const name = text(row.name);
@@ -622,7 +624,8 @@ export function readApolloOrganization(raw: unknown): ApolloOrganization | null 
   if (!name || !domain || !id) return null;
   const city = text(row.city) || text(row.organization_city);
   const state = text(row.state) || text(row.organization_state);
-  const country = text(row.country) || text(row.organization_country);
+  const printed = text(row.country) || text(row.organization_country);
+  const country = printed || searchedCountry || "";
   const place = [city, state, country].filter(Boolean).join(", ");
   const latest = Array.isArray(row.funding_events) ? asRecord(row.funding_events[0]) : null;
   return {
@@ -645,7 +648,7 @@ export function readApolloOrganization(raw: unknown): ApolloOrganization | null 
   };
 }
 
-export function parseOrganizationSearch(body: unknown): { failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number } {
+export function parseOrganizationSearch(body: unknown, searchedCountry?: "Canada" | "United States"): { failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number } {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { failure: "Apollo returned an unexpected shape" };
   const record = body as Record<string, unknown>;
   const list = Array.isArray(record.organizations) ? record.organizations : Array.isArray(record.accounts) ? record.accounts : null;
@@ -655,7 +658,7 @@ export function parseOrganizationSearch(body: unknown): { failure: string } | { 
   const totalPages = numberOrNull(pagination?.total_pages) ?? (list.length > 0 ? 1 : 0);
   return {
     organizations: list.flatMap((item) => {
-      const org = readApolloOrganization(item);
+      const org = readApolloOrganization(item, searchedCountry);
       return org ? [org] : [];
     }),
     totalEntries,
@@ -697,8 +700,16 @@ export async function buyerTitlesAtCompany(input: {
   return titlesFromPeopleSearch(body);
 }
 
+export function searchedCountryFor(input: { country?: "Canada" | "United States"; locations?: string[] }): "Canada" | "United States" {
+  if (input.country) return input.country;
+  const locations = input.locations ?? [];
+  const unitedStates = locations.length > 0 && locations.every((item) => /united states|\busa\b|u\.s\./i.test(item));
+  return unitedStates ? "United States" : "Canada";
+}
+
 export async function searchApolloCompanies(input: {
-  country: "Canada" | "United States";
+  country?: "Canada" | "United States";
+  locations?: string[];
   industries: string[];
   page: number;
   perPage: number;
@@ -722,7 +733,7 @@ export async function searchApolloCompanies(input: {
   const warning = `${called.response.headers.get("deprecation") ?? ""} ${called.response.headers.get("warning") ?? ""}`;
   if (called.response.status === 410 || /deprecat/i.test(warning)) return { failure: `Apollo HTTP ${called.response.status}: deprecated` };
   if (!called.response.ok) return { failure: `Apollo HTTP ${called.response.status}` };
-  const parsed = parseOrganizationSearch(body);
+  const parsed = parseOrganizationSearch(body, searchedCountryFor(input));
   if ("failure" in parsed) return parsed;
   return { ...parsed, credits: 1 };
 }

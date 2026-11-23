@@ -5,19 +5,29 @@ import {
   acceptPage,
   applyBuyerTitleBoost,
   apolloProfileSignals,
+  CAMPAIGN_PAGES_PER_REGION,
+  CAMPAIGN_STATE_VERSION,
   companySource,
   creditAlarm,
   freshCampaign,
   keywordSignalsOnPage,
+  loadCampaignState,
+  needsAnotherPage,
   nextWeights,
+  pageDropNote,
+  phaseOneCountry,
   rankOrganizations,
   regionForDraw,
+  searchDraw,
   signOffSuggestion,
   signedSegment,
   STARTING_WEIGHTS,
   suggestSegment,
+  THREE_CITY_LOCATIONS,
   withMondaySuggestion,
 } from "./hunter-campaign.ts";
+import { companySearchParams, readApolloOrganization } from "./apollo.ts";
+import { HUNTER_REGION_WEIGHTS, regionWeightForPlace } from "../data/hunter-profile.ts";
 import { fileHunterCards, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
 
 function org(over: Partial<ApolloOrganization> = {}): ApolloOrganization {
@@ -103,7 +113,7 @@ test("ranking keeps a large company and places the sweet spot higher", () => {
   assert.match(ranked[1]?.inputs.join(" ") ?? "", /still ranked/);
 });
 
-test("the region draw follows 70/30 and a page of known companies stops further pulls", () => {
+test("the region draw follows 70/30 and a page of known companies advances", () => {
   const draws = Array.from({ length: 10 }, (_, index) => regionForDraw(index, { canada: 70, us: 30 }));
   assert.equal(draws.filter((item) => item === "canada").length, 7);
   assert.equal(draws.filter((item) => item === "us").length, 3);
@@ -111,8 +121,11 @@ test("the region draw follows 70/30 and a page of known companies stops further 
   assert.equal(first.added, 1);
   const again = acceptPage(first.state, "canada", [org()], "2026-11-20");
   assert.equal(again.added, 0);
-  assert.equal(again.stopPulls, true);
-  assert.equal(again.state.exhausted.canada, true);
+  assert.equal(again.seen, 1);
+  assert.equal(again.exhausted, false);
+  assert.equal(again.state.exhausted.canada, false);
+  assert.equal(again.state.nextPage.canada, first.state.nextPage.canada + 1);
+  assert.match(pageDropNote(again), /Already seen 1/);
 });
 
 test("apollo funding, hiring, and growth are profile signals, and a keyword counts only on the company site", () => {
@@ -184,4 +197,98 @@ test("an apollo-backed company keeps its place and its apollo signal when the pa
   assert.equal(company?.fieldSources?.place?.via, "Apollo");
   assert.equal(company?.fieldSources?.place?.url, "");
   assert.equal(filed.filed, 1);
+});
+
+test("a blank location from a Canada or United States search is kept", () => {
+  const blank = readApolloOrganization({ id: "blank-1", name: "No City Co", primary_domain: "nocity.example" }, "United States");
+  assert.equal(blank?.country, "United States");
+  assert.equal(phaseOneCountry("", "", "canada"), true);
+  assert.equal(phaseOneCountry("", "", "us"), true);
+  assert.equal(phaseOneCountry("Germany", "Berlin", "canada"), false);
+  const accepted = acceptPage(
+    freshCampaign("2026-11-20"),
+    "canada",
+    [
+      org({ id: "blank-2", domain: "blank.example", name: "Blank Co", country: "", place: "" }),
+      org({ id: "de", domain: "de.example", name: "Berlin Co", country: "Germany", place: "Berlin, Germany" }),
+    ],
+    "2026-11-20",
+  );
+  assert.equal(accepted.added, 1);
+  assert.equal(accepted.outOfRegion, 1);
+  assert.equal(accepted.seen, 0);
+  assert.match(pageDropNote(accepted), /Returned 2/);
+  assert.match(pageDropNote(accepted), /Outside Canada and the United States 1/);
+  const draft: HunterDraft = {
+    domain: "blank.example",
+    org: "Blank Co",
+    place: "",
+    industry: "other",
+    sizeBand: "unknown",
+    sourceUrl: "https://blank.example",
+    signals: [],
+    profileSignals: [{ id: "distributed", sourceUrl: "https://blank.example" }],
+    buyer: { name: "", title: "", email: "", emailSource: "" },
+  };
+  const cards = verifyHunterDrafts([draft], { "https://blank.example": "Blank Co at blank.example runs a distributed team." }, { regionId: "canada", today: "2026-11-20" });
+  assert.equal(cards[0]?.place, "");
+  const filed = fileHunterCards([], cards, { today: "2026-11-20", floor: 0 });
+  assert.equal(filed.filed, 1);
+  assert.equal(filed.drops.outOfRegion, undefined);
+});
+
+test("three of every seven Canadian draws search the three cities, and thirty percent are the United States", () => {
+  const draws = Array.from({ length: 10 }, (_, index) => searchDraw(index));
+  assert.equal(draws.filter((item) => item.tier === "three-city").length, 3);
+  assert.equal(draws.filter((item) => item.tier === "canada").length, 4);
+  assert.equal(draws.filter((item) => item.tier === "us").length, 3);
+  assert.deepEqual(draws[0]?.locations, [...THREE_CITY_LOCATIONS]);
+  assert.deepEqual(draws[3]?.locations, ["Canada"]);
+  assert.deepEqual(draws[7]?.locations, ["United States"]);
+  const params = companySearchParams({ locations: draws[0]?.locations, industries: ["information technology & services"], page: 1, perPage: 100 });
+  assert.equal(params.has("organization_not_locations[]"), false);
+  assert.equal(regionWeightForPlace("Edmonton, Alberta", "canada"), 10);
+  assert.equal(regionWeightForPlace("Calgary, Alberta", "canada"), HUNTER_REGION_WEIGHTS.threeCities);
+  assert.equal(regionWeightForPlace("Red Deer, Alberta", "canada"), 10);
+  assert.equal(regionWeightForPlace("Lethbridge, Alberta", "canada"), 9);
+  assert.equal(regionWeightForPlace("Halifax, NS", "canada"), 7);
+  assert.equal(regionWeightForPlace("Seattle, WA", "us"), 6);
+});
+
+test("an empty Apollo page exhausts the region, and the weekly cap resets on Monday", () => {
+  const empty = acceptPage(freshCampaign("2026-11-20"), "us", [], "2026-11-20");
+  assert.equal(empty.exhausted, true);
+  assert.equal(empty.state.exhausted.us, true);
+  let state = freshCampaign("2026-11-20");
+  for (let n = 0; n < CAMPAIGN_PAGES_PER_REGION; n += 1) {
+    const page = acceptPage(state, "canada", [org({ id: `id-${n}`, domain: `co${n}.example`, name: `Co ${n}` })], "2026-11-20", 50);
+    state = page.state;
+  }
+  assert.equal(state.exhausted.canada, true);
+  assert.equal(state.pagesPulled.canada, CAMPAIGN_PAGES_PER_REGION);
+  const monday = loadCampaignState(state, "2026-11-23");
+  assert.equal(monday.weekStart, "2026-11-23");
+  assert.equal(monday.exhausted.canada, false);
+  assert.equal(monday.pagesPulled.canada, 0);
+  assert.equal(monday.version, CAMPAIGN_STATE_VERSION);
+});
+
+test("a stuck exhausted campaign pulls again without a manual edit", () => {
+  const stuck = {
+    ...freshCampaign("2026-11-20"),
+    version: 1,
+    exhausted: { canada: true, us: true },
+    pagesPulled: { canada: CAMPAIGN_PAGES_PER_REGION, us: CAMPAIGN_PAGES_PER_REGION },
+    queued: [],
+  };
+  const recovered = loadCampaignState(stuck, "2026-11-20");
+  assert.equal(recovered.exhausted.canada, false);
+  assert.equal(recovered.exhausted.us, false);
+  assert.equal(recovered.pagesPulled.canada, 0);
+  assert.equal(recovered.pagesPulled.us, 0);
+  assert.equal(needsAnotherPage(recovered, "canada"), true);
+  assert.equal(needsAnotherPage(recovered, "us"), true);
+  assert.equal(recovered.segmentId, "tech");
+  const stillCapped = loadCampaignState({ ...stuck, version: CAMPAIGN_STATE_VERSION, exhausted: { canada: true, us: false }, pagesPulled: { canada: CAMPAIGN_PAGES_PER_REGION, us: 0 } }, "2026-11-20");
+  assert.equal(stillCapped.exhausted.canada, true);
 });

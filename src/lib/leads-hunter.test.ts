@@ -208,21 +208,21 @@ test("geography scores a company and never drops it", () => {
   assert.ok(alberta && seattle && halifax && unprinted);
   assert.equal(alberta.place, "Calgary, Alberta");
   assert.equal(alberta.city, "Calgary");
-  assert.equal(alberta.hunterBreak.travel, HUNTER_REGION_WEIGHTS.alberta);
+  assert.equal(alberta.hunterBreak.travel, HUNTER_REGION_WEIGHTS.threeCities);
   assert.equal(seattle.place, "Seattle, WA");
-  assert.equal(seattle.hunterBreak.travel, HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(seattle.hunterBreak.travel, HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(halifax.place, "Halifax, NS");
-  assert.equal(halifax.hunterBreak.travel, HUNTER_REGION_WEIGHTS.elsewhere);
+  assert.equal(halifax.hunterBreak.travel, HUNTER_REGION_WEIGHTS.canada);
   assert.equal(unprinted.place, "");
   assert.equal(unprinted.city, "Elsewhere");
   assert.equal(unprinted.hunterBreak.travel, HUNTER_REGION_WEIGHTS.elsewhere);
-  assert.ok(alberta.hunterBreak.travel > seattle.hunterBreak.travel);
-  assert.ok(seattle.hunterBreak.travel > halifax.hunterBreak.travel);
-  assert.ok(halifax.hunterBreak.travel > 0);
+  assert.ok(alberta.hunterBreak.travel > halifax.hunterBreak.travel);
+  assert.ok(halifax.hunterBreak.travel > seattle.hunterBreak.travel);
+  assert.ok(seattle.hunterBreak.travel > 0);
   assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), seattlePage, "canada", "ok"), null);
   assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), "", "canada", "blocked"), "blocked");
-  assert.equal(regionWeightForPlace("Seattle, WA", "canada"), HUNTER_REGION_WEIGHTS.californiaWashington);
-  assert.equal(regionWeightForPlace("Halifax, NS", "us"), HUNTER_REGION_WEIGHTS.elsewhere);
+  assert.equal(regionWeightForPlace("Seattle, WA", "canada"), HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.equal(regionWeightForPlace("Halifax, NS", "us"), HUNTER_REGION_WEIGHTS.canada);
   assert.equal(regionWeightForPlace("", "canada"), HUNTER_REGION_WEIGHTS.elsewhere);
 });
 
@@ -457,19 +457,25 @@ test("region weights are a soft monthly priority, and Europe matches Mexico", ()
   assert.equal(HUNTER_STRATEGY_REVIEW.fixed, false);
   assert.equal(HUNTER_STRATEGY_REVIEW.cadence, "monthly");
   assert.equal(HUNTER_REGION_WEIGHTS.europe, HUNTER_REGION_WEIGHTS.mexico);
-  assert.equal(regionWeightForPlace("Calgary, Alberta", "canada"), HUNTER_REGION_WEIGHTS.alberta);
+  assert.equal(regionWeightForPlace("Calgary, Alberta", "canada"), HUNTER_REGION_WEIGHTS.threeCities);
+  assert.equal(regionWeightForPlace("Edmonton, Alberta", "canada"), 10);
+  assert.equal(regionWeightForPlace("Red Deer, Alberta", "canada"), 10);
+  assert.equal(regionWeightForPlace("Lethbridge, Alberta", "canada"), HUNTER_REGION_WEIGHTS.alberta);
   assert.equal(regionWeightForPlace("Toronto, Canada", "canada"), HUNTER_REGION_WEIGHTS.canada);
-  assert.equal(regionWeightForPlace("Vancouver, Canada", "canada"), HUNTER_REGION_WEIGHTS.vancouver);
-  assert.equal(regionWeightForPlace("San Francisco, California, United States", "us"), HUNTER_REGION_WEIGHTS.californiaWashington);
-  assert.equal(regionWeightForPlace("Seattle, Washington, United States", "us"), HUNTER_REGION_WEIGHTS.californiaWashington);
+  assert.equal(regionWeightForPlace("Vancouver, Canada", "canada"), HUNTER_REGION_WEIGHTS.canada);
+  assert.equal(regionWeightForPlace("San Francisco, California, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.equal(regionWeightForPlace("Seattle, Washington, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(regionWeightForPlace("Washington, DC, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(regionWeightForPlace("Albuquerque, New Mexico, United States", "us"), HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(regionWeightForPlace("Berlin, Germany", "europe"), HUNTER_REGION_WEIGHTS.europe);
   assert.equal(regionWeightForPlace("Mexico City, Mexico", "latin-america"), HUNTER_REGION_WEIGHTS.mexico);
+  assert.equal(HUNTER_REGION_WEIGHTS.threeCities, 10);
+  assert.equal(HUNTER_REGION_WEIGHTS.alberta, 9);
+  assert.equal(HUNTER_REGION_WEIGHTS.canada, 7);
+  assert.equal(HUNTER_REGION_WEIGHTS.unitedStates, 6);
+  assert.ok(HUNTER_REGION_WEIGHTS.threeCities > HUNTER_REGION_WEIGHTS.alberta);
   assert.ok(HUNTER_REGION_WEIGHTS.alberta > HUNTER_REGION_WEIGHTS.canada);
-  assert.ok(HUNTER_REGION_WEIGHTS.canada > HUNTER_REGION_WEIGHTS.vancouver);
-  assert.ok(HUNTER_REGION_WEIGHTS.vancouver > HUNTER_REGION_WEIGHTS.californiaWashington);
-  assert.ok(HUNTER_REGION_WEIGHTS.californiaWashington > HUNTER_REGION_WEIGHTS.unitedStates);
+  assert.ok(HUNTER_REGION_WEIGHTS.canada > HUNTER_REGION_WEIGHTS.unitedStates);
   assert.ok(HUNTER_REGION_WEIGHTS.unitedStates > HUNTER_REGION_WEIGHTS.europe);
 });
 
@@ -639,9 +645,18 @@ test("filing keeps Canada and the United States and counts a missing country", (
   );
   assert.ok(unknown);
   const filedUnknown = fileHunterCards([], [unknown], { today: "2026-11-18", floor: 0 });
-  assert.equal(filedUnknown.filed, 0);
-  assert.equal(filedUnknown.companies.length, 0);
-  assert.equal(filedUnknown.drops.outOfRegion, 1);
+  assert.equal(filedUnknown.filed, 1);
+  assert.equal(filedUnknown.drops.outOfRegion, undefined);
+  const [outside] = verifyHunterDrafts(
+    [draft({ domain: "quiet.example", org: "Quiet Co", place: "", sourceUrl: blankSource, signals: [], profileSignals: [{ id: "big-tech", sourceUrl: blankSource }], buyer })],
+    { [blankSource]: "Quiet Co is a software company." },
+    { regionId: "europe", today: "2026-11-18" },
+  );
+  assert.ok(outside);
+  const filedOutside = fileHunterCards([], [outside], { today: "2026-11-18", floor: 0 });
+  assert.equal(filedOutside.filed, 0);
+  assert.equal(filedOutside.companies.length, 0);
+  assert.equal(filedOutside.drops.outOfRegion, 1);
 
   const hqSource = "https://austin.example/about";
   const hqPage = "Austin Co is a software company. Headquartered in Austin, Texas.";

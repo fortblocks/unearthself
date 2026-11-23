@@ -177,31 +177,6 @@ export function buildMorningBatch(
   };
 }
 
-export function scoutPrompt(knownDomains: string[]): string {
-  const skip = knownDomains.slice(0, 200).join(", ");
-  return `Find Alberta companies for a corporate retreat in Drumheller. Return JSON only.
-
-Cities: Calgary, Edmonton, and Red Deer first. Only a company headquartered in Canada. Do not return a company outside Canada.
-Headcount: any. Record a size band only when the page prints a number. Do not skip a company for being small or large.
-Industries: any. Record the closest label, or "other".
-Skip these domains: ${skip || "none"}.
-
-For each company include org, domain, city, industry, sizeBand ("1-49", "50-79", "80-800", "801-1500", "1500+", or "unknown"), sourceUrl, why, whySources (url and label), signals, and buyer.
-
-Signals are public dated events only: hiring, office, expansion, win, year-end. Each signal needs kind, date as YYYY-MM-DD, sourceUrl, and a short note. Omit a signal when you do not have both a date and a page URL.
-
-buyer.name, buyer.title, buyer.email, and buyer.emailSource: include a name or email only when that exact text is published on buyer.emailSource. If you cannot point at the page, leave the buyer fields as empty strings. A blank buyer is still a company to return. Never guess an email. Never use a pattern such as first.last@.
-
-hook is optional. Include it only when the page prints both the exact sentence and a date as YYYY-MM-DD. hook has text, sourceUrl, sourceDate (the date printed on that page, not the day you fetched it), and kind. Omit hook when you do not have both the exact text and the printed date.
-
-Choose the contact by judging whether that person would buy a hotel spa team retreat in Drumheller, Alberta for their company. Reason from the company's size, industry, location, and how the team is set up, and from the person's role. There is no fixed list of job titles.
-
-why is two or three sentences on why the company fits, and whySources lists the pages you used.
-
-Return at most 15 companies. Return a company when you have its name, domain, and a page URL, even if the buyer or a signal is blank. Use an empty companies array only when the search found no organisation.
-{ "companies": [] }`;
-}
-
 export async function researchCompanies(
   knownDomains: string[],
   timeLeft?: () => number,
