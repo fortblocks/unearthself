@@ -1365,6 +1365,19 @@ async function noteOnPage(page: string, timeoutMs: number, onSpend: (usage: { in
   return { text: hook.text, sourceDate: hook.sourceDate, kind: hook.kind || "note" };
 }
 
+/** Each run starts a new plan note. The stored note is not copied forward, so a thin-list line cannot stack. */
+export function nextCampaignPlanNote(
+  previous: string,
+  input: { segmentLabel: string; split: { canada: number; us: number }; weightChange?: string; lines: string[] },
+) {
+  void previous;
+  const header = `Signed segment: ${input.segmentLabel}. Split ${input.split.canada}/${input.split.us}.`;
+  return [header, input.weightChange ?? "", ...input.lines]
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 async function prepareCampaignDrafts(
   redis: { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown): Promise<unknown>; incrby?: (key: string, amount: number) => Promise<number> },
   input: { today: string; known: Set<string>; companies: Company[]; timeLeft: () => number },
@@ -1380,11 +1393,19 @@ async function prepareCampaignDrafts(
   }
   state = withMondaySuggestion(state, input.today, reviewedBySegment, scoreBySegment);
   const weights = nextWeights(state.weights, campaignOutcomes(input.companies, state.segmentId));
-  if (weights.note !== state.weightNote) {
-    state = { ...state, weights: weights.weights, weightNote: weights.note, planNote: `${state.planNote} ${weights.note}` };
+  const weightChanged = weights.note !== state.weightNote;
+  if (weightChanged) {
+    state = { ...state, weights: weights.weights, weightNote: weights.note };
   }
   const segment = signedSegment(state);
-  let note = state.planNote;
+  const lines: string[] = [];
+  const runNoteFor = (extra: string[] = []) =>
+    nextCampaignPlanNote(state.planNote, {
+      segmentLabel: segment.label,
+      split: state.split,
+      weightChange: weightChanged ? weights.note : "",
+      lines: [...lines, ...extra],
+    });
   const key = apolloApiKey();
   if (key && input.timeLeft() > 8_000) {
     for (const regionName of ["canada", "us"] as const) {
@@ -1406,7 +1427,7 @@ async function prepareCampaignDrafts(
         await redis.incrby(apolloCreditKey(input.today), sized.credits);
       }
     }
-    note = `${state.planNote} Canada list size ${state.canadaSize ?? "not sized"}. United States list size ${state.usSize ?? "not sized"}.`;
+    lines.push(`Canada list size ${state.canadaSize ?? "not sized"}. United States list size ${state.usSize ?? "not sized"}.`);
   }
   const draw = searchDraw(state.drawCursor, state.split);
   const region = draw.region;
@@ -1425,8 +1446,9 @@ async function prepareCampaignDrafts(
       timeoutMs: Math.min(20_000, input.timeLeft()),
     });
     if ("failure" in searched) {
-      await saveCampaign(redis, state);
-      return { drafts: [], query: `campaign:${segment.id}`, regionId: region, note: searched.failure, alarm: "" };
+      const note = runNoteFor([searched.failure]);
+      await saveCampaign(redis, { ...state, planNote: note });
+      return { drafts: [], query: `campaign:${segment.id}`, regionId: region, note, alarm: "" };
     }
     const month = input.today.slice(0, 7);
     if (redis.incrby) {
@@ -1437,7 +1459,7 @@ async function prepareCampaignDrafts(
     state = accepted.state;
     const dropNote = pageDropNote(accepted);
     console.info(JSON.stringify({ hunter: "campaign-page", region, tier: draw.tier, returned: accepted.returned, seen: accepted.seen, outOfRegion: accepted.outOfRegion, added: accepted.added }));
-    note = `${note} ${dropNote}`;
+    lines.push(dropNote);
     if (accepted.added > 0 && input.timeLeft() > 8_000) {
       const top = [...state.queued].filter((row) => row.region === region && row.page === state.nextPage[region] - 1).sort((a, b) => b.score - a.score).slice(0, 5);
       const titles: Record<string, string[]> = {};
@@ -1447,18 +1469,19 @@ async function prepareCampaignDrafts(
       }
       state = { ...state, queued: applyBuyerTitleBoost(state.queued, titles, state.weights) };
     }
-    if (accepted.exhausted && accepted.returned === 0) note = `${note} ${region} is out of Apollo results.`;
-    else if (accepted.exhausted && accepted.state.pagesPulled[region] >= CAMPAIGN_PAGES_PER_REGION) note = `${note} ${region} reached the weekly page cap of ${CAMPAIGN_PAGES_PER_REGION}.`;
+    if (accepted.exhausted && accepted.returned === 0) lines.push(`${region} is out of Apollo results.`);
+    else if (accepted.exhausted && accepted.state.pagesPulled[region] >= CAMPAIGN_PAGES_PER_REGION) lines.push(`${region} reached the weekly page cap of ${CAMPAIGN_PAGES_PER_REGION}.`);
     collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
     state = collected.state;
     taken = collected.taken;
   } else if (taken.length === 0 && !key) {
-    note = `${note} Apollo key is not set, so no company page was pulled.`;
+    lines.push("Apollo key is not set, so no company page was pulled.");
   } else if (taken.length === 0 && state.exhausted[region]) {
-    note = `${note} The signed list has no queued companies left in ${region}. Hunter keeps the signed segment and does not pick a new one.`;
+    lines.push(`The signed list has no queued companies left in ${region}. Hunter keeps the signed segment and does not pick a new one.`);
   } else if (taken.length === 0 && !needsAnotherPage(state, region)) {
-    note = `${note} The signed list is thin in ${region}. Hunter keeps the signed segment and pulls no further pages this week.`;
+    lines.push(`The signed list is thin in ${region}. Hunter keeps the signed segment and pulls no further pages this week.`);
   }
+  const note = runNoteFor();
   state = { ...state, drawCursor: state.drawCursor + 1, planNote: note };
   await saveCampaign(redis, state);
   const monthCredits = Number(await redis.get<string | number>(apolloCreditKey(input.today.slice(0, 7)))) || 0;

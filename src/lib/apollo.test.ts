@@ -16,12 +16,14 @@ import {
   applyApolloContact,
   apolloFailureCode,
   enrichHunterContacts,
+  apolloOrganizationFacts,
   companySearchParams,
+  pickSearchPerson,
   readApolloOrganization,
   searchApolloCompanies,
 } from "./apollo.ts";
 import { hasBuyerContact, isContactReady } from "./hunter-cap.ts";
-import { APOLLO_CASL_STATEMENT, titleFitsBuyerRole } from "./hunter-phase.ts";
+import { APOLLO_CASL_STATEMENT, BUYER_ROLE_TITLES, titleFitsBuyerRole } from "./hunter-phase.ts";
 import type { Company } from "./lead-score.ts";
 
 const KEY = "test-key-should-not-leak";
@@ -390,4 +392,99 @@ test("a company search with no city still keeps the searched country", () => {
     "Red Deer, Alberta, Canada",
   ]);
   assert.equal(cities.has("organization_not_locations[]"), false);
+});
+
+test("people and HR titles are searched before sales and marketing", () => {
+  const index = (title: string) => BUYER_ROLE_TITLES.indexOf(title);
+  assert.ok(index("chief people officer") >= 0);
+  assert.ok(index("chief people officer") < index("sales director"));
+  assert.ok(index("chief people officer") < index("marketing director"));
+  assert.ok(index("hr manager") < index("sales director"));
+  assert.ok(index("office manager") < index("marketing director"));
+  assert.ok(index("founder") < index("sales director"));
+  assert.ok(index("ceo") < index("marketing director"));
+  assert.equal(BUYER_ROLE_TITLES.slice(0, index("operations manager")).some((title) => /sales|marketing/.test(title)), false);
+  const params = apolloSearchParams({ domain: "acme.example", org: "Acme Alpine" });
+  const titles = params.getAll("person_titles[]");
+  assert.equal(titles[0], "chief people officer");
+  assert.ok(titles.indexOf("sales director") > titles.indexOf("head of people"));
+});
+
+test("a chief people officer without an email outranks a sales director with one", async () => {
+  const facts = apolloOrganizationFacts({
+    person: { organization: { industry: "information technology & services", estimated_num_employees: 18 } },
+  });
+  assert.equal(facts.industry, "information technology & services");
+  assert.equal(facts.headcount, "18");
+  assert.equal(facts.employeeRange, "1-49");
+  const picked = pickSearchPerson({
+    people: [
+      { id: "sales", title: "Sales Director", has_email: true },
+      { id: "cpo", title: "Chief People Officer", has_email: false },
+    ],
+  });
+  assert.equal(picked?.id, "cpo");
+  let revealedId = "";
+  const judged: { industry: string; headcount: string; sizeBand: string; role: string } = {
+    industry: "",
+    headcount: "",
+    sizeBand: "",
+    role: "",
+  };
+  const result = await enrichHunterContacts({
+    companies: [company({ industry: "other", sizeBand: "unknown", buyerName: "", buyerTitle: "", email: "" })],
+    domains: ["acme.example"],
+    today: "2026-11-24",
+    revealsUsed: 0,
+    cap: 48,
+    apiKey: KEY,
+    limit: 1,
+    judgeContact: async (input) => {
+      judged.industry = input.industry;
+      judged.headcount = input.headcount;
+      judged.sizeBand = input.sizeBand;
+      judged.role = input.role;
+      return {
+        ok: true,
+        judgment: { buyer: true, confidence: "high", reason: "This people leader would buy the retreat.", model: "test" },
+      };
+    },
+    fetchImpl: async (url) => {
+      if (url.includes("/people/match")) {
+        revealedId = new URL(url).searchParams.get("id") ?? "";
+        return Response.json({
+          person: {
+            id: "cpo",
+            name: "Ada North",
+            title: "Chief People Officer",
+            email: "",
+            email_status: "unavailable",
+            organization: {
+              name: "Acme Alpine",
+              primary_domain: "acme.example",
+              industry: "information technology & services",
+              estimated_num_employees: 18,
+            },
+          },
+        });
+      }
+      return Response.json({
+        people: [
+          { id: "sales", title: "Sales Director", has_email: true },
+          { id: "cpo", title: "Chief People Officer", has_email: false },
+        ],
+      });
+    },
+  });
+  assert.equal(revealedId, "cpo");
+  assert.equal(judged.industry, "information technology & services");
+  assert.equal(judged.headcount, "18");
+  assert.equal(judged.sizeBand, "1-49");
+  assert.equal(judged.role, "Chief People Officer");
+  const card = result.companies[0];
+  assert.equal(card?.buyerName, "Ada North");
+  assert.equal(card?.buyerTitle, "Chief People Officer");
+  assert.equal(card?.email, "");
+  assert.equal(card?.email.includes("@"), false);
+  assert.equal(/^[a-z]+\.[a-z]+@/i.test(card?.email ?? "kept-blank"), false);
 });

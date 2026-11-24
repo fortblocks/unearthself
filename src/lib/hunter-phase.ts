@@ -124,20 +124,34 @@ export type CaslBasis = {
 
 export const APOLLO_CASL_STATEMENT = "Under Apollo's terms its data comes from public sources.";
 
-/** Titles Apollo searches for. Role fit uses this list. */
+/**
+ * Titles Apollo's people search asks for, in pick order.
+ * People, HR, culture, and the small-company founder or CEO come before sales and marketing.
+ * This list is a search parameter. It does not decide buyer fit.
+ */
 export const BUYER_ROLE_TITLES = [
+  "chief people officer",
+  "vp people",
+  "vice president of people",
+  "head of people",
+  "people director",
+  "director of people and culture",
+  "people and culture lead",
+  "head of culture",
+  "employee experience",
+  "hr director",
+  "hr manager",
+  "human resources director",
+  "human resources manager",
+  "office manager",
+  "executive assistant to the ceo",
+  "executive assistant to ceo",
+  "founder",
+  "chief executive officer",
+  "ceo",
+  "operations manager",
   "marketing director",
   "sales director",
-  "hr director",
-  "people director",
-  "people and culture lead",
-  "head of people",
-  "office manager",
-  "operations manager",
-  "executive assistant to the CEO",
-  "chief people officer",
-  "head of culture",
-  "director of people and culture",
 ];
 
 /** Close titles in the same lanes: people, HR, culture, learning, operations, and executive leaders. */

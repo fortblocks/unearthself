@@ -38,6 +38,7 @@ import {
   selectHunterRows,
   slotAt,
   travelPoints,
+  nextCampaignPlanNote,
   verifyHunterDrafts,
   type HunterDraft,
 } from "./leads-hunter.ts";
@@ -670,6 +671,28 @@ test("filing keeps Canada and the United States and counts a missing country", (
   const filedHq = fileHunterCards([], [fromHq], { today: "2026-11-18", floor: 0, pages: { [hqSource]: hqPage } });
   assert.equal(filedHq.filed, 1);
   assert.equal(filedHq.companies[0]?.org, "Austin Co");
+});
+
+test("a campaign run drops the previous plan note instead of stacking it", () => {
+  const previous = [
+    "Signed segment: Technology.",
+    "The signed list has no queued companies left in canada. Hunter keeps the signed segment and does not pick a new one.",
+    "The signed list has no queued companies left in canada. Hunter keeps the signed segment and does not pick a new one.",
+  ].join(" ");
+  const note = nextCampaignPlanNote(previous, {
+    segmentLabel: "Technology",
+    split: { canada: 70, us: 30 },
+    lines: ["Returned 4. Already seen 0. Outside Canada and the United States 0. New 4."],
+  });
+  assert.equal(note.split("no queued companies left").length - 1, 0);
+  assert.match(note, /^Signed segment: Technology\. Split 70\/30\./);
+  assert.match(note, /Returned 4\./);
+  const stillThin = nextCampaignPlanNote(previous, {
+    segmentLabel: "Technology",
+    split: { canada: 70, us: 30 },
+    lines: ["The signed list has no queued companies left in canada. Hunter keeps the signed segment and does not pick a new one."],
+  });
+  assert.equal(stillThin.split("no queued companies left").length - 1, 1);
 });
 
 test("another studio is skipped without being named in the prompt", () => {

@@ -291,6 +291,24 @@ test("no enumerated title allow-list gates filing", () => {
     signals: "hiring",
     role: "Software Engineer",
   }), /Do not use a fixed title list/);
+  const withCompany = buyerJudgmentPrompt({
+    org: "Soft Co",
+    domain: "soft.example",
+    place: "Calgary, Canada",
+    city: "Calgary",
+    industry: "information technology & services",
+    headcount: "18",
+    sizeBand: "1-49",
+    signals: "hiring",
+    role: "Chief People Officer",
+  });
+  assert.match(withCompany, /Industry: information technology & services/);
+  assert.match(withCompany, /Headcount: 18/);
+  assert.match(withCompany, /Employee range: 1-49/);
+  assert.equal(withCompany.includes("Industry: not stated"), false);
+  assert.equal(withCompany.includes("Headcount: not stated"), false);
+  assert.equal(isClearBuyer({ buyer: true, confidence: "low" }), false);
+  assert.equal(isClearBuyer({ buyer: false, confidence: "high" }), false);
 });
 
 test("the judgement call uses Hunter's Grok model and fails closed", async () => {

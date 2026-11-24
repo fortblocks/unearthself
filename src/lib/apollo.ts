@@ -9,7 +9,7 @@ import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
 import { isClearBuyer, type BuyerJudgment, type FitRating } from "./buyer-judgment.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
-import { apolloFieldSources, normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
+import { apolloFieldSources, coerceSize, normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
 
 export const APOLLO_DAILY_CREDIT_CAP_DEFAULT = 48;
 export const APOLLO_OFF = "Apollo off: no key";
@@ -208,6 +208,20 @@ export function classifyApolloReveal(
   return { empty: record.person == null };
 }
 
+function normalizeTitle(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Title relevance first, then whether Apollo already has an email.
+ * A people leader without an email outranks a sales title that has one.
+ * This returns an id only. It never builds an email.
+ */
 export function pickSearchPerson(body: unknown): { id: string } | null {
   const record = asRecord(body);
   const people = Array.isArray(record?.people) ? record.people : [];
@@ -216,12 +230,26 @@ export function pickSearchPerson(body: unknown): { id: string } | null {
       const row = asRecord(item);
       const id = text(row?.id);
       if (!row || !id) return [];
-      const title = text(row.title).toLowerCase();
-      const titleRank = APOLLO_TARGET_TITLES.findIndex((target) => title.includes(target));
+      const title = normalizeTitle(text(row.title));
+      const titleRank = APOLLO_TARGET_TITLES.findIndex((target) => title.includes(normalizeTitle(target)));
       return [{ id, hasEmail: row.has_email === true, titleRank: titleRank === -1 ? 100 : titleRank }];
     })
-    .sort((a, b) => Number(b.hasEmail) - Number(a.hasEmail) || a.titleRank - b.titleRank);
+    .sort((a, b) => a.titleRank - b.titleRank || Number(b.hasEmail) - Number(a.hasEmail));
   return ranked[0] ? { id: ranked[0].id } : null;
+}
+
+/** Industry and headcount already on the people-match organization. No extra Apollo call. */
+export function apolloOrganizationFacts(body: unknown): { industry: string; headcount: string; employeeRange: string } {
+  const record = asRecord(body);
+  const person = asRecord(record?.person);
+  const org = asRecord(person?.organization);
+  const industry = text(org?.industry) || stringList(org?.industries)[0] || "";
+  const employees = [org?.estimated_num_employees, org?.num_employees, org?.employee_count]
+    .map((value) => numberOrNull(value))
+    .find((value) => value != null && value > 0);
+  const headcount = employees == null ? "" : String(employees);
+  const range = headcount ? coerceSize(headcount, "unknown") : "unknown";
+  return { industry, headcount, employeeRange: range === "unknown" ? "" : range };
 }
 
 export function readApolloReveal(body: unknown): ApolloReveal | null {
@@ -267,6 +295,7 @@ export function applyApolloContact(company: Company, person: ApolloReveal | null
   const verified = apolloEmailIsVerified(person.emailStatus);
   const email = verified ? person.email.trim().toLowerCase() : "";
   if (!verified || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) flags.add(APOLLO_EMAIL_NOT_VERIFIED);
+  // A missing or unverified email stays blank. The name and title are kept. No pattern address is built.
   const usableEmail = flags.has(APOLLO_EMAIL_NOT_VERIFIED) ? "" : email;
   const next: Company = {
     ...company,
@@ -334,6 +363,7 @@ export async function enrichHunterContacts(input: {
     place: string;
     city: string;
     industry: string;
+    headcount: string;
     sizeBand: string;
     signals: string;
     role: string;
@@ -456,13 +486,17 @@ export async function enrichHunterContacts(input: {
     const person = revealClass.empty ? null : readApolloReveal(revealed.body);
     const current = byDomain.get(company.domain) ?? company;
     if (input.judgeContact && person) {
+      const facts = apolloOrganizationFacts(revealed.body);
+      const industry = facts.industry || (current.industry && current.industry !== "other" ? current.industry : "");
+      const employeeRange = facts.employeeRange || (current.sizeBand && current.sizeBand !== "unknown" ? current.sizeBand : "");
       const decision = await input.judgeContact({
         org: current.org,
         domain: current.domain,
         place: current.place ?? "",
         city: current.city,
-        industry: current.industry,
-        sizeBand: current.sizeBand,
+        industry,
+        headcount: facts.headcount,
+        sizeBand: employeeRange,
         signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
         role: person.title,
       });

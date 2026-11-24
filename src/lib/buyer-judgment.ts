@@ -48,6 +48,9 @@ export type BuyerJudgmentInput = {
   place: string;
   city: string;
   industry: string;
+  /** Apollo headcount when the company row includes one. Blank stays unstated. */
+  headcount?: string;
+  /** Employee range, such as 1-49. The stored size band is this value. */
   sizeBand: string;
   signals: string;
   role: string;
@@ -68,16 +71,22 @@ export function useBuyerJudgeForTests(judge: TestJudge | null) {
   testJudge = judge;
 }
 
+function stated(value: string | undefined) {
+  const text = (value ?? "").trim();
+  return text || "not stated";
+}
+
 export function buyerJudgmentPrompt(input: BuyerJudgmentInput) {
   return [
-    `Company: ${input.org || "not stated"}`,
-    `Domain: ${input.domain || "not stated"}`,
-    `Place: ${input.place || "not stated"}`,
-    `City: ${input.city || "not stated"}`,
-    `Industry: ${input.industry || "not stated"}`,
-    `Size band: ${input.sizeBand || "not stated"}`,
-    `Signals: ${input.signals || "none"}`,
-    `Role: ${input.role || "not stated"}`,
+    `Company: ${stated(input.org)}`,
+    `Domain: ${stated(input.domain)}`,
+    `Place: ${stated(input.place)}`,
+    `City: ${stated(input.city)}`,
+    `Industry: ${stated(input.industry)}`,
+    `Headcount: ${stated(input.headcount)}`,
+    `Employee range: ${stated(input.sizeBand)}`,
+    `Signals: ${(input.signals ?? "").trim() || "none"}`,
+    `Role: ${stated(input.role)}`,
     "",
     "Is this contact a clear prospective buyer for a hotel spa team retreat in Drumheller, Alberta?",
     "Judge from the company context and the role. Do not use a fixed title list.",
