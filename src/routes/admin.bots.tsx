@@ -12,7 +12,7 @@ import { HUNTER_ROSTER } from "@/data/hunter-profile";
 import { partnerFirst, useDesk } from "@/lib/desk-store";
 import { botForLead } from "@/lib/bot-copy";
 import { formatFunnelDrops } from "@/lib/hunter-drops";
-import { getHunterDesk, setHunterPaused, signHunterSegment } from "@/lib/leads-hunter-api";
+import { getHunterDesk, setHunterPaused } from "@/lib/leads-hunter-api";
 
 export const Route = createFileRoute("/admin/bots")({
   loader: () => getHunterDesk(),
@@ -89,22 +89,6 @@ function BotsPage() {
   const dueFollow = leads.filter(
     (l) => !l.stopped && l.status !== "lost" && l.status !== "won" && l.nudges > 0 && l.nudges < 3,
   ).length;
-  async function signSegment() {
-    if (hunter.storage !== "redis") {
-      toast("Redis is not connected. Sign-off cannot be saved.");
-      return;
-    }
-    setSavingHunter(true);
-    try {
-      const next = await signHunterSegment({ data: { confirm: true } });
-      setHunter(next);
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not sign off the segment");
-    } finally {
-      setSavingHunter(false);
-    }
-  }
-
   async function toggleHunter() {
     if (hunter.storage !== "redis") {
       toast("Redis is not connected. Pause cannot be saved.");
@@ -203,16 +187,16 @@ function BotsPage() {
               </p>
               {hunter.apolloCreditAlarm ? <p className="mt-1 text-sm text-coal">{hunter.apolloCreditAlarm}</p> : null}
               <p className="mt-1 text-sm text-coal">
-                Signed segment: {hunter.campaign.segment}. Split {hunter.campaign.split}. {hunter.campaign.splitReason}
+                Active segment: {hunter.campaign.segment}. Source: {hunter.campaign.segmentSource}. Split {hunter.campaign.split}. {hunter.campaign.splitReason}
               </p>
               <p className="mt-1 text-sm text-muted">
                 Canada list {hunter.campaign.canadaSize ?? "not sized"}. United States list {hunter.campaign.usSize ?? "not sized"}.
               </p>
               <p className="mt-1 text-sm text-muted">{hunter.campaign.weightNote}</p>
               <p className="mt-1 text-sm text-pretty text-shale">{hunter.campaign.planNote}</p>
-              {hunter.campaign.needsSignOff ? (
+              {hunter.campaign.suggestionId !== hunter.campaign.segmentId ? (
                 <p className="mt-1 text-sm text-coal">
-                  Monday suggestion, not yet signed: {hunter.campaign.suggestion}.
+                  Monday suggestion, not applied: {hunter.campaign.suggestion}. {hunter.campaign.suggestionReason}
                 </p>
               ) : null}
               <p className="mt-1 text-sm text-muted">Monthly spend: {hunter.monthlyCap}.</p>
@@ -301,16 +285,6 @@ function BotsPage() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              {hunter.campaign.needsSignOff ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={savingHunter || hunter.storage !== "redis"}
-                  onClick={() => void signSegment()}
-                >
-                  Sign off segment
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"

@@ -1368,11 +1368,11 @@ async function noteOnPage(page: string, timeoutMs: number, onSpend: (usage: { in
 /** Each run starts a new plan note. The stored note is not copied forward, so a thin-list line cannot stack. */
 export function nextCampaignPlanNote(
   previous: string,
-  input: { segmentLabel: string; split: { canada: number; us: number }; weightChange?: string; lines: string[] },
+  input: { segmentLabel: string; split: { canada: number; us: number }; weightChange?: string; choice?: string; lines: string[] },
 ) {
   void previous;
-  const header = `Signed segment: ${input.segmentLabel}. Split ${input.split.canada}/${input.split.us}.`;
-  return [header, input.weightChange ?? "", ...input.lines]
+  const header = `Active segment: ${input.segmentLabel}. Split ${input.split.canada}/${input.split.us}.`;
+  return [header, input.choice ?? "", input.weightChange ?? "", ...input.lines]
     .map((line) => line.trim())
     .filter(Boolean)
     .join(" ");
@@ -1399,11 +1399,14 @@ async function prepareCampaignDrafts(
   }
   const segment = signedSegment(state);
   const lines: string[] = [];
+  const latestSwitch = state.switches[state.switches.length - 1];
+  const choice = latestSwitch ? `Last switch ${latestSwitch.at} from ${latestSwitch.from} to ${latestSwitch.to}. ${latestSwitch.reason}` : "";
   const runNoteFor = (extra: string[] = []) =>
     nextCampaignPlanNote(state.planNote, {
       segmentLabel: segment.label,
       split: state.split,
       weightChange: weightChanged ? weights.note : "",
+      choice,
       lines: [...lines, ...extra],
     });
   const key = apolloApiKey();
@@ -2197,9 +2200,11 @@ export async function readHunterDesk(today = edmontonToday(), now = new Date()) 
     campaign: {
       segment: signedSegment(campaign).label,
       segmentId: campaign.segmentId,
+      segmentSource: campaign.segmentSource === "hunter" ? "Hunter's choice" : "Build",
       suggestionId: campaign.suggestionId,
       suggestion: segmentById(campaign.suggestionId).label,
-      needsSignOff: campaign.suggestionId !== campaign.segmentId,
+      suggestionReason: campaign.suggestionReason,
+      needsSignOff: false,
       planNote: campaign.planNote,
       split: `${campaign.split.canada}/${campaign.split.us}`,
       splitReason: campaign.splitReason,

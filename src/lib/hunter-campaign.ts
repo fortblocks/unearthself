@@ -35,7 +35,7 @@ export type CampaignSegment = {
   industries: string[];
 };
 
-/** The catalogue Hunter may suggest. Only a signed segment is searched. */
+/** The catalogue Hunter may choose. The active segment is the one that is searched. */
 export const CAMPAIGN_SEGMENTS: CampaignSegment[] = [
   { id: "tech", label: "Technology companies, Canada and the United States, no headcount cap", industries: ["information technology & services"] },
   { id: "energy", label: "Energy companies, Canada and the United States, no headcount cap", industries: ["oil & energy"] },
@@ -103,6 +103,19 @@ export type CampaignState = {
   drawCursor: number;
   creditsMonth: string;
   version: number;
+  /** Who set the active segment. The build set the first one. Later changes are Hunter's. */
+  segmentSource: "hunter" | "build";
+  /** Each switch Hunter makes. The plan note is reset every run, so this list is the history. */
+  switches: SegmentSwitch[];
+};
+
+export type SegmentSwitch = {
+  at: string;
+  on: string;
+  from: string;
+  to: string;
+  reason: string;
+  source: "hunter";
 };
 
 const BUYER_TITLE_TERMS = ["head of people", "office manager", "executive assistant", "chief of staff", "people", "culture", "events", "learning"];
@@ -171,6 +184,8 @@ export function freshCampaign(today: string, segment = FIRST_SEGMENT): CampaignS
     drawCursor: 0,
     creditsMonth: today.slice(0, 7),
     version: CAMPAIGN_STATE_VERSION,
+    segmentSource: "build",
+    switches: [],
   };
 }
 
@@ -192,7 +207,22 @@ function campaignFromRaw(raw: unknown): CampaignState | null {
     queued: row.queued,
     split: row.split,
     weights: row.weights ?? base.weights,
+    segmentSource: row.segmentSource === "hunter" ? "hunter" : "build",
+    switches: sanitizeSwitches(row.switches),
   };
+}
+
+function sanitizeSwitches(value: unknown): SegmentSwitch[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as Partial<SegmentSwitch>;
+      if (row.source !== "hunter") return [];
+      if (typeof row.at !== "string" || typeof row.on !== "string" || typeof row.from !== "string" || typeof row.to !== "string" || typeof row.reason !== "string") return [];
+      return [{ at: row.at, on: row.on, from: row.from, to: row.to, reason: row.reason, source: "hunter" as const }];
+    })
+    .slice(-40);
 }
 
 function safeCampaignJson(raw: string) {
@@ -237,38 +267,43 @@ export function loadCampaignState(raw: unknown, today: string): CampaignState {
 
 export function suggestSegment(input: {
   weekStart: string;
+  /** The segment already being worked. A tie or a thin sample stays here. */
+  currentSegmentId?: string;
   reviewedBySegment: Record<string, number>;
   scoreBySegment: Record<string, number>;
   sampleFloor?: number;
 }): { id: string; reason: string } {
+  const current = CAMPAIGN_SEGMENTS.some((item) => item.id === input.currentSegmentId) ? input.currentSegmentId! : FIRST_SEGMENT.id;
   const floor = input.sampleFloor ?? HUNTER_SAMPLE_FLOOR;
   const weekIndex = Math.floor(Date.parse(`${input.weekStart}T00:00:00Z`) / (7 * 24 * 60 * 60 * 1000));
   const explore = Number.isFinite(weekIndex) && weekIndex % 4 === 3;
   if (explore) {
-    const least = [...CAMPAIGN_SEGMENTS].sort(
-      (a, b) => (input.reviewedBySegment[a.id] ?? 0) - (input.reviewedBySegment[b.id] ?? 0) || a.id.localeCompare(b.id),
-    )[0];
-    return { id: least?.id ?? FIRST_SEGMENT.id, reason: "Every fourth week suggests the least-tested segment." };
+    const leastCount = Math.min(...CAMPAIGN_SEGMENTS.map((item) => input.reviewedBySegment[item.id] ?? 0));
+    const least = CAMPAIGN_SEGMENTS.filter((item) => (input.reviewedBySegment[item.id] ?? 0) === leastCount);
+    if (least.length === 1 && least[0]) return { id: least[0].id, reason: "Every fourth week suggests the least-tested segment." };
+    return { id: current, reason: "No single least-tested segment. Hunter keeps the current segment." };
   }
   const ready = CAMPAIGN_SEGMENTS.filter((item) => (input.reviewedBySegment[item.id] ?? 0) >= floor);
-  const best = [...(ready.length ? ready : CAMPAIGN_SEGMENTS)].sort(
-    (a, b) => (input.scoreBySegment[b.id] ?? 0) - (input.scoreBySegment[a.id] ?? 0) || a.id.localeCompare(b.id),
-  )[0];
-  return {
-    id: best?.id ?? FIRST_SEGMENT.id,
-    reason: ready.length ? "Best outcome score so far." : "Not enough reviewed cards for an outcome score. Stay with the signed segment until Christopher signs a change.",
-  };
+  if (!ready.length) {
+    return { id: current, reason: "Not enough reviewed cards for a conversion score. Hunter keeps the current segment." };
+  }
+  const bestScore = Math.max(...ready.map((item) => input.scoreBySegment[item.id] ?? 0));
+  const best = ready.filter((item) => (input.scoreBySegment[item.id] ?? 0) === bestScore);
+  if (best.length !== 1 || !best[0]) {
+    return { id: current, reason: "Conversion scores are tied. Hunter keeps the current segment." };
+  }
+  return { id: best[0].id, reason: "Best conversion score so far." };
 }
 
-/** A suggestion does not replace the signed segment. */
+/** The segment Hunter is working. A missing sign-off does not substitute another segment. */
 export function signedSegment(state: CampaignState) {
-  return segmentById(state.signed ? state.segmentId : FIRST_SEGMENT.id);
+  return segmentById(state.segmentId);
 }
 
 export function withMondaySuggestion(state: CampaignState, today: string, reviewedBySegment: Record<string, number>, scoreBySegment: Record<string, number>): CampaignState {
   const start = weekStartMonday(today);
   if (!isMonday(today) || state.weekStart === start && state.suggestionReason) return { ...state, weekStart: state.weekStart || start };
-  const suggestion = suggestSegment({ weekStart: start, reviewedBySegment, scoreBySegment });
+  const suggestion = suggestSegment({ weekStart: start, currentSegmentId: state.segmentId, reviewedBySegment, scoreBySegment });
   const same = suggestion.id === state.segmentId;
   return {
     ...state,
@@ -277,7 +312,36 @@ export function withMondaySuggestion(state: CampaignState, today: string, review
     suggestionReason: suggestion.reason,
     planNote: same
       ? state.planNote
-      : `${state.planNote} Monday suggestion: ${segmentById(suggestion.id).label}. ${suggestion.reason} Still working the signed segment until Christopher signs off.`,
+      : `${state.planNote} Monday suggestion: ${segmentById(suggestion.id).label}. ${suggestion.reason} The current segment stays until Hunter chooses a change.`,
+  };
+}
+
+/** Hunter sets the active segment. The previous queue is left behind. Weights stay. */
+export function applyHunterSegment(
+  state: CampaignState,
+  input: { segmentId: string; reason: string; today: string; at: string },
+): CampaignState | { error: "invalid"; field: "segmentId" | "reason" } {
+  const segment = CAMPAIGN_SEGMENTS.find((item) => item.id === input.segmentId);
+  if (!segment) return { error: "invalid", field: "segmentId" };
+  const reason = input.reason.replace(/\s+/g, " ").trim();
+  if (reason.length < 8 || reason.length > 240) return { error: "invalid", field: "reason" };
+  if (segment.id === state.segmentId) return state;
+  const split = splitForSegment(segment.id);
+  const from = state.segmentId;
+  const record: SegmentSwitch = { at: input.at, on: input.today, from, to: segment.id, reason, source: "hunter" };
+  const switches = [...state.switches, record].slice(-40);
+  const note = `Active segment: ${segment.label}. Hunter's choice. Switched ${input.at} from ${from} to ${segment.id}. ${reason} Split ${split.split.canada}/${split.split.us}. ${split.reason}`;
+  return {
+    ...freshCampaign(input.today, segment),
+    weights: state.weights,
+    weightNote: state.weightNote,
+    segmentSource: "hunter",
+    suggestionId: segment.id,
+    suggestionReason: reason,
+    split: split.split,
+    splitReason: split.reason,
+    switches,
+    planNote: note,
   };
 }
 
@@ -295,6 +359,7 @@ export function signOffSuggestion(state: CampaignState, today: string): Campaign
     planNote: `Signed segment: ${segment.label}. Christopher signed off on ${today}. Split ${split.split.canada}/${split.split.us}. ${split.reason}`,
     weights: state.weights,
     weightNote: state.weightNote,
+    switches: state.switches,
   };
 }
 

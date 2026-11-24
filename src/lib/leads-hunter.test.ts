@@ -685,7 +685,7 @@ test("a campaign run drops the previous plan note instead of stacking it", () =>
     lines: ["Returned 4. Already seen 0. Outside Canada and the United States 0. New 4."],
   });
   assert.equal(note.split("no queued companies left").length - 1, 0);
-  assert.match(note, /^Signed segment: Technology\. Split 70\/30\./);
+  assert.match(note, /^Active segment: Technology\. Split 70\/30\./);
   assert.match(note, /Returned 4\./);
   const stillThin = nextCampaignPlanNote(previous, {
     segmentLabel: "Technology",

@@ -79,6 +79,7 @@ import { Route as ApiCronLeadsHunterRouteImport } from './routes/api.cron.leads-
 import { Route as ApiCronLeadsScoutRouteImport } from './routes/api.cron.leads-scout'
 import { Route as ApiHunterOutreachRouteImport } from './routes/api.hunter.outreach'
 import { Route as ApiHunterReadRouteImport } from './routes/api.hunter.read'
+import { Route as ApiHunterSegmentRouteImport } from './routes/api.hunter.segment'
 import { Route as QuestAdminIndexRouteImport } from './routes/quest.admin.index'
 import { Route as QuestAdminAfterRouteImport } from './routes/quest.admin.after'
 import { Route as QuestAdminBroadcastRouteImport } from './routes/quest.admin.broadcast'
@@ -438,6 +439,11 @@ const ApiHunterReadRoute = ApiHunterReadRouteImport.update({
   path: '/api/hunter/read',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHunterSegmentRoute = ApiHunterSegmentRouteImport.update({
+  id: '/api/hunter/segment',
+  path: '/api/hunter/segment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuestAdminIndexRoute = QuestAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -549,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
+  '/api/hunter/segment': typeof ApiHunterSegmentRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -622,6 +629,7 @@ export interface FileRoutesByTo {
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
+  '/api/hunter/segment': typeof ApiHunterSegmentRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -703,6 +711,7 @@ export interface FileRoutesById {
   '/api/cron/leads-scout': typeof ApiCronLeadsScoutRoute
   '/api/hunter/outreach': typeof ApiHunterOutreachRoute
   '/api/hunter/read': typeof ApiHunterReadRoute
+  '/api/hunter/segment': typeof ApiHunterSegmentRoute
   '/quest/admin/after': typeof QuestAdminAfterRoute
   '/quest/admin/broadcast': typeof QuestAdminBroadcastRoute
   '/quest/admin/live': typeof QuestAdminLiveRoute
@@ -785,6 +794,7 @@ export interface FileRouteTypes {
     | '/api/cron/leads-scout'
     | '/api/hunter/outreach'
     | '/api/hunter/read'
+    | '/api/hunter/segment'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -858,6 +868,7 @@ export interface FileRouteTypes {
     | '/api/cron/leads-scout'
     | '/api/hunter/outreach'
     | '/api/hunter/read'
+    | '/api/hunter/segment'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -938,6 +949,7 @@ export interface FileRouteTypes {
     | '/api/cron/leads-scout'
     | '/api/hunter/outreach'
     | '/api/hunter/read'
+    | '/api/hunter/segment'
     | '/quest/admin/after'
     | '/quest/admin/broadcast'
     | '/quest/admin/live'
@@ -987,6 +999,7 @@ export interface RootRouteChildren {
   ApiCronLeadsScoutRoute: typeof ApiCronLeadsScoutRoute
   ApiHunterOutreachRoute: typeof ApiHunterOutreachRoute
   ApiHunterReadRoute: typeof ApiHunterReadRoute
+  ApiHunterSegmentRoute: typeof ApiHunterSegmentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1481,6 +1494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHunterReadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/hunter/segment': {
+      id: '/api/hunter/segment'
+      path: '/api/hunter/segment'
+      fullPath: '/api/hunter/segment'
+      preLoaderRoute: typeof ApiHunterSegmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/quest/admin/': {
       id: '/quest/admin/'
       path: '/'
@@ -1721,6 +1741,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronLeadsScoutRoute: ApiCronLeadsScoutRoute,
   ApiHunterOutreachRoute: ApiHunterOutreachRoute,
   ApiHunterReadRoute: ApiHunterReadRoute,
+  ApiHunterSegmentRoute: ApiHunterSegmentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

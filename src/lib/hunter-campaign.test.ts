@@ -4,6 +4,7 @@ import type { ApolloOrganization } from "./apollo.ts";
 import {
   acceptPage,
   applyBuyerTitleBoost,
+  applyHunterSegment,
   apolloProfileSignals,
   CAMPAIGN_PAGES_PER_REGION,
   CAMPAIGN_STATE_VERSION,
@@ -75,6 +76,79 @@ test("a monday suggestion does not replace the signed segment", () => {
   assert.equal(signed.segmentId, "energy");
   assert.equal(signed.signed, true);
   assert.match(signed.planNote, /signed off/);
+});
+
+test("a thin sample keeps the current segment instead of an alphabetical pick", () => {
+  const pick = suggestSegment({
+    weekStart: "2026-11-09",
+    currentSegmentId: "healthcare",
+    reviewedBySegment: { tech: 0, energy: 0, professional: 0, healthcare: 0 },
+    scoreBySegment: {},
+  });
+  assert.equal(pick.id, "healthcare");
+  assert.match(pick.reason, /current segment/);
+  assert.notEqual(pick.id, "energy");
+  const exploreTie = suggestSegment({
+    weekStart: "2026-11-16",
+    currentSegmentId: "professional",
+    reviewedBySegment: { tech: 1, energy: 1, professional: 1, healthcare: 1 },
+    scoreBySegment: {},
+  });
+  assert.equal(exploreTie.id, "professional");
+  const tied = suggestSegment({
+    weekStart: "2026-11-09",
+    currentSegmentId: "healthcare",
+    reviewedBySegment: { tech: 30, energy: 30, professional: 30, healthcare: 30 },
+    scoreBySegment: { tech: 4, energy: 4, professional: 4, healthcare: 4 },
+  });
+  assert.equal(tied.id, "healthcare");
+  const winner = suggestSegment({
+    weekStart: "2026-11-09",
+    currentSegmentId: "tech",
+    reviewedBySegment: { tech: 30, energy: 30 },
+    scoreBySegment: { tech: 1, energy: 9 },
+  });
+  assert.equal(winner.id, "energy");
+  assert.match(winner.reason, /conversion/i);
+  const monday = withMondaySuggestion(freshCampaign("2026-11-16"), "2026-11-23", {}, {});
+  assert.equal(monday.segmentId, "tech");
+  assert.equal(monday.suggestionId, "tech");
+  assert.equal(signedSegment({ ...freshCampaign("2026-11-20"), signed: false, segmentId: "healthcare" }).id, "healthcare");
+});
+
+test("Hunter can switch the active segment and the switch is logged", () => {
+  const state = freshCampaign("2026-11-24");
+  const rejected = applyHunterSegment(state, { segmentId: "sales", reason: "Sales booked more often last week.", today: "2026-11-24", at: "2026-11-24T17:47:00.000Z" });
+  assert.equal("error" in rejected, true);
+  const short = applyHunterSegment(state, { segmentId: "energy", reason: "short", today: "2026-11-24", at: "2026-11-24T17:47:00.000Z" });
+  assert.equal("error" in short, true);
+  const next = applyHunterSegment(state, {
+    segmentId: "energy",
+    reason: "Energy replies converted more often than technology.",
+    today: "2026-11-24",
+    at: "2026-11-24T17:47:00.000Z",
+  });
+  assert.equal("error" in next, false);
+  if ("error" in next) return;
+  assert.equal(next.segmentId, "energy");
+  assert.equal(next.segmentSource, "hunter");
+  assert.equal(signedSegment(next).id, "energy");
+  assert.equal(next.switches.length, 1);
+  assert.equal(next.switches[0]?.from, "tech");
+  assert.equal(next.switches[0]?.to, "energy");
+  assert.match(next.planNote, /2026-11-24T17:47:00.000Z/);
+  assert.match(next.planNote, /from tech to energy/);
+  assert.match(next.planNote, /Energy replies converted/);
+  assert.deepEqual(next.weights, state.weights);
+  const same = applyHunterSegment(next, {
+    segmentId: "energy",
+    reason: "Energy replies converted more often than technology.",
+    today: "2026-11-24",
+    at: "2026-11-24T18:00:00.000Z",
+  });
+  assert.equal("error" in same, false);
+  if ("error" in same) return;
+  assert.equal(same.switches.length, 1);
 });
 
 test("every fourth week suggests the least-tested segment", () => {
