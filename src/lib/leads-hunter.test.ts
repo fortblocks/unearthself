@@ -12,6 +12,7 @@ import {
   regionWeightForPlace,
   searchRegionCycle,
 } from "../data/hunter-profile.ts";
+import { dailyFileRoom } from "./hunter-phase.ts";
 import { formatFunnelDrops } from "./hunter-drops.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 import type { HunterCard } from "./leads-hunter.ts";
@@ -19,6 +20,7 @@ import { scoreCompany, type Company } from "./lead-score.ts";
 import {
   applyHunterWork,
   assignEnrichment,
+  contactReadyFiledToday,
   hasBuyerContact,
   hunterStop,
   isContactReady,
@@ -427,6 +429,40 @@ test("only an Enriched card with a sourced fact, a name, a title, and an email i
   assert.equal(isContactReady(research), false);
   assert.equal(isContactReady({ ...enriched, enrichment: "not-enriched" }), false);
   assert.equal(isContactReady({ ...enriched, profileHits: [], signals: [], whySources: [] }), false);
+});
+
+test("the daily 48 counts contact-ready cards and leaves out a row with no named person", () => {
+  const today = "2026-11-18";
+  const shells = Array.from({ length: 48 }, (_, index) =>
+    company({
+      id: `C-shell-${index}`,
+      org: `Shell ${index}`,
+      domain: `shell-${index}.example`,
+      filedOn: today,
+      buyerName: "",
+      buyerTitle: "",
+      email: "",
+      emailSource: "",
+    }),
+  );
+  assert.equal(contactReadyFiledToday(shells, today), 0);
+  assert.equal(dailyFileRoom(contactReadyFiledToday(shells, today)), 48);
+  const named = assignEnrichment(
+    company({
+      buyerName: "Laura Starchuk",
+      buyerTitle: "Head of People",
+      email: "laura@acmealpine.example",
+      emailSource: url,
+      filedOn: today,
+      profileHits: [{ id: "distributed", label: "Distributed", sourceUrl: url }],
+    }),
+    today,
+  );
+  assert.equal(isContactReady(named), true);
+  assert.equal(contactReadyFiledToday([...shells, named], today), 1);
+  assert.equal(contactReadyFiledToday([{ ...named, filedOn: "2026-11-17" }], today), 0);
+  const unnamed = assignEnrichment(company({ ...named, buyerName: "", email: "", filedOn: today }), today);
+  assert.equal(contactReadyFiledToday([unnamed], today), 0);
 });
 
 test("card source distinguishes hunter, scout, and hand", () => {

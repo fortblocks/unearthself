@@ -37,6 +37,7 @@ import { isClearBuyer, isStoredJudgment, judgeBuyerFit, type BuyerJudgment, type
 import {
   applyHunterWork,
   assignEnrichment,
+  contactReadyFiledToday,
   countContactReadyGain,
   countsForToday,
   hunterStop,
@@ -1640,7 +1641,8 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         break;
       }
       if (hunterStop(state, today)) break;
-      if (companies.filter((company) => company.filedOn === today).length >= hunterDailyFiledCap()) break;
+      const readyToday = contactReadyFiledToday(companies, today);
+      if (readyToday >= hunterDailyFiledCap()) break;
       const spent = await readMonthSpend(redis, month);
       if (monthlyCapState(capSpend(spent)) === "stop") {
         stopReason = "spend";
@@ -1784,7 +1786,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
         }
         ready.push(stamped);
       }
-      const limited = ready.slice(0, dailyFileRoom(companies.filter((company) => company.filedOn === today).length));
+      const limited = ready.slice(0, dailyFileRoom(readyToday));
       funnel.verified += limited.length;
       funnel.contactFound += limited.filter((card) => card.email).length;
       const judged = await attachBuyerJudgments(limited, () => runClock.clip(20_000), async (usage) => {

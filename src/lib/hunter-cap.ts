@@ -139,6 +139,11 @@ export function isContactReady(company: {
   return false;
 }
 
+/** Rows filed today that meet the contact-ready bar. A company row with no named person is left out. */
+export function contactReadyFiledToday(companies: Company[], today: string) {
+  return companies.filter((company) => company.filedOn === today && isContactReady(company)).length;
+}
+
 export function countContactReadyGain(before: Company[], after: Company[]) {
   const prior = new Map(before.map((company) => [company.domain, isContactReady(company)]));
   const seen = new Set<string>();

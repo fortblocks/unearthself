@@ -6,7 +6,7 @@ import { useBuyerJudgeForTests } from "./buyer-judgment.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 import { HUNTER_KEY, appendDoNotContact, enrichUnderApolloCap, readHunterDesk, runHunterBatch, useMxLookupForTests } from "./leads-hunter.ts";
 import { runNightlyCron } from "./hunter-nightly.ts";
-import type { Company } from "./lead-score.ts";
+import { edmontonToday, type Company } from "./lead-score.ts";
 
 const ABOUT = "https://northwind.example/about";
 const TEAM = "https://northwind.example/team";
@@ -429,6 +429,50 @@ test("a permanent reason replaces Skip or Lost, including a card with no email",
     assert.equal(noEmail.some((entry) => entry.domain === "blank.example" && entry.email === "" && entry.until === "never"), true);
   } finally {
     await restore(globalThis.fetch, {});
+  }
+});
+
+test("forty-eight company rows with no named person do not stop the day", async () => {
+  const redis = memoryRedis();
+  const previousFetch = globalThis.fetch;
+  const env = {
+    XAI_API_KEY: process.env.XAI_API_KEY,
+    HUNTER_KILL_SWITCH: process.env.HUNTER_KILL_SWITCH,
+    APOLLO_API_KEY: process.env.APOLLO_API_KEY,
+  };
+  delete process.env.HUNTER_KILL_SWITCH;
+  delete process.env.APOLLO_API_KEY;
+  process.env.XAI_API_KEY = "xai-test-key";
+  install(redis);
+  const today = edmontonToday(HUNT_AT);
+  const shells = Array.from({ length: 48 }, (_, index) => ({
+    ...oldCompany(),
+    id: `C-shell-${index}`,
+    org: `Shell ${index}`,
+    domain: `shell-${index}.example`,
+    filedOn: today,
+    buyerName: "",
+    buyerTitle: "",
+    email: "",
+    emailSource: "",
+  }));
+  await redis.set(LEADS_KEY, { ...emptyBook(), companies: shells });
+  let xaiCalls = 0;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("api.x.ai")) {
+      xaiCalls += 1;
+      return Response.json(xaiBody([]));
+    }
+    return new Response("missing", { status: 404 });
+  };
+  try {
+    const result = await runHunterBatch(HUNT_AT, { clock: () => HUNT_AT.getTime() });
+    assert.equal(result.ok, true);
+    assert.equal("skipped" in result ? result.skipped : "", "");
+    assert.equal(xaiCalls > 0, true);
+  } finally {
+    await restore(previousFetch, env);
   }
 });
 

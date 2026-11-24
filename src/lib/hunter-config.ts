@@ -19,8 +19,9 @@ export const HUNTER_LINKEDIN_METHOD_ID = "public-linkedin-post";
 export const HUNTER_CARD_CEILING = HUNTER_DAILY_CARD_TARGET;
 
 /**
- * Every card filed in an Edmonton day, research cards included.
- * 48 matches the contact-ready ceiling so a day never asks for more reviews than that number.
+ * Contact-ready cards in an Edmonton day. A row with no named person does not count.
+ * The count is isContactReady: a real name, a title, an email, and an Enriched mark with a sourced fact.
+ * 48 matches the contact-ready ceiling.
  * Env HUNTER_DAILY_FILED_CAP.
  */
 export const HUNTER_DAILY_FILED_CAP_DEFAULT = 48;
