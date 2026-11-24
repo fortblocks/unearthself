@@ -52,6 +52,7 @@ This folder is the single source of truth for every Grok chat, Grok Bot and huma
 | VOICE | `25_WS_VOICE.md` | Christopher (Tess on product language) | P0 |
 | LEADS | `26_LEADS_PRODUCT_EVOLUTION.md` | Christopher | Spec on top of SALES |
 | LEADS | `30_LEADS_STRATEGY.md` | Christopher | Governing frame for leads work |
+| LEADS | `31_HUNTER_STANDING_BRIEF.md` | Christopher | DRAFT for partner approval |
 
 ## Human-facing pack
 
