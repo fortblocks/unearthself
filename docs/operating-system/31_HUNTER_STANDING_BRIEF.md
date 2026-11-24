@@ -3,8 +3,9 @@
 **Status:** DRAFT for partner approval. Nothing is built, changed or published from this file until a partner approves it.  
 **Date:** 24th November 2026  
 **Written by:** Rex, from Christopher's brief on a voice call, 24th November 2026  
+**Revised:** 24th November 2026, from Christopher's voice brief. The weekly segment choice is now Hunter's own, without sign-off.  
 **Owner:** Christopher  
-**Supersedes:** nothing yet. `30_LEADS_STRATEGY.md` and `29_LEAD_HUNTER_BOT.md` still govern until this draft is approved and they are updated to match.  
+**Supersedes:** nothing yet (see "Effect on existing rules"). `30_LEADS_STRATEGY.md` and `29_LEAD_HUNTER_BOT.md` still govern until this draft is approved and they are updated to match.  
 **Related:** `29_LEAD_HUNTER_BOT.md` (Hunter spec), `30_LEADS_STRATEGY.md` (leads frame), Apollo campaign scope v2.6 (20th November 2026, Rex's working scope, approved by Christopher on 20th November and built in commit 5b809f8)
 
 This is Christopher's standing brief for how Hunter should develop. It has three layers, plus a self-learning loop that runs across all of them.
@@ -17,11 +18,12 @@ A good lead is a contact-ready card as defined in `29_LEAD_HUNTER_BOT.md`: a nam
 
 ## Layer 2. Autonomous weekly strategy
 
-At the start of each week, on its own initiative, Hunter presents the segments it thinks are best to target. For each segment it gives the rationale: why the segment is good and relevant to Unearth Self in the corporate retreat market.
+Hunter picks and switches segments itself, without sign-off. In Christopher's words, it is a moving feast.
 
-**Existing settled rule (scope v2.6, 20th November 2026, and `29_LEAD_HUNTER_BOT.md` section 10):** Hunter suggests the segment at the Monday stand-up and Christopher signs it off. Hunter does not pick a segment itself without that sign-off. This draft keeps that sign-off as it stands.
+- At the start of each week, on its own initiative, Hunter presents the segments it has chosen and the rationale: why each is good and relevant to Unearth Self in the corporate retreat market. This is for visibility, not for sign-off.
+- Hunter can change course mid-week if the evidence says so, and records the change and the reason.
 
-**Open question for partners:** the brief calls the weekly strategy "autonomous". Does that mean Hunter prepares and presents the plan on its own initiative, with Christopher's sign-off still required (as now)? Or should Hunter be able to switch segments without sign-off? This draft does not decide it.
+**Change from the current rule:** see "Effect on existing rules" below.
 
 ## Layer 3. Quality lead provision
 
@@ -29,9 +31,13 @@ Hunter puts lead data into the system according to the signed weekly strategy. I
 
 ## Self-learning and intelligence
 
-Hunter uses real-time feedback to adjust its own strategy toward the Layer 1 objective. That feedback includes which sectors are responding, conversion signals, and anything measurable on a card: reviewed, approved, sent, replied, booked.
+Conversion is the yardstick. Hunter judges its own performance on how its leads convert: reviewed, approved, sent, replied, booked, and which sectors respond. It keeps optimizing toward leads that convert, not toward a volume of random companies.
 
-**Current fact:** ranking weights change only once at least 30 cards have been reviewed (`HUNTER_SAMPLE_FLOOR`, `src/lib/hunter-config.ts`). Weekly weight changes then apply on their own and are logged in the plan note. The segment pick still waits for Christopher's sign-off.
+**Current fact:** ranking weights change only once at least 30 cards have been reviewed (`HUNTER_SAMPLE_FLOOR`, `src/lib/hunter-config.ts`). Weekly weight changes then apply on their own and are logged in the plan note.
+
+## Effect on existing rules
+
+Once partners approve this draft, it supersedes the 20th November 2026 rule in scope v2.6 and `29_LEAD_HUNTER_BOT.md` that the weekly segment needs Christopher's sign-off. `29_LEAD_HUNTER_BOT.md`, `30_LEADS_STRATEGY.md` and scope v2.6 would then need matching edits. They are not edited now.
 
 ## Current gap, as of 24th November 2026
 
