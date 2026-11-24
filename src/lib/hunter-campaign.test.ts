@@ -7,6 +7,8 @@ import {
   applyHunterSegment,
   apolloProfileSignals,
   CAMPAIGN_PAGES_PER_REGION,
+  CANADA_TILT_REASON,
+  collectRegion,
   CAMPAIGN_STATE_VERSION,
   companySource,
   creditAlarm,
@@ -58,9 +60,11 @@ test("the first segment is technology, signed, with the default split", () => {
   assert.equal(state.signed, true);
   assert.equal(state.segmentId, "tech");
   assert.equal(signedSegment(state).industries[0], "information technology & services");
-  assert.deepEqual(state.split, { canada: 70, us: 30 });
+  assert.deepEqual(state.split, { canada: 85, us: 15 });
+  assert.equal(state.splitReason, CANADA_TILT_REASON);
+  assert.equal(state.nextPage.cities, 1);
+  assert.equal(state.exhausted.cities, false);
   assert.match(state.planNote, /20th November 2026/);
-  assert.match(state.splitReason, /No clear lean/);
   assert.equal(companySource(undefined), "campaign");
   assert.equal(companySource("xai"), "xai");
   assert.equal(companySource("campaign"), "campaign");
@@ -311,14 +315,16 @@ test("a blank location from a Canada or United States search is kept", () => {
   assert.equal(filed.drops.outOfRegion, undefined);
 });
 
-test("three of every seven Canadian draws search the three cities, and thirty percent are the United States", () => {
-  const draws = Array.from({ length: 10 }, (_, index) => searchDraw(index));
-  assert.equal(draws.filter((item) => item.tier === "three-city").length, 3);
-  assert.equal(draws.filter((item) => item.tier === "canada").length, 4);
-  assert.equal(draws.filter((item) => item.tier === "us").length, 3);
+test("Canadian draws alternate the city queue first, and fifteen percent are the United States", () => {
+  const draws = Array.from({ length: 20 }, (_, index) => searchDraw(index, { canada: 85, us: 15 }));
+  assert.equal(draws.filter((item) => item.queue === "cities").length, 9);
+  assert.equal(draws.filter((item) => item.queue === "canada").length, 8);
+  assert.equal(draws.filter((item) => item.queue === "us").length, 3);
+  assert.equal(draws[0]?.queue, "cities");
+  assert.equal(draws[1]?.queue, "canada");
   assert.deepEqual(draws[0]?.locations, [...THREE_CITY_LOCATIONS]);
-  assert.deepEqual(draws[3]?.locations, ["Canada"]);
-  assert.deepEqual(draws[7]?.locations, ["United States"]);
+  assert.deepEqual(draws[1]?.locations, ["Canada"]);
+  assert.deepEqual(draws[17]?.locations, ["United States"]);
   const params = companySearchParams({ locations: draws[0]?.locations, industries: ["information technology & services"], page: 1, perPage: 100 });
   assert.equal(params.has("organization_not_locations[]"), false);
   assert.equal(regionWeightForPlace("Edmonton, Alberta", "canada"), 10);
@@ -343,7 +349,9 @@ test("an empty Apollo page exhausts the region, and the weekly cap resets on Mon
   const monday = loadCampaignState(state, "2026-11-23");
   assert.equal(monday.weekStart, "2026-11-23");
   assert.equal(monday.exhausted.canada, false);
+  assert.equal(monday.exhausted.cities, false);
   assert.equal(monday.pagesPulled.canada, 0);
+  assert.equal(monday.pagesPulled.cities, 0);
   assert.equal(monday.version, CAMPAIGN_STATE_VERSION);
 });
 
@@ -351,8 +359,8 @@ test("a stuck exhausted campaign pulls again without a manual edit", () => {
   const stuck = {
     ...freshCampaign("2026-11-20"),
     version: 1,
-    exhausted: { canada: true, us: true },
-    pagesPulled: { canada: CAMPAIGN_PAGES_PER_REGION, us: CAMPAIGN_PAGES_PER_REGION },
+    exhausted: { cities: true, canada: true, us: true },
+    pagesPulled: { cities: CAMPAIGN_PAGES_PER_REGION, canada: CAMPAIGN_PAGES_PER_REGION, us: CAMPAIGN_PAGES_PER_REGION },
     queued: [],
   };
   const recovered = loadCampaignState(stuck, "2026-11-20");
@@ -363,6 +371,42 @@ test("a stuck exhausted campaign pulls again without a manual edit", () => {
   assert.equal(needsAnotherPage(recovered, "canada"), true);
   assert.equal(needsAnotherPage(recovered, "us"), true);
   assert.equal(recovered.segmentId, "tech");
-  const stillCapped = loadCampaignState({ ...stuck, version: CAMPAIGN_STATE_VERSION, exhausted: { canada: true, us: false }, pagesPulled: { canada: CAMPAIGN_PAGES_PER_REGION, us: 0 } }, "2026-11-20");
+  const stillCapped = loadCampaignState({ ...stuck, version: CAMPAIGN_STATE_VERSION, exhausted: { cities: false, canada: true, us: false }, pagesPulled: { cities: 0, canada: CAMPAIGN_PAGES_PER_REGION, us: 0 } }, "2026-11-20");
   assert.equal(stillCapped.exhausted.canada, true);
+  assert.equal(stillCapped.exhausted.cities, false);
+});
+
+test("a stored 70/30 campaign takes the Canada tilt, and the city queue stays separate", () => {
+  const stored = {
+    ...freshCampaign("2026-11-24"),
+    split: { canada: 70, us: 30 },
+    splitReason: "No clear lean. The default is 70 percent Canada and 30 percent the United States.",
+    nextPage: { canada: 4, us: 2 },
+    pagesPulled: { canada: 3, us: 1 },
+    exhausted: { canada: false, us: false },
+  };
+  const loaded = loadCampaignState(stored as unknown, "2026-11-24");
+  assert.deepEqual(loaded.split, { canada: 85, us: 15 });
+  assert.equal(loaded.splitReason, CANADA_TILT_REASON);
+  assert.equal(loaded.nextPage.canada, 4);
+  assert.equal(loaded.nextPage.cities, 1);
+  assert.equal(loaded.pagesPulled.cities, 0);
+  assert.equal(loaded.exhausted.cities, false);
+  const custom = loadCampaignState(
+    { ...stored, split: { canada: 60, us: 40 }, splitReason: "Hunter set this split." } as unknown,
+    "2026-11-24",
+  );
+  assert.deepEqual(custom.split, { canada: 60, us: 40 });
+  assert.equal(custom.splitReason, "Hunter set this split.");
+  const national = acceptPage(freshCampaign("2026-11-24"), "canada", [org({ id: "nat", domain: "national.example", name: "National" })], "2026-11-24");
+  assert.equal(needsAnotherPage(national.state, "canada"), false);
+  assert.equal(needsAnotherPage(national.state, "cities"), true);
+  assert.equal(collectRegion(national.state, "cities", new Set(), 4).taken.length, 0);
+  assert.equal(collectRegion(national.state, "canada", new Set(), 4).taken.length, 1);
+  const cityPage = acceptPage(national.state, "cities", [org({ id: "city", domain: "edmonton.example", name: "Edmonton Co" })], "2026-11-24");
+  assert.equal(cityPage.added, 1);
+  assert.equal(cityPage.state.nextPage.cities, 2);
+  assert.equal(cityPage.state.nextPage.canada, national.state.nextPage.canada);
+  assert.equal(cityPage.state.queued.filter((row) => row.queue === "cities").length, 1);
+  assert.equal(cityPage.state.queued.find((row) => row.queue === "cities")?.region, "canada");
 });

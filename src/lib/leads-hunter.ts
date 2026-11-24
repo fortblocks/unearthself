@@ -1435,15 +1435,17 @@ async function prepareCampaignDrafts(
   }
   const draw = searchDraw(state.drawCursor, state.split);
   const region = draw.region;
-  let collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
+  const queue = draw.queue;
+  const queueName = queue === "cities" ? "Edmonton, Calgary, and Red Deer" : queue === "us" ? "the United States" : "Canada";
+  let collected = collectRegion(state, queue, input.known, CAMPAIGN_COMPANIES_PER_PASS);
   state = collected.state;
   let taken = collected.taken;
-  if (taken.length === 0 && needsAnotherPage(state, region) && key && input.timeLeft() > 5_000) {
+  if (taken.length === 0 && needsAnotherPage(state, queue) && key && input.timeLeft() > 5_000) {
     const searched = await searchApolloCompanies({
-      country: region === "us" ? "United States" : "Canada",
+      country: queue === "us" ? "United States" : "Canada",
       locations: draw.locations,
       industries: segment.industries,
-      page: state.nextPage[region],
+      page: state.nextPage[queue],
       perPage: 100,
       apiKey: key,
       sleep: async () => {},
@@ -1459,13 +1461,13 @@ async function prepareCampaignDrafts(
       await redis.incrby(apolloCreditKey(month), searched.credits);
       await redis.incrby(apolloCreditKey(input.today), searched.credits);
     }
-    const accepted = acceptPage(state, region, searched.organizations, input.today, searched.totalPages);
+    const accepted = acceptPage(state, queue, searched.organizations, input.today, searched.totalPages);
     state = accepted.state;
     const dropNote = pageDropNote(accepted);
-    console.info(JSON.stringify({ hunter: "campaign-page", region, tier: draw.tier, returned: accepted.returned, seen: accepted.seen, outOfRegion: accepted.outOfRegion, added: accepted.added }));
+    console.info(JSON.stringify({ hunter: "campaign-page", region, queue, tier: draw.tier, returned: accepted.returned, seen: accepted.seen, outOfRegion: accepted.outOfRegion, added: accepted.added }));
     lines.push(dropNote);
     if (accepted.added > 0 && input.timeLeft() > 8_000) {
-      const top = [...state.queued].filter((row) => row.region === region && row.page === state.nextPage[region] - 1).sort((a, b) => b.score - a.score).slice(0, 5);
+      const top = [...state.queued].filter((row) => (row.queue ?? row.region) === queue && row.page === state.nextPage[queue] - 1).sort((a, b) => b.score - a.score).slice(0, 5);
       const titles: Record<string, string[]> = {};
       for (const row of top) {
         if (input.timeLeft() < 2_000) break;
@@ -1473,17 +1475,17 @@ async function prepareCampaignDrafts(
       }
       state = { ...state, queued: applyBuyerTitleBoost(state.queued, titles, state.weights) };
     }
-    if (accepted.exhausted && accepted.returned === 0) lines.push(`${region} is out of Apollo results.`);
-    else if (accepted.exhausted && accepted.state.pagesPulled[region] >= CAMPAIGN_PAGES_PER_REGION) lines.push(`${region} reached the weekly page cap of ${CAMPAIGN_PAGES_PER_REGION}.`);
-    collected = collectRegion(state, region, input.known, CAMPAIGN_COMPANIES_PER_PASS);
+    if (accepted.exhausted && accepted.returned === 0) lines.push(`${queueName} is out of Apollo results.`);
+    else if (accepted.exhausted && accepted.state.pagesPulled[queue] >= CAMPAIGN_PAGES_PER_REGION) lines.push(`${queueName} reached the weekly page cap of ${CAMPAIGN_PAGES_PER_REGION}.`);
+    collected = collectRegion(state, queue, input.known, CAMPAIGN_COMPANIES_PER_PASS);
     state = collected.state;
     taken = collected.taken;
   } else if (taken.length === 0 && !key) {
     lines.push("Apollo key is not set, so no company page was pulled.");
-  } else if (taken.length === 0 && state.exhausted[region]) {
-    lines.push(`The signed list has no queued companies left in ${region}. Hunter keeps the signed segment and does not pick a new one.`);
-  } else if (taken.length === 0 && !needsAnotherPage(state, region)) {
-    lines.push(`The signed list is thin in ${region}. Hunter keeps the signed segment and pulls no further pages this week.`);
+  } else if (taken.length === 0 && state.exhausted[queue]) {
+    lines.push(`The signed list has no queued companies left in ${queueName}. Hunter keeps the signed segment and does not pick a new one.`);
+  } else if (taken.length === 0 && !needsAnotherPage(state, queue)) {
+    lines.push(`The signed list is thin in ${queueName}. Hunter keeps the signed segment and pulls no further pages this week.`);
   }
   const note = runNoteFor();
   state = { ...state, drawCursor: state.drawCursor + 1, planNote: note };

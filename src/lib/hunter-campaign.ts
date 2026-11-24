@@ -4,7 +4,7 @@
  * Headcount is a ranking input. It never drops a company.
  */
 
-import { HUNTER_REGION_SPLIT, HUNTER_SIGNALS, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
+import { HUNTER_SIGNALS, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
 import type { ApolloOrganization } from "./apollo.ts";
 import { HUNTER_SAMPLE_FLOOR } from "./hunter-config.ts";
 import { addDays } from "./hunter-phase.ts";
@@ -22,6 +22,13 @@ export const CAMPAIGN_PAGES_PER_REGION = 10;
 export const CAMPAIGN_STATE_VERSION = 2;
 export const THREE_CITY_LOCATIONS = ["Edmonton, Alberta, Canada", "Calgary, Alberta, Canada", "Red Deer, Alberta, Canada"] as const;
 export const CAMPAIGN_COMPANIES_PER_PASS = 4;
+/** Campaign draws only. The older slot walker keeps HUNTER_REGION_SPLIT. */
+export const CAMPAIGN_SPLIT = { canada: 85, us: 15 } as const;
+export const CANADA_TILT_REASON = "Canada tilt approved by Christopher 24 Nov";
+
+export type CampaignQueue = "cities" | "canada" | "us";
+export type QueueCounts = { cities: number; canada: number; us: number };
+export type QueueFlags = { cities: boolean; canada: boolean; us: boolean };
 
 export type CompanySource = "campaign" | "xai";
 
@@ -74,6 +81,8 @@ export type RankedCompany = {
   domain: string;
   name: string;
   region: "canada" | "us";
+  /** Which list this company was pulled from. City rows stay region canada. */
+  queue: CampaignQueue;
   score: number;
   inputs: string[];
   page: number;
@@ -95,9 +104,9 @@ export type CampaignState = {
   planNote: string;
   canadaSize: number | null;
   usSize: number | null;
-  nextPage: { canada: number; us: number };
-  pagesPulled: { canada: number; us: number };
-  exhausted: { canada: boolean; us: boolean };
+  nextPage: QueueCounts;
+  pagesPulled: QueueCounts;
+  exhausted: QueueFlags;
   seenIds: string[];
   queued: RankedCompany[];
   drawCursor: number;
@@ -140,18 +149,24 @@ export function isMonday(iso: string) {
   return weekStartMonday(iso) === iso;
 }
 
-/** 70/30 unless a segment has a logged lean. Tech does not. */
-export function splitForSegment(segmentId: string): { split: { canada: number; us: number }; reason: string } {
-  if (segmentId === "tech" || segmentId === "energy" || segmentId === "professional" || segmentId === "healthcare") {
+/** 85/15 Canada tilt. A stored 70/30 campaign is moved here on load. Any other stored split is left as it is. */
+export function splitForSegment(_segmentId: string): { split: { canada: number; us: number }; reason: string } {
+  return {
+    split: { canada: CAMPAIGN_SPLIT.canada, us: CAMPAIGN_SPLIT.us },
+    reason: CANADA_TILT_REASON,
+  };
+}
+
+/** The approved tilt replaces only the old 70/30 default. Hunter can still keep a different split. */
+export function applyCanadaTilt(state: CampaignState): CampaignState {
+  if (state.split.canada === 70 && state.split.us === 30) {
     return {
-      split: { canada: HUNTER_REGION_SPLIT.canada, us: HUNTER_REGION_SPLIT.us },
-      reason: "No clear lean. The default is 70 percent Canada and 30 percent the United States.",
+      ...state,
+      split: { canada: CAMPAIGN_SPLIT.canada, us: CAMPAIGN_SPLIT.us },
+      splitReason: CANADA_TILT_REASON,
     };
   }
-  return {
-    split: { canada: HUNTER_REGION_SPLIT.canada, us: HUNTER_REGION_SPLIT.us },
-    reason: "Unknown segment. The default is 70 percent Canada and 30 percent the United States.",
-  };
+  return state;
 }
 
 export function freshCampaign(today: string, segment = FIRST_SEGMENT): CampaignState {
@@ -176,9 +191,9 @@ export function freshCampaign(today: string, segment = FIRST_SEGMENT): CampaignS
     planNote: note,
     canadaSize: null,
     usSize: null,
-    nextPage: { canada: 1, us: 1 },
-    pagesPulled: { canada: 0, us: 0 },
-    exhausted: { canada: false, us: false },
+    nextPage: { cities: 1, canada: 1, us: 1 },
+    pagesPulled: { cities: 0, canada: 0, us: 0 },
+    exhausted: { cities: false, canada: false, us: false },
     seenIds: [],
     queued: [],
     drawCursor: 0,
@@ -200,16 +215,35 @@ function campaignFromRaw(raw: unknown): CampaignState | null {
     ...base,
     ...row,
     version: typeof row.version === "number" ? row.version : 1,
-    nextPage: row.nextPage ?? base.nextPage,
-    pagesPulled: row.pagesPulled ?? base.pagesPulled,
-    exhausted: row.exhausted ?? base.exhausted,
+    nextPage: numberQueue(row.nextPage, base.nextPage),
+    pagesPulled: numberQueue(row.pagesPulled, base.pagesPulled),
+    exhausted: flagQueue(row.exhausted, base.exhausted),
     seenIds: row.seenIds ?? [],
-    queued: row.queued,
+    queued: sanitizeQueued(row.queued),
     split: row.split,
     weights: row.weights ?? base.weights,
     segmentSource: row.segmentSource === "hunter" ? "hunter" : "build",
     switches: sanitizeSwitches(row.switches),
   };
+}
+
+function numberQueue(value: unknown, fallback: QueueCounts): QueueCounts {
+  const row = value && typeof value === "object" ? (value as Partial<QueueCounts>) : {};
+  const pick = (key: keyof QueueCounts) => (typeof row[key] === "number" && Number.isFinite(row[key]) ? row[key]! : fallback[key]);
+  return { cities: pick("cities"), canada: pick("canada"), us: pick("us") };
+}
+
+function flagQueue(value: unknown, fallback: QueueFlags): QueueFlags {
+  const row = value && typeof value === "object" ? (value as Partial<QueueFlags>) : {};
+  const pick = (key: keyof QueueFlags) => (typeof row[key] === "boolean" ? row[key]! : fallback[key]);
+  return { cities: pick("cities"), canada: pick("canada"), us: pick("us") };
+}
+
+function sanitizeQueued(value: RankedCompany[]): RankedCompany[] {
+  return value.map((row) => {
+    const queue: CampaignQueue = row.queue === "cities" || row.queue === "canada" || row.queue === "us" ? row.queue : row.region === "us" ? "us" : "canada";
+    return { ...row, queue, region: queue === "us" ? "us" : "canada" };
+  });
 }
 
 function sanitizeSwitches(value: unknown): SegmentSwitch[] {
@@ -238,8 +272,8 @@ export function recoverStuckCampaign(state: CampaignState, today: string): Campa
   return {
     ...state,
     version: CAMPAIGN_STATE_VERSION,
-    exhausted: { canada: false, us: false },
-    pagesPulled: { canada: 0, us: 0 },
+    exhausted: { cities: false, canada: false, us: false },
+    pagesPulled: { cities: 0, canada: 0, us: 0 },
     planNote: `${state.planNote} Recovered on ${today}. Canada and the United States pull again. The stuck exhausted flags are cleared.`,
   };
 }
@@ -251,8 +285,8 @@ export function resetCampaignWeek(state: CampaignState, today: string): Campaign
   return {
     ...state,
     weekStart: start,
-    pagesPulled: { canada: 0, us: 0 },
-    exhausted: { canada: false, us: false },
+    pagesPulled: { cities: 0, canada: 0, us: 0 },
+    exhausted: { cities: false, canada: false, us: false },
     suggestionReason: "",
     planNote: `${state.planNote} New week ${start}. The weekly page cap and exhausted flags are reset.`,
   };
@@ -262,7 +296,7 @@ export function loadCampaignState(raw: unknown, today: string): CampaignState {
   const parsed = campaignFromRaw(raw);
   if (!parsed) return freshCampaign(today);
   const current = parsed.version === CAMPAIGN_STATE_VERSION ? parsed : recoverStuckCampaign(parsed, today);
-  return resetCampaignWeek(current, today);
+  return applyCanadaTilt(resetCampaignWeek(current, today));
 }
 
 export function suggestSegment(input: {
@@ -371,7 +405,8 @@ function headcountPoints(employees: number | null, weight: number) {
   return { points: Math.round(weight * 0.3), note: "Large company, still ranked" };
 }
 
-export function rankOrganizations(orgs: ApolloOrganization[], region: "canada" | "us", weights: RankWeights, page: number): RankedCompany[] {
+export function rankOrganizations(orgs: ApolloOrganization[], queue: CampaignQueue, weights: RankWeights, page: number): RankedCompany[] {
+  const region: "canada" | "us" = queue === "us" ? "us" : "canada";
   const ranked = orgs
     .filter((org) => phaseOneCountry(org.country, org.place, region))
     .map((org) => {
@@ -407,7 +442,7 @@ export function rankOrganizations(orgs: ApolloOrganization[], region: "canada" |
         score += weights.technologies;
         inputs.push("Remote-work tool");
       }
-      return { id: org.id, domain: org.domain, name: org.name, region, score, inputs, page, status: "queued" as const, organization: org };
+      return { id: org.id, domain: org.domain, name: org.name, region, queue, score, inputs, page, status: "queued" as const, organization: org };
     });
   ranked.sort((a, b) => b.score - a.score || regionWeightForPlace(b.organization.place, region) - regionWeightForPlace(a.organization.place, region) || a.domain.localeCompare(b.domain));
   return ranked;
@@ -435,24 +470,26 @@ export function phaseOneCountry(country: string, place: string, searched?: "cana
 
 export type SearchDraw = {
   region: "canada" | "us";
+  queue: CampaignQueue;
   tier: "three-city" | "canada" | "us";
   locations: string[];
 };
 
 /**
- * 70/30 Canada/United States. Of each 7 Canadian draws, 3 search Edmonton, Calgary, and Red Deer.
- * The other 4 search Canada. No location inside either country is excluded.
+ * 85/15 Canada/United States by default. Canadian draws alternate, city queue first,
+ * between Edmonton, Calgary, and Red Deer and a Canada-wide search.
+ * No location inside either country is excluded.
  */
-export function searchDraw(cursor: number, split: { canada: number; us: number } = HUNTER_REGION_SPLIT): SearchDraw {
-  const cycle = searchRegionCycle({ canada: split.canada, us: split.us } as typeof HUNTER_REGION_SPLIT);
+export function searchDraw(cursor: number, split: { canada: number; us: number } = CAMPAIGN_SPLIT): SearchDraw {
+  const cycle = searchRegionCycle({ canada: split.canada, us: split.us });
   const index = cycle.length ? cursor % cycle.length : 0;
   const slot = cycle[index] ?? "canada";
-  if (slot === "us") return { region: "us", tier: "us", locations: ["United States"] };
+  if (slot === "us") return { region: "us", queue: "us", tier: "us", locations: ["United States"] };
   const canadaIndex = cycle.slice(0, index + 1).filter((item) => item === "canada").length - 1;
-  if (canadaIndex >= 0 && canadaIndex < 3) {
-    return { region: "canada", tier: "three-city", locations: [...THREE_CITY_LOCATIONS] };
+  if (canadaIndex % 2 === 0) {
+    return { region: "canada", queue: "cities", tier: "three-city", locations: [...THREE_CITY_LOCATIONS] };
   }
-  return { region: "canada", tier: "canada", locations: ["Canada"] };
+  return { region: "canada", queue: "canada", tier: "canada", locations: ["Canada"] };
 }
 
 function fundingWithin18Months(iso: string, today = "2026-11-20") {
@@ -466,18 +503,17 @@ function hiringTitle(title: string) {
   return ["people", "culture", "events", "learning", "office manager"].some((term) => hay.includes(term));
 }
 
-export function regionForDraw(cursor: number, split: { canada: number; us: number } = HUNTER_REGION_SPLIT): "canada" | "us" {
-  const cycle = searchRegionCycle({ canada: split.canada, us: split.us } as typeof HUNTER_REGION_SPLIT);
-  const slot = cycle[cursor % cycle.length] ?? "canada";
-  return slot === "us" ? "us" : "canada";
+export function regionForDraw(cursor: number, split: { canada: number; us: number } = CAMPAIGN_SPLIT): "canada" | "us" {
+  return searchDraw(cursor, split).region;
 }
 
-export function collectRegion(state: CampaignState, region: "canada" | "us", known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[] } {
+export function collectRegion(state: CampaignState, queue: CampaignQueue, known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[] } {
   const taken: RankedCompany[] = [];
   const queued = state.queued.map((row) => ({ ...row }));
   for (const row of queued) {
     if (taken.length >= limit) break;
-    if (row.status !== "queued" || row.region !== region) continue;
+    const rowQueue = row.queue ?? (row.region === "us" ? "us" : "canada");
+    if (row.status !== "queued" || rowQueue !== queue) continue;
     if (known.has(row.domain)) {
       row.status = "dropped";
       row.inputs = [...row.inputs, "Already on file"];
@@ -489,10 +525,10 @@ export function collectRegion(state: CampaignState, region: "canada" | "us", kno
   return { state: { ...state, queued }, taken };
 }
 
-export function takeQueued(state: CampaignState, known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[]; region: "canada" | "us" } {
-  const region = regionForDraw(state.drawCursor, state.split);
-  const collected = collectRegion(state, region, known, limit);
-  return { state: { ...collected.state, drawCursor: state.drawCursor + 1 }, taken: collected.taken, region };
+export function takeQueued(state: CampaignState, known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[]; region: "canada" | "us"; queue: CampaignQueue } {
+  const draw = searchDraw(state.drawCursor, state.split);
+  const collected = collectRegion(state, draw.queue, known, limit);
+  return { state: { ...collected.state, drawCursor: state.drawCursor + 1 }, taken: collected.taken, region: draw.region, queue: draw.queue };
 }
 
 export type PageAccept = {
@@ -508,7 +544,7 @@ export type PageAccept = {
 
 export function acceptPage(
   state: CampaignState,
-  region: "canada" | "us",
+  queue: CampaignQueue,
   organizations: ApolloOrganization[],
   today: string,
   totalPages?: number,
@@ -523,15 +559,15 @@ export function acceptPage(
       continue;
     }
     seenIds.add(org.id);
-    if (!phaseOneCountry(org.country, org.place, region)) {
+    if (!phaseOneCountry(org.country, org.place, queue === "us" ? "us" : "canada")) {
       outOfRegion += 1;
       continue;
     }
     fresh.push(org);
   }
-  const ranked = rankOrganizations(fresh, region, state.weights, state.nextPage[region]);
-  const pagesPulled = state.pagesPulled[region] + 1;
-  const atEnd = typeof totalPages === "number" && totalPages > 0 && state.nextPage[region] >= totalPages;
+  const ranked = rankOrganizations(fresh, queue, state.weights, state.nextPage[queue]);
+  const pagesPulled = state.pagesPulled[queue] + 1;
+  const atEnd = typeof totalPages === "number" && totalPages > 0 && state.nextPage[queue] >= totalPages;
   const empty = organizations.length === 0;
   const cap = pagesPulled >= CAMPAIGN_PAGES_PER_REGION;
   const exhausted = empty || atEnd || cap;
@@ -540,9 +576,9 @@ export function acceptPage(
       ...state,
       seenIds: [...seenIds],
       queued: [...state.queued, ...ranked],
-      nextPage: { ...state.nextPage, [region]: state.nextPage[region] + 1 },
-      pagesPulled: { ...state.pagesPulled, [region]: pagesPulled },
-      exhausted: { ...state.exhausted, [region]: exhausted },
+      nextPage: { ...state.nextPage, [queue]: state.nextPage[queue] + 1 },
+      pagesPulled: { ...state.pagesPulled, [queue]: pagesPulled },
+      exhausted: { ...state.exhausted, [queue]: exhausted },
       creditsMonth: today.slice(0, 7),
     },
     added: ranked.length,
@@ -558,10 +594,10 @@ export function pageDropNote(result: Pick<PageAccept, "returned" | "seen" | "out
   return `Returned ${result.returned}. Already seen ${result.seen}. Outside Canada and the United States ${result.outOfRegion}. New ${result.added}.`;
 }
 
-export function needsAnotherPage(state: CampaignState, region: "canada" | "us") {
-  if (state.exhausted[region]) return false;
-  if (state.pagesPulled[region] >= CAMPAIGN_PAGES_PER_REGION) return false;
-  return !state.queued.some((row) => row.region === region && row.status === "queued");
+export function needsAnotherPage(state: CampaignState, queue: CampaignQueue) {
+  if (state.exhausted[queue]) return false;
+  if (state.pagesPulled[queue] >= CAMPAIGN_PAGES_PER_REGION) return false;
+  return !state.queued.some((row) => (row.queue ?? (row.region === "us" ? "us" : "canada")) === queue && row.status === "queued");
 }
 
 export function creditAlarm(monthCredits: number) {

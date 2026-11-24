@@ -266,7 +266,15 @@ test("GET /api/hunter/read?view=weekly returns the Monday plan without emails", 
       today: string;
       weekStart: string;
       previousWeek: { start: string; end: string };
-      campaign: { segmentId: string; source: string; seenCount: number; split: { canada: number; us: number }; exhausted: { canada: boolean; us: boolean } };
+      campaign: {
+        segmentId: string;
+        source: string;
+        seenCount: number;
+        split: { canada: number; us: number };
+        splitReason: string;
+        nextPage: { cities: number; canada: number; us: number };
+        exhausted: { cities: boolean; canada: boolean; us: boolean };
+      };
       weekToDate: { cardsFiled: number; contactReady: number; apolloEmailLookups: number; xaiSpend: number; reviewed: { unreviewed: number } };
       lastWeek: { cardsFiled: number };
       bySegment: { weekToDate: { id: string }[] };
@@ -280,8 +288,10 @@ test("GET /api/hunter/read?view=weekly returns the Monday plan without emails", 
     assert.equal(body.campaign.segmentId, "tech");
     assert.equal(body.campaign.source, "Build");
     assert.equal(body.campaign.seenCount, 2);
-    assert.equal(body.campaign.split.canada, 70);
-    assert.deepEqual(body.campaign.exhausted, { canada: false, us: false });
+    assert.equal(body.campaign.split.canada, 85);
+    assert.equal(body.campaign.splitReason, "Canada tilt approved by Christopher 24 Nov");
+    assert.equal(body.campaign.nextPage.cities, 1);
+    assert.deepEqual(body.campaign.exhausted, { cities: false, canada: false, us: false });
     assert.equal(body.weekToDate.cardsFiled, 1);
     assert.equal(body.weekToDate.contactReady, 1);
     assert.equal(body.weekToDate.reviewed.unreviewed, 1);
