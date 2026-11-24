@@ -425,6 +425,7 @@ test("a chief people officer without an email outranks a sales director with one
   });
   assert.equal(picked?.id, "cpo");
   let revealedId = "";
+  let matches = 0;
   const judged: { industry: string; headcount: string; sizeBand: string; role: string } = {
     industry: "",
     headcount: "",
@@ -440,6 +441,7 @@ test("a chief people officer without an email outranks a sales director with one
     apiKey: KEY,
     limit: 1,
     judgeContact: async (input) => {
+      assert.equal(matches, 0);
       judged.industry = input.industry;
       judged.headcount = input.headcount;
       judged.sizeBand = input.sizeBand;
@@ -451,6 +453,7 @@ test("a chief people officer without an email outranks a sales director with one
     },
     fetchImpl: async (url) => {
       if (url.includes("/people/match")) {
+        matches += 1;
         revealedId = new URL(url).searchParams.get("id") ?? "";
         return Response.json({
           person: {
@@ -459,23 +462,25 @@ test("a chief people officer without an email outranks a sales director with one
             title: "Chief People Officer",
             email: "",
             email_status: "unavailable",
-            organization: {
-              name: "Acme Alpine",
-              primary_domain: "acme.example",
-              industry: "information technology & services",
-              estimated_num_employees: 18,
-            },
+            organization: { name: "Acme Alpine", primary_domain: "acme.example" },
           },
         });
       }
       return Response.json({
         people: [
           { id: "sales", title: "Sales Director", has_email: true },
-          { id: "cpo", title: "Chief People Officer", has_email: false },
+          {
+            id: "cpo",
+            title: "Chief People Officer",
+            has_email: false,
+            organization: { industry: "information technology & services", estimated_num_employees: 18 },
+          },
         ],
       });
     },
   });
+  assert.equal(matches, 1);
+  assert.equal(result.reveals, 1);
   assert.equal(revealedId, "cpo");
   assert.equal(judged.industry, "information technology & services");
   assert.equal(judged.headcount, "18");
@@ -487,4 +492,97 @@ test("a chief people officer without an email outranks a sales director with one
   assert.equal(card?.email, "");
   assert.equal(card?.email.includes("@"), false);
   assert.equal(/^[a-z]+\.[a-z]+@/i.test(card?.email ?? "kept-blank"), false);
+});
+
+test("a person who is not a buyer never spends an email lookup", async () => {
+  let matches = 0;
+  let reserved = 0;
+  const result = await enrichHunterContacts({
+    companies: [company({ buyerName: "", buyerTitle: "", email: "" })],
+    domains: ["acme.example"],
+    today: "2026-11-24",
+    revealsUsed: 47,
+    cap: 48,
+    apiKey: KEY,
+    limit: 1,
+    reserveReveal: async () => {
+      reserved += 1;
+      return true;
+    },
+    judgeContact: async () => ({
+      ok: true,
+      judgment: { buyer: false, confidence: "high", reason: "This role would not buy the retreat.", model: "test" },
+    }),
+    fetchImpl: async (url) => {
+      if (url.includes("/people/match")) {
+        matches += 1;
+        return Response.json(personBody("verified"));
+      }
+      return Response.json(searchBody());
+    },
+  });
+  assert.equal(matches, 0);
+  assert.equal(reserved, 0);
+  assert.equal(result.reveals, 0);
+  assert.equal(result.searches, 1);
+  assert.equal(result.failures.ceiling, undefined);
+  assert.equal(result.companies[0]?.buyerName, "");
+  assert.equal(result.companies[0]?.email, "");
+  assert.equal(result.companies[0]?.apolloCheckedOn, "2026-11-24");
+});
+
+test("a clear buyer spends one email lookup, and the 48th lookup stops the next", async () => {
+  const matches: string[] = [];
+  const buyer = async () => ({
+    ok: true as const,
+    judgment: { buyer: true, confidence: "high" as const, reason: "This people leader would buy the retreat.", model: "test" },
+  });
+  const one = await enrichHunterContacts({
+    companies: [company({ buyerName: "", buyerTitle: "", email: "" })],
+    domains: ["acme.example"],
+    today: "2026-11-24",
+    revealsUsed: 0,
+    cap: 48,
+    apiKey: KEY,
+    limit: 1,
+    judgeContact: buyer,
+    fetchImpl: async (url) => {
+      if (url.includes("/people/match")) {
+        matches.push(new URL(url).searchParams.get("id") ?? "");
+        return Response.json(personBody("verified"));
+      }
+      return Response.json(searchBody());
+    },
+  });
+  assert.deepEqual(matches, ["person-1"]);
+  assert.equal(one.reveals, 1);
+  assert.equal(one.companies[0]?.email, "jordan.blake@acme.example");
+
+  const cappedMatches: string[] = [];
+  const capped = await enrichHunterContacts({
+    companies: [
+      company({ buyerName: "", buyerTitle: "", email: "" }),
+      company({ id: "C-101", org: "North Line", domain: "northline.example", buyerName: "", buyerTitle: "", email: "" }),
+    ],
+    domains: ["acme.example", "northline.example"],
+    today: "2026-11-24",
+    revealsUsed: 47,
+    cap: 48,
+    apiKey: KEY,
+    limit: 2,
+    judgeContact: buyer,
+    fetchImpl: async (url) => {
+      if (url.includes("/people/match")) {
+        cappedMatches.push(url);
+        return Response.json(personBody("verified"));
+      }
+      return Response.json(searchBody());
+    },
+  });
+  assert.equal(cappedMatches.length, 1);
+  assert.equal(capped.reveals, 1);
+  assert.equal(capped.searches, 1);
+  assert.equal(capped.failures.ceiling, 1);
+  assert.equal(capped.note, APOLLO_CEILING);
+  assert.equal(capped.companies.filter((card) => card.email).length, 1);
 });

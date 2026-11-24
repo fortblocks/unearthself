@@ -220,9 +220,9 @@ function normalizeTitle(title: string) {
 /**
  * Title relevance first, then whether Apollo already has an email.
  * A people leader without an email outranks a sales title that has one.
- * This returns an id only. It never builds an email.
+ * This returns an id and the title from the free search. It never builds an email.
  */
-export function pickSearchPerson(body: unknown): { id: string } | null {
+export function pickSearchPerson(body: unknown): { id: string; title: string } | null {
   const record = asRecord(body);
   const people = Array.isArray(record?.people) ? record.people : [];
   const ranked = people
@@ -230,19 +230,15 @@ export function pickSearchPerson(body: unknown): { id: string } | null {
       const row = asRecord(item);
       const id = text(row?.id);
       if (!row || !id) return [];
-      const title = normalizeTitle(text(row.title));
-      const titleRank = APOLLO_TARGET_TITLES.findIndex((target) => title.includes(normalizeTitle(target)));
-      return [{ id, hasEmail: row.has_email === true, titleRank: titleRank === -1 ? 100 : titleRank }];
+      const title = text(row.title);
+      const titleRank = APOLLO_TARGET_TITLES.findIndex((target) => normalizeTitle(title).includes(normalizeTitle(target)));
+      return [{ id, title, hasEmail: row.has_email === true, titleRank: titleRank === -1 ? 100 : titleRank }];
     })
     .sort((a, b) => a.titleRank - b.titleRank || Number(b.hasEmail) - Number(a.hasEmail));
-  return ranked[0] ? { id: ranked[0].id } : null;
+  return ranked[0] ? { id: ranked[0].id, title: ranked[0].title } : null;
 }
 
-/** Industry and headcount already on the people-match organization. No extra Apollo call. */
-export function apolloOrganizationFacts(body: unknown): { industry: string; headcount: string; employeeRange: string } {
-  const record = asRecord(body);
-  const person = asRecord(record?.person);
-  const org = asRecord(person?.organization);
+function factsFromOrganization(org: Record<string, unknown> | null): { industry: string; headcount: string; employeeRange: string } {
   const industry = text(org?.industry) || stringList(org?.industries)[0] || "";
   const employees = [org?.estimated_num_employees, org?.num_employees, org?.employee_count]
     .map((value) => numberOrNull(value))
@@ -250,6 +246,21 @@ export function apolloOrganizationFacts(body: unknown): { industry: string; head
   const headcount = employees == null ? "" : String(employees);
   const range = headcount ? coerceSize(headcount, "unknown") : "unknown";
   return { industry, headcount, employeeRange: range === "unknown" ? "" : range };
+}
+
+/** Industry and headcount already on an organization object. No extra Apollo call. */
+export function apolloOrganizationFacts(body: unknown): { industry: string; headcount: string; employeeRange: string } {
+  const record = asRecord(body);
+  const person = asRecord(record?.person);
+  return factsFromOrganization(asRecord(person?.organization));
+}
+
+/** Facts on the free people-search row, when Apollo included them. Missing fields stay blank. */
+export function searchPersonFacts(body: unknown, personId: string): { industry: string; headcount: string; employeeRange: string } {
+  const record = asRecord(body);
+  const people = Array.isArray(record?.people) ? record.people : [];
+  const row = people.map(asRecord).find((item) => item && text(item.id) === personId) ?? null;
+  return factsFromOrganization(asRecord(row?.organization));
 }
 
 export function readApolloReveal(body: unknown): ApolloReveal | null {
@@ -354,8 +365,8 @@ export async function enrichHunterContacts(input: {
   /** Milliseconds left for the next Apollo call. 0 means stop. */
   timeLeft?: () => number;
   /**
-   * When set, a revealed person is written only if this says they are a clear buyer.
-   * A no, or a failed call, leaves the contact off the card.
+   * Runs on the free people-search result, before the paid email lookup.
+   * Only a clear buyer spends that lookup. A no, or a failed call, spends nothing and leaves the contact off the card.
    */
   judgeContact?: (input: {
     org: string;
@@ -442,10 +453,48 @@ export async function enrichHunterContacts(input: {
       break;
     }
     const chosen = searchClass.empty ? null : pickSearchPerson(searched.body);
+    const current = byDomain.get(company.domain) ?? company;
     if (!chosen) {
-      const checked = byDomain.get(company.domain);
-      if (checked) byDomain.set(company.domain, { ...checked, apolloCheckedOn: input.today });
+      byDomain.set(company.domain, { ...current, apolloCheckedOn: input.today });
       continue;
+    }
+    let priorJudgment: BuyerJudgment | undefined;
+    let priorFit: FitRating | null | undefined;
+    if (input.judgeContact) {
+      const judgeBudget = input.timeLeft?.() ?? 20_000;
+      if (input.timeLeft && judgeBudget < 1_000) {
+        note = "Stopped for time.";
+        timedOut = true;
+        break;
+      }
+      const facts = searchPersonFacts(searched.body, chosen.id);
+      const industry = facts.industry || (current.industry && current.industry !== "other" ? current.industry : "");
+      const employeeRange = facts.employeeRange || (current.sizeBand && current.sizeBand !== "unknown" ? current.sizeBand : "");
+      const decision = await input.judgeContact({
+        org: current.org,
+        domain: current.domain,
+        place: current.place ?? "",
+        city: current.city,
+        industry,
+        headcount: facts.headcount,
+        sizeBand: employeeRange,
+        signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
+        role: chosen.title,
+      });
+      const clear = decision.ok && isClearBuyer(decision.judgment);
+      console.info(
+        JSON.stringify(
+          decision.ok
+            ? { hunter: "buyer-judgment", outcome: clear ? "buyer" : "notBuyerJudged", confidence: decision.judgment.confidence, reason: decision.judgment.reason }
+            : { hunter: "buyer-judgment", outcome: "judgmentUnavailable" },
+        ),
+      );
+      if (!clear) {
+        byDomain.set(company.domain, { ...current, apolloCheckedOn: input.today });
+        continue;
+      }
+      priorJudgment = decision.judgment;
+      priorFit = decision.fit;
     }
     if (input.reserveReveal) {
       const allowed = await input.reserveReveal();
@@ -484,48 +533,15 @@ export async function enrichHunterContacts(input: {
       break;
     }
     const person = revealClass.empty ? null : readApolloReveal(revealed.body);
-    const current = byDomain.get(company.domain) ?? company;
-    if (input.judgeContact && person) {
-      const facts = apolloOrganizationFacts(revealed.body);
-      const industry = facts.industry || (current.industry && current.industry !== "other" ? current.industry : "");
-      const employeeRange = facts.employeeRange || (current.sizeBand && current.sizeBand !== "unknown" ? current.sizeBand : "");
-      const decision = await input.judgeContact({
-        org: current.org,
-        domain: current.domain,
-        place: current.place ?? "",
-        city: current.city,
-        industry,
-        headcount: facts.headcount,
-        sizeBand: employeeRange,
-        signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
-        role: person.title,
-      });
-      const clear = decision.ok && isClearBuyer(decision.judgment);
-      console.info(
-        JSON.stringify(
-          decision.ok
-            ? { hunter: "buyer-judgment", outcome: clear ? "buyer" : "notBuyerJudged", confidence: decision.judgment.confidence, reason: decision.judgment.reason }
-            : { hunter: "buyer-judgment", outcome: "judgmentUnavailable" },
-        ),
-      );
-      if (!clear) {
-        byDomain.set(company.domain, { ...current, apolloCheckedOn: input.today });
-        continue;
-      }
-      const accepted = applyApolloContact(current, person, input.today);
-      const withFit: Company = {
-        ...accepted,
-        buyerJudgment: decision.judgment,
-        fitRating: current.fitRating ?? decision.fit ?? undefined,
-        casl: accepted.casl ? { ...accepted.casl, roleFit: true } : accepted.casl,
-      };
-      if (withFit.email.trim() && apolloEmailIsVerified(withFit.apolloEmailStatus ?? "")) verifiedEmails += 1;
-      if (withFit.cardFlags?.includes(APOLLO_STALE)) countFailure("stale");
-      if (withFit.cardFlags?.includes(APOLLO_EMAIL_NOT_VERIFIED)) countFailure("unverified");
-      byDomain.set(company.domain, withFit);
-      continue;
-    }
-    const next = applyApolloContact(current, person, input.today);
+    const accepted = applyApolloContact(current, person, input.today);
+    const next: Company = priorJudgment
+      ? {
+          ...accepted,
+          buyerJudgment: priorJudgment,
+          fitRating: current.fitRating ?? priorFit ?? undefined,
+          casl: accepted.casl ? { ...accepted.casl, roleFit: true } : accepted.casl,
+        }
+      : accepted;
     if (next.email.trim() && apolloEmailIsVerified(next.apolloEmailStatus ?? "")) verifiedEmails += 1;
     if (next.cardFlags?.includes(APOLLO_STALE)) countFailure("stale");
     if (next.cardFlags?.includes(APOLLO_EMAIL_NOT_VERIFIED)) countFailure("unverified");
