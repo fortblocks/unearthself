@@ -316,7 +316,7 @@ function LeadsPage() {
       <Section
         kicker="This morning"
         action={
-          <label className="flex items-center gap-2 whitespace-nowrap text-xs tracking-widest text-sandstone uppercase">
+          <label className="flex items-center gap-2 whitespace-nowrap text-xs tracking-widest text-[#7A5B2B] uppercase">
             How many
             <select className={`${fieldClass} w-20`} value={morningCount} onChange={(event) => void changeCount(event.target.value)} aria-label="How many each morning">
               {Array.from({ length: 11 }, (_, index) => 10 + index).map((count) => (
@@ -390,7 +390,7 @@ function SortHeader({
     <span className={className}>
       <button
         type="button"
-        className={`inline-flex items-center gap-1 bg-transparent p-0 text-xs tracking-widest uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember ${align === "right" ? "w-full justify-end" : ""} ${active ? "text-coal" : "text-sandstone"}`}
+        className={`inline-flex items-center gap-1 bg-transparent p-0 text-xs tracking-widest uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember ${align === "right" ? "w-full justify-end" : ""} ${active ? "text-coal" : "text-[#7A5B2B]"}`}
         aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
         onClick={() => onSort(column)}
       >
@@ -438,13 +438,13 @@ function CompanyList({
         <SortHeader label="Score" column="score" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="w-14 shrink-0" align="right" />
       </li>
       {ordered.ready.length > 0 ? (
-        <li className="py-2 text-xs tracking-widest text-sandstone uppercase">Contact-ready</li>
+        <li className="py-2 text-xs tracking-widest text-[#7A5B2B] uppercase">Contact-ready</li>
       ) : null}
       {ordered.ready.map((row) => (
         <CompanyRow key={row.company.id} row={row} openId={openId} threads={threads} today={today} cocoById={cocoById} onCoco={onCoco} onToggle={onToggle} onMutate={onMutate} />
       ))}
       {ordered.research.length > 0 ? (
-        <li className="py-2 text-xs tracking-widest text-sandstone uppercase">Research cards, no contact yet</li>
+        <li className="py-2 text-xs tracking-widest text-[#7A5B2B] uppercase">Research cards, no contact yet</li>
       ) : null}
       {ordered.research.map((row) => (
         <CompanyRow key={row.company.id} row={row} openId={openId} threads={threads} today={today} cocoById={cocoById} onCoco={onCoco} onToggle={onToggle} onMutate={onMutate} />
@@ -491,7 +491,7 @@ function CompanyRow({
         />
         <span className="min-w-0 flex-1 font-semibold">
           {company.org}
-          <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
+          <span className="ml-2 text-xs font-normal tracking-widest text-[#7A5B2B] uppercase">
             {originLabel(cardSource(company))}
           </span>
           {cocoById[company.id]?.stage === "draft-flagged" ? (
@@ -627,7 +627,7 @@ function CompanyPanel({
     <div className="mb-4 grid gap-6 border border-line bg-paper p-4">
       <div className="grid gap-6 lg:grid-cols-2">
         <div>
-          <p className="text-xs tracking-widest text-sandstone uppercase">Company</p>
+          <p className="text-xs tracking-widest text-[#7A5B2B] uppercase">Company</p>
           <p className="mt-2 text-sm text-coal">
             {company.org} · {company.place?.trim() || company.city} · {company.industry} ·{" "}
             {company.sizeBand === "unknown" ? "size not stated" : company.sizeBand}
@@ -640,18 +640,18 @@ function CompanyPanel({
           ) : (
             <p className="mt-2 text-sm text-shale">No company source URL.</p>
           )}
-          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Status</p>
+          <p className="mt-3 text-xs tracking-widest text-[#7A5B2B] uppercase">Status</p>
           <p className="mt-1 text-sm text-coal">
             {company.status}
             {hasAccess(company) ? "" : " · access incomplete"}
           </p>
-          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Review</p>
+          <p className="mt-3 text-xs tracking-widest text-[#7A5B2B] uppercase">Review</p>
           <p className="mt-1 text-sm text-coal">
             {company.review ?? "unreviewed"}
             {company.skipReason ? ` · ${company.skipReason}` : ""}
             {company.pipeline ? ` · ${company.pipeline}` : ""}
           </p>
-          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Why this card</p>
+          <p className="mt-3 text-xs tracking-widest text-[#7A5B2B] uppercase">Why this card</p>
           <p className="mt-1 text-sm text-coal">
             {isContactReady(company) ? "Contact-ready." : company.buyerName.trim() ? "Named contact, not contact-ready." : "No contact yet. Kept off the contact-ready list."}
           </p>
@@ -666,7 +666,7 @@ function CompanyPanel({
           {company.why ? <p className="mt-1 text-sm text-shale">{company.why}</p> : null}
         </div>
         <div>
-          <p className="text-xs tracking-widest text-sandstone uppercase">Named contact</p>
+          <p className="text-xs tracking-widest text-[#7A5B2B] uppercase">Named contact</p>
           {company.buyerName ? (
             <p className="mt-2 text-sm text-coal">
               {company.buyerName}
@@ -707,7 +707,7 @@ function CompanyPanel({
       </div>
 
       <div>
-        <p className="text-xs tracking-widest text-sandstone uppercase">Why they fit</p>
+        <p className="text-xs tracking-widest text-[#7A5B2B] uppercase">Why they fit</p>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-coal">{company.why}</p>
         {company.whySources && company.whySources.length > 0 ? (
           <ul className="mt-3 space-y-1">
@@ -723,7 +723,7 @@ function CompanyPanel({
       </div>
 
       <div>
-        <p className="text-xs tracking-widest text-sandstone uppercase">Score</p>
+        <p className="text-xs tracking-widest text-[#7A5B2B] uppercase">Score</p>
         <p className="mt-2 text-sm text-coal">
           Fit {score.fit} / 60. City {score.geo}, size {score.size}, industry {score.industry}.
         </p>
@@ -766,23 +766,23 @@ function CompanyPanel({
         }}
       >
         <div>
-          <Label htmlFor={`${company.id}-name`}>Name</Label>
+          <Label className="!text-[#7A5B2B]" htmlFor={`${company.id}-name`}>Name</Label>
           <Input id={`${company.id}-name`} value={buyerName} onChange={(event) => setBuyerName(event.target.value)} />
         </div>
         <div>
-          <Label htmlFor={`${company.id}-title`}>Title</Label>
+          <Label className="!text-[#7A5B2B]" htmlFor={`${company.id}-title`}>Title</Label>
           <Input id={`${company.id}-title`} value={buyerTitle} onChange={(event) => setBuyerTitle(event.target.value)} />
         </div>
         <div>
-          <Label htmlFor={`${company.id}-email`}>Published email</Label>
+          <Label className="!text-[#7A5B2B]" htmlFor={`${company.id}-email`}>Published email</Label>
           <Input id={`${company.id}-email`} value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div>
-          <Label htmlFor={`${company.id}-email-source`}>Page where the email was published</Label>
+          <Label className="!text-[#7A5B2B]" htmlFor={`${company.id}-email-source`}>Page where the email was published</Label>
           <Input id={`${company.id}-email-source`} value={emailSource} onChange={(event) => setEmailSource(event.target.value)} />
         </div>
         <div className="md:col-span-2">
-          <Label htmlFor={`${company.id}-source`}>Company source URL</Label>
+          <Label className="!text-[#7A5B2B]" htmlFor={`${company.id}-source`}>Company source URL</Label>
           <Input id={`${company.id}-source`} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
         </div>
         <div>
@@ -800,7 +800,7 @@ function CompanyPanel({
         onSubject={setSubject}
         onBody={setBody}
         onApproveDraft={() => {
-          void approveAndQueueForCoco({ data: { cardId: company.id } }).then(async (result) => {
+          void approveAndQueueForCoco({ data: { cardId: company.id, rewrite: coco.stage === "draft-flagged" } }).then(async (result) => {
             if (!result.ok && result.error === "blocked") {
               toast.error(result.reasons?.join(" ") || "This card cannot be queued.");
               return;
@@ -821,7 +821,7 @@ function CompanyPanel({
             }
             await markApproved();
             await refreshCoco();
-            toast("Asked Coco to draft. Nothing was sent.");
+            toast(coco.stage === "draft-flagged" ? "Asked Coco to rewrite. Nothing was sent." : "Asked Coco to draft. Nothing was sent.");
           });
         }}
         onSkip={(reason) => {
@@ -870,6 +870,14 @@ function CompanyPanel({
             }
             if (!result.ok && result.error === "greeting-name") {
               toast.error("The greeting name is initials, one or two letters, or all capitals.");
+              return;
+            }
+            if (!result.ok && result.error === "tess-and-i") {
+              toast.error('The draft says "Tess and I".');
+              return;
+            }
+            if (!result.ok && (result.error === "em-dash" || result.error === "price")) {
+              toast.error(result.error === "em-dash" ? "The draft has an em dash." : "The draft has a price.");
               return;
             }
             if (!result.ok && result.error === "send-approved") {
@@ -954,7 +962,7 @@ function CompanyPanel({
 
       {threads.length > 0 ? (
         <div>
-          <p className="text-xs tracking-widest text-sandstone uppercase">Thread</p>
+          <p className="text-xs tracking-widest text-[#7A5B2B] uppercase">Thread</p>
           <ul className="mt-2 space-y-2">
             {threads.map((thread) => (
               <li key={thread.id} className="text-sm text-shale">

@@ -4,7 +4,7 @@
  * No model call. The check is the reject list and the house voice rules.
  */
 
-import { draftHasPrice, draftSellsCanyon, wordCount } from "./lead-copy.ts";
+import { draftHasPrice, draftSellsCanyon, letterForWordCount, wordCount } from "./lead-copy.ts";
 
 export type HumanizerResult = {
   pass: boolean;
@@ -79,7 +79,7 @@ export function humanizerCheck(subject: string, body: string): HumanizerResult {
   if (!/\bI (?:read this about|was looking at)\b/.test(body) && !/\bat [A-Z]/.test(body)) {
     notes.push("The letter needs one specific reference to this company or role.");
   }
-  const words = wordCount(body);
+  const words = wordCount(letterForWordCount(body));
   if (words < 120 || words > 180) notes.push(`House voice is 120 to 180 words. This is ${words}.`);
   return { pass: notes.length === 0, notes };
 }

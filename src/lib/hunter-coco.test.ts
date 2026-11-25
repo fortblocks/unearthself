@@ -291,12 +291,12 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     };
     assert.equal(stored.draftRejected?.check, "missing-touch");
     assert.match(stored.draftRejected?.at ?? "", /^\d{4}-\d{2}-\d{2}T/);
-    assert.equal(JSON.stringify(stored).includes(secret), false);
+    assert.equal(JSON.stringify(stored).includes("a".repeat(80)), false);
     assert.equal(JSON.stringify(stored).includes("SUBJECT-SECRET"), false);
     const view = await readCocoCard(card.id);
     assert.equal(view?.draftRejected?.check, "missing-touch");
-    assert.equal(view?.subject, "");
-    assert.equal(view?.body, "");
+    assert.equal(view?.subject, "A short note");
+    assert.equal(view?.body.includes("$12"), true);
     const accepted = await post(letter(card.id, "drafted", { subject: "A short note", body: "Hello from Drumheller." }));
     assert.equal(accepted.status, 200);
     const after = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { draftRejected?: unknown };
@@ -1062,7 +1062,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(logged?.check, "tess-and-i");
     const view = await readCocoCard(card.id);
     assert.equal(view?.stage, "draft-flagged");
-    assert.equal(view?.body, "");
+    assert.equal(view?.body.includes("Tess and I"), true);
     assert.equal(view?.draftFlag, 'The draft says "Tess and I".');
   });
 
@@ -1090,8 +1090,8 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     const ready = await readCocoCard("a");
     assert.equal(ready?.stage, "draft-ready");
     assert.equal(ready?.body.includes("<a href="), true);
-    assert.equal(ready?.body.includes(">unsubscribe</a>"), true);
-    assert.equal(ready?.body.includes("unsubscribe: "), true);
+    assert.equal(ready?.body.includes(">Unsubscribe here</a>"), true);
+    assert.equal(ready?.body.includes("Unsubscribe here: "), true);
     const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.a ?? "{}") as {
       sendApproved?: unknown;
       touches?: number;
@@ -1123,7 +1123,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     await seed(redis, [...cards, company({ id: "bad-letter", filedOn: today })]);
     const failed = await readCocoCard("bad-letter");
     assert.equal(failed?.stage, "draft-flagged");
-    assert.equal(failed?.body, "");
+    assert.equal(failed?.body.includes("Tess and I"), true);
     assert.equal(failed?.draftFlag.includes("Tess and I"), true);
   });
 

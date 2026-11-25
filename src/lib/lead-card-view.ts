@@ -3,6 +3,7 @@ import { isPhaseOneCompany } from "../data/hunter-profile.ts";
 import { isClearBuyer, isStoredJudgment } from "./buyer-judgment.ts";
 import {
   draftEditWarnings,
+  draftRejectionCheck,
   draftRejectionReason,
   emailableLead,
   ensureUnsubscribeLink,
@@ -34,7 +35,17 @@ const STAGE_MARKS = [
 const buttonClass =
   "inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-line-strong bg-paper px-3 text-sm font-semibold text-coal";
 const primaryClass =
-  "inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-ember bg-ember px-3 text-sm font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-ember bg-ember px-3 text-sm font-semibold text-coal";
+const primaryDisabledClass =
+  "inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-line bg-fossil px-3 text-sm font-semibold text-shale";
+const quietClass =
+  "inline-flex h-11 items-center justify-center whitespace-nowrap px-3 text-sm font-semibold text-shale underline decoration-shale/40 underline-offset-2";
+const kickerClass = "text-xs font-semibold tracking-widest text-[#7A5B2B] uppercase";
+
+const SEND_LINE =
+  "Approving queues this email from chris@badlandsbootcamp.com in Coco's chat (nothing on this card sends immediately).";
+const APPROVED_LINE =
+  "Approved. This email is queued in Coco's chat from chris@badlandsbootcamp.com. Nothing on this card sends it.";
 
 /** The named contact's published email. Blank and whitespace count as none. */
 export function hasPublishedEmail(company: { email?: string | null }) {
@@ -155,7 +166,7 @@ function actionButton(label: string, onClick: (() => void) | undefined, primary 
     "button",
     {
       type: "button",
-      className: primary ? primaryClass : buttonClass,
+      className: primary ? (disabled ? primaryDisabledClass : primaryClass) : buttonClass,
       onClick: disabled ? undefined : onClick,
       disabled,
     },
@@ -189,110 +200,57 @@ export function LeadCardActions({
   onWithdraw,
   draftWait,
 }: LeadCardActionsProps) {
-  const [localMenu, setLocalMenu] = useState<"skip" | "stage" | "stop" | null>(null);
+  const [fitOpen, setFitOpen] = useState(false);
   const warnings = draftEditWarnings(subject, body);
   const voice = humanizerCheck(subject, body);
   const badGreeting = greetingNameCheck(body);
-  const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved";
+  const letterCheck = draftRejectionCheck(subject, body);
+  const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved" || coco.stage === "draft-flagged";
   const awaiting = cocoAwaitingDraft(coco);
-  const flagReason =
-    coco.stage === "draft-flagged"
-      ? coco.draftFlag || draftRejectionReason(coco.draftRejected?.check ?? "rejected")
-      : awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check))
-        ? draftRejectionReason(coco.draftRejected?.check ?? "rejected")
-        : "";
-  const wait = flagReason || !awaiting ? null : draftWait === "late" ? "late" : "writing";
+  const editorFlag =
+    coco.stage === "draft-flagged" ? coco.draftFlag || draftRejectionReason(coco.draftRejected?.check ?? "rejected") : "";
+  const waitReason =
+    awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check))
+      ? draftRejectionReason(coco.draftRejected?.check ?? "rejected")
+      : "";
+  const wait = waitReason ? null : !awaiting ? null : draftWait === "late" ? "late" : "writing";
   const skip = skipReasonLines(coco);
-  const hasDraft = !flagReason && hasDraftCopy(subject, body, coco.subject, coco.body);
+  const hasDraft = hasDraftCopy(subject, body, coco.subject, coco.body);
+  const showEditor = hasDraft || coco.stage === "draft-flagged";
   const link = coco.unsubscribeUrl;
-  const showUnsubscribe = Boolean(hasDraft && link && body.includes(link));
-  const letter = showUnsubscribe ? letterWithoutUnsubscribe(body, link) : body;
+  const letter = link ? letterWithoutUnsubscribe(body, link) : body;
+  const rows = Math.min(
+    40,
+    Math.max(4, letter.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 68)), 0)),
+  );
   const words = letter.trim() ? `${wordCount(letter)} words` : "No draft yet.";
   const sources = hasDraft ? (coco.sources ?? []) : [];
-  const approveBlocked = !voice.pass || badGreeting;
-  const canSendApproval = hasDraft && (coco.canApproveWording || coco.stage === "draft-ready" || coco.canApproveDraft);
-  function menuOpen(id: "skip" | "stage" | "stop") {
-    if (menusOpen) return true;
-    if (openMenu) return openMenu === id;
-    return localMenu === id;
-  }
-  function toggleMenu(id: "skip" | "stage" | "stop") {
+  const approveBlocked = !voice.pass || badGreeting || Boolean(letterCheck);
+  const shownStage = approveBlocked && coco.stage === "draft-ready" ? "Needs edit" : skip.stage;
+  const fitMenu = menusOpen || openMenu === "skip" || openMenu === "stop" || fitOpen;
+  function toggleFit() {
     if (menusOpen || openMenu) return;
-    setLocalMenu((current) => (current === id ? null : id));
+    setFitOpen((open) => !open);
   }
+  const ruleNotes = [
+    ...(editorFlag ? [editorFlag] : []),
+    ...(badGreeting ? ["The greeting name is initials, one or two letters, or all capitals."] : []),
+    ...voice.notes,
+  ];
+  const showApprove = showEditor && !coco.canWithdraw;
+  const askCoco = !showEditor && coco.canApproveDraft && coco.stage !== "draft-flagged";
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
     createElement(
       "div",
       null,
-      createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Stage"),
-      createElement("p", { className: "mt-1 text-sm text-coal" }, skip.stage),
+      createElement("p", { className: kickerClass }, "Stage"),
+      createElement("p", { className: "mt-1 text-sm text-coal" }, shownStage),
       skip.status ? createElement("p", { className: "mt-1 text-sm text-shale" }, skip.status) : null,
       skip.note ? createElement("p", { className: "mt-1 text-sm text-coal" }, skip.note) : null,
     ),
-    createElement(
-      "div",
-      { className: "grid gap-2", "data-actions": "lead-card" },
-      createElement(
-        "p",
-        { className: "text-sm text-coal", "data-send-path": "explicit" },
-        "The only send is from chris@badlandsbootcamp.com, in Coco's chat, after Approve to send. Save edit does not send. Nothing else on this card sends.",
-      ),
-      createElement(
-        "div",
-        { className: "grid grid-cols-1 gap-2 sm:grid-cols-2" },
-        !hasDraft && coco.canApproveDraft ? actionButton("Ask Coco to draft", onApproveDraft, true) : null,
-        canSendApproval
-          ? actionButton("Approve to send", onApproveWording, true, approveBlocked)
-          : null,
-        hasDraft ? actionButton("Save edit", onSaveCopy) : null,
-      ),
-      coco.canWithdraw
-        ? createElement("div", { className: "grid grid-cols-1" }, optionButton("Take back send approval", onWithdraw))
-        : null,
-      approveBlocked && hasDraft
-        ? createElement(
-            "div",
-            { className: "border border-line bg-fossil p-3", "data-humanizer": voice.pass ? "pass" : "fail" },
-            createElement("p", { className: "text-sm font-semibold text-coal" }, "Approve to send is off."),
-            ...(badGreeting ? [createElement("p", { key: "greeting", className: "mt-1 text-sm text-coal" }, "The greeting name is initials, one or two letters, or all capitals.")] : []),
-            ...voice.notes.map((note) => createElement("p", { key: note, className: "mt-1 text-sm text-coal" }, note)),
-          )
-        : null,
-      coco.greetingNote ? createElement("p", { className: "text-sm text-coal", "data-greeting": "neutral" }, coco.greetingNote) : null,
-      coco.wordingNote ? createElement("p", { className: "text-sm text-coal" }, coco.wordingNote) : null,
-      createElement(
-        "div",
-        { className: "grid grid-cols-1 gap-2 sm:grid-cols-3" },
-        optionButton(menuOpen("skip") ? "Close not a fit" : "Not a fit", () => toggleMenu("skip")),
-        optionButton(menuOpen("stop") ? "Close do not contact" : "Do not contact", () => toggleMenu("stop")),
-        optionButton(menuOpen("stage") ? "Close after they reply" : "After they reply", () => toggleMenu("stage")),
-      ),
-      menuOpen("skip")
-        ? createElement(
-            "div",
-            { className: "grid grid-cols-1 gap-2 sm:grid-cols-3", "data-menu": "skip" },
-            SKIP_REASONS.map(([reason, label]) => optionButton(label, () => onSkip?.(reason), reason)),
-          )
-        : null,
-      menuOpen("stop")
-        ? createElement(
-            "div",
-            { className: "grid grid-cols-1 gap-2 sm:grid-cols-2", "data-menu": "stop" },
-            optionButton("Do not contact this person", () => onStop?.("person")),
-            optionButton("Do not contact this company", () => onStop?.("company")),
-          )
-        : null,
-      menuOpen("stage")
-        ? createElement(
-            "div",
-            { className: "grid grid-cols-2 gap-2 sm:grid-cols-4", "data-menu": "stage" },
-            STAGE_MARKS.map(([mark, label]) => optionButton(label, () => onStage?.(mark), mark)),
-          )
-        : null,
-    ),
-    flagReason ? flaggedPanel(flagReason) : wait ? draftingPanel(wait) : null,
+    waitReason ? flaggedPanel(waitReason) : wait ? draftingPanel(wait) : null,
     coco.blocked.length > 0
       ? createElement(
           "ul",
@@ -300,74 +258,137 @@ export function LeadCardActions({
           coco.blocked.map((reason) => createElement("li", { key: reason, className: "text-sm text-coal" }, reason)),
         )
       : null,
-    hasDraft
+    showEditor
       ? createElement(
-      "div",
-      null,
-      createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Draft"),
-      coco.touch ? createElement("p", { className: "mt-2 text-sm text-shale" }, `Touch ${coco.touch} of 3.`) : null,
-      createElement("p", { className: "mt-1 text-sm text-shale" }, "The letter goes from chris@badlandsbootcamp.com after Christopher approves it in Coco's chat."),
-      coco.unsubscribeAppended
-        ? createElement("p", { className: "mt-1 text-sm text-coal" }, UNSUBSCRIBE_ADDED_COPY)
-        : null,
-      createElement(
-        "label",
-        { className: "mt-3 block", htmlFor: `${cardId}-subject` },
-        createElement("span", { className: "mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase" }, "Subject"),
-        createElement("input", {
-          id: `${cardId}-subject`,
-          className: "h-11 w-full rounded-sm border border-line bg-paper px-3 text-sm text-coal",
-          value: subject,
-          readOnly: !editable,
-          onChange: (event: { target: { value: string } }) => onSubject?.(event.target.value),
-        }),
-      ),
-      createElement(
-        "label",
-        { className: "mt-3 block", htmlFor: `${cardId}-body` },
-        createElement("span", { className: "mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase" }, "Email"),
-        createElement("textarea", {
-          id: `${cardId}-body`,
-          rows: Math.min(
-            40,
-            Math.max(
-              8,
-              letter.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 52)), 0) + 1,
-            ),
+          "div",
+          null,
+          coco.touch ? createElement("p", { className: "text-sm text-shale" }, `Touch ${coco.touch} of 3.`) : null,
+          coco.greetingNote
+            ? createElement("p", { className: "mt-2 text-sm text-coal", "data-greeting": "neutral" }, coco.greetingNote)
+            : null,
+          coco.wordingNote ? createElement("p", { className: "mt-2 text-sm text-coal" }, coco.wordingNote) : null,
+          createElement(
+            "label",
+            { className: "mt-3 block", htmlFor: `${cardId}-subject` },
+            createElement("span", { className: `mb-1.5 block ${kickerClass}` }, "Subject"),
+            createElement("input", {
+              id: `${cardId}-subject`,
+              className: "h-11 w-full rounded-sm border border-line bg-paper px-3 text-sm text-coal",
+              value: subject,
+              readOnly: !editable,
+              onChange: (event: { target: { value: string } }) => onSubject?.(event.target.value),
+            }),
           ),
-          className: "w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal",
-          value: letter,
-          readOnly: !editable,
-          onChange: (event: { target: { value: string } }) => {
-            const next = event.target.value;
-            onBody?.(showUnsubscribe && link ? ensureUnsubscribeLink(next, link).body : next);
-          },
-        }),
-      ),
-      showUnsubscribe && link
-        ? createElement(
-            "p",
-            { className: "mt-3 text-sm text-coal" },
-            createElement(
-              "a",
-              {
-                href: link,
-                className: "font-semibold text-ember hover:underline",
-                "data-unsubscribe": "link",
+          createElement(
+            "label",
+            { className: "mt-3 block", htmlFor: `${cardId}-body` },
+            createElement("span", { className: `mb-1.5 block ${kickerClass}` }, "Email"),
+            approveBlocked && ruleNotes.length > 0
+              ? createElement(
+                  "div",
+                  {
+                    className: "mb-2 border border-line bg-fossil p-3",
+                    "data-humanizer": voice.pass ? "pass" : "fail",
+                    ...(editorFlag ? { "data-draft-flag": "failed" } : {}),
+                  },
+                  createElement("p", { className: "text-sm font-semibold text-coal" }, editorFlag ? DRAFT_FLAGGED_COPY : "Approve to send is off."),
+                  ...ruleNotes.map((note) => createElement("p", { key: note, className: "mt-1 text-sm text-coal" }, note)),
+                )
+              : null,
+            createElement("textarea", {
+              id: `${cardId}-body`,
+              rows,
+              className: "w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal [field-sizing:content]",
+              value: letter,
+              readOnly: !editable,
+              onChange: (event: { target: { value: string } }) => {
+                const next = event.target.value;
+                onBody?.(link ? ensureUnsubscribeLink(next, link).body : next);
               },
-              "unsubscribe",
-            ),
+            }),
+          ),
+          createElement(
+            "p",
+            { className: "mt-2 text-sm text-shale", "data-unsubscribe": "preview" },
+            "Don't want these emails? ",
+            createElement("span", { className: "underline" }, "Unsubscribe here"),
+            " and we won't contact you again.",
+          ),
+          createElement(
+            "p",
+            { className: "mt-2 text-xs text-shale" },
+            words,
+            coco.problems[0] ? ` ${coco.problems[0]}` : "",
+          ),
+          warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
+          createElement(
+            "div",
+            { className: "sticky bottom-0 z-10 mt-3 grid gap-2 bg-paper py-3 sm:static" },
+            showApprove ? actionButton("Approve to send", onApproveWording, true, approveBlocked) : null,
+            coco.canWithdraw ? optionButton("Take back send approval", onWithdraw) : null,
+            showEditor ? createElement("button", { type: "button", className: quietClass, onClick: onSaveCopy }, "Save draft without sending") : null,
+            coco.stage === "draft-flagged"
+              ? createElement("button", { type: "button", className: buttonClass, onClick: onApproveDraft }, "Rewrite with Coco")
+              : null,
+            showApprove
+              ? createElement("p", { className: "text-sm text-coal", "data-send-path": "explicit" }, SEND_LINE)
+              : null,
+            coco.canWithdraw
+              ? createElement("p", { className: "text-sm text-coal", "data-send-path": "explicit" }, APPROVED_LINE)
+              : null,
+          ),
+        )
+      : askCoco
+        ? createElement("div", { className: "grid" }, actionButton("Ask Coco to draft", onApproveDraft, true))
+        : null,
+    createElement(
+      "div",
+      { className: "relative", "data-actions": "lead-card" },
+      createElement(
+        "button",
+        {
+          type: "button",
+          className: fitMenu ? `${buttonClass} border-coal bg-fossil` : buttonClass,
+          "aria-expanded": fitMenu,
+          onClick: toggleFit,
+        },
+        "Not a fit ",
+        createElement("span", { "aria-hidden": "true" }, fitMenu ? "\u25B4" : "\u25BE"),
+      ),
+      fitMenu
+        ? createElement(
+            "div",
+            {
+              className: "absolute z-20 mt-1 w-full min-w-64 border border-line bg-paper p-2 shadow-sm",
+              "data-menu": "skip",
+              role: "menu",
+            },
+            ...SKIP_REASONS.map(([reason, label]) => optionButton(label, () => onSkip?.(reason), reason)),
+            createElement("div", { className: "my-2 border-t border-line", role: "separator" }),
+            optionButton("Do not contact this person", () => onStop?.("person"), "person"),
+            optionButton("Do not contact this company", () => onStop?.("company"), "company"),
           )
         : null,
+    ),
+    createElement(
+      "label",
+      { className: "flex items-center gap-3" },
+      createElement("span", { className: kickerClass }, "Outcome"),
       createElement(
-        "p",
-        { className: "mt-2 text-xs text-shale" },
-        words,
-        coco.problems[0] ? ` ${coco.problems[0]}` : "",
+        "select",
+        {
+          className: "h-11 min-w-0 flex-1 rounded-sm border border-line-strong bg-paper px-3 text-sm text-coal",
+          "aria-label": "Outcome",
+          defaultValue: "",
+          onChange: (event: { target: { value: string } }) => {
+            const mark = event.target.value;
+            if (mark === "replied" || mark === "booked" || mark === "won" || mark === "lost") onStage?.(mark);
+          },
+        },
+        createElement("option", { value: "" }, "After they reply"),
+        ...STAGE_MARKS.map(([mark, label]) => createElement("option", { key: mark, value: mark }, label)),
       ),
-      warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
-    )
-      : null,
+    ),
     sources.length > 0 ? draftSourceList(sources) : null,
   );
 }
@@ -376,7 +397,7 @@ function draftSourceList(sources: DraftSource[]) {
   return createElement(
     "div",
     null,
-    createElement("p", { className: "text-xs tracking-widest text-sandstone uppercase" }, "Sources"),
+    createElement("p", { className: kickerClass }, "Sources"),
     createElement(
       "ul",
       { className: "mt-2 space-y-1" },

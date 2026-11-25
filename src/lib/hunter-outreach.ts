@@ -250,6 +250,15 @@ function json(body: unknown, status: number, extra?: Record<string, string>) {
   return Response.json(body, { status, headers: { ...NO_STORE, ...extra } });
 }
 
+function rejectionCopy(payload: unknown): { subject?: string; body?: string } | undefined {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+  const row = payload as Record<string, unknown>;
+  const subject = typeof row.subject === "string" ? row.subject : undefined;
+  const body = typeof row.body === "string" ? row.body : undefined;
+  if (!subject && !body) return undefined;
+  return { subject, body };
+}
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -285,14 +294,17 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
   return `${UNSUBSCRIBE_ORIGIN}/u/${token}`;
 }
 
-/** HTML anchor. The visible text is the word unsubscribe. The token stays in the href. */
+/** The opt-out sentence. The link sits on "Unsubscribe here". The card shows this same line as text. */
+export const UNSUBSCRIBE_NOTICE = "Don't want these emails? Unsubscribe here and we won't contact you again.";
+
+/** HTML anchor. The visible words are "Unsubscribe here". The token stays in the href. */
 export function unsubscribeHtml(link: string) {
-  return `<a href="${escapeHtml(link)}">unsubscribe</a>`;
+  return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.`;
 }
 
 /** Plain-text fallback for a client that does not render the anchor. The URL stays so a reply can still opt out. */
 export function unsubscribePlain(link: string) {
-  return `unsubscribe: ${link}`;
+  return `Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.`;
 }
 
 export function unsubscribeBlock(link: string) {
@@ -324,6 +336,10 @@ export function letterWithoutUnsubscribe(body: string, link: string | null) {
     if (next.endsWith(trailing)) next = next.slice(0, -trailing.length);
     else if (next.trim() === link) next = "";
   }
+  const legacyHtml = `<a href="${escapeHtml(link)}">unsubscribe</a>`;
+  const legacyPlain = `unsubscribe: ${link}`;
+  next = next.split(legacyHtml).join("");
+  next = next.split(legacyPlain).join("");
   return next.replace(/[ \t]+$/g, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "");
 }
 
@@ -512,8 +528,8 @@ async function writeOutreachRecord(redis: LeadsRedis, record: OutreachRecord) {
   await redis.hset(HUNTER_OUTREACH_KEY, { [record.cardId]: JSON.stringify(record) });
 }
 
-/** Remember a rejected write-back by time and check code. The draft text is not written. */
-async function rememberDraftRejection(cardId: string, check: string) {
+/** Remember a rejected write-back. A letter Chris can fix stays on the card. A structural rejection only stamps the check. */
+async function rememberDraftRejection(cardId: string, check: string, copy?: { subject?: string; body?: string }) {
   if (!logSafe(cardId) || !/^[A-Za-z0-9_-]{1,40}$/.test(check)) return;
   try {
     const redis = await getRedisClient();
@@ -521,10 +537,22 @@ async function rememberDraftRejection(cardId: string, check: string) {
     const loaded = await loadBook();
     if (loaded.storage !== "redis") return;
     if (!loaded.book.companies.some((company) => company.id === cardId)) return;
+    const fixable = check === "tess-and-i" || check === "greeting-name" || check === "em-dash" || check === "price";
     await withOutreachLock(redis, cardId, async () => {
       const existing = await readOutreachRecord(redis, cardId);
       if (!existing) return;
-      existing.draftRejected = { at: new Date().toISOString(), check };
+      const at = new Date().toISOString();
+      existing.draftRejected = { at, check };
+      const subject = copy?.subject?.slice(0, 200) ?? "";
+      const body = copy?.body?.slice(0, 4096) ?? "";
+      if (fixable && (subject || body)) {
+        const touch = nextTouchNumber(existing) ?? 1;
+        const key = touchKey(touch);
+        const drafts = { ...(existing.drafts ?? {}) };
+        const prior = drafts[key] ?? {};
+        drafts[key] = { ...prior, subject: subject || prior.subject || "", body: body || prior.body || "", draftedAt: at };
+        existing.drafts = drafts;
+      }
       await writeOutreachRecord(redis, existing);
     });
   } catch {
@@ -1166,7 +1194,7 @@ export async function handleOutreach(request: Request) {
     const parsed = parseEvent(payload, Date.now());
     if (!parsed.ok) {
       const check = formatCheck(parsed.field, payload);
-      if (cardId) await rememberDraftRejection(cardId, check);
+      if (cardId) await rememberDraftRejection(cardId, check, rejectionCopy(payload));
       return finish(400, { error: "invalid", field: parsed.field }, check);
     }
     eventId = parsed.event.eventId;
@@ -1596,12 +1624,11 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
   const blocked = cocoBlockReasons(company, record, dnc, today).map((rule) => BLOCK_COPY[rule] ?? rule);
   const flagged = stage === "draft-flagged";
   const draftFlag = flagged ? draftRejectionReason(record?.draftRejected?.check ?? "rejected") : "";
-  const body = flagged ? "" : shown.body;
-  const shownSubject = flagged ? "" : subject;
-  const hasDraft = !flagged && Boolean(draft?.subject || draft?.body || draft?.editedBody);
-  const voice = flagged ? { pass: false, notes: [] as string[] } : humanizerCheck(shownSubject, body);
-  const greetingNote =
-    !flagged && body.startsWith("Hello,") ? "No usable first name. The greeting is Hello." : "";
+  const body = shown.body;
+  const shownSubject = subject;
+  const hasDraft = Boolean(draft?.subject || draft?.body || draft?.editedBody);
+  const voice = humanizerCheck(shownSubject, body);
+  const greetingNote = body.startsWith("Hello,") ? "No usable first name. The greeting is Hello." : "";
   const wordingNote = !hasDraft
     ? ""
     : !link
@@ -1616,13 +1643,13 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     touch,
     subject: shownSubject,
     body,
-    problems: flagged ? [] : (draft?.problems ?? []),
+    problems: draft?.problems ?? [],
     blocked,
     skipNote: record?.draftSkipped?.reason ?? "",
     draftRejected: record?.draftRejected ?? null,
     draftFlag,
-    unsubscribeAppended: flagged ? false : draft?.unsubscribeAppended === true || shown.appended,
-    sources: flagged ? [] : shownDraftSources(draft),
+    unsubscribeAppended: draft?.unsubscribeAppended === true || shown.appended,
+    sources: shownDraftSources(draft),
     canApproveDraft:
       emailableLead(company, blocked) &&
       blocked.length === 0 &&
@@ -1638,7 +1665,7 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
       voice.pass &&
       !greetingNameCheck(body),
     canWithdraw: stage === "wording-approved",
-    wordingNote: flagged ? "" : wordingNote,
+    wordingNote,
     unsubscribeUrl: link,
     humanizerPass: voice.pass,
     humanizerNotes: voice.notes,
@@ -1874,7 +1901,7 @@ export const COCO_PREDRAFT_BY = "coco-predraft";
 
 /**
  * Files one background draft. Does not approve the lead and does not send.
- * A letter that fails the draft check is stored as a flag, with no body.
+ * A letter that fails the draft check is stored and flagged. The words stay so they can be edited.
  * A card that already has a draft or a flag is left alone.
  */
 export async function storeBackgroundDraft(input: {
@@ -1898,6 +1925,9 @@ export async function storeBackgroundDraft(input: {
     if (!ensured || after) {
       fresh.draftRejected = { at: now, check: after || "draft-error" };
       fresh.queue = fresh.queue ?? { queuedAt: now, queuedBy: COCO_PREDRAFT_BY };
+      const drafts = { ...(fresh.drafts ?? {}) };
+      drafts["1"] = { subject: input.subject, body: input.body, draftedAt: now };
+      fresh.drafts = drafts;
       await writeOutreachRecord(redis, fresh);
       return "flagged" as const;
     }
@@ -1928,6 +1958,8 @@ export type DeskCocoResult =
 export async function approveAndQueueForCoco(input: {
   cardId: string;
   queuedBy: string;
+  /** Clears a flagged letter and asks Coco for another. Approve does not set this. */
+  rewrite?: boolean;
   fetchImpl?: WakeFetch;
 }): Promise<DeskCocoResult> {
   const redis = await getRedisClient();
@@ -1948,11 +1980,6 @@ export async function approveAndQueueForCoco(input: {
       reasons: [company.status === "stopped" ? "This card is stopped." : "This card cannot be emailed."],
     };
   }
-  if (draftFlagged(existing)) {
-    const blockedTouch = nextTouchNumber(existing);
-    const blockedDraft = blockedTouch != null ? existing?.drafts?.[touchKey(blockedTouch)] : undefined;
-    if (blockedDraft?.subject || blockedDraft?.body || blockedDraft?.editedBody) return { ok: false, error: "draft-flagged" };
-  }
   const reviewedOn = today;
   const nextBook = {
     ...loaded.book,
@@ -1964,7 +1991,8 @@ export async function approveAndQueueForCoco(input: {
   const approved = nextBook.companies.find((item) => item.id === company.id) ?? { ...company, review: "approved" as const, reviewedOn };
   const readyTouch = nextTouchNumber(existing);
   const readyDraft = readyTouch != null ? existing?.drafts?.[touchKey(readyTouch)] : undefined;
-  if (readyDraft && (readyDraft.subject || readyDraft.body || readyDraft.editedBody)) {
+  const rewriting = input.rewrite === true && draftFlagged(existing);
+  if (!rewriting && readyDraft && (readyDraft.subject || readyDraft.body || readyDraft.editedBody)) {
     return { ok: true, stage: cocoStage(approved, existing, Date.now(), dnc, today) };
   }
   let alreadyQueued = Boolean(existing?.queue?.queuedAt);
@@ -1974,6 +2002,20 @@ export async function approveAndQueueForCoco(input: {
       const fresh = (await readOutreachRecord(redis, company.id)) ?? { cardId: company.id, touches: 0, events: [] };
       if (draftFlagged(fresh)) {
         delete fresh.draftRejected;
+        if (input.rewrite && fresh.drafts) {
+          const touch = nextTouchNumber(fresh) ?? 1;
+          const key = touchKey(touch);
+          const prior = fresh.drafts[key];
+          if (prior) {
+            const kept = { ...prior };
+            delete kept.subject;
+            delete kept.body;
+            delete kept.editedSubject;
+            delete kept.editedBody;
+            delete kept.draftedAt;
+            fresh.drafts = { ...fresh.drafts, [key]: kept };
+          }
+        }
         fresh.queue = { queuedAt: new Date().toISOString(), queuedBy: input.queuedBy };
         await writeOutreachRecord(redis, fresh);
         alreadyQueued = false;
@@ -2068,6 +2110,8 @@ export async function approveWording(input: {
   if (!company) return { ok: false, error: "unknown-card" };
   const link = unsubscribeUrl(company.id);
   if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
+  const rejected = draftRejectionCheck(input.subject, input.body);
+  if (rejected) return { ok: false, error: rejected };
   if (greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
   const voice = humanizerCheck(input.subject, input.body);
   if (!voice.pass) return { ok: false, error: "humanizer", reasons: voice.notes };

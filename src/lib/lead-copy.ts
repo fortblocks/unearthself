@@ -19,8 +19,17 @@ export function draftSellsCanyon(body: string) {
   return /\b(abseil|rappel|rappelling|canyoning)\b/i.test(body);
 }
 
+/** The house-voice count ignores the legal opt-out footer. That line is not the letter. */
+export function letterForWordCount(text: string) {
+  return text
+    .replace(/\n*Don't want these emails\?[\s\S]*$/i, "")
+    .replace(/\n*<a href="[^"]*">unsubscribe<\/a>[\s\S]*$/i, "")
+    .replace(/\n*unsubscribe:\s+\S[\s\S]*$/i, "")
+    .trim();
+}
+
 export function draftProblems(body: string): string[] {
-  const n = wordCount(body);
+  const n = wordCount(letterForWordCount(body));
   const out: string[] = [];
   if (n < 120) out.push(`House voice is 120–180 words. This is ${n}.`);
   if (n > 180) out.push(`House voice is 120–180 words. This is ${n}.`);

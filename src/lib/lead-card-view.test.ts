@@ -55,6 +55,9 @@ const stages: CocoJoin[] = [
     stage: "draft-flagged",
     stageLabel: "Draft flagged",
     status: 'The draft says "Tess and I".',
+    subject: "A note",
+    body: "Tess and I will write.",
+    touch: 1,
     draftFlag: 'The draft says "Tess and I".',
     draftRejected: { at: "2026-11-20T19:40:00.000Z", check: "tess-and-i" },
     canApproveDraft: false,
@@ -360,7 +363,7 @@ test("subject and email stay hidden until a draft exists", () => {
   assert.equal(shown.includes(">Subject<"), true);
   assert.equal(shown.includes(">Email<"), true);
   assert.equal(shown.includes("A week in Drumheller"), true);
-  assert.equal(controlLabels(shown).includes("Save edit"), true);
+    assert.equal(controlLabels(shown).includes("Save draft without sending"), true);
   assert.equal(shown.includes(">Sources<"), false);
 
   const cited = "https://northwind.example/offsite";
@@ -424,7 +427,10 @@ test("the card notes when the unsubscribe link was added", () => {
       body: "Stored without a link.",
     }),
   );
-  assert.equal(html.split("The unsubscribe link was added automatically.").length - 1, 1);
+  assert.equal(html.includes('data-unsubscribe="preview"'), true);
+  assert.equal(html.split("Unsubscribe here").length - 1, 1);
+  assert.equal(html.includes("contact you again."), true);
+  assert.equal(html.includes("<a "), false);
   assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });
@@ -491,9 +497,12 @@ test("the card page has no Send control and no mail link in any stage", () => {
     if (coco.stage === "draft-flagged") {
       assert.equal(html.includes("data-draft-flag=\"failed\""), true);
       assert.equal(html.includes("Draft flagged"), true);
-      assert.equal(html.includes('id="card-1-subject"'), false);
+      assert.equal(html.includes('id="card-1-subject"'), true);
+      assert.equal(html.includes("Rewrite with Coco"), true);
+      assert.equal(html.includes("disabled"), true);
       assert.equal(html.includes("animate-spin"), false);
     }
+    assert.equal(html.includes("Close not a fit"), false, coco.stage);
     if (coco.stage === "wording-approved") assert.equal(labels.includes("Take back send approval"), true);
     assert.equal(labels.includes("Ask Coco to draft") || coco.stage !== "new", true);
   }
@@ -550,7 +559,7 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
   assert.equal(ready.includes("A week in Drumheller"), true);
   assert.equal(ready.includes("Ada, a team of 12 can come for three days."), true);
   assert.equal(controlLabels(ready).includes("Approve to send"), true);
-  assert.equal(controlLabels(ready).includes("Save edit"), true);
+  assert.equal(controlLabels(ready).includes("Save draft without sending"), true);
 
   const link = "https://www.unearthself.xyz/u/payload.signature";
   const linked = renderToStaticMarkup(
@@ -569,8 +578,9 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
       body: `Ada, a team of 12 can come for three days.\n\n<a href="${link}">unsubscribe</a>\nunsubscribe: ${link}`,
     }),
   );
-  assert.equal(linked.includes(`href="${link}"`), true);
-  assert.equal(linked.includes(">unsubscribe</a>"), true);
+  assert.equal(linked.includes(`href="${link}"`), false);
+  assert.equal(linked.includes('data-unsubscribe="preview"'), true);
+  assert.equal(linked.includes("Unsubscribe here"), true);
   const textarea = linked.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/);
   assert.equal(textarea?.[1]?.includes("payload.signature") ?? false, false);
   assert.equal(controlLabels(linked).includes("Approve to send"), true);

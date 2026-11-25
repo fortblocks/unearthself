@@ -46,10 +46,10 @@ export const addDoNotContact = createServerFn({ method: "POST" })
   });
 
 export const approveAndQueueForCoco = createServerFn({ method: "POST" })
-  .validator((data: { cardId: string }) => data)
+  .validator((data: { cardId: string; rewrite?: boolean }) => data)
   .handler(async ({ data }) => {
     const session = await requireStaffSession();
-    return queueForCoco({ cardId: data.cardId, queuedBy: session.email });
+    return queueForCoco({ cardId: data.cardId, queuedBy: session.email, rewrite: data.rewrite === true });
   });
 
 export const saveCocoDraftEdit = createServerFn({ method: "POST" })
