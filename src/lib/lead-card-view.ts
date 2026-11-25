@@ -8,6 +8,9 @@ import {
   emailableLead,
   ensureUnsubscribeLink,
   letterWithoutUnsubscribe,
+  OUTREACH_POSTAL_ADDRESS,
+  OUTREACH_SITE,
+  UNSUBSCRIBE_NOTICE,
   type CocoJoin,
   type DraftSource,
 } from "./hunter-outreach.ts";
@@ -324,7 +327,12 @@ export function LeadCardActions({
           createElement(
             "p",
             { className: "mt-2 text-sm text-shale", "data-unsubscribe": "preview" },
-            "Email footer (added automatically): Don't want these emails? Unsubscribe here and we won't contact you again.",
+            "Email footer (added automatically): ",
+            UNSUBSCRIBE_NOTICE,
+            createElement("br"),
+            OUTREACH_POSTAL_ADDRESS,
+            createElement("br"),
+            OUTREACH_SITE,
           ),
           createElement(
             "p",

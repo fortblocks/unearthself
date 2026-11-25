@@ -297,14 +297,22 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
 /** The opt-out sentence. The link sits on "Unsubscribe here". The card shows this same line as text. */
 export const UNSUBSCRIBE_NOTICE = "Don't want these emails? Unsubscribe here and we won't contact you again.";
 
+/** Postal address on every outreach footer and on the unsubscribe page. */
+export const OUTREACH_POSTAL_ADDRESS = "356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada";
+
+/** Second contact method on those footers. The card shows the words. The sent HTML links them. */
+export const OUTREACH_SITE = "www.unearthself.xyz";
+
+const OUTREACH_SITE_URL = "https://www.unearthself.xyz/";
+
 /** HTML anchor. The visible words are "Unsubscribe here". The token stays in the href. */
 export function unsubscribeHtml(link: string) {
-  return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.`;
+  return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.<br>${OUTREACH_POSTAL_ADDRESS}<br><a href="${OUTREACH_SITE_URL}">${OUTREACH_SITE}</a>`;
 }
 
 /** Plain-text fallback for a client that does not render the anchor. The URL stays so a reply can still opt out. */
 export function unsubscribePlain(link: string) {
-  return `Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.`;
+  return `Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.\n${OUTREACH_POSTAL_ADDRESS}\n${OUTREACH_SITE}`;
 }
 
 export function unsubscribeBlock(link: string) {
@@ -338,8 +346,12 @@ export function letterWithoutUnsubscribe(body: string, link: string | null) {
   }
   const legacyHtml = `<a href="${escapeHtml(link)}">unsubscribe</a>`;
   const legacyPlain = `unsubscribe: ${link}`;
+  const previousHtml = `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.`;
+  const previousPlain = `Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.`;
   next = next.split(legacyHtml).join("");
   next = next.split(legacyPlain).join("");
+  next = next.split(previousHtml).join("");
+  next = next.split(previousPlain).join("");
   return next.replace(/[ \t]+$/g, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "");
 }
 
@@ -2289,8 +2301,8 @@ function unsubscribePage(input: { message: string; token?: string; mask?: string
   ${input.token ? detail : `<p>${escapeHtml(input.message)}</p>`}
   ${form}
   <footer>
-    <p>Unearth Self<br>356 4 Street West<br>Drumheller, Alberta</p>
-    <p><a href="https://www.unearthself.xyz/" rel="noreferrer">unearthself.xyz</a></p>
+    <p>Unearth Self<br>${OUTREACH_POSTAL_ADDRESS}</p>
+    <p><a href="${OUTREACH_SITE_URL}" rel="noreferrer">${OUTREACH_SITE}</a></p>
   </footer>
 </main>
 </body>
