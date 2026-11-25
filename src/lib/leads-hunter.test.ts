@@ -28,6 +28,7 @@ import {
 import {
   advanceCursor,
   cardSource,
+  apolloFactsEnough,
   draftDropReason,
   fileHunterCards,
   freshHunterState,
@@ -224,6 +225,27 @@ test("geography scores a company and never drops it", () => {
   assert.ok(seattle.hunterBreak.travel > 0);
   assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), seattlePage, "canada", "ok"), null);
   assert.equal(draftDropReason(row("Harbor Software", "harbor.example", "Seattle, WA", "https://harbor.example/about"), "", "canada", "blocked"), "blocked");
+  const apollo = draft({ apolloBacked: true, place: "Calgary, Alberta", industry: "information technology & services", sizeBand: "120" });
+  assert.equal(apolloFactsEnough(apollo), true);
+  assert.equal(draftDropReason(apollo, "", "canada", "fetch-failed"), null);
+  const [kept] = verifyHunterDrafts([apollo], {}, { regionId: "canada", today: "2026-11-25" });
+  assert.ok(kept);
+  assert.equal(kept?.org, "Acme Alpine");
+  assert.equal(kept?.buyerName, "");
+  const scored = scoreHunter({
+    hitIds: ["offsite"],
+    buyerName: "Ada North",
+    email: "ada@keep.example",
+    emailSource: "Apollo",
+    sourceUrl: "https://keep.example",
+    signals: [],
+    today: "2026-11-25",
+    regionId: "canada",
+    place: "Calgary, Alberta",
+  });
+  assert.ok(scored.access >= 22);
+  assert.ok(scored.total > 20);
+  assert.equal(scored.profile > 0, true);
   assert.equal(regionWeightForPlace("Seattle, WA", "canada"), HUNTER_REGION_WEIGHTS.unitedStates);
   assert.equal(regionWeightForPlace("Halifax, NS", "us"), HUNTER_REGION_WEIGHTS.canada);
   assert.equal(regionWeightForPlace("", "canada"), HUNTER_REGION_WEIGHTS.elsewhere);

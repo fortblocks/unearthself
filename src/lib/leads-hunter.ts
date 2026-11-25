@@ -222,6 +222,8 @@ export type HunterCard = {
   method?: "apollo-campaign";
   /** Fields the company site did not print. Their source is Apollo, not the homepage. */
   apolloFields?: ("place" | "industry" | "sizeBand")[];
+  /** The company row came from Apollo, so a failed homepage does not erase it. */
+  apolloBacked?: boolean;
   hunterBreak: HunterBreak;
   hunterScore: number;
   query?: string;
@@ -390,6 +392,12 @@ export function hunterAccessPoints(input: {
   }).access;
 }
 
+/**
+ * Profile up to 50, access up to 25 (named person 12, sourced email 10, source URL 3),
+ * timing up to 15, travel up to 10. Access stays near zero until a named person
+ * and a sourced email are on the card. One profile signal plus that contact,
+ * in Alberta, clears the quality floor.
+ */
 export function scoreHunter(input: {
   hitIds: string[];
   buyerName: string;
@@ -411,6 +419,24 @@ export function scoreHunter(input: {
   }).timing;
   const travel = regionWeightForPlace(input.place ?? "", input.regionId);
   return { profile, access, timing, travel, total: profile + access + timing + travel };
+}
+
+/** Recompute the Hunter score after a contact is added, so access points show on the card. */
+export function refreshHunterScore(company: Company, today: string): Company {
+  if (company.hunterScore == null && !company.hunterBreak) return company;
+  const hunterBreak = scoreHunter({
+    hitIds: (company.profileHits ?? []).map((hit) => hit.id),
+    buyerName: company.buyerName,
+    email: company.email,
+    emailSource: company.emailSource,
+    sourceUrl: company.sourceUrl,
+    signals: company.signals ?? [],
+    lastTouch: company.lastTouch,
+    today,
+    regionId: company.hunterRegion || "canada",
+    place: company.place,
+  });
+  return { ...company, hunterBreak, hunterScore: hunterBreak.total };
 }
 
 function asRecord(row: unknown): Record<string, unknown> | null {
@@ -605,9 +631,10 @@ export function verifyHunterDrafts(
   for (const draft of drafts) {
     if (draft.sourceKind === "public-linkedin" && !isPublicLinkedInPost(draft.sourceUrl)) continue;
     const page = pages[draft.sourceUrl] ?? "";
-    if (!page) continue;
-    if (!pageHas(page, draft.org)) continue;
-    if (!domainOnSource(draft.domain, draft.sourceUrl, page)) continue;
+    const apolloEnough = apolloFactsEnough(draft);
+    if (!page && !apolloEnough) continue;
+    if (page && !pageHas(page, draft.org) && !apolloEnough) continue;
+    if (page && !domainOnSource(draft.domain, draft.sourceUrl, page) && !apolloEnough) continue;
     const placeOnPage = Boolean(draft.place && pageHas(page, draft.place));
     const place = placeOnPage ? draft.place : draft.apolloBacked && draft.place ? draft.place : "";
     const city = place ? cityFromPlace(place) : "Elsewhere";
@@ -677,6 +704,7 @@ export function verifyHunterDrafts(
       hunterRegion: opts.regionId,
       sourceKind: draft.sourceKind,
       method: draft.method,
+      apolloBacked: draft.apolloBacked,
       apolloFields,
       hunterBreak,
       hunterScore: hunterBreak.total,
@@ -845,7 +873,8 @@ export function fileHunterCards(
         continue;
       }
     }
-    if (index === -1 && (card.profileHits.length === 0 || !passesQualityFloor(card.hunterScore, floor))) {
+    const apolloResearch = apolloFactsEnough(card);
+    if (index === -1 && !apolloResearch && (card.profileHits.length === 0 || !passesQualityFloor(card.hunterScore, floor))) {
       noteDrop("below-quality-floor");
       continue;
     }
@@ -1032,6 +1061,20 @@ export async function readPages(urls: string[], timeLeft?: () => number) {
   return pages;
 }
 
+/** Apollo already supplied a domain plus a place, an industry, or a headcount. */
+export function apolloFactsEnough(draft: {
+  apolloBacked?: boolean;
+  domain: string;
+  place?: string;
+  industry?: string;
+  sizeBand?: string;
+}) {
+  if (!draft.apolloBacked || !draft.domain.trim()) return false;
+  const industry = Boolean(draft.industry && draft.industry !== "other");
+  const size = Boolean(draft.sizeBand && draft.sizeBand !== "unknown");
+  return Boolean(draft.place?.trim() || industry || size);
+}
+
 export function draftDropReason(
   draft: HunterDraft,
   page: string,
@@ -1040,12 +1083,13 @@ export function draftDropReason(
   source?: HunterSource,
 ): import("./hunter-phase.ts").DropReason | null {
   if ((source ?? draft.sourceKind) === "public-linkedin" && !isPublicLinkedInPost(draft.sourceUrl)) return "unverified";
+  if (!page && apolloFactsEnough(draft)) return null;
   if (!page) {
     if (fetchReason === "blocked" || fetchReason === "timed-out" || fetchReason === "fetch-failed") return fetchReason;
     return "page-empty";
   }
-  if (!pageHas(page, draft.org)) return "name-missing";
-  if (!domainOnSource(draft.domain, draft.sourceUrl, page)) return "domain-mismatch";
+  if (!pageHas(page, draft.org) && !apolloFactsEnough(draft)) return "name-missing";
+  if (!domainOnSource(draft.domain, draft.sourceUrl, page) && !apolloFactsEnough(draft)) return "domain-mismatch";
   return null;
 }
 
@@ -1191,6 +1235,7 @@ export async function enrichUnderApolloCap(input: {
   const cap = apolloCreditCap();
   const dnc = client ? await loadDoNotContact(client) : [];
   const seeded = client ? await seedCounter(client, apolloCounterKey(input.today), revealsOn(state, input.today)) : revealsOn(state, input.today);
+  let buyerCalls = 0;
   const result = await enrichHunterContacts({
     companies: input.companies,
     domains: input.domains,
@@ -1207,6 +1252,8 @@ export async function enrichUnderApolloCap(input: {
     judgeContact: async (contact) => {
       const left = input.timeLeft ? input.timeLeft() : 20_000;
       if (left < 1_000) return { ok: false };
+      if (client) await countCall(client, callCounterKey(input.today));
+      buyerCalls += 1;
       const result = await judgeBuyerFit(contact, { timeoutMs: Math.min(20_000, left) });
       return result.ok ? { ok: true, judgment: result.judgment, fit: result.fit ?? null } : { ok: false };
     },
@@ -1225,7 +1272,7 @@ export async function enrichUnderApolloCap(input: {
       apolloReveals: revealsOn(fresh, input.today) + result.reveals,
     });
   }
-  return result;
+  return { ...result, buyerCalls };
 }
 
 function huntQuery(slot: HunterSlot, explore: boolean) {
@@ -1454,7 +1501,7 @@ async function prepareCampaignDrafts(
     if ("failure" in searched) {
       const note = runNoteFor([searched.failure]);
       await saveCampaign(redis, { ...state, planNote: note });
-      return { drafts: [], query: `campaign:${segment.id}`, regionId: region, note, alarm: "" };
+      return { drafts: [], query: `campaign:${segment.id}|queue:${queue}`, regionId: region, note, alarm: "" };
     }
     const month = input.today.slice(0, 7);
     if (redis.incrby) {
@@ -1493,7 +1540,7 @@ async function prepareCampaignDrafts(
   const monthCredits = Number(await redis.get<string | number>(apolloCreditKey(input.today.slice(0, 7)))) || 0;
   return {
     drafts: draftsFromRanked(taken, input.today),
-    query: `campaign:${segment.id}`,
+    query: `campaign:${segment.id}|queue:${queue}`,
     regionId: region,
     note,
     alarm: creditAlarm(monthCredits),
@@ -1677,6 +1724,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
           xaiFailed = false;
           break;
         }
+        passesRun += 1;
       } else {
         const slotIndex = chooseSlotIndex({
           cursor,
@@ -1790,8 +1838,10 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       }
       const limited = ready.slice(0, dailyFileRoom(readyToday));
       funnel.verified += limited.length;
-      funnel.contactFound += limited.filter((card) => card.email).length;
-      const judged = await attachBuyerJudgments(limited, () => runClock.clip(20_000), async (usage) => {
+      const judged = await attachBuyerJudgments(limited, () => runClock.clip(20_000), async () => {
+        const used = await countCall(redis, callCounterKey(today));
+        state = { ...state, callsOn: today, callsToday: used };
+      }, async (usage) => {
         inputTokens += usage.inputTokens;
         outputTokens += usage.outputTokens;
         if (usage.dollars == null) return;
@@ -1815,16 +1865,20 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     }
 
     const apollo = timedOut
-      ? { companies, searches: 0, reveals: 0, verifiedEmails: 0, failures: { timeout: 1 }, note: "Stopped for time.", failed: false, timedOut: true }
+      ? { companies, searches: 0, reveals: 0, verifiedEmails: 0, failures: { timeout: 1 }, note: "Stopped for time.", failed: false, timedOut: true, buyerCalls: 0 }
       : await enrichUnderApolloCap({
           companies,
           domains: companies.filter((company) => company.filedOn === today).map((company) => company.domain),
           today,
-          limit: 8,
+          limit: 12,
           timeLeft: () => runClock.clip(20_000),
         });
     if (apollo.timedOut) timedOut = true;
-    companies = apollo.companies;
+    companies = apollo.companies.map((company) => refreshHunterScore(company, today));
+    const hadEmail = new Set(loaded.book.companies.filter((company) => company.email.trim()).map((company) => company.domain));
+    funnel.contactFound = companies.filter(
+      (company) => company.filedOn === today && company.email.trim() && !hadEmail.has(company.domain),
+    ).length;
     if (apollo.reveals > 0) {
       await redis.incrby(apolloCreditKey(month), apollo.reveals);
       await redis.incrby(apolloCreditKey(today), apollo.reveals);
@@ -1834,7 +1888,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     const settled = applyHunterWork(
       { ...state, callsOn: today, callsToday: callsUsed, filedOn: today, filedToday: counts.filedToday },
       today,
-      { calls: Math.max(0, state.callsToday - callsUsed), contactReady },
+      { calls: Math.max(0, state.callsToday - callsUsed) + apollo.buyerCalls, contactReady },
     );
     const history = await readHunterRuns(400);
     const hour = edmontonClock(now).hour;
@@ -1972,15 +2026,22 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
 }
 
 function judgmentInput(card: HunterCard): BuyerJudgmentInput {
+  const pageText = card.profileHits
+    .map((hit) => hit.snippet)
+    .filter((snippet) => snippet && snippet !== "Apollo")
+    .join(" ")
+    .slice(0, 500);
   return {
     org: card.org,
     domain: card.domain,
     place: card.place,
     city: card.city,
-    industry: card.industry,
-    sizeBand: card.sizeBand,
+    industry: card.industry === "other" ? "" : card.industry,
+    headcount: card.sizeBand === "unknown" ? "" : card.sizeBand,
+    sizeBand: card.sizeBand === "unknown" ? "" : card.sizeBand,
     signals: [...card.profileHits.map((hit) => hit.label), ...card.signals.map((signal) => signal.kind)].filter(Boolean).join(", "),
     role: card.buyerTitle,
+    pageText,
   };
 }
 
@@ -1988,6 +2049,7 @@ function judgmentInput(card: HunterCard): BuyerJudgmentInput {
 async function attachBuyerJudgments(
   cards: HunterCard[],
   timeoutFor: () => number,
+  onCall: () => Promise<void>,
   noteUsage: (usage: { inputTokens: number; outputTokens: number; dollars: number | null }) => Promise<void>,
 ): Promise<HunterCard[]> {
   const next: HunterCard[] = [];
@@ -2001,6 +2063,7 @@ async function attachBuyerJudgments(
       next.push({ ...card, buyerJudgment: "unavailable" });
       continue;
     }
+    await onCall();
     const result = await judgeBuyerFit(judgmentInput(card), { timeoutMs });
     await noteUsage(result.usage);
     next.push(

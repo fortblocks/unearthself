@@ -378,6 +378,7 @@ export async function enrichHunterContacts(input: {
     sizeBand: string;
     signals: string;
     role: string;
+    pageText?: string;
   }) => Promise<{ ok: true; judgment: BuyerJudgment; fit?: FitRating | null } | { ok: false }>;
 }): Promise<{
   companies: Company[];
@@ -470,22 +471,37 @@ export async function enrichHunterContacts(input: {
       const facts = searchPersonFacts(searched.body, chosen.id);
       const industry = facts.industry || (current.industry && current.industry !== "other" ? current.industry : "");
       const employeeRange = facts.employeeRange || (current.sizeBand && current.sizeBand !== "unknown" ? current.sizeBand : "");
+      const headcount = facts.headcount || employeeRange;
+      const pageText = (current.facts ?? [])
+        .map((fact) => fact.snippet)
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 500);
       const decision = await input.judgeContact({
         org: current.org,
         domain: current.domain,
         place: current.place ?? "",
         city: current.city,
         industry,
-        headcount: facts.headcount,
+        headcount,
         sizeBand: employeeRange,
         signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
         role: chosen.title,
+        pageText,
       });
       const clear = decision.ok && isClearBuyer(decision.judgment);
       console.info(
         JSON.stringify(
           decision.ok
-            ? { hunter: "buyer-judgment", outcome: clear ? "buyer" : "notBuyerJudged", confidence: decision.judgment.confidence, reason: decision.judgment.reason }
+            ? {
+                hunter: "buyer-judgment",
+                outcome: clear ? "buyer" : "notBuyerJudged",
+                confidence: decision.judgment.confidence,
+                reason: decision.judgment.reason,
+                hasIndustry: Boolean(industry),
+                hasHeadcount: Boolean(headcount),
+                hasPageText: Boolean(pageText),
+              }
             : { hunter: "buyer-judgment", outcome: "judgmentUnavailable" },
         ),
       );
@@ -624,6 +640,8 @@ export function companySearchParams(input: {
   country?: "Canada" | "United States";
   locations?: string[];
   industries: string[];
+  /** Fit-signal tags. Omitted means the retreat-buyer keywords. Pass [] to send none. */
+  keywords?: string[];
   page: number;
   perPage: number;
 }) {
@@ -631,6 +649,15 @@ export function companySearchParams(input: {
   const locations = input.locations?.length ? input.locations : input.country ? [input.country] : [];
   for (const location of locations) params.append("organization_locations[]", location);
   for (const industry of input.industries) params.append("organization_industries[]", industry);
+  const keywords = input.keywords ?? [
+    "offsite",
+    "culture",
+    "learning and development",
+    "b corp",
+    "outdoor",
+    "purpose",
+  ];
+  for (const keyword of keywords) params.append("q_organization_keyword_tags[]", keyword);
   params.set("page", String(input.page));
   params.set("per_page", String(input.perPage));
   return params;

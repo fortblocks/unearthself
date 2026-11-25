@@ -18,7 +18,12 @@ export const BUYER_JUDGMENT_SYSTEM = [
   'Return JSON only: {"buyer": true or false, "confidence": "low" or "medium" or "high", "reason": "one or two sentences", "fit": {"band": "strong" or "maybe" or "weak", "reason": "one line"}}.',
   "Rate how well the company fits the Drumheller team-retreat customer against the profile signals you are given.",
   "Set buyer to true only when you are clear this person would buy the retreat for their team.",
-  "Use confidence low when you are not clear.",
+  "A staffing firm, a recruiter, a job board, an outsourcing shop, or an IT consultancy is not a buyer.",
+  "A company of several thousand people, with no stated local team, is not a buyer.",
+  "A missing homepage is not, by itself, a reason for confidence low when place, industry, or headcount is stated.",
+  "When headcount is not stated, a company in Canada can still be a clear buyer at medium confidence if it is not one of those excluded company types.",
+  "A company in the United States with no stated headcount and no stated Canadian team is not a clear buyer.",
+  "Use confidence low when the company type or the role is a poor fit.",
   "The reason must not include a person's name, an email address, or a phone number.",
   "Do not invent facts that were not given.",
 ].join(" ");
@@ -54,6 +59,8 @@ export type BuyerJudgmentInput = {
   sizeBand: string;
   signals: string;
   role: string;
+  /** Short excerpt already fetched. Blank when the homepage was not read. */
+  pageText?: string;
 };
 
 export type BuyerJudgmentResult =
@@ -87,6 +94,7 @@ export function buyerJudgmentPrompt(input: BuyerJudgmentInput) {
     `Employee range: ${stated(input.sizeBand)}`,
     `Signals: ${(input.signals ?? "").trim() || "none"}`,
     `Role: ${stated(input.role)}`,
+    `Page text: ${stated(input.pageText)}`,
     "",
     "Is this contact a clear prospective buyer for a hotel spa team retreat in Drumheller, Alberta?",
     "Judge from the company context and the role. Do not use a fixed title list.",

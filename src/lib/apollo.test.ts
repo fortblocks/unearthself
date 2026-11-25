@@ -313,6 +313,8 @@ test("company search asks for a country and an industry, never a headcount range
   assert.equal(params.get("page"), "2");
   assert.equal(params.get("per_page"), "100");
   assert.equal(params.has("organization_num_employees_ranges[]"), false);
+  assert.equal(params.getAll("q_organization_keyword_tags[]").includes("offsite"), true);
+  assert.equal(params.getAll("q_organization_keyword_tags[]").includes("b corp"), true);
   const slept: number[] = [];
   let calls = 0;
   const result = await searchApolloCompanies({

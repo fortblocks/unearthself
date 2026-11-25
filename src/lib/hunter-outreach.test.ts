@@ -773,7 +773,21 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const snapshot = await read("/api/hunter/read", READ);
     assert.equal(snapshot.status, 200);
     const snap = (await snapshot.json()) as { cards: Record<string, unknown>[] };
-    assert.deepEqual(Object.keys(snap.cards[0] ?? {}).sort(), ["domain", "filedOn", "org", "pipeline", "score", "status"]);
+    assert.deepEqual(Object.keys(snap.cards[0] ?? {}).sort(), [
+      "contactStatus",
+      "domain",
+      "filedOn",
+      "fitBand",
+      "org",
+      "pipeline",
+      "queue",
+      "reason",
+      "score",
+      "scoreParts",
+      "segment",
+      "status",
+    ]);
+    assert.equal("email" in (snap.cards[0] ?? {}), false);
     assert.equal(JSON.stringify(snap).includes("ada@northwind.example"), false);
   });
 

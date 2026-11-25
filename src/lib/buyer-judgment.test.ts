@@ -304,6 +304,20 @@ test("no enumerated title allow-list gates filing", () => {
   });
   assert.match(withCompany, /Industry: information technology & services/);
   assert.match(withCompany, /Headcount: 18/);
+  assert.match(withCompany, /Page text: not stated/);
+  const withPage = buyerJudgmentPrompt({
+    org: "Soft Co",
+    domain: "soft.example",
+    place: "Calgary, Canada",
+    city: "Calgary",
+    industry: "tech",
+    headcount: "80",
+    sizeBand: "80-800",
+    signals: "offsite",
+    role: "People lead",
+    pageText: "Soft Co runs a culture programme in Calgary.",
+  });
+  assert.match(withPage, /Page text: Soft Co runs a culture programme in Calgary/);
   assert.match(withCompany, /Employee range: 1-49/);
   assert.equal(withCompany.includes("Industry: not stated"), false);
   assert.equal(withCompany.includes("Headcount: not stated"), false);

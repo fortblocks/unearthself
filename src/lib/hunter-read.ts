@@ -7,7 +7,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getRedisClient, loadBook } from "./leads-book.ts";
 import { edmontonToday, type Company } from "./lead-score.ts";
-import { countsForToday } from "./hunter-cap.ts";
+import { isStoredJudgment } from "./buyer-judgment.ts";
+import { countsForToday, isContactReady } from "./hunter-cap.ts";
 import { readHunterRuns, type HunterRunEntry } from "./hunter-runs.ts";
 import { addDays, capSpend, methodStats, monthSpendFromCounts, spendCounterKey, spendEstimateKey, spendTicksKey } from "./hunter-phase.ts";
 import { HUNTER_CAMPAIGN_KEY, loadCampaignState, segmentById, weekStartMonday } from "./hunter-campaign.ts";
@@ -103,8 +104,10 @@ export async function readHunterSnapshot(now = new Date()) {
     funnel: entry.funnel,
   }));
   const book = redis ? await loadBook() : null;
-  const cards = (book?.book.companies ?? [])
+  const companies = book?.book.companies ?? [];
+  const cards = companies
     .filter((company) => company.source === "hunter" || company.source === "scout" || company.hunterScore != null)
+    .sort((a, b) => Number(contactStatus(b) === "contact-ready") - Number(contactStatus(a) === "contact-ready"))
     .slice(0, 40)
     .map((company) => ({
       org: company.org,
@@ -113,6 +116,7 @@ export async function readHunterSnapshot(now = new Date()) {
       score: company.hunterScore ?? null,
       filedOn: company.filedOn ?? company.scoutBatch ?? "",
       pipeline: company.pipeline ?? "",
+      ...readCardFields(company),
     }));
   return {
     paused: state.paused,
@@ -120,6 +124,8 @@ export async function readHunterSnapshot(now = new Date()) {
       date: today,
       calls: counts.callsToday,
       cardsFiled: counts.filedToday,
+      cardsFiledToday: filedTodayCount(companies, today),
+      contactReadyToday: counts.filedToday,
       spendActual: spend.actual,
       spendEstimated: spend.estimated,
       spendTowardCap: capSpend(spend),
@@ -170,6 +176,63 @@ export function hasNamedContact(card: { buyerName?: string; buyerTitle?: string;
 export function segmentIdFromQuery(query: string) {
   const match = /(?:^|\|)campaign:(tech|energy|professional|healthcare)(?:\||$)/.exec(query);
   return match?.[1] ?? "";
+}
+
+export function queueFromQuery(query: string) {
+  const match = /(?:^|\|)queue:(cities|canada|us)(?:\||$)/.exec(query);
+  return match?.[1] ?? "";
+}
+
+export function contactStatus(company: {
+  buyerName?: string;
+  buyerTitle?: string;
+  email?: string;
+  emailSource?: string;
+  contactSource?: "Apollo" | "Public page";
+  apolloPersonId?: string;
+  apolloEmailStatus?: string;
+  cardFlags?: string[];
+  enrichment?: string;
+  facts?: { sourceUrl: string }[];
+  profileHits?: { sourceUrl: string }[];
+  signals?: { sourceUrl: string }[];
+}): "contact-ready" | "named" | "no-contact" {
+  if (
+    isContactReady({
+      buyerName: company.buyerName ?? "",
+      buyerTitle: company.buyerTitle ?? "",
+      email: company.email ?? "",
+      emailSource: company.emailSource ?? "",
+      contactSource: company.contactSource,
+      apolloPersonId: company.apolloPersonId,
+      apolloEmailStatus: company.apolloEmailStatus,
+      cardFlags: company.cardFlags,
+      enrichment: company.enrichment === "enriched" || company.enrichment === "not-enriched" || company.enrichment === "no-signal" ? company.enrichment : undefined,
+      profileHits: company.profileHits,
+      signals: company.signals,
+    })
+  ) {
+    return "contact-ready";
+  }
+  if (company.buyerName?.trim() && company.buyerTitle?.trim()) return "named";
+  return "no-contact";
+}
+
+function readCardFields(company: Company) {
+  const query = company.lineage?.query ?? "";
+  const reason = isStoredJudgment(company.buyerJudgment) ? company.buyerJudgment.reason : (company.why ?? "");
+  return {
+    reason: reason.slice(0, 240),
+    fitBand: company.fitRating?.band ?? "",
+    segment: segmentIdFromQuery(query),
+    queue: queueFromQuery(query),
+    contactStatus: contactStatus(company),
+    scoreParts: company.hunterBreak ?? null,
+  };
+}
+
+function filedTodayCount(companies: Company[], today: string) {
+  return companies.filter((company) => company.filedOn === today || company.scoutBatch === today).length;
 }
 
 function emptyCounts(): OutcomeCounts {
@@ -237,12 +300,13 @@ export function tallyOutcomeCards(cards: Company[], start: string, end: string) 
     listed.push({
       org: card.org,
       domain: card.domain,
-      segment,
       industry,
       contactReady: hasNamedContact(card),
       filedOn: on,
       review: card.review ?? "unreviewed",
       pipeline: card.pipeline ?? "",
+      ...readCardFields(card),
+      segment,
     });
   }
   return {
@@ -298,7 +362,11 @@ export async function readHunterWeekly(now = new Date()) {
     Number.isFinite(estimate) ? estimate : 0,
   );
   return {
-    today,
+    today: {
+      date: today,
+      cardsFiledToday: filedTodayCount(companies, today),
+      contactReadyToday: countsForToday(state, today).filedToday,
+    },
     weekStart: ranges.weekStart,
     previousWeek: ranges.lastWeek,
     campaign: {

@@ -27,6 +27,7 @@ import {
 import { getLeadsBook, importLeadsCompanies, saveLeadsCompany, setLeadsMorningCount } from "@/lib/leads-api";
 import { addDoNotContact, approveAndQueueForCoco, approveWording, getCocoCard, saveCocoDraftEdit, withdrawWording } from "@/lib/leads-hunter-api";
 import { cardSource } from "@/lib/leads-hunter";
+import { isContactReady } from "@/lib/hunter-cap";
 import { DEFAULT_LEAD_SORT, deskScoreRank, nextLeadSort, sortLeadRows, type LeadSortKey } from "@/lib/leads-table";
 import {
   bandLabel,
@@ -420,7 +421,13 @@ function CompanyList({
   onMutate: (id: string, act: () => string | null) => Promise<string | null>;
 }) {
   const [sort, setSort] = useState(DEFAULT_LEAD_SORT);
-  const ordered = useMemo(() => sortLeadRows(rows, sort), [rows, sort]);
+  const ordered = useMemo(() => {
+    const sorted = sortLeadRows(rows, sort);
+    return {
+      ready: sorted.filter(({ company }) => isContactReady(company)),
+      research: sorted.filter(({ company }) => !isContactReady(company)),
+    };
+  }, [rows, sort]);
   return (
     <ul className="divide-y divide-line border-y border-line">
       <li className="flex items-center gap-4 py-2 text-xs tracking-widest uppercase">
@@ -430,50 +437,82 @@ function CompanyList({
         <SortHeader label="Size" column="size" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="hidden w-24 shrink-0 sm:block" />
         <SortHeader label="Score" column="score" sort={sort} onSort={(column) => setSort((current) => nextLeadSort(current, column))} className="w-14 shrink-0" align="right" />
       </li>
-      {ordered.map(({ company, score }) => {
-        const open = openId === company.id;
-        const sendable = leadOnDesk(company, cocoById[company.id]?.blocked ?? []);
-        const rank = deskScoreRank({ company, score });
-        const place = company.place?.trim() || company.city;
-        return (
-          <li key={company.id}>
-            <button
-              type="button"
-              className="flex w-full items-center gap-4 py-3 text-left"
-              aria-expanded={open}
-              onClick={() => onToggle(open ? "" : company.id)}
-            >
-              <span
-                className={`size-2.5 shrink-0 rounded-full ${sendable ? "bg-ember" : "bg-line"}`}
-                aria-label={sendable ? "Ready" : "Not ready"}
-              />
-              <span className="min-w-0 flex-1 font-semibold">
-                {company.org}
-                <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
-                  {originLabel(cardSource(company))}
-                </span>
-              </span>
-              <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>
-              <span className="hidden w-24 shrink-0 text-sm text-shale sm:block">
-                {company.sizeBand === "unknown" ? "not stated" : company.sizeBand}
-              </span>
-              <span className="w-14 shrink-0 text-right text-sm tabular-nums">{rank.value}</span>
-            </button>
-            {open ? (
-              <CompanyPanel
-                company={company}
-                coco={cocoById[company.id] ?? emptyCoco({ canApproveDraft: company.review !== "skipped" })}
-                score={score}
-                today={today}
-                threads={threads.filter((thread) => thread.companyId === company.id)}
-                onCoco={onCoco}
-                onMutate={onMutate}
-              />
-            ) : null}
-          </li>
-        );
-      })}
+      {ordered.ready.length > 0 ? (
+        <li className="py-2 text-xs tracking-widest text-sandstone uppercase">Contact-ready</li>
+      ) : null}
+      {ordered.ready.map((row) => (
+        <CompanyRow key={row.company.id} row={row} openId={openId} threads={threads} today={today} cocoById={cocoById} onCoco={onCoco} onToggle={onToggle} onMutate={onMutate} />
+      ))}
+      {ordered.research.length > 0 ? (
+        <li className="py-2 text-xs tracking-widest text-sandstone uppercase">Research cards, no contact yet</li>
+      ) : null}
+      {ordered.research.map((row) => (
+        <CompanyRow key={row.company.id} row={row} openId={openId} threads={threads} today={today} cocoById={cocoById} onCoco={onCoco} onToggle={onToggle} onMutate={onMutate} />
+      ))}
     </ul>
+  );
+}
+
+function CompanyRow({
+  row,
+  openId,
+  threads,
+  today,
+  cocoById,
+  onCoco,
+  onToggle,
+  onMutate,
+}: {
+  row: { company: Company; score: ReturnType<typeof scoreCompany> };
+  openId: string;
+  threads: Array<{ id: string; companyId?: string; dir: string; subject: string; at: string }>;
+  today: string;
+  cocoById: Record<string, CocoJoin>;
+  onCoco: (id: string, card: CocoJoin) => void;
+  onToggle: (id: string) => void;
+  onMutate: (id: string, act: () => string | null) => Promise<string | null>;
+}) {
+  const { company, score } = row;
+  const open = openId === company.id;
+  const sendable = leadOnDesk(company, cocoById[company.id]?.blocked ?? []);
+  const rank = deskScoreRank({ company, score });
+  const place = company.place?.trim() || company.city;
+  return (
+    <li>
+      <button
+        type="button"
+        className="flex w-full items-center gap-4 py-3 text-left"
+        aria-expanded={open}
+        onClick={() => onToggle(open ? "" : company.id)}
+      >
+        <span
+          className={`size-2.5 shrink-0 rounded-full ${sendable ? "bg-ember" : "bg-line"}`}
+          aria-label={sendable ? "Ready" : "Not ready"}
+        />
+        <span className="min-w-0 flex-1 font-semibold">
+          {company.org}
+          <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
+            {originLabel(cardSource(company))}
+          </span>
+        </span>
+        <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>
+        <span className="hidden w-24 shrink-0 text-sm text-shale sm:block">
+          {company.sizeBand === "unknown" ? "not stated" : company.sizeBand}
+        </span>
+        <span className="w-14 shrink-0 text-right text-sm tabular-nums">{rank.value}</span>
+      </button>
+      {open ? (
+        <CompanyPanel
+          company={company}
+          coco={cocoById[company.id] ?? emptyCoco({ canApproveDraft: company.review !== "skipped" })}
+          score={score}
+          today={today}
+          threads={threads.filter((thread) => thread.companyId === company.id)}
+          onCoco={onCoco}
+          onMutate={onMutate}
+        />
+      ) : null}
+    </li>
   );
 }
 
@@ -599,6 +638,19 @@ function CompanyPanel({
             {company.skipReason ? ` · ${company.skipReason}` : ""}
             {company.pipeline ? ` · ${company.pipeline}` : ""}
           </p>
+          <p className="mt-3 text-xs tracking-widest text-sandstone uppercase">Why this card</p>
+          <p className="mt-1 text-sm text-coal">
+            {isContactReady(company) ? "Contact-ready." : company.buyerName.trim() ? "Named contact, not contact-ready." : "No contact yet. Kept off the contact-ready list."}
+          </p>
+          {company.buyerJudgment ? <p className="mt-1 text-sm text-shale">{company.buyerJudgment.reason}</p> : null}
+          {company.fitRating ? <p className="mt-1 text-sm text-shale">Fit {company.fitRating.band}. {company.fitRating.reason}</p> : null}
+          {company.hunterBreak ? (
+            <p className="mt-1 text-sm text-shale">
+              Score {company.hunterBreak.total}. Profile {company.hunterBreak.profile}, access {company.hunterBreak.access}, timing {company.hunterBreak.timing}, travel {company.hunterBreak.travel}.
+            </p>
+          ) : null}
+          {company.lineage?.query ? <p className="mt-1 text-sm text-shale">Source {company.lineage.query}.</p> : null}
+          {company.why ? <p className="mt-1 text-sm text-shale">{company.why}</p> : null}
         </div>
         <div>
           <p className="text-xs tracking-widest text-sandstone uppercase">Named contact</p>

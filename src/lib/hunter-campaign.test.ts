@@ -9,6 +9,7 @@ import {
   CAMPAIGN_PAGES_PER_REGION,
   CANADA_TILT_REASON,
   collectRegion,
+  companyBuyerBlock,
   CAMPAIGN_STATE_VERSION,
   companySource,
   creditAlarm,
@@ -409,4 +410,42 @@ test("a stored 70/30 campaign takes the Canada tilt, and the city queue stays se
   assert.equal(cityPage.state.nextPage.canada, national.state.nextPage.canada);
   assert.equal(cityPage.state.queued.filter((row) => row.queue === "cities").length, 1);
   assert.equal(cityPage.state.queued.find((row) => row.queue === "cities")?.region, "canada");
+});
+
+test("staffing firms, IT consultancies, and giants stay out of the queue", () => {
+  assert.equal(companyBuyerBlock({ name: "Aditi Consulting", industry: "information technology & services" }), "IT consultancy");
+  assert.equal(companyBuyerBlock({ name: "Applicantz", industry: "staffing" })?.includes("Staffing"), true);
+  assert.equal(companyBuyerBlock({ name: "Trillium Information Security Systems", industry: "information security" }), "IT consultancy");
+  assert.equal(companyBuyerBlock({ name: "BayOne Solutions", industry: "information technology & services" }), "IT consultancy");
+  assert.equal(companyBuyerBlock({ name: "Epic", industry: "software", employees: 12000 }), "Giant company");
+  assert.equal(companyBuyerBlock({ name: "Northwind", industry: "oil and energy", employees: 80, keywords: ["outdoor"] }), null);
+  const page = acceptPage(
+    freshCampaign("2026-11-25"),
+    "cities",
+    [
+      org({ id: "aditi", domain: "aditi.example", name: "Aditi Consulting" }),
+      org({ id: "keep", domain: "keep.example", name: "Keep Energy", industry: "oil and energy", employees: 80 }),
+    ],
+    "2026-11-25",
+  );
+  assert.equal(page.added, 1);
+  assert.equal(page.state.queued[0]?.name, "Keep Energy");
+  const stale = collectRegion(page.state, "cities", new Set(), 4);
+  const blocked = collectRegion(
+    {
+      ...freshCampaign("2026-11-25"),
+      queued: rankOrganizations(
+        [org({ id: "app", domain: "applicantz.example", name: "Applicantz", industry: "staffing & recruiting" })],
+        "canada",
+        STARTING_WEIGHTS,
+        1,
+      ),
+    },
+    "canada",
+    new Set(),
+    4,
+  );
+  assert.equal(blocked.taken.length, 0);
+  assert.equal(blocked.state.queued[0]?.status, "dropped");
+  assert.equal(stale.taken.length, 1);
 });

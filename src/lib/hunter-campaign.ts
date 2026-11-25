@@ -1,7 +1,7 @@
 /**
  * Weekly Apollo campaigns. Apollo finds the companies. xAI only reads pages we already fetched.
  * Phase two, an xAI web search on strong-rated companies only, is not built.
- * Headcount is a ranking input. It never drops a company.
+ * Headcount ranks a company. A company of 5,000 or more is dropped as a giant. There is no Apollo employee-range filter.
  */
 
 import { HUNTER_SIGNALS, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
@@ -507,6 +507,43 @@ export function regionForDraw(cursor: number, split: { canada: number; us: numbe
   return searchDraw(cursor, split).region;
 }
 
+/**
+ * Staffing, recruiting, job boards, and IT consultancies are not retreat buyers.
+ * A company of 5,000 or more people is a giant multinational. Doc 30 has no general
+ * headcount cap, and this cutoff is not sent to Apollo as an employee-range filter.
+ */
+export const GIANT_EMPLOYEE_CUTOFF = 5000;
+
+/** Fit signals from the leads strategy. Seeded on the company search, not a headcount filter. */
+export const FIT_SEARCH_KEYWORDS = [
+  "offsite",
+  "culture",
+  "learning and development",
+  "b corp",
+  "outdoor",
+  "purpose",
+];
+
+export function companyBuyerBlock(input: {
+  name: string;
+  industry?: string;
+  keywords?: string[];
+  employees?: number | null;
+}): string | null {
+  const name = input.name.trim().toLowerCase();
+  const industry = (input.industry ?? "").trim().toLowerCase();
+  const hay = `${name} ${industry} ${(input.keywords ?? []).join(" ")}`.toLowerCase();
+  if (/staffing|recruit|applicant|headhunt|outsourcing|job board|staff augmentation|talent acquisition/.test(hay)) {
+    return "Staffing, recruiting, or a job board";
+  }
+  const services = /information technology|information security|cyber|it service|computer/.test(hay);
+  if (/\bconsult/.test(name) || (services && /\b(solutions|systems|consultancy|consulting)\b/.test(name))) {
+    return "IT consultancy";
+  }
+  if (input.employees != null && input.employees >= GIANT_EMPLOYEE_CUTOFF) return "Giant company";
+  return null;
+}
+
 export function collectRegion(state: CampaignState, queue: CampaignQueue, known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[] } {
   const taken: RankedCompany[] = [];
   const queued = state.queued.map((row) => ({ ...row }));
@@ -514,6 +551,17 @@ export function collectRegion(state: CampaignState, queue: CampaignQueue, known:
     if (taken.length >= limit) break;
     const rowQueue = row.queue ?? (row.region === "us" ? "us" : "canada");
     if (row.status !== "queued" || rowQueue !== queue) continue;
+    const block = companyBuyerBlock({
+      name: row.name,
+      industry: row.organization.industry,
+      keywords: row.organization.keywords,
+      employees: row.organization.employees,
+    });
+    if (block) {
+      row.status = "dropped";
+      row.inputs = [...row.inputs, block];
+      continue;
+    }
     if (known.has(row.domain)) {
       row.status = "dropped";
       row.inputs = [...row.inputs, "Already on file"];
@@ -561,6 +609,16 @@ export function acceptPage(
     seenIds.add(org.id);
     if (!phaseOneCountry(org.country, org.place, queue === "us" ? "us" : "canada")) {
       outOfRegion += 1;
+      continue;
+    }
+    if (
+      companyBuyerBlock({
+        name: org.name,
+        industry: org.industry,
+        keywords: org.keywords,
+        employees: org.employees,
+      })
+    ) {
       continue;
     }
     fresh.push(org);

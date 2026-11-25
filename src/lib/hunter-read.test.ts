@@ -111,13 +111,17 @@ test("GET /api/hunter/read is read-only, no-store, and 401 without the token", a
     assert.equal(ok.headers.get("cache-control"), "no-store");
     const body = (await ok.json()) as {
       paused: boolean;
-      today: { calls: number; cardsFiled: number; spendActual: number; spendEstimated: number };
+      today: { calls: number; cardsFiled: number; cardsFiledToday: number; contactReadyToday: number; spendActual: number; spendEstimated: number };
       runs: unknown[];
-      cards: { org: string; status: string; score: number | null; email?: string }[];
+      cards: { org: string; status: string; score: number | null; email?: string; contactStatus?: string }[];
     };
     assert.equal(body.paused, true);
     assert.equal(body.today.calls, 2);
     assert.equal(body.today.cardsFiled, 1);
+    assert.equal(body.today.cardsFiledToday, 1);
+    assert.equal(body.today.contactReadyToday, 1);
+    assert.equal(body.cards[0]?.contactStatus, "no-contact");
+    assert.equal("email" in (body.cards[0] ?? {}), false);
     assert.equal(typeof body.today.spendActual, "number");
     assert.equal(body.cards[0]?.org, "Northwind Example");
     assert.equal(body.cards[0]?.status, "unreviewed");
@@ -263,7 +267,7 @@ test("GET /api/hunter/read?view=weekly returns the Monday plan without emails", 
     );
     assert.equal(ok.status, 200);
     const body = (await ok.json()) as {
-      today: string;
+      today: { date: string; cardsFiledToday: number; contactReadyToday: number };
       weekStart: string;
       previousWeek: { start: string; end: string };
       campaign: {
@@ -282,7 +286,9 @@ test("GET /api/hunter/read?view=weekly returns the Monday plan without emails", 
       methods: { method: string; filed: number }[];
       cards: { segment: string; industry: string; contactReady: boolean; email?: string }[];
     };
-    assert.equal(body.today, today);
+    assert.equal(body.today.date, today);
+    assert.equal(typeof body.today.cardsFiledToday, "number");
+    assert.equal(typeof body.today.contactReadyToday, "number");
     assert.equal(body.weekStart, ranges.weekStart);
     assert.deepEqual(body.previousWeek, ranges.lastWeek);
     assert.equal(body.campaign.segmentId, "tech");

@@ -137,7 +137,7 @@ export type Company = {
     reason: string;
     model: string;
   };
-  /** Shadow company fit. Absent on older cards. Not a filing gate and not shown on the desk. */
+  /** Company fit band. Absent on older cards. Not a filing gate. Shown on the open card. */
   fitRating?: {
     band: "strong" | "maybe" | "weak";
     reason: string;
@@ -724,7 +724,7 @@ export function coerceIndustry(raw: string | undefined, fallback: Industry = "ot
   if (/logistics|transport|freight|trucking/.test(v)) return "logistics";
   if (/college|polytech|universit|education|sait|nait/.test(v)) return "education";
   if (/civic|municipal|city of|county|public sector/.test(v)) return "civic";
-  if (/tech|software|saas/.test(v)) return "tech";
+  if (/tech|software|saas|information technology|cyber|information security/.test(v)) return "tech";
   return fallback;
 }
 
