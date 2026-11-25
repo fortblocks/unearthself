@@ -1931,6 +1931,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     }));
     const delivery = await publishAlarms(redis, alarms, now.toISOString(), "always-on", () => runClock.clipWall(8_000));
     if (delivery.failed) alarms.push("Alarm post failed.");
+    const modelCalls = Math.max(0, state.callsToday - callsUsed) + apollo.buyerCalls;
     const outcome = timedOut
       ? "stopped-time"
       : abandoned || xaiFailed
@@ -1941,7 +1942,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
     await rememberRun({
       run: "always-on",
       outcome,
-      modelCalls: Math.max(0, state.callsToday - callsUsed),
+      modelCalls,
       candidates: funnel.candidates,
       cardsFiled: funnel.filed,
       contactReady,
@@ -1962,7 +1963,7 @@ export async function runHunterBatch(now = new Date(), hooks?: { clock?: () => n
       startedAt,
       endedAt: new Date().toISOString(),
       passes: passesRun,
-      calls: Math.max(0, state.callsToday - callsUsed),
+      calls: modelCalls,
       funnel,
       cardsFiled: funnel.filed,
       spendActual: actualDollars,

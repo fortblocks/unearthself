@@ -718,7 +718,7 @@ export function coerceIndustry(raw: string | undefined, fallback: Industry = "ot
   const v = (raw ?? "").trim().toLowerCase();
   if (/energy|oil|gas|e&p|producer/.test(v)) return "energy";
   if (/construct|build|trades|contractor/.test(v)) return "construction";
-  if (/law|legal|account|advisory|professional/.test(v)) return "professional";
+  if (/law|legal|account|advisory|professional|consult/.test(v)) return "professional";
   if (/health|care|nursing|hospital/.test(v)) return "healthcare";
   if (/engineer|consulting eng/.test(v)) return "engineering";
   if (/logistics|transport|freight|trucking/.test(v)) return "logistics";
