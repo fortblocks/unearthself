@@ -89,7 +89,15 @@ export async function readHunterSnapshot(now = new Date()) {
     Number.isFinite(ticks) ? ticks : 0,
     Number.isFinite(estimate) ? estimate : 0,
   );
-  const runs = (await readHunterRuns(20)).map((entry) => ({
+  const logged = await readHunterRuns(80);
+  const day = tallyRunWindow(logged, today, today);
+  let dayEstimate = 0;
+  for (const run of logged) {
+    const stamp = Date.parse(run.at);
+    if (!Number.isFinite(stamp) || edmontonToday(new Date(stamp)) !== today) continue;
+    if (Number.isFinite(run.estimatedDollars)) dayEstimate += run.estimatedDollars;
+  }
+  const runs = logged.slice(0, 20).map((entry) => ({
     at: entry.at,
     run: entry.run,
     outcome: entry.outcome,
@@ -126,6 +134,11 @@ export async function readHunterSnapshot(now = new Date()) {
       cardsFiled: counts.filedToday,
       cardsFiledToday: filedTodayCount(companies, today),
       contactReadyToday: counts.filedToday,
+      spendActual: day.xaiSpend,
+      spendEstimated: Math.round(dayEstimate * 10000) / 10000,
+      spendTowardCap: Math.round((day.xaiSpend + dayEstimate) * 10000) / 10000,
+    },
+    month: {
       spendActual: spend.actual,
       spendEstimated: spend.estimated,
       spendTowardCap: capSpend(spend),

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { BUYER_JUDGMENT_MODEL, BUYER_JUDGMENT_SYSTEM, buyerJudgmentPrompt, isClearBuyer, judgeBuyerFit, parseBuyerJudgment, parseFitRating, useBuyerJudgeForTests } from "./buyer-judgment.ts";
+import { BUYER_JUDGMENT_MODEL, BUYER_JUDGMENT_SYSTEM, buyerCheckInput, buyerJudgmentPrompt, isClearBuyer, judgeBuyerFit, parseBuyerJudgment, parseFitRating, useBuyerJudgeForTests } from "./buyer-judgment.ts";
 import { addDays } from "./hunter-phase.ts";
 import { fileHunterCards, stampCard, verifyHunterDrafts, type HunterDraft } from "./leads-hunter.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
@@ -150,6 +150,38 @@ test("a fit band parses beside the buyer judgement and a bad band does not block
     signals: "distributed team",
     role: "Software Engineer",
   })), false);
+  const aimsio = buyerCheckInput({
+    org: "Aimsio",
+    domain: "aimsio.com",
+    place: "Canada",
+    city: "",
+    industry: "other",
+    apolloIndustry: "information technology & services",
+    sizeBand: "unknown",
+    role: "Head of People and Operations",
+    pageText: "Team offsites and culture.",
+  });
+  assert.equal(aimsio.industry, "information technology & services");
+  assert.equal(aimsio.headcount, "");
+  const aimsioPrompt = buyerJudgmentPrompt(aimsio);
+  assert.match(aimsioPrompt, /plausible buyer/);
+  assert.match(aimsioPrompt, /Company size alone is not a no/);
+  assert.match(aimsioPrompt, /Head of People and Operations/);
+  assert.match(BUYER_JUDGMENT_SYSTEM, /global enterprise/);
+  assert.match(BUYER_JUDGMENT_SYSTEM, /low confidence is not a yes/i);
+  const large = buyerJudgmentPrompt({
+    org: "Google",
+    domain: "google.com",
+    place: "Canada",
+    city: "Calgary",
+    industry: "information technology & services",
+    headcount: "180000",
+    sizeBand: "1500+",
+    role: "Workplace Experience Lead",
+    signals: "culture",
+  });
+  assert.match(large, /180000/);
+  assert.match(large, /Company size alone is not a no/);
 });
 
 test("a hook stays only when the page prints the text and the date, and a duplicate email is not filed", () => {

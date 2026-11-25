@@ -313,6 +313,14 @@ test("company search asks for a country and an industry, never a headcount range
   assert.equal(params.get("page"), "2");
   assert.equal(params.get("per_page"), "100");
   assert.equal(params.has("organization_num_employees_ranges[]"), false);
+  const ranged = companySearchParams({
+    country: "Canada",
+    industries: ["information technology & services"],
+    employeeRanges: ["21,100"],
+    page: 1,
+    perPage: 100,
+  });
+  assert.deepEqual(ranged.getAll("organization_num_employees_ranges[]"), ["21,100"]);
   assert.equal(params.getAll("q_organization_keyword_tags[]").includes("offsite"), true);
   assert.equal(params.getAll("q_organization_keyword_tags[]").includes("b corp"), true);
   const slept: number[] = [];
@@ -382,6 +390,24 @@ test("a company search with no city still keeps the searched country", () => {
   );
   assert.equal(printed?.country, "Germany");
   assert.equal(printed?.place, "Berlin, Germany");
+  const thin = readApolloOrganization(
+    {
+      id: "org-thin",
+      name: "Thin Co",
+      primary_domain: "thin.example",
+      industries: [{ name: "information technology & services" }],
+      organization_estimated_num_employees: 4000,
+      organization_city: "Calgary",
+      organization_state: "Alberta",
+      organization_country: "Canada",
+      keyword_tags: ["culture", "offsite"],
+    },
+    "Canada",
+  );
+  assert.equal(thin?.industry, "information technology & services");
+  assert.equal(thin?.employees, 4000);
+  assert.equal(thin?.place, "Calgary, Alberta, Canada");
+  assert.deepEqual(thin?.keywords, ["culture", "offsite"]);
   const cities = companySearchParams({
     locations: ["Edmonton, Alberta, Canada", "Calgary, Alberta, Canada", "Red Deer, Alberta, Canada"],
     industries: ["information technology & services"],
@@ -403,6 +429,9 @@ test("people and HR titles are searched before sales and marketing", () => {
   assert.ok(index("chief people officer") < index("marketing director"));
   assert.ok(index("hr manager") < index("sales director"));
   assert.ok(index("office manager") < index("marketing director"));
+  assert.ok(index("head of learning and development") < index("sales director"));
+  assert.ok(index("head of events") < index("sales director"));
+  assert.ok(index("head of workplace") < index("marketing director"));
   assert.ok(index("founder") < index("sales director"));
   assert.ok(index("ceo") < index("marketing director"));
   assert.equal(BUYER_ROLE_TITLES.slice(0, index("operations manager")).some((title) => /sales|marketing/.test(title)), false);
@@ -445,7 +474,7 @@ test("a chief people officer without an email outranks a sales director with one
     judgeContact: async (input) => {
       assert.equal(matches, 0);
       judged.industry = input.industry;
-      judged.headcount = input.headcount;
+      judged.headcount = input.headcount ?? "";
       judged.sizeBand = input.sizeBand;
       judged.role = input.role;
       return {

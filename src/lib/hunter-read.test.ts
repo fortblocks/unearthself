@@ -5,6 +5,7 @@ import { LEADS_KEY, emptyBook, useRedisClientForTests } from "./leads-book.ts";
 import { HUNTER_KEY } from "./leads-hunter.ts";
 import { HUNTER_CAMPAIGN_KEY, freshCampaign } from "./hunter-campaign.ts";
 import { HUNTER_RUNS_KEY } from "./hunter-runs.ts";
+import { spendCounterKey } from "./hunter-phase.ts";
 import { handleHunterSegment } from "./hunter-segment.ts";
 import {
   dateInRange,
@@ -130,6 +131,51 @@ test("GET /api/hunter/read is read-only, no-store, and 401 without the token", a
     const text = JSON.stringify(body);
     assert.equal(text.includes("read-token-test"), false);
     assert.equal(text.includes("ada@northwind.test"), false);
+  } finally {
+    useRedisClientForTests(null);
+    if (previous == null) delete process.env.HUNTER_READ_TOKEN;
+    else process.env.HUNTER_READ_TOKEN = previous;
+  }
+});
+
+test("today spend is the day's run lines, and the month counter stays on the cap", async () => {
+  const redis = memoryRedis();
+  const today = edmontonToday();
+  const month = today.slice(0, 7);
+  await redis.set(HUNTER_KEY, { paused: false, callsOn: today, callsToday: 0, filedOn: today, filedToday: 0 });
+  await redis.set(spendCounterKey(month), "889");
+  redis.lists.set(HUNTER_RUNS_KEY, [
+    JSON.stringify({
+      at: new Date().toISOString(),
+      run: "always-on",
+      outcome: "fired",
+      modelCalls: 9,
+      candidates: 12,
+      cardsFiled: 0,
+      contactReady: 0,
+      apolloSearches: 0,
+      apolloReveals: 0,
+      error: "",
+      model: "test",
+      alarms: [],
+      inputTokens: 1,
+      outputTokens: 1,
+      dollars: 0.017,
+      estimatedDollars: 0,
+      funnel: null,
+    }),
+  ]);
+  useRedisClientForTests(redis);
+  const previous = process.env.HUNTER_READ_TOKEN;
+  process.env.HUNTER_READ_TOKEN = "read-token-test";
+  try {
+    const ok = await handleHunterRead(
+      new Request("https://unearthself.example/api/hunter/read", { headers: { authorization: "Bearer read-token-test" } }),
+    );
+    assert.equal(ok.status, 200);
+    const body = (await ok.json()) as { today: { spendActual: number }; month: { spendActual: number } };
+    assert.equal(body.today.spendActual, 0.017);
+    assert.equal(body.month.spendActual, 8.89);
   } finally {
     useRedisClientForTests(null);
     if (previous == null) delete process.env.HUNTER_READ_TOKEN;

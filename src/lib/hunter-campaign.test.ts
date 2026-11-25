@@ -9,6 +9,7 @@ import {
   CAMPAIGN_PAGES_PER_REGION,
   CANADA_TILT_REASON,
   collectRegion,
+  campaignEmployeeRanges,
   companyBuyerBlock,
   CAMPAIGN_STATE_VERSION,
   companySource,
@@ -25,6 +26,7 @@ import {
   searchDraw,
   signOffSuggestion,
   signedSegment,
+  stampSearchIndustry,
   STARTING_WEIGHTS,
   suggestSegment,
   THREE_CITY_LOCATIONS,
@@ -362,9 +364,16 @@ test("a stuck exhausted campaign pulls again without a manual edit", () => {
     version: 1,
     exhausted: { cities: true, canada: true, us: true },
     pagesPulled: { cities: CAMPAIGN_PAGES_PER_REGION, canada: CAMPAIGN_PAGES_PER_REGION, us: CAMPAIGN_PAGES_PER_REGION },
+    nextPage: { cities: 4, canada: 6, us: 2 },
+    seenIds: ["old-id"],
     queued: [],
   };
   const recovered = loadCampaignState(stuck, "2026-11-20");
+  assert.equal(recovered.version, CAMPAIGN_STATE_VERSION);
+  assert.deepEqual(recovered.seenIds, []);
+  assert.deepEqual(recovered.queued, []);
+  assert.equal(recovered.nextPage.canada, 1);
+  assert.equal(recovered.nextPage.cities, 1);
   assert.equal(recovered.exhausted.canada, false);
   assert.equal(recovered.exhausted.us, false);
   assert.equal(recovered.pagesPulled.canada, 0);
@@ -412,24 +421,35 @@ test("a stored 70/30 campaign takes the Canada tilt, and the city queue stays se
   assert.equal(cityPage.state.queued.find((row) => row.queue === "cities")?.region, "canada");
 });
 
-test("staffing firms, IT consultancies, and giants stay out of the queue", () => {
-  assert.equal(companyBuyerBlock({ name: "Aditi Consulting", industry: "information technology & services" }), "IT consultancy");
+test("staffing, recruiting, job boards, and outsourcing stay out, and large technology companies stay in", () => {
+  assert.equal(freshCampaign("2026-11-25").employeeRange, null);
+  assert.equal(campaignEmployeeRanges(null), null);
+  assert.deepEqual(campaignEmployeeRanges({ min: 21, max: 100 }), ["21,100"]);
+  assert.equal(companyBuyerBlock({ name: "Aditi Consulting", industry: "information technology & services" }), null);
+  assert.equal(companyBuyerBlock({ name: "Thinking Ape", industry: "information technology & services", employees: 80 }), null);
   assert.equal(companyBuyerBlock({ name: "Applicantz", industry: "staffing" })?.includes("Staffing"), true);
-  assert.equal(companyBuyerBlock({ name: "Trillium Information Security Systems", industry: "information security" }), "IT consultancy");
-  assert.equal(companyBuyerBlock({ name: "BayOne Solutions", industry: "information technology & services" }), "IT consultancy");
-  assert.equal(companyBuyerBlock({ name: "Epic", industry: "software", employees: 12000 }), "Giant company");
+  assert.equal(companyBuyerBlock({ name: "Trillium Information Security Systems", industry: "information security" }), null);
+  assert.equal(companyBuyerBlock({ name: "BayOne Solutions", industry: "information technology & services" }), null);
+  assert.equal(companyBuyerBlock({ name: "Epic", industry: "software", employees: 12000 }), null);
+  assert.equal(companyBuyerBlock({ name: "Google", industry: "information technology & services", employees: 180000 }), null);
   assert.equal(companyBuyerBlock({ name: "Northwind", industry: "oil and energy", employees: 80, keywords: ["outdoor"] }), null);
+  assert.equal(companyBuyerBlock({ name: "Desk BPO", industry: "outsourcing", keywords: ["business process outsourcing"] })?.includes("outsourcing"), true);
+  const blank = stampSearchIndustry(org({ id: "blank", domain: "blank.example", name: "Blank", industry: "" }), ["information technology & services"]);
+  assert.equal(blank.industry, "information technology & services");
+  assert.equal(stampSearchIndustry(org({ industry: "software" }), ["information technology & services"]).industry, "software");
   const page = acceptPage(
     freshCampaign("2026-11-25"),
     "cities",
     [
-      org({ id: "aditi", domain: "aditi.example", name: "Aditi Consulting" }),
+      org({ id: "aditi", domain: "aditi.example", name: "Aditi Consulting", industry: "information technology & services" }),
       org({ id: "keep", domain: "keep.example", name: "Keep Energy", industry: "oil and energy", employees: 80 }),
+      org({ id: "google", domain: "google.example", name: "Google", industry: "information technology & services", employees: 180000 }),
     ],
     "2026-11-25",
   );
-  assert.equal(page.added, 1);
-  assert.equal(page.state.queued[0]?.name, "Keep Energy");
+  assert.equal(page.added, 3);
+  assert.equal(page.state.queued.some((row) => row.name === "Aditi Consulting"), true);
+  assert.equal(page.state.queued.some((row) => row.name === "Google"), true);
   const stale = collectRegion(page.state, "cities", new Set(), 4);
   const blocked = collectRegion(
     {
@@ -447,5 +467,5 @@ test("staffing firms, IT consultancies, and giants stay out of the queue", () =>
   );
   assert.equal(blocked.taken.length, 0);
   assert.equal(blocked.state.queued[0]?.status, "dropped");
-  assert.equal(stale.taken.length, 1);
+  assert.equal(stale.taken.length, 3);
 });

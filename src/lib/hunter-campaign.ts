@@ -1,7 +1,8 @@
 /**
  * Weekly Apollo campaigns. Apollo finds the companies. xAI only reads pages we already fetched.
  * Phase two, an xAI web search on strong-rated companies only, is not built.
- * Headcount ranks a company. A company of 5,000 or more is dropped as a giant. There is no Apollo employee-range filter.
+ * Headcount ranks a company. It is not a drop rule, and there is no size cap.
+ * A campaign may set its own employee range. Unset means Apollo is not sent one.
  */
 
 import { HUNTER_SIGNALS, regionWeightForPlace, searchRegionCycle } from "../data/hunter-profile.ts";
@@ -18,8 +19,8 @@ export const HUNTER_COMPANY_SOURCE_DEFAULT = "campaign";
 export const APOLLO_BASIC_MONTHLY_CREDITS = 2500;
 export const APOLLO_CREDIT_ALARM_AT = 2000;
 export const CAMPAIGN_PAGES_PER_REGION = 10;
-/** Bump when a stored campaign must drop a stuck exhausted flag and pull again. */
-export const CAMPAIGN_STATE_VERSION = 2;
+/** Bump when a stored queue must be retired so the next runs pull fresh pages. */
+export const CAMPAIGN_STATE_VERSION = 3;
 export const THREE_CITY_LOCATIONS = ["Edmonton, Alberta, Canada", "Calgary, Alberta, Canada", "Red Deer, Alberta, Canada"] as const;
 export const CAMPAIGN_COMPANIES_PER_PASS = 4;
 /** Campaign draws only. The older slot walker keeps HUNTER_REGION_SPLIT. */
@@ -112,6 +113,8 @@ export type CampaignState = {
   drawCursor: number;
   creditsMonth: string;
   version: number;
+  /** Optional Apollo headcount band for this campaign only. Null means the search does not filter by size. */
+  employeeRange: { min: number; max: number } | null;
   /** Who set the active segment. The build set the first one. Later changes are Hunter's. */
   segmentSource: "hunter" | "build";
   /** Each switch Hunter makes. The plan note is reset every run, so this list is the history. */
@@ -199,6 +202,7 @@ export function freshCampaign(today: string, segment = FIRST_SEGMENT): CampaignS
     drawCursor: 0,
     creditsMonth: today.slice(0, 7),
     version: CAMPAIGN_STATE_VERSION,
+    employeeRange: null,
     segmentSource: "build",
     switches: [],
   };
@@ -224,7 +228,33 @@ function campaignFromRaw(raw: unknown): CampaignState | null {
     weights: row.weights ?? base.weights,
     segmentSource: row.segmentSource === "hunter" ? "hunter" : "build",
     switches: sanitizeSwitches(row.switches),
+    employeeRange: sanitizeEmployeeRange(row.employeeRange),
   };
+}
+
+function sanitizeEmployeeRange(value: unknown): { min: number; max: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as { min?: unknown; max?: unknown };
+  const min = row.min;
+  const max = row.max;
+  if (!Number.isInteger(min) || !Number.isInteger(max)) return null;
+  if ((min as number) < 1 || (max as number) < (min as number) || (max as number) > 1_000_000) return null;
+  return { min: min as number, max: max as number };
+}
+
+/** One Apollo band, "min,max". Absent when the campaign has no headcount setting. */
+export function campaignEmployeeRanges(range: { min: number; max: number } | null | undefined): string[] | null {
+  const clean = sanitizeEmployeeRange(range);
+  if (!clean) return null;
+  return [`${clean.min},${clean.max}`];
+}
+
+/** The industry filter is known even when Apollo leaves the company industry blank. Headcount is not invented. */
+export function stampSearchIndustry(org: ApolloOrganization, industries: string[]): ApolloOrganization {
+  if (org.industry.trim()) return org;
+  const industry = industries.map((item) => item.trim()).find(Boolean) ?? "";
+  if (!industry) return org;
+  return { ...org, industry };
 }
 
 function numberQueue(value: unknown, fallback: QueueCounts): QueueCounts {
@@ -267,15 +297,26 @@ function safeCampaignJson(raw: string) {
   }
 }
 
-/** Clears a stuck exhausted list from an older stored campaign so the next run pulls again. */
-export function recoverStuckCampaign(state: CampaignState, today: string): CampaignState {
+/**
+ * Drops a queue saved before the current search rules.
+ * Already filed companies stay on file. The next run pulls a fresh page.
+ */
+export function retireStaleQueue(state: CampaignState, today: string): CampaignState {
   return {
     ...state,
     version: CAMPAIGN_STATE_VERSION,
-    exhausted: { cities: false, canada: false, us: false },
+    queued: [],
+    seenIds: [],
+    nextPage: { cities: 1, canada: 1, us: 1 },
     pagesPulled: { cities: 0, canada: 0, us: 0 },
-    planNote: `${state.planNote} Recovered on ${today}. Canada and the United States pull again. The stuck exhausted flags are cleared.`,
+    exhausted: { cities: false, canada: false, us: false },
+    planNote: `${state.planNote} Retired the queue on ${today}. The next runs pull fresh pages. Companies already on file stay there.`,
   };
+}
+
+/** Clears a stuck exhausted list from an older stored campaign so the next run pulls again. */
+export function recoverStuckCampaign(state: CampaignState, today: string): CampaignState {
+  return retireStaleQueue(state, today);
 }
 
 /** The page cap is per Edmonton week. A new Monday clears exhausted flags and the week's page counts. */
@@ -295,7 +336,7 @@ export function resetCampaignWeek(state: CampaignState, today: string): Campaign
 export function loadCampaignState(raw: unknown, today: string): CampaignState {
   const parsed = campaignFromRaw(raw);
   if (!parsed) return freshCampaign(today);
-  const current = parsed.version === CAMPAIGN_STATE_VERSION ? parsed : recoverStuckCampaign(parsed, today);
+  const current = parsed.version === CAMPAIGN_STATE_VERSION ? parsed : retireStaleQueue(parsed, today);
   return applyCanadaTilt(resetCampaignWeek(current, today));
 }
 
@@ -376,6 +417,7 @@ export function applyHunterSegment(
     splitReason: split.reason,
     switches,
     planNote: note,
+    employeeRange: state.employeeRange,
   };
 }
 
@@ -394,6 +436,7 @@ export function signOffSuggestion(state: CampaignState, today: string): Campaign
     weights: state.weights,
     weightNote: state.weightNote,
     switches: state.switches,
+    employeeRange: state.employeeRange,
   };
 }
 
@@ -508,22 +551,9 @@ export function regionForDraw(cursor: number, split: { canada: number; us: numbe
 }
 
 /**
- * Staffing, recruiting, job boards, and IT consultancies are not retreat buyers.
- * A company of 5,000 or more people is a giant multinational. Doc 30 has no general
- * headcount cap, and this cutoff is not sent to Apollo as an employee-range filter.
+ * Staffing, recruiting, job boards, and outsourcing or BPO are not retreat buyers.
+ * Information technology companies stay in the pool, including large ones. There is no size cap.
  */
-export const GIANT_EMPLOYEE_CUTOFF = 5000;
-
-/** Fit signals from the leads strategy. Seeded on the company search, not a headcount filter. */
-export const FIT_SEARCH_KEYWORDS = [
-  "offsite",
-  "culture",
-  "learning and development",
-  "b corp",
-  "outdoor",
-  "purpose",
-];
-
 export function companyBuyerBlock(input: {
   name: string;
   industry?: string;
@@ -533,16 +563,21 @@ export function companyBuyerBlock(input: {
   const name = input.name.trim().toLowerCase();
   const industry = (input.industry ?? "").trim().toLowerCase();
   const hay = `${name} ${industry} ${(input.keywords ?? []).join(" ")}`.toLowerCase();
-  if (/staffing|recruit|applicant|headhunt|outsourcing|job board|staff augmentation|talent acquisition/.test(hay)) {
-    return "Staffing, recruiting, or a job board";
+  if (/staffing|recruit|applicant|headhunt|job board|staff augmentation|talent acquisition|outsourcing|\bbpo\b|business process outsourc/.test(hay)) {
+    return "Staffing, recruiting, a job board, or outsourcing";
   }
-  const services = /information technology|information security|cyber|it service|computer/.test(hay);
-  if (/\bconsult/.test(name) || (services && /\b(solutions|systems|consultancy|consulting)\b/.test(name))) {
-    return "IT consultancy";
-  }
-  if (input.employees != null && input.employees >= GIANT_EMPLOYEE_CUTOFF) return "Giant company";
   return null;
 }
+
+/** Fit signals from the leads strategy. Seeded on the company search. Headcount is not sent unless the campaign sets a range. */
+export const FIT_SEARCH_KEYWORDS = [
+  "offsite",
+  "culture",
+  "learning and development",
+  "b corp",
+  "outdoor",
+  "purpose",
+];
 
 export function collectRegion(state: CampaignState, queue: CampaignQueue, known: Set<string>, limit: number): { state: CampaignState; taken: RankedCompany[] } {
   const taken: RankedCompany[] = [];

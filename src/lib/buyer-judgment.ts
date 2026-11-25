@@ -11,21 +11,26 @@ import { callXaiJson, HUNTER_SEARCH_MODEL, type XaiUsage } from "./xai-search.ts
 export const BUYER_JUDGMENT_MODEL = HUNTER_SEARCH_MODEL;
 
 export const BUYER_JUDGMENT_SYSTEM = [
-  "You decide whether this contact is a clear prospective buyer for a hotel spa team retreat in Drumheller, Alberta.",
+  "You decide whether this contact is a plausible buyer of a corporate retreat for their team.",
+  "The retreat is a hotel spa team retreat in Drumheller, Alberta.",
+  "The question is whether a booking is plausible, not whether a purchase is already proven.",
   "Reason from the company and from the person's role.",
-  "Use the company's size, industry, location, how the team is set up, and any signals you are given.",
+  "Use the company's size, industry, location, keywords, how the team is set up, and any signals or page text you are given.",
   "There is no fixed list of job titles. A title is one clue, not a rule.",
-  'Return JSON only: {"buyer": true or false, "confidence": "low" or "medium" or "high", "reason": "one or two sentences", "fit": {"band": "strong" or "maybe" or "weak", "reason": "one line"}}.',
-  "Rate how well the company fits the Drumheller team-retreat customer against the profile signals you are given.",
-  "Set buyer to true only when you are clear this person would buy the retreat for their team.",
-  "A staffing firm, a recruiter, a job board, an outsourcing shop, or an IT consultancy is not a buyer.",
-  "A company of several thousand people, with no stated local team, is not a buyer.",
+  "A Canadian employer is in range. Alberta is the strongest fit. A company of about 30 to 1,000 people with a people, HR, office, founder, or operations lead is a plausible buyer.",
+  "A large company, including a company of several thousand people or a global enterprise, is still a plausible buyer when the contact leads a team that could book the retreat: people, HR, learning and development, culture, events, office, or workplace.",
+  "Do not say no only because the company is large, or only because headcount was not stated.",
+  "A staffing firm, a recruiter, a job board, an outsourcing shop, or a business process outsourcer is not a buyer.",
+  "An information technology or software company is not excluded for its industry.",
   "A missing homepage is not, by itself, a reason for confidence low when place, industry, or headcount is stated.",
-  "When headcount is not stated, a company in Canada can still be a clear buyer at medium confidence if it is not one of those excluded company types.",
-  "A company in the United States with no stated headcount and no stated Canadian team is not a clear buyer.",
-  "Use confidence low when the company type or the role is a poor fit.",
+  "When headcount is not stated, a company in Canada can still be a plausible buyer at medium confidence if it is not one of those excluded company types.",
+  "A company in the United States can still be a plausible buyer when the contact leads people, HR, learning, culture, events, office, or workplace.",
+  "Use confidence low when the company type or the role is a poor fit. Low confidence is not a yes.",
+  "Set buyer to true when the contact is a plausible buyer and your confidence is medium or high.",
   "The reason must not include a person's name, an email address, or a phone number.",
   "Do not invent facts that were not given.",
+  'Return JSON only: {"buyer": true or false, "confidence": "low" or "medium" or "high", "reason": "one or two sentences", "fit": {"band": "strong" or "maybe" or "weak", "reason": "one line"}}.',
+  "Rate how well the company fits the Drumheller team-retreat customer against the profile signals you are given.",
 ].join(" ");
 
 export type BuyerConfidence = "low" | "medium" | "high";
@@ -57,6 +62,8 @@ export type BuyerJudgmentInput = {
   headcount?: string;
   /** Employee range, such as 1-49. The stored size band is this value. */
   sizeBand: string;
+  /** Apollo keyword tags, or the search tags when the row has none. */
+  keywords?: string;
   signals: string;
   role: string;
   /** Short excerpt already fetched. Blank when the homepage was not read. */
@@ -92,13 +99,54 @@ export function buyerJudgmentPrompt(input: BuyerJudgmentInput) {
     `Industry: ${stated(input.industry)}`,
     `Headcount: ${stated(input.headcount)}`,
     `Employee range: ${stated(input.sizeBand)}`,
+    `Keywords: ${stated(input.keywords)}`,
     `Signals: ${(input.signals ?? "").trim() || "none"}`,
     `Role: ${stated(input.role)}`,
     `Page text: ${stated(input.pageText)}`,
     "",
-    "Is this contact a clear prospective buyer for a hotel spa team retreat in Drumheller, Alberta?",
-    "Judge from the company context and the role. Do not use a fixed title list.",
+    "Is this contact a plausible buyer of a corporate retreat for their team in Drumheller, Alberta?",
+    "Judge whether a booking is plausible. Do not require proof that they have already bought a retreat.",
+    "For a large company, a people, HR, learning, culture, events, office, or workplace lead can be a yes. Company size alone is not a no.",
+    "Do not use a fixed title list.",
   ].join("\n");
+}
+
+/** People-search facts fill gaps. A stored Apollo or search-filter value is kept when the people row is thin. */
+export function buyerCheckInput(input: {
+  org: string;
+  domain: string;
+  place?: string;
+  city: string;
+  industry?: string;
+  apolloIndustry?: string;
+  headcount?: string;
+  apolloHeadcount?: string;
+  sizeBand?: string;
+  keywords?: string[] | string;
+  signals?: string;
+  role: string;
+  pageText?: string;
+  people?: { industry?: string; headcount?: string; employeeRange?: string };
+}): BuyerJudgmentInput {
+  const peopleIndustry = input.people?.industry?.trim() ?? "";
+  const storedIndustry = (input.apolloIndustry ?? "").trim() || ((input.industry ?? "").trim() && input.industry !== "other" ? input.industry!.trim() : "");
+  const peopleHead = input.people?.headcount?.trim() ?? "";
+  const storedHead = (input.apolloHeadcount ?? "").trim() || ((input.sizeBand ?? "").trim() && input.sizeBand !== "unknown" ? input.sizeBand!.trim() : "");
+  const peopleRange = input.people?.employeeRange?.trim() ?? "";
+  const keywords = Array.isArray(input.keywords) ? input.keywords.map((item) => item.trim()).filter(Boolean).join(", ") : (input.keywords ?? "").trim();
+  return {
+    org: input.org,
+    domain: input.domain,
+    place: input.place ?? "",
+    city: input.city,
+    industry: peopleIndustry || storedIndustry,
+    headcount: peopleHead || storedHead,
+    sizeBand: peopleRange || ((input.sizeBand ?? "").trim() && input.sizeBand !== "unknown" ? input.sizeBand!.trim() : "") || peopleHead || storedHead,
+    keywords,
+    signals: input.signals ?? "",
+    role: input.role,
+    pageText: input.pageText,
+  };
 }
 
 /** Drop an email address or a phone number if the model put one in the reason. Keep two sentences. */

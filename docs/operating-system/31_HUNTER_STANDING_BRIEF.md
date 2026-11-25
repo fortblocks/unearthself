@@ -16,7 +16,7 @@ Provide 48 good leads per day, with as many as possible converting.
 
 A good lead is a contact-ready card as defined in `29_LEAD_HUNTER_BOT.md`: a named person, a title and an email on file, with sourced facts.
 
-Noted 25th November 2026, from the approved pipeline fix. The leads list now keeps no-contact rows in a separate research group, and contact-ready cards show first. This note does not approve the rest of this draft.
+Noted 25th November 2026, from the approved pipeline fix. The leads list now keeps no-contact rows in a separate research group, and contact-ready cards show first. The same morning, Christopher corrected the search: a headcount range is optional per campaign and off by default, there is no size cap, and large companies stay in when the contact leads people, HR, learning and development, culture, events, office, or workplace. Staffing, recruiting, job boards, and outsourcing or BPO stay out. This note does not approve the rest of this draft.
 
 ## Layer 2. Autonomous weekly strategy
 

@@ -70,8 +70,14 @@ export type Company = {
   scoutBatch: string;
   /** Who filed the card. Missing on older nightly and hand cards. The stored value "scout" is Hunter's nightly run. */
   source?: "scout" | "hunter" | "hand";
-  /** City and country as printed on the source page. */
+  /** City and country as printed on the source page, or the Apollo place. */
   place?: string;
+  /** Apollo industry text, or the industry filter that returned the company. Not the short score label. */
+  apolloIndustry?: string;
+  /** Apollo employee count when the search returned one. Blank when it did not. */
+  apolloHeadcount?: string;
+  /** Apollo keyword tags from the company search. */
+  apolloKeywords?: string[];
   /** Search region used when the Hunter filed or updated the card. */
   hunterRegion?: string;
   profileHits?: { id: string; label: string; sourceUrl: string; snippet?: string }[];

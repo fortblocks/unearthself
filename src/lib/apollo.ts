@@ -6,7 +6,7 @@
  */
 
 import { HUNTER_PHASE_ONE_COUNTRIES } from "../data/hunter-profile.ts";
-import { isClearBuyer, type BuyerJudgment, type FitRating } from "./buyer-judgment.ts";
+import { buyerCheckInput, isClearBuyer, type BuyerJudgment, type BuyerJudgmentInput, type FitRating } from "./buyer-judgment.ts";
 import { assignEnrichment, hasBuyerContact } from "./hunter-cap.ts";
 import { BUYER_ROLE_TITLES, apolloCaslBasis, retryDelayMs } from "./hunter-phase.ts";
 import { apolloFieldSources, coerceSize, normalizeDomain, scoreCompany, type Company } from "./lead-score.ts";
@@ -238,14 +238,73 @@ export function pickSearchPerson(body: unknown): { id: string; title: string } |
   return ranked[0] ? { id: ranked[0].id, title: ranked[0].title } : null;
 }
 
+function namedValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (typeof item === "string") return item.trim() ? [item.trim()] : [];
+      const row = asRecord(item);
+      const name = text(row?.name) || text(row?.label);
+      return name ? [name] : [];
+    });
+  }
+  const row = asRecord(value);
+  if (!row) return [];
+  return Object.keys(row).map((key) => key.trim()).filter(Boolean);
+}
+
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    const printed = text(value);
+    if (printed) return printed;
+  }
+  return "";
+}
+
+function positiveNumber(...values: unknown[]) {
+  for (const value of values) {
+    const n = numberOrNull(value);
+    if (n != null && n > 0) return n;
+  }
+  return null;
+}
+
+/** Industry, headcount, place, and keywords already on an Apollo object. No extra call. */
+export function organizationDetail(row: Record<string, unknown> | null) {
+  const nested = asRecord(row?.organization);
+  const location = asRecord(row?.primary_location) ?? asRecord(nested?.primary_location);
+  const city = firstText(row?.city, row?.organization_city, location?.city, nested?.city, nested?.organization_city);
+  const state = firstText(row?.state, row?.organization_state, location?.state, nested?.state, nested?.organization_state);
+  const country = firstText(row?.country, row?.organization_country, location?.country, nested?.country, nested?.organization_country);
+  const rawAddress = firstText(row?.raw_address, row?.organization_raw_address, location?.raw_address, nested?.raw_address);
+  const industry = firstText(row?.industry, nested?.industry)
+    || namedValues(row?.industries)[0]
+    || namedValues(nested?.industries)[0]
+    || namedValues(row?.industry_tag_hash)[0]
+    || namedValues(nested?.industry_tag_hash)[0]
+    || "";
+  const employees = positiveNumber(
+    row?.estimated_num_employees,
+    row?.num_employees,
+    row?.employee_count,
+    row?.organization_estimated_num_employees,
+    nested?.estimated_num_employees,
+    nested?.num_employees,
+    nested?.employee_count,
+  );
+  const keywords = [...new Set([
+    ...namedValues(row?.keywords),
+    ...namedValues(row?.keyword_tags),
+    ...namedValues(row?.organization_keyword_tags),
+    ...namedValues(nested?.keywords),
+  ])];
+  return { city, state, country, rawAddress, industry, employees, keywords };
+}
+
 function factsFromOrganization(org: Record<string, unknown> | null): { industry: string; headcount: string; employeeRange: string } {
-  const industry = text(org?.industry) || stringList(org?.industries)[0] || "";
-  const employees = [org?.estimated_num_employees, org?.num_employees, org?.employee_count]
-    .map((value) => numberOrNull(value))
-    .find((value) => value != null && value > 0);
-  const headcount = employees == null ? "" : String(employees);
+  const detail = organizationDetail(org);
+  const headcount = detail.employees == null ? "" : String(detail.employees);
   const range = headcount ? coerceSize(headcount, "unknown") : "unknown";
-  return { industry, headcount, employeeRange: range === "unknown" ? "" : range };
+  return { industry: detail.industry, headcount, employeeRange: range === "unknown" ? "" : range };
 }
 
 /** Industry and headcount already on an organization object. No extra Apollo call. */
@@ -368,18 +427,7 @@ export async function enrichHunterContacts(input: {
    * Runs on the free people-search result, before the paid email lookup.
    * Only a clear buyer spends that lookup. A no, or a failed call, spends nothing and leaves the contact off the card.
    */
-  judgeContact?: (input: {
-    org: string;
-    domain: string;
-    place: string;
-    city: string;
-    industry: string;
-    headcount: string;
-    sizeBand: string;
-    signals: string;
-    role: string;
-    pageText?: string;
-  }) => Promise<{ ok: true; judgment: BuyerJudgment; fit?: FitRating | null } | { ok: false }>;
+  judgeContact?: (input: BuyerJudgmentInput) => Promise<{ ok: true; judgment: BuyerJudgment; fit?: FitRating | null } | { ok: false }>;
 }): Promise<{
   companies: Company[];
   searches: number;
@@ -469,26 +517,29 @@ export async function enrichHunterContacts(input: {
         break;
       }
       const facts = searchPersonFacts(searched.body, chosen.id);
-      const industry = facts.industry || (current.industry && current.industry !== "other" ? current.industry : "");
-      const employeeRange = facts.employeeRange || (current.sizeBand && current.sizeBand !== "unknown" ? current.sizeBand : "");
-      const headcount = facts.headcount || employeeRange;
       const pageText = (current.facts ?? [])
         .map((fact) => fact.snippet)
         .filter(Boolean)
         .join(" ")
         .slice(0, 500);
-      const decision = await input.judgeContact({
+      const check = buyerCheckInput({
         org: current.org,
         domain: current.domain,
         place: current.place ?? "",
         city: current.city,
-        industry,
-        headcount,
-        sizeBand: employeeRange,
+        industry: current.industry,
+        apolloIndustry: current.apolloIndustry,
+        apolloHeadcount: current.apolloHeadcount,
+        sizeBand: current.sizeBand,
+        keywords: current.apolloKeywords,
         signals: (current.signals ?? []).map((signal) => signal.kind).filter(Boolean).join(", "),
         role: chosen.title,
         pageText,
+        people: facts,
       });
+      const industry = check.industry;
+      const headcount = check.headcount ?? "";
+      const decision = await input.judgeContact(check);
       const clear = decision.ok && isClearBuyer(decision.judgment);
       console.info(
         JSON.stringify(
@@ -636,30 +687,50 @@ export function companySearchUrl(params: URLSearchParams) {
   return `${APOLLO_ORIGIN}/mixed_companies/search?${params.toString()}`;
 }
 
-export function companySearchParams(input: {
+export type CompanySearchInput = {
   country?: "Canada" | "United States";
   locations?: string[];
   industries: string[];
   /** Fit-signal tags. Omitted means the retreat-buyer keywords. Pass [] to send none. */
   keywords?: string[];
+  /**
+   * Apollo headcount bands, such as "21,100".
+   * Null or omitted means this campaign has no headcount setting, so the parameter is not sent.
+   */
+  employeeRanges?: string[] | null;
   page: number;
   perPage: number;
-}) {
-  const params = new URLSearchParams();
+};
+
+const DEFAULT_SEARCH_KEYWORDS = ["offsite", "culture", "learning and development", "b corp", "outdoor", "purpose"];
+
+/** The JSON body Apollo is sent. It has no API key. Headcount is absent unless this campaign set a range. */
+export function companySearchBody(input: CompanySearchInput): Record<string, string | number | string[]> {
   const locations = input.locations?.length ? input.locations : input.country ? [input.country] : [];
-  for (const location of locations) params.append("organization_locations[]", location);
-  for (const industry of input.industries) params.append("organization_industries[]", industry);
-  const keywords = input.keywords ?? [
-    "offsite",
-    "culture",
-    "learning and development",
-    "b corp",
-    "outdoor",
-    "purpose",
-  ];
-  for (const keyword of keywords) params.append("q_organization_keyword_tags[]", keyword);
-  params.set("page", String(input.page));
-  params.set("per_page", String(input.perPage));
+  const keywords = input.keywords ?? DEFAULT_SEARCH_KEYWORDS;
+  const body: Record<string, string | number | string[]> = {
+    organization_locations: locations,
+    organization_industries: input.industries,
+    q_organization_keyword_tags: keywords,
+    page: input.page,
+    per_page: input.perPage,
+  };
+  const ranges = (input.employeeRanges ?? []).map((item) => item.trim()).filter(Boolean);
+  if (ranges.length) body.organization_num_employees_ranges = ranges;
+  return body;
+}
+
+export function companySearchParams(input: CompanySearchInput) {
+  const body = companySearchBody(input);
+  const params = new URLSearchParams();
+  for (const location of body.organization_locations as string[]) params.append("organization_locations[]", location);
+  for (const industry of body.organization_industries as string[]) params.append("organization_industries[]", industry);
+  for (const keyword of body.q_organization_keyword_tags as string[]) params.append("q_organization_keyword_tags[]", keyword);
+  for (const range of (body.organization_num_employees_ranges as string[] | undefined) ?? []) {
+    params.append("organization_num_employees_ranges[]", range);
+  }
+  params.set("page", String(body.page));
+  params.set("per_page", String(body.per_page));
   return params;
 }
 
@@ -695,15 +766,14 @@ function stringList(value: unknown) {
 export function readApolloOrganization(raw: unknown, searchedCountry?: "Canada" | "United States"): ApolloOrganization | null {
   const row = asRecord(raw);
   if (!row) return null;
-  const name = text(row.name);
-  const domain = normalizeDomain(text(row.primary_domain) || text(row.domain));
-  const id = text(row.id);
+  const nested = asRecord(row.organization);
+  const name = text(row.name) || text(nested?.name);
+  const domain = normalizeDomain(text(row.primary_domain) || text(row.domain) || text(nested?.primary_domain) || text(nested?.domain));
+  const id = text(row.id) || text(row.organization_id) || text(nested?.id);
   if (!name || !domain || !id) return null;
-  const city = text(row.city) || text(row.organization_city);
-  const state = text(row.state) || text(row.organization_state);
-  const printed = text(row.country) || text(row.organization_country);
-  const country = printed || searchedCountry || "";
-  const place = [city, state, country].filter(Boolean).join(", ");
+  const detail = organizationDetail(row);
+  const country = detail.country || searchedCountry || "";
+  const place = [detail.city, detail.state, country].filter(Boolean).join(", ") || detail.rawAddress;
   const latest = Array.isArray(row.funding_events) ? asRecord(row.funding_events[0]) : null;
   return {
     id,
@@ -712,15 +782,15 @@ export function readApolloOrganization(raw: unknown, searchedCountry?: "Canada" 
     website: text(row.website_url) || text(row.website) || (domain ? `https://${domain}` : ""),
     place,
     country,
-    industry: text(row.industry) || stringList(row.industries)[0] || "",
-    employees: numberOrNull(row.estimated_num_employees),
+    industry: detail.industry,
+    employees: detail.employees,
     revenue: numberOrNull(row.organization_revenue) ?? numberOrNull(row.annual_revenue),
     latestFundingOn: dateOnly(text(row.latest_funding_round_date) || text(latest?.date)),
     latestFundingAmount: numberOrNull(row.latest_funding_amount) ?? numberOrNull(latest?.amount),
     headcountGrowth: numberOrNull(row.organization_headcount_six_month_growth) ?? numberOrNull(row.headcount_growth),
     jobCount: numberOrNull(row.organization_num_current_job_postings) ?? numberOrNull(row.num_job_postings),
     jobTitles: stringList(row.job_posting_titles),
-    keywords: stringList(row.keywords),
+    keywords: detail.keywords,
     technologies: stringList(row.technology_names),
   };
 }
@@ -728,19 +798,50 @@ export function readApolloOrganization(raw: unknown, searchedCountry?: "Canada" 
 export function parseOrganizationSearch(body: unknown, searchedCountry?: "Canada" | "United States"): { failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number } {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { failure: "Apollo returned an unexpected shape" };
   const record = body as Record<string, unknown>;
-  const list = Array.isArray(record.organizations) ? record.organizations : Array.isArray(record.accounts) ? record.accounts : null;
-  if (!list) return { failure: "Apollo returned an unexpected shape" };
+  const organizations = Array.isArray(record.organizations) ? record.organizations : null;
+  const accounts = Array.isArray(record.accounts) ? record.accounts : null;
+  if (!organizations && !accounts) return { failure: "Apollo returned an unexpected shape" };
+  const list = [...(organizations ?? []), ...(accounts ?? [])];
   const pagination = asRecord(record.pagination);
   const totalEntries = numberOrNull(pagination?.total_entries) ?? list.length;
   const totalPages = numberOrNull(pagination?.total_pages) ?? (list.length > 0 ? 1 : 0);
   return {
-    organizations: list.flatMap((item) => {
+    organizations: mergeOrganizations(list.flatMap((item) => {
       const org = readApolloOrganization(item, searchedCountry);
       return org ? [org] : [];
-    }),
+    })),
     totalEntries,
     totalPages,
   };
+}
+
+/** Keep the fuller row when the same company is in both organizations and accounts. */
+function mergeOrganizations(rows: ApolloOrganization[]): ApolloOrganization[] {
+  const byDomain = new Map<string, ApolloOrganization>();
+  for (const org of rows) {
+    const have = byDomain.get(org.domain);
+    if (!have) {
+      byDomain.set(org.domain, org);
+      continue;
+    }
+    byDomain.set(org.domain, {
+      ...have,
+      industry: have.industry || org.industry,
+      employees: have.employees ?? org.employees,
+      place: have.place.length >= org.place.length ? have.place : org.place,
+      country: have.country || org.country,
+      keywords: [...new Set([...have.keywords, ...org.keywords])],
+      technologies: have.technologies.length ? have.technologies : org.technologies,
+      website: have.website || org.website,
+      revenue: have.revenue ?? org.revenue,
+      latestFundingOn: have.latestFundingOn || org.latestFundingOn,
+      latestFundingAmount: have.latestFundingAmount ?? org.latestFundingAmount,
+      headcountGrowth: have.headcountGrowth ?? org.headcountGrowth,
+      jobCount: have.jobCount ?? org.jobCount,
+      jobTitles: have.jobTitles.length ? have.jobTitles : org.jobTitles,
+    });
+  }
+  return [...byDomain.values()];
 }
 
 export function titlesFromPeopleSearch(body: unknown) {
@@ -784,12 +885,7 @@ export function searchedCountryFor(input: { country?: "Canada" | "United States"
   return unitedStates ? "United States" : "Canada";
 }
 
-export async function searchApolloCompanies(input: {
-  country?: "Canada" | "United States";
-  locations?: string[];
-  industries: string[];
-  page: number;
-  perPage: number;
+export async function searchApolloCompanies(input: CompanySearchInput & {
   apiKey: string;
   fetchImpl?: ApolloFetch;
   maxRetries?: number;
@@ -797,6 +893,8 @@ export async function searchApolloCompanies(input: {
   timeoutMs?: number;
 }): Promise<{ failure: string } | { organizations: ApolloOrganization[]; totalEntries: number; totalPages: number; credits: 1 }> {
   const fetchImpl = input.fetchImpl ?? fetch;
+  const requestBody = companySearchBody(input);
+  console.info(JSON.stringify({ hunter: "apollo-company-search", body: requestBody }));
   const called = await apolloCall(
     fetchImpl,
     companySearchUrl(companySearchParams(input)),
@@ -804,6 +902,7 @@ export async function searchApolloCompanies(input: {
     input.maxRetries ?? 2,
     input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
     input.timeoutMs ?? 20_000,
+    JSON.stringify(requestBody),
   );
   if ("failure" in called) return { failure: called.failure };
   const { body } = await readJson(called.response, input.apiKey);
