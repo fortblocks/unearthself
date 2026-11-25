@@ -6,9 +6,16 @@ import { handleHunterRead } from "./hunter-read.ts";
 import {
   FROM_ADDRESS,
   HUNTER_OUTREACH_KEY,
+  OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
+  UNSUBSCRIBE_KEY_RING_WINDOW_MS,
   handleOutreach,
   handleUnsubscribe,
   outreachLockKey,
+  readUnsubscribeCardId,
+  renderLegalReviewSample,
+  unsubscribeHtml,
+  unsubscribeKeysFromRing,
+  unsubscribePlain,
   unsubscribeToken,
   unsubscribeUrl,
 } from "./hunter-outreach.ts";
@@ -202,12 +209,14 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
   beforeEach(() => {
     previous.HUNTER_WRITE_TOKEN = process.env.HUNTER_WRITE_TOKEN;
     previous.HUNTER_WRITE_TOKEN_PREVIOUS = process.env.HUNTER_WRITE_TOKEN_PREVIOUS;
+    previous.HUNTER_UNSUBSCRIBE_KEY_RING = process.env.HUNTER_UNSUBSCRIBE_KEY_RING;
     previous.HUNTER_CARDS_TOKEN = process.env.HUNTER_CARDS_TOKEN;
     previous.HUNTER_READ_TOKEN = process.env.HUNTER_READ_TOKEN;
     process.env.HUNTER_WRITE_TOKEN = WRITE;
     process.env.HUNTER_CARDS_TOKEN = CARDS;
     process.env.HUNTER_READ_TOKEN = READ;
     delete process.env.HUNTER_WRITE_TOKEN_PREVIOUS;
+    delete process.env.HUNTER_UNSUBSCRIBE_KEY_RING;
   });
 
   afterEach(() => {
@@ -845,6 +854,7 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     assert.match(html, /www\.unearthself\.xyz/);
     assert.equal(html.includes("356 4 Street West"), false);
     assert.match(html, /Unearth Self/);
+    assert.equal(html.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
     assert.equal(redis.values.size, setsBefore);
     assert.equal(JSON.stringify(redis.hashes), hashesBefore);
     const tampered = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
@@ -903,6 +913,11 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     assert.equal(redis.hashes.get(HUNTER_OUTREACH_KEY), undefined);
     assert.equal(redis.hashes.get(HUNTER_DNC_KEY), undefined);
     process.env.HUNTER_WRITE_TOKEN = WRITE;
+    const ignored = await handleUnsubscribe(new Request(`https://www.unearthself.xyz/u/${oldLink}`, { method: "POST" }));
+    assert.match(await ignored.text(), /isn(?:'|&#39;)t valid/);
+    assert.equal(redis.hashes.get(HUNTER_DNC_KEY), undefined);
+    const retiredAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    process.env.HUNTER_UNSUBSCRIBE_KEY_RING = JSON.stringify([{ id: "previous", secret: PREVIOUS, retiredAt }]);
     const still = await handleUnsubscribe(new Request(`https://www.unearthself.xyz/u/${oldLink}`, { method: "POST" }));
     assert.match(await still.text(), /unsubscribed/i);
     const record = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { optOutSource?: string };
@@ -916,5 +931,63 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const minted = unsubscribeUrl(fresh.id);
     assert.equal(minted, `https://www.unearthself.xyz/u/${unsubscribeToken(fresh.id, WRITE)}`);
     assert.notEqual(minted, `https://www.unearthself.xyz/u/${unsubscribeToken(fresh.id, PREVIOUS)}`);
+  });
+
+  test("unsubscribe: a previous key works inside 60 days, and an expired or tampered link does not", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "card-window", email: "ada.secret@northwind.example" });
+    await seed(redis, [card]);
+    const token = unsubscribeToken(card.id, PREVIOUS);
+    assert.ok(token);
+    const now = Date.parse("2026-06-01T00:00:00.000Z");
+    const ring = (retiredAt: string) => JSON.stringify([{ id: "previous", secret: PREVIOUS, retiredAt }]);
+    const keysAt = (retiredAt: string) => {
+      const current = unsubscribeKeysFromRing(undefined, now);
+      assert.equal(current.length, 0);
+      return unsubscribeKeysFromRing(ring(retiredAt), now);
+    };
+    const inside = new Date(now - UNSUBSCRIBE_KEY_RING_WINDOW_MS).toISOString();
+    const outside = new Date(now - UNSUBSCRIBE_KEY_RING_WINDOW_MS - 1).toISOString();
+    const future = new Date(now + 60_000).toISOString();
+    assert.equal(keysAt(inside).length, 1);
+    assert.equal(keysAt(outside).length, 0);
+    assert.equal(keysAt(future).length, 0);
+    assert.equal(unsubscribeKeysFromRing("{", now).length, 0);
+    assert.equal(unsubscribeKeysFromRing(JSON.stringify([{ secret: PREVIOUS, retiredAt: inside }]), now).length, 0);
+    assert.equal(unsubscribeKeysFromRing(JSON.stringify([{ id: "short", secret: "too-short", retiredAt: inside }]), now).length, 0);
+    assert.equal(readUnsubscribeCardId(token, keysAt(inside)), card.id);
+    assert.equal(readUnsubscribeCardId(token, keysAt(outside)), null);
+    const tampered = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+    assert.equal(readUnsubscribeCardId(tampered, keysAt(inside)), null);
+
+    process.env.HUNTER_UNSUBSCRIBE_KEY_RING = ring(new Date(Date.now() - UNSUBSCRIBE_KEY_RING_WINDOW_MS - 24 * 60 * 60 * 1000).toISOString());
+    const expired = await handleUnsubscribe(new Request(`https://www.unearthself.xyz/u/${token}`, { method: "POST" }));
+    assert.match(await expired.text(), /isn(?:'|&#39;)t valid/);
+    assert.equal(redis.hashes.get(HUNTER_DNC_KEY), undefined);
+    process.env.HUNTER_UNSUBSCRIBE_KEY_RING = ring(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString());
+    const bad = await handleUnsubscribe(new Request(`https://www.unearthself.xyz/u/${tampered}`, { method: "POST" }));
+    assert.match(await bad.text(), /isn(?:'|&#39;)t valid/);
+    assert.equal(redis.hashes.get(HUNTER_DNC_KEY), undefined);
+    const kept = await handleUnsubscribe(new Request(`https://www.unearthself.xyz/u/${token}`, { method: "POST" }));
+    assert.match(await kept.text(), /unsubscribed/i);
+    assert.equal(JSON.stringify(redis.hashes).includes(PREVIOUS), false);
+  });
+
+  test("the legal sample shows the placeholder, and the live footer does not", () => {
+    const link = "https://www.unearthself.xyz/u/sample-not-a-live-link";
+    const sample = renderLegalReviewSample(link);
+    assert.match(sample.html, /<a href="https:\/\/www\.unearthself\.xyz\/u\/sample-not-a-live-link">Unsubscribe here<\/a>/);
+    assert.match(sample.text, /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\/sample-not-a-live-link/);
+    assert.match(sample.html, /356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada/);
+    assert.match(sample.text, /www\.unearthself\.xyz/);
+    assert.equal(sample.html.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), true);
+    assert.equal(sample.text.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), true);
+    const liveHtml = unsubscribeHtml(`https://www.unearthself.xyz/u/${"a".repeat(20)}`);
+    const livePlain = unsubscribePlain(`https://www.unearthself.xyz/u/${"a".repeat(20)}`);
+    assert.equal(liveHtml.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    assert.equal(livePlain.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    assert.match(liveHtml, /<a href="https:\/\/www\.unearthself\.xyz\/u\/a{20}">Unsubscribe here<\/a>/);
+    assert.match(livePlain, /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\/a{20}/);
   });
 });

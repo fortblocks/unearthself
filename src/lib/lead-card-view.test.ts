@@ -458,6 +458,7 @@ test("the card notes when the unsubscribe link was added", () => {
   assert.equal(preview?.[0]?.includes("<br") ?? true, false);
   assert.equal(preview?.[0]?.includes("<a") ?? true, false);
   assert.match(preview?.[0] ?? "", /text-xs/);
+  assert.equal(html.includes("[SENDER IDENTIFICATION PENDING LEGAL]"), false);
   assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });

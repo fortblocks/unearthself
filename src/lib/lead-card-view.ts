@@ -8,9 +8,7 @@ import {
   emailableLead,
   ensureUnsubscribeLink,
   letterWithoutUnsubscribe,
-  OUTREACH_POSTAL_ADDRESS,
-  OUTREACH_SITE,
-  UNSUBSCRIBE_NOTICE,
+  outreachFooterPreview,
   type CocoJoin,
   type DraftSource,
 } from "./hunter-outreach.ts";
@@ -327,7 +325,7 @@ export function LeadCardActions({
           createElement(
             "p",
             { className: "mt-1 text-xs leading-tight text-shale", "data-unsubscribe": "preview" },
-            `Email footer (added automatically): ${UNSUBSCRIBE_NOTICE} ${OUTREACH_POSTAL_ADDRESS}. ${OUTREACH_SITE}`,
+            outreachFooterPreview(),
           ),
           createElement(
             "p",

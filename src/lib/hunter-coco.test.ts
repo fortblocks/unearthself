@@ -17,6 +17,8 @@ import {
   draftRejectionCheck,
   readCocoCard,
   saveCocoDraftEdit,
+  OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
+  setOutreachSenderIdentificationForTests,
   storeBackgroundDraft,
   unsubscribeBlock,
   unsubscribeUrl,
@@ -199,12 +201,14 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     }
     process.env.HUNTER_WRITE_TOKEN = WRITE;
     process.env.HUNTER_CARDS_TOKEN = CARDS;
+    setOutreachSenderIdentificationForTests("Unearth Self");
     delete process.env.COCO_DRAFT_WEBHOOK_URL;
     delete process.env.COCO_DRAFT_WEBHOOK_KEY;
     delete process.env.COCO_DRAFT_WEBHOOK_HEADER;
   });
 
   afterEach(() => {
+    setOutreachSenderIdentificationForTests(null);
     useRedisClientForTests(null);
     for (const [key, value] of Object.entries(previous)) {
       if (value == null) delete process.env[key];
@@ -911,6 +915,10 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     };
     assert.equal(sentRecord.edited, true);
     assert.equal(sentRecord.sendApproved?.body.includes("I'm Christopher"), true);
+    assert.equal(sentRecord.sendApproved?.body.includes("Unearth Self"), true);
+    assert.match(sentRecord.sendApproved?.body ?? "", /<a href="https:\/\/www\.unearthself\.xyz\/u\/[^"]+">Unsubscribe here<\/a>/);
+    assert.match(sentRecord.sendApproved?.body ?? "", /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\//);
+    assert.equal(sentRecord.sendApproved?.body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
     assert.equal(sentRecord.drafts["1"].sent?.body.includes("Changed in chat"), true);
 
     const follow = await post(letter(card.id, "drafted", { touch: 2, subject: "Follow up", body: "A second note." }));
@@ -1184,5 +1192,57 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     if (!short.ok) assert.equal(short.error, "humanizer");
     const ready = approvableCopy(card, link);
     assert.equal(humanizerCheck(ready.subject, ready.body).pass, true);
+  });
+
+  test("approve to send fails closed while sender identification is the placeholder", async () => {
+    setOutreachSenderIdentificationForTests(null);
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "campfire", review: "approved" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const drafted = await post(letter(card.id, "drafted", { body: `Hello from Drumheller.\n${link}` }));
+    assert.equal(drafted.status, 200);
+    const storedDraft = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
+      drafts: { "1": { body: string } };
+    };
+    assert.equal(storedDraft.drafts["1"].body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    let woke = false;
+    const refused = await approveWording({
+      cardId: card.id,
+      subject: "A note",
+      body: `Hello from Drumheller.\n${link}`,
+      fetchImpl: async () => {
+        woke = true;
+        return { status: 202 };
+      },
+    });
+    assert.equal(refused.ok, false);
+    if (!refused.ok) assert.equal(refused.error, "sender-identification");
+    assert.equal(woke, false);
+    const after = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { sendApproved?: unknown };
+    assert.equal(after.sendApproved, undefined);
+    const posted = await post(letter(card.id, "send_approved", { body: `Hello from Drumheller.\n${link}` }));
+    assert.equal(posted.status, 409);
+    assert.deepEqual(await posted.json(), { error: "sender-identification" });
+    assert.equal(JSON.stringify(redis.hashes).includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    setOutreachSenderIdentificationForTests("Unearth Self");
+    const planted = await approveWording({
+      cardId: card.id,
+      subject: "A note",
+      body: `Hello from Drumheller.\n${OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER}\n${link}`,
+      fetchImpl: async () => {
+        woke = true;
+        return { status: 202 };
+      },
+    });
+    assert.equal(planted.ok, false);
+    if (!planted.ok) assert.equal(planted.error, "sender-identification");
+    assert.equal(woke, false);
+    const still = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { sendApproved?: unknown };
+    assert.equal(still.sendApproved, undefined);
+    assert.equal(JSON.stringify(redis.hashes).includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
   });
 });
