@@ -1180,21 +1180,37 @@ type HunterRedis = {
   lrange?: (key: string, start: number, stop: number) => Promise<unknown[]>;
 };
 
-export async function loadDoNotContact(redis: HunterRedis): Promise<DncEntry[]> {
-  if (redis.hgetall) {
-    try {
-      const hash = await redis.hgetall(doNotContactKey());
-      if (hash && typeof hash === "object" && !Array.isArray(hash) && Object.keys(hash).length > 0) {
-        return Object.values(hash).flatMap((value) => {
-          const entry = parseDncValue(value);
-          return entry ? [entry] : [];
-        });
-      }
-    } catch {
-      // An older list is a string key. Fall through and read it.
-    }
+function isWrongType(error: unknown) {
+  return error instanceof Error && /WRONGTYPE/i.test(error.message);
+}
+
+async function dncHash(redis: HunterRedis): Promise<Record<string, unknown> | null> {
+  if (!redis.hgetall) return null;
+  try {
+    const hash = await redis.hgetall(doNotContactKey());
+    if (hash && typeof hash === "object" && !Array.isArray(hash) && Object.keys(hash).length > 0) return hash;
+    return null;
+  } catch (error) {
+    if (isWrongType(error)) return null;
+    throw error;
   }
-  const raw = await redis.get<unknown>(doNotContactKey());
+}
+
+export async function loadDoNotContact(redis: HunterRedis): Promise<DncEntry[]> {
+  const hash = await dncHash(redis);
+  if (hash) {
+    return Object.values(hash).flatMap((value) => {
+      const entry = parseDncValue(value);
+      return entry ? [entry] : [];
+    });
+  }
+  let raw: unknown = null;
+  try {
+    raw = await redis.get<unknown>(doNotContactKey());
+  } catch (error) {
+    if (isWrongType(error)) return [];
+    throw error;
+  }
   const list = Array.isArray(raw) ? raw : [];
   return list.flatMap((row) => {
     const entry = parseDncValue(row);
@@ -1222,10 +1238,18 @@ export async function appendDoNotContact(input: {
   const writes = dncUpsertPlan(entries, next, input.today);
   if (writes.length === 0) return entries;
   if (client.hset) {
-    const legacy = await client.get<unknown>(doNotContactKey());
-    if (Array.isArray(legacy)) {
-      await client.del?.(doNotContactKey());
-      for (const row of entries) await client.hset(doNotContactKey(), { [dncField(row)]: JSON.stringify(row) });
+    const existingHash = await dncHash(client);
+    if (!existingHash) {
+      let legacy: unknown = null;
+      try {
+        legacy = await client.get<unknown>(doNotContactKey());
+      } catch (error) {
+        if (!isWrongType(error)) throw error;
+      }
+      if (Array.isArray(legacy)) {
+        await client.del?.(doNotContactKey());
+        for (const row of entries) await client.hset(doNotContactKey(), { [dncField(row)]: JSON.stringify(row) });
+      }
     }
     for (const row of writes) await client.hset(doNotContactKey(), { [dncField(row)]: JSON.stringify(row) });
     return loadDoNotContact(client);

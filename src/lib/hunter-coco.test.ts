@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { COCO_INTROS, cocoLetter, draftMentionsTessAndI, greetingNameCheck, usableFirstName } from "./coco-letter.ts";
+import { humanizerCheck } from "./humanizer.ts";
+import { predraftFiledLeads } from "./coco-predraft.ts";
 import { HUNTER_DNC_KEY } from "./hunter-config.ts";
 import { handleHunterRead } from "./hunter-read.ts";
 import {
@@ -11,16 +14,19 @@ import {
   cocoJoin,
   cocoStage,
   handleOutreach,
+  draftRejectionCheck,
   readCocoCard,
   saveCocoDraftEdit,
+  storeBackgroundDraft,
+  unsubscribeBlock,
   unsubscribeUrl,
   wakeCocoDraft,
   withdrawWording,
 } from "./hunter-outreach.ts";
-import { mergeHunterCompanies } from "./hunter-phase.ts";
+import { mergeHunterCompanies, spendCounterKey } from "./hunter-phase.ts";
 import { LEADS_KEY, emptyBook, saveBook, upsertCompany, useRedisClientForTests, type LeadsRedis } from "./leads-book.ts";
-import { refreshUnsentDrafts } from "./lead-copy.ts";
-import type { Company } from "./lead-score.ts";
+import { draftProblems, refreshUnsentDrafts } from "./lead-copy.ts";
+import { edmontonToday, type Company } from "./lead-score.ts";
 
 const WRITE = "w".repeat(32);
 const CARDS = "c".repeat(32);
@@ -111,8 +117,8 @@ function company(partial: Partial<Company> & { id: string }): Company {
     scoutBatch: "",
     source: "hunter",
     review: partial.review ?? "unreviewed",
-    hunterScore: 70,
-    filedOn: "2026-11-01",
+    hunterScore: partial.hunterScore ?? 70,
+    filedOn: partial.filedOn ?? "2026-11-01",
     enrichment: partial.enrichment ?? "enriched",
     contactSource: "Public page",
     place: "Calgary, Alberta, Canada",
@@ -177,6 +183,11 @@ function letter(cardId: string, type: string, extra: Record<string, unknown> = {
     event.experimentId = extra.experimentId ?? "exp-1";
   }
   return event;
+}
+
+function approvableCopy(card: Company, link: string) {
+  const draft = cocoLetter(card);
+  return { subject: draft.subject, body: `${draft.body}\n\n${unsubscribeBlock(link)}` };
 }
 
 describe("coco approve and draft", { concurrency: 1 }, () => {
@@ -424,7 +435,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       sources: [{ url: page, note: "Leadership offsite" }],
     }));
     assert.equal(restored.status, 200);
-    const approved = await approveWording({ cardId: card.id, subject: "Final", body: `Final copy.\n${link}` });
+    const approved = await approveWording({ cardId: card.id, ...approvableCopy(card, link) });
     assert.equal(approved.ok, true);
     const sent = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
       sendApproved?: Record<string, unknown>;
@@ -518,7 +529,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     const afterEdit = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
       drafts: { "1": { editedBody?: string; unsubscribeAppended?: boolean } };
     };
-    assert.equal(afterEdit.drafts["1"].editedBody, `Edited letter\n\n${link}`);
+    assert.equal(afterEdit.drafts["1"].editedBody, `Edited letter\n\n${unsubscribeBlock(link)}`);
     assert.equal(afterEdit.drafts["1"].unsubscribeAppended, true);
     const again = await saveCocoDraftEdit({
       cardId: card.id,
@@ -530,11 +541,12 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     const kept = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
       drafts: { "1": { editedBody?: string } };
     };
-    assert.equal(kept.drafts["1"].editedBody, `Edited letter\n\n${link}`);
+    assert.equal(kept.drafts["1"].editedBody, `Edited letter\n\n${unsubscribeBlock(link)}`);
 
     const view = await readCocoCard(card.id);
-    assert.equal(view?.body, `Edited letter\n\n${link}`);
-    assert.equal(view?.canApproveWording, true);
+    assert.equal(view?.body, `Edited letter\n\n${unsubscribeBlock(link)}`);
+    assert.equal(view?.canApproveWording, false);
+    assert.equal((view?.humanizerNotes ?? []).some((note) => note.includes("120 to 180")), true);
     assert.equal(view?.unsubscribeAppended, true);
     assert.equal(view?.wordingNote, "");
 
@@ -556,19 +568,19 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     try {
       filled = await readCocoCard(card.id);
       const second = await readCocoCard(card.id);
-      assert.equal(second?.body, `Stored without a link.\n\n${link}`);
+      assert.equal(second?.body, `Stored without a link.\n\n${unsubscribeBlock(link)}`);
     } finally {
       console.info = original;
     }
-    assert.equal(filled?.body, `Stored without a link.\n\n${link}`);
-    assert.equal(filled?.canApproveWording, true);
+    assert.equal(filled?.body, `Stored without a link.\n\n${unsubscribeBlock(link)}`);
+    assert.equal(filled?.canApproveWording, false);
     assert.equal(filled?.unsubscribeAppended, true);
     const fills = backfillLines.filter((line) => line.includes("draft-missing-unsubscribe"));
     assert.equal(fills.length, 1);
     const backed = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
       drafts: { "1": { body: string } };
     };
-    assert.equal(backed.drafts["1"].body.split(link).length - 1, 1);
+    assert.equal(backed.drafts["1"].body.split(link).length - 1, 2);
 
     assert.equal(unsubscribeUrl(card.id, ""), null);
     delete process.env.HUNTER_WRITE_TOKEN;
@@ -843,7 +855,8 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
 
     const missingLink = await approveWording({ cardId: card.id, subject: "Newer", body: "No link here." });
     assert.equal(missingLink.ok, false);
-    const approved = await approveWording({ cardId: card.id, subject: "Final", body: `Final copy.\n${link}` });
+    const copy = approvableCopy(card, link);
+    const approved = await approveWording({ cardId: card.id, ...copy });
     assert.equal(approved.ok, true);
     if (approved.ok) assert.equal(approved.stage, "wording-approved");
     const duplicateApproval = await post(letter(card.id, "send_approved", { body: `Again\n${link}` }));
@@ -858,7 +871,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       card: { stage: string; sendApproved: { eventId: string; subject: string; body: string; touch: number } | null };
     };
     assert.equal(cardBody.card.stage, "wording-approved");
-    assert.equal(cardBody.card.sendApproved?.subject, "Final");
+    assert.equal(cardBody.card.sendApproved?.subject, copy.subject);
     assert.equal(cardBody.card.sendApproved?.touch, 1);
     assert.ok(cardBody.card.sendApproved?.eventId);
 
@@ -872,7 +885,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
 
     const withdrawn = await withdrawWording({ cardId: card.id });
     assert.equal(withdrawn.ok, true);
-    const reapproved = await approveWording({ cardId: card.id, subject: "Final", body: `Final copy.\n${link}` });
+    const reapproved = await approveWording({ cardId: card.id, ...approvableCopy(card, link) });
     assert.equal(reapproved.ok, true);
 
     const sent = await post({
@@ -897,7 +910,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       drafts: { "1": { sent?: { body: string } } };
     };
     assert.equal(sentRecord.edited, true);
-    assert.equal(sentRecord.sendApproved?.body.includes("Final copy"), true);
+    assert.equal(sentRecord.sendApproved?.body.includes("I'm Christopher"), true);
     assert.equal(sentRecord.drafts["1"].sent?.body.includes("Changed in chat"), true);
 
     const follow = await post(letter(card.id, "drafted", { touch: 2, subject: "Follow up", body: "A second note." }));
@@ -994,5 +1007,182 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(page.includes("Write the draft"), false);
     assert.equal(page.includes("mailto:"), false);
     assert.equal(page.includes(">Send<"), false);
+  });
+
+  test("a background letter uses one approved intro and never says Tess and I", () => {
+    const card = company({ id: "campfire", org: "Northwind Example" });
+    const letter = cocoLetter(card);
+    const chosen = COCO_INTROS.filter((intro) => letter.body.includes(intro));
+    assert.equal(chosen.length, 1);
+    assert.equal(letter.body.includes("Northwind Example"), true);
+    assert.equal(letter.body.includes("Play, Adaptability, Connection, Experience"), true);
+    assert.equal(letter.body.includes("We are taking bookings for 2027."), true);
+    assert.equal(letter.body.includes("A short reply is enough."), true);
+    assert.equal(draftMentionsTessAndI(letter.subject) || draftMentionsTessAndI(letter.body), false);
+    assert.equal(letter.body.includes("\u2014"), false);
+    assert.equal(draftRejectionCheck(letter.subject, letter.body), null);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const stored = `${letter.body}\n\n${unsubscribeBlock(link)}`;
+    assert.deepEqual(draftProblems(stored), []);
+    const fallback = readFileSync(new URL("./bot-copy.ts", import.meta.url), "utf8");
+    assert.equal(/tess\s+and\s+i\b/i.test(fallback), false);
+    assert.equal(fallback.includes("COCO_INTRO_TEAM"), true);
+    assert.equal(fallback.includes("Hello,"), true);
+    assert.equal(fallback.includes("A short reply is enough."), true);
+  });
+
+  test("a drafted event that says Tess and I is rejected and flagged", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "campfire" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    let refused: Response;
+    try {
+      refused = await post(letter(card.id, "drafted", { body: "Tess and I will write." }));
+    } finally {
+      console.info = original;
+    }
+    assert.equal(refused.status, 400);
+    const logged = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line) as { check?: string };
+        } catch {
+          return null;
+        }
+      })
+      .find((item) => item?.check);
+    assert.equal(logged?.check, "tess-and-i");
+    const view = await readCocoCard(card.id);
+    assert.equal(view?.stage, "draft-flagged");
+    assert.equal(view?.body, "");
+    assert.equal(view?.draftFlag, 'The draft says "Tess and I".');
+  });
+
+  test("filed leads are drafted before approve, and a flagged letter is not shown as done", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const today = edmontonToday();
+    const cards = ["a", "b", "c", "d", "e", "f"].map((id) => company({ id, filedOn: today, org: `Org ${id}` }));
+    await seed(redis, cards);
+    const calls: string[] = [];
+    process.env.COCO_DRAFT_WEBHOOK_URL = "https://hooks.example/coco";
+    process.env.COCO_DRAFT_WEBHOOK_KEY = "secret-key";
+    process.env.COCO_DRAFT_WEBHOOK_HEADER = "X-Coco-Key";
+    const first = await predraftFiledLeads({
+      today,
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return { status: 200 };
+      },
+    });
+    assert.deepEqual(first.drafted, ["a", "b", "c", "d"]);
+    assert.deepEqual(first.flagged, []);
+    assert.equal(first.stopped, "");
+    assert.equal(calls.length, 4);
+    const ready = await readCocoCard("a");
+    assert.equal(ready?.stage, "draft-ready");
+    assert.equal(ready?.body.includes("<a href="), true);
+    assert.equal(ready?.body.includes(">unsubscribe</a>"), true);
+    assert.equal(ready?.body.includes("unsubscribe: "), true);
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.a ?? "{}") as {
+      sendApproved?: unknown;
+      touches?: number;
+    };
+    assert.equal(stored.sendApproved, undefined);
+    assert.equal(stored.touches ?? 0, 0);
+    const book = await redis.get<{ companies: Company[] }>(LEADS_KEY);
+    assert.equal(book?.companies.find((item) => item.id === "a")?.review, "unreviewed");
+
+    calls.length = 0;
+    const approved = await approveAndQueueForCoco({
+      cardId: "a",
+      queuedBy: "chris",
+      fetchImpl: async () => {
+        calls.push("approve");
+        return { status: 200 };
+      },
+    });
+    assert.equal(approved.ok, true);
+    assert.equal(calls.length, 0);
+    if (approved.ok) assert.equal(approved.stage, "draft-ready");
+
+    const flagged = await storeBackgroundDraft({
+      company: company({ id: "bad-letter", filedOn: today }),
+      subject: "A week in Drumheller for your team",
+      body: "Tess and I will write tomorrow.",
+    });
+    assert.equal(flagged, "flagged");
+    await seed(redis, [...cards, company({ id: "bad-letter", filedOn: today })]);
+    const failed = await readCocoCard("bad-letter");
+    assert.equal(failed?.stage, "draft-flagged");
+    assert.equal(failed?.body, "");
+    assert.equal(failed?.draftFlag.includes("Tess and I"), true);
+  });
+
+  test("background drafting stops when the monthly cap is spent", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const today = edmontonToday();
+    await seed(redis, [company({ id: "spent", filedOn: today })]);
+    await redis.set(spendCounterKey(today.slice(0, 7)), "99999999");
+    const result = await predraftFiledLeads({ today, fetchImpl: async () => ({ status: 200 }) });
+    assert.deepEqual(result.drafted, []);
+    assert.equal(result.stopped, "spend");
+    assert.equal(redis.hashes.get(HUNTER_OUTREACH_KEY)?.spent, undefined);
+  });
+
+  test("a newer rejection hides an older draft, and an older rejection does not", () => {
+    const card = company({ id: "campfire", review: "approved" });
+    const older = cocoStage(card, {
+      cardId: card.id,
+      touches: 0,
+      events: [],
+      drafts: { "1": { subject: "A note", body: "Hello from Drumheller.", draftedAt: "2026-11-20T20:00:00.000Z" } },
+      draftRejected: { at: "2026-11-20T19:00:00.000Z", check: "em-dash" },
+    });
+    assert.equal(older, "draft-ready");
+    const newer = cocoStage(card, {
+      cardId: card.id,
+      touches: 0,
+      events: [],
+      drafts: { "1": { subject: "A note", body: "Hello from Drumheller.", draftedAt: "2026-11-20T19:00:00.000Z" } },
+      draftRejected: { at: "2026-11-20T20:00:00.000Z", check: "tess-and-i" },
+    });
+    assert.equal(newer, "draft-flagged");
+  });
+
+  test("an initials greeting is rejected, and a short letter cannot be approved to send", async () => {
+    assert.equal(usableFirstName("NN Srinivas"), "");
+    assert.equal(usableFirstName("nn.srinivas@centricsoftware.com"), "");
+    assert.equal(usableFirstName("Ada North"), "Ada");
+    const neutral = cocoLetter(company({ id: "centric", buyerName: "NN Srinivas", org: "Centric Software" }));
+    assert.equal(neutral.body.startsWith("Hello,"), true);
+    assert.equal(greetingNameCheck(neutral.body), false);
+    assert.equal(greetingNameCheck("Hello NN, thanks for reading."), true);
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({ id: "campfire", review: "approved" });
+    await seed(redis, [card]);
+    assert.equal((await approveAndQueueForCoco({ cardId: card.id, queuedBy: "chris@unearthself.xyz" })).ok, true);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const drafted = await post(letter(card.id, "drafted", { body: `Hello from Drumheller.\n${link}` }));
+    assert.equal(drafted.status, 200);
+    const initials = await approveWording({ cardId: card.id, subject: "A note", body: `Hello NN, thanks for reading.\n${link}` });
+    assert.equal(initials.ok, false);
+    if (!initials.ok) assert.equal(initials.error, "greeting-name");
+    const short = await approveWording({ cardId: card.id, subject: "A note", body: `Hello from Drumheller.\n${link}` });
+    assert.equal(short.ok, false);
+    if (!short.ok) assert.equal(short.error, "humanizer");
+    const ready = approvableCopy(card, link);
+    assert.equal(humanizerCheck(ready.subject, ready.body).pass, true);
   });
 });

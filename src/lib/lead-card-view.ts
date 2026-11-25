@@ -1,7 +1,17 @@
-import { createElement, type ReactNode } from "react";
+import { createElement, useState } from "react";
 import { isPhaseOneCompany } from "../data/hunter-profile.ts";
 import { isClearBuyer, isStoredJudgment } from "./buyer-judgment.ts";
-import { draftEditWarnings, emailableLead, type CocoJoin, type DraftSource } from "./hunter-outreach.ts";
+import {
+  draftEditWarnings,
+  draftRejectionReason,
+  emailableLead,
+  ensureUnsubscribeLink,
+  letterWithoutUnsubscribe,
+  type CocoJoin,
+  type DraftSource,
+} from "./hunter-outreach.ts";
+import { greetingNameCheck } from "./coco-letter.ts";
+import { humanizerCheck } from "./humanizer.ts";
 import { wordCount } from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
 
@@ -22,8 +32,9 @@ const STAGE_MARKS = [
 ] as const;
 
 const buttonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs border border-line-strong px-4 text-sm font-semibold text-coal";
-const primaryClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xs bg-ember px-4 text-sm font-semibold text-paper";
+  "inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-line-strong bg-paper px-3 text-sm font-semibold text-coal";
+const primaryClass =
+  "inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xs border border-ember bg-ember px-3 text-sm font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-40";
 
 /** The named contact's published email. Blank and whitespace count as none. */
 export function hasPublishedEmail(company: { email?: string | null }) {
@@ -45,11 +56,12 @@ export function storedJudgmentHides(company: { buyerJudgment?: unknown }) {
 }
 
 /**
- * A card the desk may list. Canada or the United States, a named person, a verified or published email, a source URL, and no send block.
- * Score band is not a gate. A stored buyer judgement of no hides the card. Do-not-contact and a bounce come from the outreach join.
+ * A card the desk may list. Canada or the United States, a named person, a verified or published email, and a source URL.
+ * Score band is not a gate. A stored buyer judgement of no hides the card.
+ * A send block from the outreach join does not remove the card. The card shows the reason instead.
  */
-export function leadOnDesk(company: Company, blocked: readonly string[] = []) {
-  return leadInPhaseOne(company) && hasPublishedEmail(company) && emailableLead(company, blocked) && !storedJudgmentHides(company);
+export function leadOnDesk(company: Company, _blocked: readonly string[] = []) {
+  return leadInPhaseOne(company) && hasPublishedEmail(company) && emailableLead(company) && !storedJudgmentHides(company);
 }
 
 /** Display list only. The stored book is not changed. */
@@ -96,7 +108,7 @@ export function draftPanelKind(
   return late ? "late" : "writing";
 }
 
-export const DRAFT_REJECTED_COPY = "Coco's draft was rejected, retrying";
+export const DRAFT_FLAGGED_COPY = "Draft flagged";
 
 export const UNSUBSCRIBE_ADDED_COPY = "The unsubscribe link was added automatically.";
 
@@ -138,19 +150,23 @@ export type LeadCardActionsProps = {
   draftWait?: "writing" | "late" | "rejected";
 };
 
-function menu(title: string, open: boolean, children: ReactNode) {
-  return createElement(
-    "details",
-    { className: "relative", open },
-    createElement("summary", { className: `${buttonClass} cursor-pointer list-none` }, title),
-    createElement("div", { className: "mt-2 flex flex-wrap gap-2" }, children),
-  );
-}
-
 function actionButton(label: string, onClick: (() => void) | undefined, primary = false, disabled = false) {
   return createElement(
     "button",
-    { type: "button", className: primary ? primaryClass : buttonClass, onClick, disabled },
+    {
+      type: "button",
+      className: primary ? primaryClass : buttonClass,
+      onClick: disabled ? undefined : onClick,
+      disabled,
+    },
+    label,
+  );
+}
+
+function optionButton(label: string, onClick: (() => void) | undefined, key?: string) {
+  return createElement(
+    "button",
+    { key, type: "button", className: buttonClass, onClick },
     label,
   );
 }
@@ -170,21 +186,40 @@ export function LeadCardActions({
   onSaveCopy,
   onStage,
   onStop,
-  onUnreview,
   onWithdraw,
-  onRefresh,
-  onHandFile,
   draftWait,
 }: LeadCardActionsProps) {
+  const [localMenu, setLocalMenu] = useState<"skip" | "stage" | "stop" | null>(null);
   const warnings = draftEditWarnings(subject, body);
+  const voice = humanizerCheck(subject, body);
+  const badGreeting = greetingNameCheck(body);
   const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved";
-  const words = body.trim() ? `${wordCount(body)} words` : "No draft yet.";
   const awaiting = cocoAwaitingDraft(coco);
-  const rejected = awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check));
-  const wait = !awaiting ? null : rejected ? "rejected" : draftWait === "late" ? "late" : "writing";
+  const flagReason =
+    coco.stage === "draft-flagged"
+      ? coco.draftFlag || draftRejectionReason(coco.draftRejected?.check ?? "rejected")
+      : awaiting && (draftWait === "rejected" || Boolean(coco.draftRejected?.check))
+        ? draftRejectionReason(coco.draftRejected?.check ?? "rejected")
+        : "";
+  const wait = flagReason || !awaiting ? null : draftWait === "late" ? "late" : "writing";
   const skip = skipReasonLines(coco);
-  const hasDraft = hasDraftCopy(subject, body, coco.subject, coco.body);
+  const hasDraft = !flagReason && hasDraftCopy(subject, body, coco.subject, coco.body);
+  const link = coco.unsubscribeUrl;
+  const showUnsubscribe = Boolean(hasDraft && link && body.includes(link));
+  const letter = showUnsubscribe ? letterWithoutUnsubscribe(body, link) : body;
+  const words = letter.trim() ? `${wordCount(letter)} words` : "No draft yet.";
   const sources = hasDraft ? (coco.sources ?? []) : [];
+  const approveBlocked = !voice.pass || badGreeting;
+  const canSendApproval = hasDraft && (coco.canApproveWording || coco.stage === "draft-ready" || coco.canApproveDraft);
+  function menuOpen(id: "skip" | "stage" | "stop") {
+    if (menusOpen) return true;
+    if (openMenu) return openMenu === id;
+    return localMenu === id;
+  }
+  function toggleMenu(id: "skip" | "stage" | "stop") {
+    if (menusOpen || openMenu) return;
+    setLocalMenu((current) => (current === id ? null : id));
+  }
   return createElement(
     "div",
     { className: "grid gap-4", "data-stage": coco.stage },
@@ -198,46 +233,66 @@ export function LeadCardActions({
     ),
     createElement(
       "div",
-      { className: "flex flex-wrap gap-2" },
-      coco.canApproveDraft ? actionButton("Approve and draft", onApproveDraft, true) : null,
-      menu(
-        "Skip",
-        menusOpen || openMenu === "skip",
-        SKIP_REASONS.map(([reason, label]) =>
-          createElement("button", { key: reason, type: "button", className: buttonClass, onClick: () => onSkip?.(reason) }, label),
-        ),
+      { className: "grid gap-2", "data-actions": "lead-card" },
+      createElement(
+        "p",
+        { className: "text-sm text-coal", "data-send-path": "explicit" },
+        "The only send is from chris@badlandsbootcamp.com, in Coco's chat, after Approve to send. Save edit does not send. Nothing else on this card sends.",
       ),
-      coco.canApproveWording ? actionButton("Approve wording", onApproveWording, true) : null,
-      coco.wordingNote ? createElement("p", { className: "w-full text-sm text-coal" }, coco.wordingNote) : null,
-      menu(
-        "Set stage",
-        menusOpen || openMenu === "stage",
-        STAGE_MARKS.map(([mark, label]) =>
-          createElement("button", { key: mark, type: "button", className: buttonClass, onClick: () => onStage?.(mark) }, label),
-        ),
+      createElement(
+        "div",
+        { className: "grid grid-cols-1 gap-2 sm:grid-cols-2" },
+        !hasDraft && coco.canApproveDraft ? actionButton("Ask Coco to draft", onApproveDraft, true) : null,
+        canSendApproval
+          ? actionButton("Approve to send", onApproveWording, true, approveBlocked)
+          : null,
+        hasDraft ? actionButton("Save edit", onSaveCopy) : null,
       ),
-      menu(
-        "Stop contacting",
-        menusOpen || openMenu === "stop",
-        [
-          createElement("button", { key: "person", type: "button", className: buttonClass, onClick: () => onStop?.("person") }, "This person"),
-          createElement("button", { key: "company", type: "button", className: buttonClass, onClick: () => onStop?.("company") }, "The whole company"),
-        ],
+      coco.canWithdraw
+        ? createElement("div", { className: "grid grid-cols-1" }, optionButton("Take back send approval", onWithdraw))
+        : null,
+      approveBlocked && hasDraft
+        ? createElement(
+            "div",
+            { className: "border border-line bg-fossil p-3", "data-humanizer": voice.pass ? "pass" : "fail" },
+            createElement("p", { className: "text-sm font-semibold text-coal" }, "Approve to send is off."),
+            ...(badGreeting ? [createElement("p", { key: "greeting", className: "mt-1 text-sm text-coal" }, "The greeting name is initials, one or two letters, or all capitals.")] : []),
+            ...voice.notes.map((note) => createElement("p", { key: note, className: "mt-1 text-sm text-coal" }, note)),
+          )
+        : null,
+      coco.greetingNote ? createElement("p", { className: "text-sm text-coal", "data-greeting": "neutral" }, coco.greetingNote) : null,
+      coco.wordingNote ? createElement("p", { className: "text-sm text-coal" }, coco.wordingNote) : null,
+      createElement(
+        "div",
+        { className: "grid grid-cols-1 gap-2 sm:grid-cols-3" },
+        optionButton(menuOpen("skip") ? "Close not a fit" : "Not a fit", () => toggleMenu("skip")),
+        optionButton(menuOpen("stop") ? "Close do not contact" : "Do not contact", () => toggleMenu("stop")),
+        optionButton(menuOpen("stage") ? "Close after they reply" : "After they reply", () => toggleMenu("stage")),
       ),
-      menu(
-        "More",
-        menusOpen || openMenu === "more",
-        [
-          createElement("button", { key: "back", type: "button", className: buttonClass, onClick: onUnreview }, "Back to unreviewed"),
-          coco.canWithdraw
-            ? createElement("button", { key: "withdraw", type: "button", className: buttonClass, onClick: onWithdraw }, "Withdraw wording approval")
-            : null,
-          createElement("button", { key: "file", type: "button", className: buttonClass, onClick: onHandFile }, "Hand file"),
-          createElement("button", { key: "refresh", type: "button", className: buttonClass, onClick: onRefresh }, "Refresh"),
-        ],
-      ),
+      menuOpen("skip")
+        ? createElement(
+            "div",
+            { className: "grid grid-cols-1 gap-2 sm:grid-cols-3", "data-menu": "skip" },
+            SKIP_REASONS.map(([reason, label]) => optionButton(label, () => onSkip?.(reason), reason)),
+          )
+        : null,
+      menuOpen("stop")
+        ? createElement(
+            "div",
+            { className: "grid grid-cols-1 gap-2 sm:grid-cols-2", "data-menu": "stop" },
+            optionButton("Do not contact this person", () => onStop?.("person")),
+            optionButton("Do not contact this company", () => onStop?.("company")),
+          )
+        : null,
+      menuOpen("stage")
+        ? createElement(
+            "div",
+            { className: "grid grid-cols-2 gap-2 sm:grid-cols-4", "data-menu": "stage" },
+            STAGE_MARKS.map(([mark, label]) => optionButton(label, () => onStage?.(mark), mark)),
+          )
+        : null,
     ),
-    wait ? draftingPanel(wait) : null,
+    flagReason ? flaggedPanel(flagReason) : wait ? draftingPanel(wait) : null,
     coco.blocked.length > 0
       ? createElement(
           "ul",
@@ -273,12 +328,37 @@ export function LeadCardActions({
         createElement("span", { className: "mb-1.5 block text-xs font-semibold tracking-widest text-sandstone uppercase" }, "Email"),
         createElement("textarea", {
           id: `${cardId}-body`,
-          className: "min-h-48 w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal",
-          value: body,
+          rows: Math.min(
+            40,
+            Math.max(
+              8,
+              letter.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 52)), 0) + 1,
+            ),
+          ),
+          className: "w-full rounded-sm border border-line bg-paper px-3 py-2 text-sm text-coal",
+          value: letter,
           readOnly: !editable,
-          onChange: (event: { target: { value: string } }) => onBody?.(event.target.value),
+          onChange: (event: { target: { value: string } }) => {
+            const next = event.target.value;
+            onBody?.(showUnsubscribe && link ? ensureUnsubscribeLink(next, link).body : next);
+          },
         }),
       ),
+      showUnsubscribe && link
+        ? createElement(
+            "p",
+            { className: "mt-3 text-sm text-coal" },
+            createElement(
+              "a",
+              {
+                href: link,
+                className: "font-semibold text-ember hover:underline",
+                "data-unsubscribe": "link",
+              },
+              "unsubscribe",
+            ),
+          )
+        : null,
       createElement(
         "p",
         { className: "mt-2 text-xs text-shale" },
@@ -286,7 +366,6 @@ export function LeadCardActions({
         coco.problems[0] ? ` ${coco.problems[0]}` : "",
       ),
       warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
-      editable ? actionButton("Save copy", onSaveCopy) : null,
     )
       : null,
     sources.length > 0 ? draftSourceList(sources) : null,
@@ -321,8 +400,20 @@ function draftSourceList(sources: DraftSource[]) {
   );
 }
 
-function draftingPanel(kind: "writing" | "late" | "rejected") {
-  const rejected = kind === "rejected";
+function flaggedPanel(reason: string) {
+  return createElement(
+    "div",
+    {
+      className: "border border-line bg-fossil p-4",
+      role: "status",
+      "data-draft-flag": "failed",
+    },
+    createElement("p", { className: "text-sm font-semibold text-coal" }, DRAFT_FLAGGED_COPY),
+    createElement("p", { className: "mt-2 text-sm text-coal" }, reason),
+  );
+}
+
+function draftingPanel(kind: "writing" | "late") {
   const late = kind === "late";
   return createElement(
     "div",
@@ -335,21 +426,15 @@ function draftingPanel(kind: "writing" | "late" | "rejected") {
       "div",
       { className: "flex items-center gap-3" },
       late ? null : spinner(),
-      createElement(
-        "p",
-        { className: "text-sm font-semibold text-coal" },
-        rejected ? DRAFT_REJECTED_COPY : "Coco drafting",
-      ),
+      createElement("p", { className: "text-sm font-semibold text-coal" }, "Coco drafting"),
     ),
-    rejected
-      ? null
-      : createElement(
-          "p",
-          { className: "mt-2 text-sm text-shale" },
-          late
-            ? "The draft has not arrived yet. Coco's next sweep will pick it up."
-            : "This usually takes a few minutes. You can leave this page.",
-        ),
+    createElement(
+      "p",
+      { className: "mt-2 text-sm text-shale" },
+      late
+        ? "The draft has not arrived yet. Coco's next sweep will pick it up."
+        : "This usually takes a few minutes. You can leave this page.",
+    ),
   );
 }
 
@@ -391,6 +476,7 @@ export function emptyCoco(partial: Partial<CocoJoin> = {}): CocoJoin {
     blocked: [],
     skipNote: "",
     draftRejected: null,
+    draftFlag: "",
     unsubscribeAppended: false,
     sources: [],
     canApproveDraft: true,
@@ -398,6 +484,9 @@ export function emptyCoco(partial: Partial<CocoJoin> = {}): CocoJoin {
     canWithdraw: false,
     wordingNote: "",
     unsubscribeUrl: null,
+    humanizerPass: false,
+    humanizerNotes: [],
+    greetingNote: "",
     ...partial,
   };
 }

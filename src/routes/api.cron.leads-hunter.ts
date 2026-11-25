@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { predraftFiledLeads } from "@/lib/coco-predraft";
 import { runHunterBatch } from "@/lib/leads-hunter";
 
 /**
@@ -15,6 +16,14 @@ export const Route = createFileRoute("/api/cron/leads-hunter")({
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
         const result = await runHunterBatch();
+        const filed = result.ok && (!("skipped" in result) || result.skipped === "cards");
+        if (filed) {
+          try {
+            await predraftFiledLeads();
+          } catch {
+            console.info(JSON.stringify({ coco: "predraft", error: "failed" }));
+          }
+        }
         return Response.json(result, { status: result.ok ? 200 : 500 });
       },
     },

@@ -1,20 +1,26 @@
 import type { BotId } from "@/data/bots";
 import type { Lead } from "@/data/desk";
+import { COCO_INTRO_TEAM, draftMentionsTessAndI, usableFirstName } from "@/lib/coco-letter";
+
+function researchLine(org: string, note: string) {
+  const sentence = note.split("\n")[0]?.trim().replace(/\u2014/g, ",").replace(/[.]+$/, "") ?? "";
+  if (!sentence || draftMentionsTessAndI(sentence)) return `I was looking at ${org} before I wrote.`;
+  return `I read this about ${org}: ${sentence}.`;
+}
 
 function firstName(contact: string) {
-  const raw = contact.split("·")[0]?.trim() ?? contact;
-  return raw.split(" ")[0] || "there";
+  return usableFirstName(contact);
 }
 
 export function draftFor(bot: BotId, lead: Lead): { subject: string; body: string } {
   const name = firstName(lead.contact);
-  const named = /\s/.test(lead.contact) && !lead.contact.toLowerCase().includes("unnamed");
+  const named = Boolean(name);
 
   if (bot === "concierge") {
     return {
       subject: `${lead.org} — Unearth Self, Drumheller`,
       body: named
-        ? `${name} — thanks for writing. We take teams of 6–24 for two or three days at Basecamp in Drumheller. Spring 2027 is the first window we are holding.\n\nI am not going to put a price in this mail. Send headcount and a week that works and Tess and I will come back with three dates and what a hold looks like.\n\nChristopher`
+        ? `${name ? `Hi ${name},` : "Hello,"}\n\n${COCO_INTRO_TEAM}.\n\n${researchLine(lead.org, lead.note)}\n\nThe days follow PACE: Play, Adaptability, Connection, Experience. The days are spent at Basecamp in Drumheller.\n\nWe are taking bookings for 2027.\n\nI am not going to put a price in this mail. A short reply is enough. Tell me a week that works and I will come back with three dates and what a hold looks like.\n\nChristopher`
         : `${lead.org} — this is a research file, not a conversation. Do not send until a named person exists. File sits on Christopher’s desk.`,
     };
   }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { LEADS_KEY, emptyBook, useRedisClientForTests } from "./leads-book.ts";
-import { HUNTER_ALARM_KEY, HUNTER_RUN_OPEN_KEY } from "./hunter-config.ts";
+import { HUNTER_ALARM_KEY, HUNTER_DNC_KEY, HUNTER_RUN_OPEN_KEY } from "./hunter-config.ts";
 import { useBuyerJudgeForTests } from "./buyer-judgment.ts";
 import { HUNTER_SEARCH_MODEL } from "./xai-search.ts";
 import { HUNTER_KEY, appendDoNotContact, enrichUnderApolloCap, readHunterDesk, runHunterBatch, useMxLookupForTests } from "./leads-hunter.ts";
@@ -496,5 +496,73 @@ test("the next run alarms when a previous run started and never finished", async
     assert.equal(await redis.get(HUNTER_RUN_OPEN_KEY), null);
   } finally {
     await restore(previousFetch, env);
+  }
+});
+
+test("a stage change can write do-not-contact when that key is already a hash", async () => {
+  const values = new Map<string, unknown>();
+  const hashes = new Map<string, Record<string, string>>();
+  const redis = {
+    async get<T>(key: string): Promise<T | null> {
+      if (hashes.has(key)) throw new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+      return values.has(key) ? (values.get(key) as T) : null;
+    },
+    async set(key: string, value: unknown) {
+      values.set(key, value);
+      return "OK";
+    },
+    async del(key: string) {
+      values.delete(key);
+      hashes.delete(key);
+      return 1;
+    },
+    async hgetall(key: string) {
+      return hashes.get(key) ?? {};
+    },
+    async hset(key: string, field: Record<string, string>) {
+      const hash = hashes.get(key) ?? {};
+      Object.assign(hash, field);
+      hashes.set(key, hash);
+      return 1;
+    },
+    async incr() {
+      return 1;
+    },
+    async decr() {
+      return 0;
+    },
+    async incrby() {
+      return 0;
+    },
+    async expire() {
+      return 1;
+    },
+    async eval() {
+      return 0;
+    },
+  };
+  hashes.set(HUNTER_DNC_KEY, {
+    "kept.example|": JSON.stringify({
+      domain: "kept.example",
+      email: "",
+      reason: "unsubscribe",
+      addedOn: "2026-11-01",
+      until: "never",
+    }),
+  });
+  useRedisClientForTests(redis as never);
+  try {
+    const saved = await appendDoNotContact({
+      domain: "centricsoftware.com",
+      email: "nn.srinivas@centricsoftware.com",
+      reason: "lost",
+      today: "2026-11-25",
+    });
+    assert.equal(saved.some((entry) => entry.domain === "centricsoftware.com" && entry.reason === "lost"), true);
+    assert.equal(saved.some((entry) => entry.domain === "kept.example"), true);
+    assert.equal(hashes.has(HUNTER_DNC_KEY), true);
+    assert.equal(values.has(HUNTER_DNC_KEY), false);
+  } finally {
+    useRedisClientForTests(null);
   }
 });

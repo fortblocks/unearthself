@@ -7,7 +7,7 @@ import {
   COCO_DRAFT_POLL_MS,
   COCO_DRAFT_WAIT_MS,
   companiesOnDesk,
-  DRAFT_REJECTED_COPY,
+  DRAFT_FLAGGED_COPY,
   draftPanelKind,
   draftPollDecision,
   emptyCoco,
@@ -51,6 +51,14 @@ const stages: CocoJoin[] = [
   emptyCoco({ stage: "won", stageLabel: "Won" }),
   emptyCoco({ stage: "closed", stageLabel: "Lost" }),
   emptyCoco({ stage: "draft-skipped", stageLabel: "Draft skipped: No retreat fit", skipNote: "No retreat fit", status: "Coco skipped this draft. No retreat fit" }),
+  emptyCoco({
+    stage: "draft-flagged",
+    stageLabel: "Draft flagged",
+    status: 'The draft says "Tess and I".',
+    draftFlag: 'The draft says "Tess and I".',
+    draftRejected: { at: "2026-11-20T19:40:00.000Z", check: "tess-and-i" },
+    canApproveDraft: false,
+  }),
 ];
 
 function controlLabels(html: string) {
@@ -107,8 +115,12 @@ test("a card with a person and a verified email is listed below 70, and a blocke
     visible.map((row) => row.id),
     ["hold", "watch", "higher"],
   );
-  assert.equal(leadOnDesk(higher, ["This contact is on the do-not-contact list."]), false);
-  assert.equal(leadOnDesk(higher, ["Mail to this address bounced."]), false);
+  assert.equal(leadOnDesk(higher, ["This contact is on the do-not-contact list."]), true);
+  assert.equal(leadOnDesk(higher, ["Mail to this address bounced."]), true);
+  assert.deepEqual(
+    companiesOnDesk([higher], { higher: ["This contact is on the do-not-contact list."] }).map((row) => row.id),
+    ["higher"],
+  );
   assert.equal(leadOnDesk(flagged), false);
   assert.equal(leadOnDesk(blank), false);
 
@@ -212,7 +224,7 @@ test("Coco's skip reason is shown once", () => {
   assert.equal(html.includes("\u2014"), false);
 });
 
-test("a rejected write-back says Coco is retrying, and the skip reason stays one plain line", () => {
+test("a rejected write-back is flagged with the reason, and the skip reason stays one plain line", () => {
   const rejected = emptyCoco({
     stage: "queued",
     stageLabel: "Queued",
@@ -222,11 +234,14 @@ test("a rejected write-back says Coco is retrying, and the skip reason stays one
   });
   assert.equal(cocoAwaitingDraft(rejected), true);
   assert.equal(draftPanelKind(rejected, true), "rejected");
-  assert.equal(DRAFT_REJECTED_COPY, "Coco's draft was rejected, retrying");
+  assert.equal(DRAFT_FLAGGED_COPY, "Draft flagged");
   const html = renderToStaticMarkup(
     createElement(LeadCardActions, { cardId: "card-1", coco: rejected, subject: "", body: "" }),
   );
-  assert.equal(html.includes("draft was rejected, retrying"), true);
+  assert.equal(html.includes("Draft flagged"), true);
+  assert.equal(html.includes("The draft has an em dash."), true);
+  assert.equal(html.includes("data-draft-flag=\"failed\""), true);
+  assert.equal(html.includes("animate-spin"), false);
   assert.equal(html.includes("em-dash"), false);
   assert.equal(html.includes("Coco drafting"), false);
   assert.equal(html.includes("No draft yet."), false);
@@ -251,7 +266,7 @@ test("a rejected write-back says Coco is retrying, and the skip reason stays one
       body: "Hello from Drumheller.",
     }),
   );
-  assert.equal(ready.includes("draft was rejected, retrying"), false);
+  assert.equal(ready.includes("Draft flagged"), false);
   assert.equal(ready.includes("A week in Drumheller"), true);
 });
 
@@ -310,7 +325,9 @@ test("subject and email stay hidden until a draft exists", () => {
       draftWait: "rejected",
     }),
   );
-  assert.equal(retrying.includes("draft was rejected, retrying"), true);
+  assert.equal(retrying.includes("Draft flagged"), true);
+  assert.equal(retrying.includes("The draft has an em dash."), true);
+  assert.equal(retrying.includes("data-draft-flag=\"failed\""), true);
   const skipped = renderToStaticMarkup(
     createElement(LeadCardActions, {
       cardId: "much-better",
@@ -343,7 +360,7 @@ test("subject and email stay hidden until a draft exists", () => {
   assert.equal(shown.includes(">Subject<"), true);
   assert.equal(shown.includes(">Email<"), true);
   assert.equal(shown.includes("A week in Drumheller"), true);
-  assert.equal(controlLabels(shown).includes("Save copy"), true);
+  assert.equal(controlLabels(shown).includes("Save edit"), true);
   assert.equal(shown.includes(">Sources<"), false);
 
   const cited = "https://northwind.example/offsite";
@@ -408,7 +425,7 @@ test("the card notes when the unsubscribe link was added", () => {
     }),
   );
   assert.equal(html.split("The unsubscribe link was added automatically.").length - 1, 1);
-  assert.equal(controlLabels(html).includes("Approve wording"), true);
+  assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });
 
@@ -421,7 +438,7 @@ test("Approve and draft is not offered when the card is not sendable", () => {
       body: "",
     }),
   );
-  assert.equal(controlLabels(hidden).includes("Approve and draft"), false);
+  assert.equal(controlLabels(hidden).includes("Ask Coco to draft"), false);
 
   const shown = renderToStaticMarkup(
     createElement(LeadCardActions, {
@@ -431,7 +448,7 @@ test("Approve and draft is not offered when the card is not sendable", () => {
       body: "",
     }),
   );
-  assert.equal(controlLabels(shown).includes("Approve and draft"), true);
+  assert.equal(controlLabels(shown).includes("Ask Coco to draft"), true);
 });
 
 test("the card page has no Send control and no mail link in any stage", () => {
@@ -449,15 +466,17 @@ test("the card page has no Send control and no mail link in any stage", () => {
       }),
     );
     assert.equal(html.includes("mailto:"), false, coco.stage);
-    const allowed = html.includes("Waiting for your Send in Coco") ? "Waiting for your Send in Coco" : "";
+    assert.equal(html.includes("Hand file"), false, coco.stage);
+    assert.equal(html.includes("Back to unreviewed"), false, coco.stage);
+    assert.equal(html.includes(">Refresh<"), false, coco.stage);
     const labels = controlLabels(html);
     for (const label of labels) {
-      assert.equal(/send/i.test(label), false, `${coco.stage}: ${label}`);
+      assert.equal(label === "Send", false, `${coco.stage}: ${label}`);
     }
-    if (coco.stage === "wording-approved") assert.equal(allowed.length > 0, true);
+    if (coco.stage === "wording-approved") assert.equal(html.includes("chris@badlandsbootcamp.com"), true);
     if (coco.stage === "new") assert.equal(labels.includes("Wrong size"), true);
-    if (coco.stage === "sent") assert.equal(labels.includes("This person"), true);
-    if (coco.stage === "sent") assert.equal(labels.includes("The whole company"), true);
+    if (coco.stage === "sent") assert.equal(labels.includes("Do not contact this person"), true);
+    if (coco.stage === "sent") assert.equal(labels.includes("Do not contact this company"), true);
     if (coco.stage === "queued" || coco.stage === "drafting") {
       assert.equal(html.includes("Coco drafting"), true);
       assert.equal(html.includes("This usually takes a few minutes. You can leave this page."), true);
@@ -468,9 +487,15 @@ test("the card page has no Send control and no mail link in any stage", () => {
       assert.equal(html.includes("Coco drafting"), false);
       assert.equal(html.includes('id="card-1-subject"'), true);
     }
-    if (coco.stage === "draft-ready") assert.equal(labels.includes("Approve wording"), true);
-    if (coco.stage === "wording-approved") assert.equal(labels.includes("Withdraw wording approval"), true);
-    assert.equal(labels.includes("Approve and draft") || coco.stage !== "new", true);
+    if (coco.stage === "draft-ready") assert.equal(labels.includes("Approve to send"), true);
+    if (coco.stage === "draft-flagged") {
+      assert.equal(html.includes("data-draft-flag=\"failed\""), true);
+      assert.equal(html.includes("Draft flagged"), true);
+      assert.equal(html.includes('id="card-1-subject"'), false);
+      assert.equal(html.includes("animate-spin"), false);
+    }
+    if (coco.stage === "wording-approved") assert.equal(labels.includes("Take back send approval"), true);
+    assert.equal(labels.includes("Ask Coco to draft") || coco.stage !== "new", true);
   }
   assert.equal(seen.has("draft-ready"), true);
   assert.equal(seen.has("wording-approved"), true);
@@ -524,8 +549,32 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
   assert.equal(ready.includes("Coco drafting"), false);
   assert.equal(ready.includes("A week in Drumheller"), true);
   assert.equal(ready.includes("Ada, a team of 12 can come for three days."), true);
-  assert.equal(controlLabels(ready).includes("Approve wording"), true);
-  assert.equal(controlLabels(ready).includes("Save copy"), true);
+  assert.equal(controlLabels(ready).includes("Approve to send"), true);
+  assert.equal(controlLabels(ready).includes("Save edit"), true);
+
+  const link = "https://www.unearthself.xyz/u/payload.signature";
+  const linked = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "card-1",
+      coco: emptyCoco({
+        stage: "draft-ready",
+        stageLabel: "Draft ready",
+        touch: 1,
+        subject: "A week in Drumheller",
+        body: `Ada, a team of 12 can come for three days.\n\n<a href="${link}">unsubscribe</a>\nunsubscribe: ${link}`,
+        unsubscribeUrl: link,
+        canApproveDraft: true,
+      }),
+      subject: "A week in Drumheller",
+      body: `Ada, a team of 12 can come for three days.\n\n<a href="${link}">unsubscribe</a>\nunsubscribe: ${link}`,
+    }),
+  );
+  assert.equal(linked.includes(`href="${link}"`), true);
+  assert.equal(linked.includes(">unsubscribe</a>"), true);
+  const textarea = linked.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/);
+  assert.equal(textarea?.[1]?.includes("payload.signature") ?? false, false);
+  assert.equal(controlLabels(linked).includes("Approve to send"), true);
+  assert.equal(controlLabels(linked).includes("Ask Coco to draft"), false);
 
   const blocked = renderToStaticMarkup(
     createElement(LeadCardActions, {
@@ -537,6 +586,38 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
   );
   assert.equal(blocked.includes("Coco drafting"), false);
   assert.equal(blocked.includes("There is no email address."), true);
+});
+
+test("a blocked lead stays on the desk, a bad greeting is flagged, and the humanizer can turn approve off", () => {
+  const blocked = deskCard({ id: "centric" });
+  assert.equal(leadOnDesk(blocked, ["The Apollo email is not verified."]), true);
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "centric",
+      coco: emptyCoco({
+        stage: "draft-ready",
+        stageLabel: "Draft ready",
+        touch: 1,
+        subject: "A week in Drumheller",
+        body: "Hello,",
+        greetingNote: "No usable first name. The greeting is Hello.",
+        humanizerPass: false,
+        humanizerNotes: ["House voice is 120 to 180 words. This is 1."],
+        canApproveWording: false,
+        canApproveDraft: true,
+      }),
+      subject: "A week in Drumheller",
+      body: "Hello,",
+    }),
+  );
+  assert.equal(html.includes("data-greeting=\"neutral\""), true);
+  assert.equal(html.includes("No usable first name. The greeting is Hello."), true);
+  assert.equal(html.includes("data-humanizer=\"fail\""), true);
+  assert.equal(html.includes("Approve to send is off."), true);
+  assert.equal(html.includes("disabled"), true);
+  assert.equal(html.includes("Hand file"), false);
+  assert.equal(html.includes("Back to unreviewed"), false);
+  assert.equal(html.includes("data-send-path=\"explicit\""), true);
 });
 
 test("draft polling stops when the draft arrives, the card closes, or the wait runs out", () => {

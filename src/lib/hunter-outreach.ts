@@ -14,6 +14,8 @@ import {
   loadDoNotContact,
 } from "./leads-hunter.ts";
 import { dncBlocks, type DncEntry, type DncReason, type PipelineMark } from "./hunter-phase.ts";
+import { draftMentionsTessAndI, greetingNameCheck } from "./coco-letter.ts";
+import { humanizerCheck } from "./humanizer.ts";
 import { draftHasPrice, draftProblems } from "./lead-copy.ts";
 import {
   edmontonToday,
@@ -164,6 +166,9 @@ type OutreachDraft = {
   unsubscribeAppended?: boolean;
   /** Replaced wholesale by the next drafted event. A desk edit does not change it. */
   sources?: DraftSource[];
+  /** Section 4 gate. True only when the reject list is clear. */
+  humanizerPass?: boolean;
+  humanizerNotes?: string[];
 };
 
 type OutreachQueue = { queuedAt: string; queuedBy: string };
@@ -280,15 +285,46 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
   return `${UNSUBSCRIBE_ORIGIN}/u/${token}`;
 }
 
+/** HTML anchor. The visible text is the word unsubscribe. The token stays in the href. */
+export function unsubscribeHtml(link: string) {
+  return `<a href="${escapeHtml(link)}">unsubscribe</a>`;
+}
+
+/** Plain-text fallback for a client that does not render the anchor. The URL stays so a reply can still opt out. */
+export function unsubscribePlain(link: string) {
+  return `unsubscribe: ${link}`;
+}
+
+export function unsubscribeBlock(link: string) {
+  return `${unsubscribeHtml(link)}\n${unsubscribePlain(link)}`;
+}
+
 /**
- * The plain-text unsubscribe link send approval already requires.
- * The same URL as unsubscribeUrl. No extra words.
+ * Append the HTML anchor and the plain-text fallback when the draft does not already contain the URL.
+ * A body that already contains the URL is left as it was.
  */
 export function ensureUnsubscribeLink(body: string, link: string): { body: string; appended: boolean } {
   if (body.includes(link)) return { body, appended: false };
+  const block = unsubscribeBlock(link);
   const trimmed = body.replace(/\s+$/g, "");
-  if (!trimmed) return { body: link, appended: true };
-  return { body: `${trimmed}\n\n${link}`, appended: true };
+  if (!trimmed) return { body: block, appended: true };
+  return { body: `${trimmed}\n\n${block}`, appended: true };
+}
+
+/** The letter without the unsubscribe footer, so the desk can show the anchor instead of the raw URL. */
+export function letterWithoutUnsubscribe(body: string, link: string | null) {
+  if (!link) return body;
+  let next = body;
+  const block = `\n\n${unsubscribeBlock(link)}`;
+  if (next.endsWith(block)) next = next.slice(0, -block.length);
+  else {
+    next = next.split(unsubscribeHtml(link)).join("");
+    next = next.split(unsubscribePlain(link)).join("");
+    const trailing = `\n\n${link}`;
+    if (next.endsWith(trailing)) next = next.slice(0, -trailing.length);
+    else if (next.trim() === link) next = "";
+  }
+  return next.replace(/[ \t]+$/g, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "");
 }
 
 function verificationKeys(): Buffer[] {
@@ -556,10 +592,14 @@ function formatCheck(field: string, value: unknown) {
   if (field === "experimentId") return "experimentId";
   if (field === "variantId") return "variantId";
   if (field === "subject" && typeof row?.subject === "string") {
+    if (draftMentionsTessAndI(row.subject)) return "tess-and-i";
+    if (greetingNameCheck(row.subject)) return "greeting-name";
     if (/[\r\n]/.test(row.subject)) return "subject-multiline";
     if (row.subject.length > 200) return "subject-too-long";
   }
   if (field === "body" && typeof row?.body === "string") {
+    if (draftMentionsTessAndI(row.body) || (typeof row.subject === "string" && draftMentionsTessAndI(row.subject))) return "tess-and-i";
+    if (greetingNameCheck(row.body) || (typeof row.subject === "string" && greetingNameCheck(row.subject))) return "greeting-name";
     if (Buffer.byteLength(row.body, "utf8") > 4096) return "body-too-long";
     if (row.body.includes("\u2014")) return "em-dash";
     if (draftHasPrice(row.body)) return "price";
@@ -743,7 +783,15 @@ function parseEvent(value: unknown, now: number): { ok: true; event: ParsedEvent
     event.body = row.body;
   }
   if (type === "drafted") {
-    if (event.body?.includes("\u2014") || draftHasPrice(event.body ?? "")) return { ok: false, field: "body" };
+    if (draftMentionsTessAndI(event.subject ?? "") || greetingNameCheck(event.subject ?? "")) return { ok: false, field: "subject" };
+    if (
+      draftMentionsTessAndI(event.body ?? "") ||
+      greetingNameCheck(event.body ?? "") ||
+      event.body?.includes("\u2014") ||
+      draftHasPrice(event.body ?? "")
+    ) {
+      return { ok: false, field: "body" };
+    }
     if (typeof row.experimentId !== "string" || !slug(row.experimentId, 64)) return { ok: false, field: "experimentId" };
     event.experimentId = row.experimentId;
     if (typeof row.variantId !== "string" || !slug(row.variantId, 64)) return { ok: false, field: "variantId" };
@@ -1345,6 +1393,7 @@ export type CocoStage =
   | "sent"
   | "wording-approved"
   | "draft-ready"
+  | "draft-flagged"
   | "draft-skipped"
   | "drafting"
   | "queued"
@@ -1362,6 +1411,21 @@ function draftAt(record: OutreachRecord | null, touch: number) {
   return record?.drafts?.[touchKey(touch)];
 }
 
+/** A rejection with no later accepted draft. An older rejection does not hide a draft that landed after it. */
+function draftFlagged(record: OutreachRecord | null) {
+  const rejected = record?.draftRejected;
+  if (!rejected?.at || !rejected.check) return false;
+  const touch = nextTouchNumber(record);
+  if (touch == null) return false;
+  const draft = draftAt(record, touch);
+  const hasCopy = Boolean(draft?.subject || draft?.body || draft?.editedBody);
+  if (!hasCopy || !draft?.draftedAt) return true;
+  const drafted = Date.parse(draft.draftedAt);
+  const at = Date.parse(rejected.at);
+  if (!Number.isFinite(drafted) || !Number.isFinite(at)) return true;
+  return at >= drafted;
+}
+
 export function cocoStage(company: Company, record: OutreachRecord | null, now = Date.now(), dnc: DncEntry[] = [], today = edmontonToday()): CocoStage {
   const pipeline = company.pipeline ?? "";
   if (pipeline === "lost") return "closed";
@@ -1374,6 +1438,7 @@ export function cocoStage(company: Company, record: OutreachRecord | null, now =
   if (record?.sendApproved && touch != null && record.sendApproved.touch === touch && (record.touches ?? 0) < record.sendApproved.touch) {
     return "wording-approved";
   }
+  if (draftFlagged(record)) return "draft-flagged";
   if (touch != null && (draftAt(record, touch)?.subject || draftAt(record, touch)?.body)) return "draft-ready";
   const claim = touch != null ? draftAt(record, touch)?.claim : undefined;
   if (claim && claimLive(claim, now)) return "drafting";
@@ -1390,6 +1455,7 @@ export function stageLabel(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "queued") return "Queued";
   if (stage === "drafting") return "Drafting";
   if (stage === "draft-ready") return "Draft ready";
+  if (stage === "draft-flagged") return "Draft flagged";
   if (stage === "wording-approved") return "Wording approved";
   if (stage === "approved") return "Approved";
   if (stage === "booked") return "Booked";
@@ -1405,9 +1471,38 @@ export function stageLabel(stage: CocoStage, record: OutreachRecord | null) {
 
 export function draftEditWarnings(subject: string, body: string) {
   const warnings: string[] = [];
+  if (draftMentionsTessAndI(subject) || draftMentionsTessAndI(body)) warnings.push('This copy says "Tess and I".');
   if (subject.includes("\u2014") || body.includes("\u2014")) warnings.push("This copy has an em dash.");
   if (draftHasPrice(subject) || draftHasPrice(body)) warnings.push("This copy has a price.");
   return warnings;
+}
+
+/** Hard reject for a draft write. The check code is what the card stores. */
+export function draftRejectionCheck(subject: string, body: string): string | null {
+  if (draftMentionsTessAndI(subject) || draftMentionsTessAndI(body)) return "tess-and-i";
+  if (greetingNameCheck(subject) || greetingNameCheck(body)) return "greeting-name";
+  if (subject.includes("\u2014") || body.includes("\u2014")) return "em-dash";
+  if (draftHasPrice(subject) || draftHasPrice(body)) return "price";
+  return null;
+}
+
+/** Plain reason for a failed, errored, or rejected draft. The raw check code is not the sentence. */
+export function draftRejectionReason(check: string) {
+  const known: Record<string, string> = {
+    "tess-and-i": 'The draft says "Tess and I".',
+    "greeting-name": "The greeting name is initials, one or two letters, or all capitals.",
+    "em-dash": "The draft has an em dash.",
+    price: "The draft has a price.",
+    "body-too-long": "The draft is too long.",
+    "subject-too-long": "The subject is too long.",
+    "subject-multiline": "The subject runs over more than one line.",
+    "no-unsubscribe": "The unsubscribe link is not available.",
+    "draft-error": "The draft failed before it could be saved.",
+    rejected: "The draft was rejected.",
+  };
+  if (known[check]) return known[check];
+  if (/^[A-Za-z0-9_-]{1,40}$/.test(check)) return `The draft was rejected (${check}).`;
+  return "The draft was rejected.";
 }
 
 const BLOCK_COPY: Record<string, string> = {
@@ -1457,6 +1552,8 @@ export type CocoJoin = {
   blocked: string[];
   skipNote: string;
   draftRejected: { at: string; check: string } | null;
+  /** Plain sentence when the draft failed, errored, or was rejected. Empty when the draft can be shown. */
+  draftFlag: string;
   unsubscribeAppended: boolean;
   sources: DraftSource[];
   canApproveDraft: boolean;
@@ -1464,6 +1561,11 @@ export type CocoJoin = {
   canWithdraw: boolean;
   wordingNote: string;
   unsubscribeUrl: string | null;
+  /** Section 4. False while the letter fails the humanizer. There is no override. */
+  humanizerPass: boolean;
+  humanizerNotes: string[];
+  /** Set when the letter has to greet with Hello, because the sourced name is unusable. */
+  greetingNote: string;
 };
 
 function shownDraftSources(draft: OutreachDraft | undefined): DraftSource[] {
@@ -1476,6 +1578,7 @@ function statusFor(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "queued") return "Approved, waiting for Coco.";
   if (stage === "drafting") return "Coco is writing the draft.";
   if (stage === "draft-ready") return "Read the draft, then approve the wording.";
+  if (stage === "draft-flagged") return "";
   if (stage === "wording-approved") return "Waiting for your Send in Coco's chat.";
   if (stage === "sent") return `Sent, ${record?.touches ?? 0} of 3.`;
   if (stage === "draft-skipped") return "";
@@ -1490,9 +1593,15 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
   const storedBody = draft?.editedBody ?? draft?.body ?? "";
   const link = unsubscribeUrl(company.id);
   const shown = link && storedBody.trim() && !storedBody.includes(link) ? ensureUnsubscribeLink(storedBody, link) : { body: storedBody, appended: false };
-  const body = shown.body;
   const blocked = cocoBlockReasons(company, record, dnc, today).map((rule) => BLOCK_COPY[rule] ?? rule);
-  const hasDraft = Boolean(draft?.subject || draft?.body || draft?.editedBody);
+  const flagged = stage === "draft-flagged";
+  const draftFlag = flagged ? draftRejectionReason(record?.draftRejected?.check ?? "rejected") : "";
+  const body = flagged ? "" : shown.body;
+  const shownSubject = flagged ? "" : subject;
+  const hasDraft = !flagged && Boolean(draft?.subject || draft?.body || draft?.editedBody);
+  const voice = flagged ? { pass: false, notes: [] as string[] } : humanizerCheck(shownSubject, body);
+  const greetingNote =
+    !flagged && body.startsWith("Hello,") ? "No usable first name. The greeting is Hello." : "";
   const wordingNote = !hasDraft
     ? ""
     : !link
@@ -1503,25 +1612,37 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
   return {
     stage,
     stageLabel: stageLabel(stage, record),
-    status: statusFor(stage, record),
+    status: flagged ? draftFlag : statusFor(stage, record),
     touch,
-    subject,
+    subject: shownSubject,
     body,
-    problems: draft?.problems ?? [],
+    problems: flagged ? [] : (draft?.problems ?? []),
     blocked,
     skipNote: record?.draftSkipped?.reason ?? "",
     draftRejected: record?.draftRejected ?? null,
-    unsubscribeAppended: draft?.unsubscribeAppended === true || shown.appended,
-    sources: shownDraftSources(draft),
+    draftFlag,
+    unsubscribeAppended: flagged ? false : draft?.unsubscribeAppended === true || shown.appended,
+    sources: flagged ? [] : shownDraftSources(draft),
     canApproveDraft:
       emailableLead(company, blocked) &&
       blocked.length === 0 &&
-      (stage === "new" || stage === "approved") &&
-      company.review !== "skipped",
-    canApproveWording: stage === "draft-ready" && wordingNote === "" && hasDraft && link !== null && body.includes(link),
+      company.review !== "skipped" &&
+      (stage === "new" || stage === "approved" || (stage === "draft-ready" && company.review !== "approved")),
+    canApproveWording:
+      stage === "draft-ready" &&
+      company.review === "approved" &&
+      wordingNote === "" &&
+      hasDraft &&
+      link !== null &&
+      body.includes(link) &&
+      voice.pass &&
+      !greetingNameCheck(body),
     canWithdraw: stage === "wording-approved",
-    wordingNote,
+    wordingNote: flagged ? "" : wordingNote,
     unsubscribeUrl: link,
+    humanizerPass: voice.pass,
+    humanizerNotes: voice.notes,
+    greetingNote,
   };
 }
 
@@ -1719,7 +1840,7 @@ export async function handleCardRead(url: URL) {
   }
 }
 
-type WakeFetch = (input: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ status: number }>;
+export type WakeFetch = (input: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ status: number }>;
 
 function webhookReady() {
   const url = (process.env.COCO_DRAFT_WEBHOOK_URL ?? "").trim();
@@ -1749,6 +1870,57 @@ export async function wakeCocoDraft(cardId: string, fetchImpl?: WakeFetch) {
   }
 }
 
+export const COCO_PREDRAFT_BY = "coco-predraft";
+
+/**
+ * Files one background draft. Does not approve the lead and does not send.
+ * A letter that fails the draft check is stored as a flag, with no body.
+ * A card that already has a draft or a flag is left alone.
+ */
+export async function storeBackgroundDraft(input: {
+  company: Company;
+  subject: string;
+  body: string;
+}): Promise<"ready" | "flagged" | "skipped" | "unavailable"> {
+  const redis = await getRedisClient();
+  if (!redis) return "unavailable";
+  const link = unsubscribeUrl(input.company.id);
+  const check = draftRejectionCheck(input.subject, input.body);
+  const now = new Date().toISOString();
+  const stored = await withOutreachLock(redis, input.company.id, async () => {
+    const fresh = (await readOutreachRecord(redis, input.company.id)) ?? { cardId: input.company.id, touches: 0, events: [] };
+    if (fresh.firstSentAt || fresh.sendApproved || fresh.draftSkipped || (fresh.touches ?? 0) > 0) return "skipped" as const;
+    if (fresh.draftRejected?.check) return "flagged" as const;
+    const prior = fresh.drafts?.["1"];
+    if (prior?.subject || prior?.body || prior?.editedBody) return "skipped" as const;
+    const ensured = link && !check ? ensureUnsubscribeLink(input.body, link) : null;
+    const after = ensured ? draftRejectionCheck(input.subject, ensured.body) : check ?? "no-unsubscribe";
+    if (!ensured || after) {
+      fresh.draftRejected = { at: now, check: after || "draft-error" };
+      fresh.queue = fresh.queue ?? { queuedAt: now, queuedBy: COCO_PREDRAFT_BY };
+      await writeOutreachRecord(redis, fresh);
+      return "flagged" as const;
+    }
+    fresh.queue = fresh.queue ?? { queuedAt: now, queuedBy: COCO_PREDRAFT_BY };
+    const drafts = { ...(fresh.drafts ?? {}) };
+    const voice = humanizerCheck(input.subject, ensured.body);
+    drafts["1"] = {
+      subject: input.subject,
+      body: ensured.body,
+      draftedAt: now,
+      problems: draftProblems(ensured.body),
+      unsubscribeAppended: ensured.appended ? true : undefined,
+      humanizerPass: voice.pass,
+      humanizerNotes: voice.notes,
+    };
+    fresh.drafts = drafts;
+    delete fresh.draftRejected;
+    await writeOutreachRecord(redis, fresh);
+    return "ready" as const;
+  });
+  return stored ?? "unavailable";
+}
+
 export type DeskCocoResult =
   | { ok: true; stage: CocoStage; warnings?: string[] }
   | { ok: false; error: string; reasons?: string[] };
@@ -1776,6 +1948,11 @@ export async function approveAndQueueForCoco(input: {
       reasons: [company.status === "stopped" ? "This card is stopped." : "This card cannot be emailed."],
     };
   }
+  if (draftFlagged(existing)) {
+    const blockedTouch = nextTouchNumber(existing);
+    const blockedDraft = blockedTouch != null ? existing?.drafts?.[touchKey(blockedTouch)] : undefined;
+    if (blockedDraft?.subject || blockedDraft?.body || blockedDraft?.editedBody) return { ok: false, error: "draft-flagged" };
+  }
   const reviewedOn = today;
   const nextBook = {
     ...loaded.book,
@@ -1785,11 +1962,23 @@ export async function approveAndQueueForCoco(input: {
   };
   await saveBook(nextBook);
   const approved = nextBook.companies.find((item) => item.id === company.id) ?? { ...company, review: "approved" as const, reviewedOn };
+  const readyTouch = nextTouchNumber(existing);
+  const readyDraft = readyTouch != null ? existing?.drafts?.[touchKey(readyTouch)] : undefined;
+  if (readyDraft && (readyDraft.subject || readyDraft.body || readyDraft.editedBody)) {
+    return { ok: true, stage: cocoStage(approved, existing, Date.now(), dnc, today) };
+  }
   let alreadyQueued = Boolean(existing?.queue?.queuedAt);
   let stored: OutreachRecord | null = null;
   try {
     stored = await withOutreachLock(redis, company.id, async () => {
       const fresh = (await readOutreachRecord(redis, company.id)) ?? { cardId: company.id, touches: 0, events: [] };
+      if (draftFlagged(fresh)) {
+        delete fresh.draftRejected;
+        fresh.queue = { queuedAt: new Date().toISOString(), queuedBy: input.queuedBy };
+        await writeOutreachRecord(redis, fresh);
+        alreadyQueued = false;
+        return fresh;
+      }
       if (fresh.queue?.queuedAt) {
         alreadyQueued = true;
         return fresh;
@@ -1819,6 +2008,8 @@ export async function saveCocoDraftEdit(input: {
   body: string;
 }): Promise<DeskCocoResult> {
   if (input.touch !== 1 && input.touch !== 2 && input.touch !== 3) return { ok: false, error: "touch" };
+  if (draftMentionsTessAndI(input.subject) || draftMentionsTessAndI(input.body)) return { ok: false, error: "tess-and-i" };
+  if (greetingNameCheck(input.subject) || greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
   const redis = await getRedisClient();
   if (!redis) return { ok: false, error: "unavailable" };
   const warnings = draftEditWarnings(input.subject, input.body);
@@ -1845,11 +2036,14 @@ export async function saveCocoDraftEdit(input: {
       return record;
     }
     const drafts = { ...(record.drafts ?? {}) };
+    const voice = humanizerCheck(input.subject, ensured.body);
     drafts[key] = {
       ...draft,
       editedSubject: input.subject,
       editedBody: ensured.body,
       unsubscribeAppended: ensured.appended ? true : draft.unsubscribeAppended,
+      humanizerPass: voice.pass,
+      humanizerNotes: voice.notes,
     };
     record.drafts = drafts;
     await writeOutreachRecord(redis, record);
@@ -1874,6 +2068,9 @@ export async function approveWording(input: {
   if (!company) return { ok: false, error: "unknown-card" };
   const link = unsubscribeUrl(company.id);
   if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
+  if (greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
+  const voice = humanizerCheck(input.subject, input.body);
+  if (!voice.pass) return { ok: false, error: "humanizer", reasons: voice.notes };
   const dnc = await loadDoNotContact(redis);
   let outcome: ApplyResult | null = null;
   try {
@@ -1965,7 +2162,7 @@ function applyUnsubscribeToRecord(record: OutreachRecord, link: string) {
   return true;
 }
 
-/** On read, add the plain-text unsubscribe URL to a stored draft that lacks it. A second read does not write again. */
+/** On read, add the unsubscribe block to a stored draft that lacks the URL. A second read does not write again. */
 async function persistUnsubscribe(redis: LeadsRedis, cardId: string, record: OutreachRecord): Promise<OutreachRecord> {
   const link = unsubscribeUrl(cardId);
   if (!link || !applyUnsubscribeToRecord({ ...record, drafts: record.drafts ? { ...record.drafts } : undefined }, link)) return record;

@@ -494,6 +494,19 @@ function CompanyRow({
           <span className="ml-2 text-xs font-normal tracking-widest text-sandstone uppercase">
             {originLabel(cardSource(company))}
           </span>
+          {cocoById[company.id]?.stage === "draft-flagged" ? (
+            <span className="mt-1 block text-xs font-semibold normal-case tracking-normal text-coal">
+              Draft flagged. {cocoById[company.id]?.draftFlag}
+            </span>
+          ) : null}
+          {cocoById[company.id]?.stage === "draft-ready" ? (
+            <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-shale">Draft ready</span>
+          ) : null}
+          {(cocoById[company.id]?.blocked ?? []).map((reason) => (
+            <span key={reason} className="mt-1 block text-xs font-semibold normal-case tracking-normal text-coal">
+              Cannot send yet. {reason}
+            </span>
+          ))}
         </span>
         <span className="hidden w-28 shrink-0 text-sm text-shale sm:block">{place}</span>
         <span className="hidden w-24 shrink-0 text-sm text-shale sm:block">
@@ -792,6 +805,11 @@ function CompanyPanel({
               toast.error(result.reasons?.join(" ") || "This card cannot be queued.");
               return;
             }
+            if (!result.ok && result.error === "draft-flagged") {
+              toast.error("This draft is flagged. It is not ready.");
+              await refreshCoco();
+              return;
+            }
             if (!result.ok && result.error === "queue") {
               await markApproved();
               toast.error("Could not queue, try again.");
@@ -803,6 +821,7 @@ function CompanyPanel({
             }
             await markApproved();
             await refreshCoco();
+            toast("Asked Coco to draft. Nothing was sent.");
           });
         }}
         onSkip={(reason) => {
@@ -822,33 +841,66 @@ function CompanyPanel({
             } catch (error) {
               toast.error(error instanceof Error ? error.message : "Could not save do-not-contact");
             }
+            toast("Marked as not a fit. Nothing was sent.");
           })();
         }}
         onApproveWording={() => {
-          void approveWording({ data: { cardId: company.id, subject, body } }).then(async (result) => {
+          void (async () => {
+            if (company.review !== "approved") {
+              const queued = await approveAndQueueForCoco({ data: { cardId: company.id } });
+              if (!queued.ok && queued.error === "draft-flagged") {
+                toast.error("This draft is flagged. It is not ready.");
+                await refreshCoco();
+                return;
+              }
+              if (!queued.ok) {
+                toast.error(queued.reasons?.join(" ") || "Could not approve this lead.");
+                return;
+              }
+              await markApproved();
+            }
+            const result = await approveWording({ data: { cardId: company.id, subject, body } });
             if (!result.ok && result.error === "unsubscribe") {
-              toast.error("Approve wording needs the unsubscribe link in the email.");
+              toast.error("Approve to send needs the unsubscribe link in the email.");
+              return;
+            }
+            if (!result.ok && result.error === "humanizer") {
+              toast.error(result.reasons?.join(" ") || "The humanizer check failed. There is no override.");
+              return;
+            }
+            if (!result.ok && result.error === "greeting-name") {
+              toast.error("The greeting name is initials, one or two letters, or all capitals.");
               return;
             }
             if (!result.ok && result.error === "send-approved") {
-              toast.error("Wording is already approved. Withdraw it before approving again.");
+              toast.error("This letter is already approved to send. Take it back before approving again.");
               return;
             }
             if (!result.ok) {
-              toast.error("Could not approve the wording.");
+              toast.error("Could not approve this letter to send.");
               return;
             }
+            toast("Approved to send from chris@badlandsbootcamp.com. The email has not been sent. Send it in Coco's chat.");
             await refreshCoco();
-          });
+          })();
         }}
         onSaveCopy={() => {
           if (!coco.touch) return;
           void saveCocoDraftEdit({ data: { cardId: company.id, touch: coco.touch, subject, body } }).then(async (result) => {
+            if (!result.ok && result.error === "tess-and-i") {
+              toast.error('The draft says "Tess and I".');
+              return;
+            }
+            if (!result.ok && result.error === "greeting-name") {
+              toast.error("The greeting name is initials, one or two letters, or all capitals.");
+              return;
+            }
             if (!result.ok) {
-              toast.error("Could not save the copy.");
+              toast.error("Could not save the edit.");
               return;
             }
             for (const warning of result.warnings ?? []) toast(warning);
+            toast("Saved. This lead stays on the list. Nothing was sent.");
             await refreshCoco();
           });
         }}
@@ -862,6 +914,8 @@ function CompanyPanel({
               });
               return null;
             });
+            const label = mark === "replied" ? "Replied" : mark === "booked" ? "Booked" : mark === "won" ? "Won" : "Lost";
+            toast(`Marked as ${label}. Nothing was sent.`);
             if (mark !== "lost") return;
             try {
               await addDoNotContact({
@@ -885,35 +939,17 @@ function CompanyPanel({
             (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save do-not-contact"),
           );
         }}
-        onUnreview={() => {
-          void onMutate(company.id, () => {
-            useDesk.setState({
-              companies: useDesk.getState().companies.map((row) =>
-                row.id === company.id ? { ...row, review: "unreviewed", skipReason: undefined, reviewedOn: "" } : row,
-              ),
-            });
-            return null;
-          });
-        }}
         onWithdraw={() => {
           void withdrawWording({ data: { cardId: company.id } }).then(async (result) => {
             if (!result.ok) {
               toast.error("Could not withdraw the wording approval.");
               return;
             }
+            toast("Send approval taken back. Nothing was sent.");
             await refreshCoco();
           });
         }}
-        onRefresh={() => {
-          void refreshCoco();
-        }}
         draftWait={draftPanel ?? undefined}
-        onHandFile={() => {
-          void onMutate(company.id, () => {
-            const result = useDesk.getState().fileCompany(company.id);
-            return result === "missing" ? "missing" : null;
-          });
-        }}
       />
 
       {threads.length > 0 ? (
