@@ -326,13 +326,8 @@ export function LeadCardActions({
           ),
           createElement(
             "p",
-            { className: "mt-2 text-sm text-shale", "data-unsubscribe": "preview" },
-            "Email footer (added automatically): ",
-            UNSUBSCRIBE_NOTICE,
-            createElement("br"),
-            OUTREACH_POSTAL_ADDRESS,
-            createElement("br"),
-            OUTREACH_SITE,
+            { className: "mt-1 text-xs leading-tight text-shale", "data-unsubscribe": "preview" },
+            `Email footer (added automatically): ${UNSUBSCRIBE_NOTICE} ${OUTREACH_POSTAL_ADDRESS}. ${OUTREACH_SITE}`,
           ),
           createElement(
             "p",

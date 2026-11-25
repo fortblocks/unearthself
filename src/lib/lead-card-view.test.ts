@@ -453,8 +453,11 @@ test("the card notes when the unsubscribe link was added", () => {
   assert.equal(html.split("Unsubscribe here").length - 1, 1);
   assert.equal(html.includes("contact you again."), true);
   assert.equal(html.includes("<a "), false);
-  const preview = html.match(/data-unsubscribe="preview"[^>]*>[\s\S]*?<\/p>/);
+  const preview = html.match(/<p[^>]*data-unsubscribe="preview"[^>]*>[\s\S]*?<\/p>/);
   assert.equal(preview?.[0]?.includes("underline") ?? true, false);
+  assert.equal(preview?.[0]?.includes("<br") ?? true, false);
+  assert.equal(preview?.[0]?.includes("<a") ?? true, false);
+  assert.match(preview?.[0] ?? "", /text-xs/);
   assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });
