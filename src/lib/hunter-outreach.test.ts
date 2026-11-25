@@ -841,6 +841,10 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     assert.equal(html.includes("<script"), false);
     assert.equal(html.includes("vercel"), false);
     assert.match(html, /method="post"/);
+    assert.match(html, /356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada/);
+    assert.match(html, /www\.unearthself\.xyz/);
+    assert.equal(html.includes("356 4 Street West"), false);
+    assert.match(html, /Unearth Self/);
     assert.equal(redis.values.size, setsBefore);
     assert.equal(JSON.stringify(redis.hashes), hashesBefore);
     const tampered = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
