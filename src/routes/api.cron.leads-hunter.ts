@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { predraftFiledLeads } from "@/lib/coco-predraft";
+import { clearLeakedDrafts } from "@/lib/hunter-outreach";
 import { runHunterBatch } from "@/lib/leads-hunter";
 
 /**
@@ -14,6 +15,11 @@ export const Route = createFileRoute("/api/cron/leads-hunter")({
         const auth = request.headers.get("authorization")?.trim();
         if (!secret || auth !== `Bearer ${secret}`) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        try {
+          await clearLeakedDrafts();
+        } catch {
+          console.info(JSON.stringify({ coco: "cleared-leaked-drafts", error: "failed" }));
         }
         const result = await runHunterBatch();
         const filed = result.ok && (!("skipped" in result) || result.skipped === "cards");

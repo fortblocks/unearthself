@@ -598,6 +598,30 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
   assert.equal(blocked.includes("There is no email address."), true);
 });
 
+test("a leaked draft shows Needs edit and approve stays off", () => {
+  const body =
+    "Hi Mack,\n\nI read this about Affinity Bridge: Research card from Hunter. That is the reason for this letter.\n\nChristopher";
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "C-450",
+      coco: emptyCoco({
+        stage: "draft-ready",
+        stageLabel: "Draft ready",
+        touch: 1,
+        subject: "A week in Drumheller for your team",
+        body,
+        canApproveWording: true,
+      }),
+      subject: "A week in Drumheller for your team",
+      body,
+    }),
+  );
+  assert.equal(html.includes("Needs edit"), true);
+  assert.equal(html.includes("The draft has internal notes or an unfilled slot."), true);
+  assert.equal(html.includes("disabled"), true);
+  assert.equal(controlLabels(html).includes("Approve to send"), true);
+});
+
 test("a blocked lead stays on the desk, a bad greeting is flagged, and the humanizer can turn approve off", () => {
   const blocked = deskCard({ id: "centric" });
   assert.equal(leadOnDesk(blocked, ["The Apollo email is not verified."]), true);

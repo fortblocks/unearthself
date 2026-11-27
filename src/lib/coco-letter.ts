@@ -12,6 +12,9 @@ export const COCO_INTROS = [COCO_INTRO_TEAM, COCO_INTRO_FOUNDER] as const;
 
 export const COCO_LETTER_SUBJECT = "A week in Drumheller for your team";
 
+/** The desk shows this when a card has no verified hook and no signal note. */
+export const NEEDS_RESEARCH_REASON = "Needs research";
+
 /** Rejects the phrase in any casing, including a line break between the words. */
 export function draftMentionsTessAndI(text: string) {
   return /tess\s+and\s+i\b/i.test(text);
@@ -52,36 +55,104 @@ function introFor(company: Company) {
   return sum % 2 === 0 ? COCO_INTRO_TEAM : COCO_INTRO_FOUNDER;
 }
 
-function researchClause(company: Company) {
-  const signal = [...(company.signals ?? [])].reverse().find((item) => item.note?.trim());
-  const raw = (signal?.note ?? company.why ?? "").replace(/\u2014/g, ",").replace(/\s+/g, " ").trim();
-  const sentence = raw.split(/(?<=[.!?])\s/)[0]?.trim().replace(/[.]+$/, "") ?? "";
-  if (!sentence || sentence.length > 90 || draftMentionsTessAndI(sentence) || draftHasPrice(sentence)) {
-    return `I was looking at ${company.org} before I wrote.`;
+/** One line the letter can quote. Em dashes become commas so the house rule still passes. */
+export function cleanLetterReason(text: string) {
+  return text.replace(/\u2014/g, ",").replace(/\s+/g, " ").trim().replace(/[.!?]+$/g, "");
+}
+
+/**
+ * The only company-specific lines a letter may use.
+ * A verified hook has text, a source URL, and a source date. Otherwise the latest signal note.
+ * The card's why field is never a reason.
+ */
+export function letterSpecifics(company: Pick<Company, "hook" | "signals">): { hookText: string; signalNote: string } {
+  const hook = company.hook;
+  const rawHook = hook?.text?.trim() && hook.sourceUrl?.trim() && hook.sourceDate?.trim() ? hook.text : "";
+  const rawSignal = [...(company.signals ?? [])].reverse().find((item) => item.note?.trim())?.note ?? "";
+  return { hookText: cleanLetterReason(rawHook), signalNote: cleanLetterReason(rawSignal) };
+}
+
+/**
+ * Internal labels and unfilled slots. Whole words, so "nullable" and "coconut" are not hits.
+ * A company name is removed first, including the name after "I read this about".
+ * URLs are removed first so a signed unsubscribe token cannot look like the word "null".
+ */
+const INTERNAL_LEAK: RegExp[] = [
+  /\bresearch card\b/i,
+  /\bhunter\b/i,
+  /\bcoco\b/i,
+  /\bpublic pages show\b/i,
+  /\bnightly ingest\b/i,
+  /\$\{/,
+  /\{\{/,
+  /\[\s*\]/,
+  /\bTODO\b/i,
+  /\bundefined\b/i,
+  /\bnull\b/i,
+  /\bplaceholder\b/i,
+];
+
+function withoutUrls(text: string) {
+  return text.replace(/https?:\/\/[^\s<>"']+/gi, " ");
+}
+
+function shieldNames(text: string, names: readonly string[]) {
+  let next = text;
+  const unique = [...names].filter((name) => name.trim().length >= 3).sort((a, b) => b.length - a.length);
+  for (const name of unique) {
+    const trimmed = name.trim();
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    next = next.replace(new RegExp(escaped, "gi"), " ");
   }
-  return `I read this about ${company.org}: ${sentence}.`;
+  return next;
+}
+
+function namesToShield(text: string, org?: string) {
+  const names: string[] = [];
+  const add = (name: string) => {
+    const trimmed = name.trim().replace(/[.,;:]+$/g, "").trim();
+    if (trimmed.length < 3) return;
+    if (names.some((have) => have.toLowerCase() === trimmed.toLowerCase())) return;
+    names.push(trimmed);
+  };
+  if (org) add(org);
+  for (const match of text.matchAll(/\bI (?:read this about|was looking at)\s+([^:\n]+)/gi)) {
+    add(match[1] ?? "");
+  }
+  return names;
+}
+
+export function draftLeaksInternal(text: string, org?: string) {
+  const prose = withoutUrls(text);
+  const shielded = shieldNames(prose, namesToShield(prose, org));
+  return INTERNAL_LEAK.some((pattern) => pattern.test(shielded));
 }
 
 /**
  * The desk letter Coco can file before anyone presses approve.
- * One approved intro, one company-specific line, PACE, 2027 bookings, and a short reply.
+ * One approved intro, one sourced line, and PACE. No season claim and no internal label.
+ * Returns null when there is no verified hook and no signal note. Nothing is drafted then.
  * The unsubscribe link is added later, by the draft store.
  */
-export function cocoLetter(company: Company): { subject: string; body: string } {
+export function cocoLetter(company: Company): { subject: string; body: string } | null {
+  const { hookText, signalNote } = letterSpecifics(company);
+  const reason = hookText || signalNote;
+  if (!reason) return null;
+  if (draftLeaksInternal(reason, company.org) || draftMentionsTessAndI(reason) || draftHasPrice(reason)) return null;
   const name = usableFirstName(company.buyerName);
   const greeting = name ? `Hi ${name},` : "Hello,";
   const body = `${greeting}
 
 ${introFor(company)}.
 
-${researchClause(company)} That is the reason for this letter.
+I read this about ${company.org}: ${reason}. That is the reason for this letter.
 
 The days follow PACE: Play, Adaptability, Connection, Experience. Play is the start, out on the land, before the group has to perform. Adaptability is the middle, when the route changes and the team has to choose together. Connection is the work between people. Experience is the last stretch, when the week has a shape they can take home. The evenings end at Basecamp in Drumheller.
 
-We are taking bookings for 2027. I am holding the first window of that year.
-
-A short reply is enough. If a week in that window is useful for the people you are responsible for, tell me and I will come back with three dates. If it is not, say so and I will leave the file quiet.
+A short reply is enough. If a week is useful for the people you are responsible for, tell me and I will come back with three dates. If it is not, say so and I will leave the file quiet.
 
 Christopher`;
+  if (draftLeaksInternal(`${COCO_LETTER_SUBJECT}\n${body}`, company.org)) return null;
+  if (draftMentionsTessAndI(body) || greetingNameCheck(body) || draftHasPrice(body)) return null;
   return { subject: COCO_LETTER_SUBJECT, body };
 }

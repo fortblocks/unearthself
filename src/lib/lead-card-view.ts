@@ -86,6 +86,7 @@ export function companiesOnDesk<T extends Company>(
 /** Stage and status stay free of the reason. The stored skip reason is one plain line. */
 export function skipReasonLines(coco: { stage: string; stageLabel: string; status: string; skipNote: string }) {
   const reason = coco.skipNote.trim();
+  if (coco.stageLabel === "Needs research" || reason === "Needs research") return { stage: "Needs research", status: "", note: "" };
   if (coco.stage !== "draft-skipped" || !reason) return { stage: coco.stageLabel, status: coco.status, note: "" };
   const stage = coco.stageLabel.includes(reason) ? "Draft skipped" : coco.stageLabel;
   const status = coco.status.includes(reason) ? "" : coco.status;
@@ -202,7 +203,7 @@ export function LeadCardActions({
 }: LeadCardActionsProps) {
   const [fitOpen, setFitOpen] = useState(false);
   const warnings = draftEditWarnings(subject, body);
-  const voice = humanizerCheck(subject, body);
+  const voice = humanizerCheck(subject, body, { hookText: coco.letterHook, signalNote: coco.letterSignal });
   const badGreeting = greetingNameCheck(body);
   const letterCheck = draftRejectionCheck(subject, body);
   const editable = coco.stage === "draft-ready" || coco.stage === "wording-approved" || coco.stage === "draft-flagged";

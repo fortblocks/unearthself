@@ -872,6 +872,10 @@ function CompanyPanel({
               toast.error("The greeting name is initials, one or two letters, or all capitals.");
               return;
             }
+            if (!result.ok && result.error === "internal-text") {
+              toast.error("The draft has internal notes or an unfilled slot.");
+              return;
+            }
             if (!result.ok && result.error === "tess-and-i") {
               toast.error('The draft says "Tess and I".');
               return;
@@ -895,6 +899,10 @@ function CompanyPanel({
         onSaveCopy={() => {
           if (!coco.touch) return;
           void saveCocoDraftEdit({ data: { cardId: company.id, touch: coco.touch, subject, body } }).then(async (result) => {
+            if (!result.ok && result.error === "internal-text") {
+              toast.error("The draft has internal notes or an unfilled slot.");
+              return;
+            }
             if (!result.ok && result.error === "tess-and-i") {
               toast.error('The draft says "Tess and I".');
               return;

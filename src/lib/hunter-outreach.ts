@@ -14,7 +14,13 @@ import {
   loadDoNotContact,
 } from "./leads-hunter.ts";
 import { dncBlocks, type DncEntry, type DncReason, type PipelineMark } from "./hunter-phase.ts";
-import { draftMentionsTessAndI, greetingNameCheck } from "./coco-letter.ts";
+import {
+  draftLeaksInternal,
+  draftMentionsTessAndI,
+  greetingNameCheck,
+  letterSpecifics,
+  NEEDS_RESEARCH_REASON,
+} from "./coco-letter.ts";
 import { humanizerCheck } from "./humanizer.ts";
 import { draftHasPrice, draftProblems } from "./lead-copy.ts";
 import {
@@ -537,7 +543,8 @@ async function rememberDraftRejection(cardId: string, check: string, copy?: { su
     const loaded = await loadBook();
     if (loaded.storage !== "redis") return;
     if (!loaded.book.companies.some((company) => company.id === cardId)) return;
-    const fixable = check === "tess-and-i" || check === "greeting-name" || check === "em-dash" || check === "price";
+    const fixable =
+      check === "tess-and-i" || check === "greeting-name" || check === "em-dash" || check === "price" || check === "internal-text";
     await withOutreachLock(redis, cardId, async () => {
       const existing = await readOutreachRecord(redis, cardId);
       if (!existing) return;
@@ -620,12 +627,14 @@ function formatCheck(field: string, value: unknown) {
   if (field === "experimentId") return "experimentId";
   if (field === "variantId") return "variantId";
   if (field === "subject" && typeof row?.subject === "string") {
+    if (draftLeaksInternal(row.subject) || (typeof row.body === "string" && draftLeaksInternal(row.body))) return "internal-text";
     if (draftMentionsTessAndI(row.subject)) return "tess-and-i";
     if (greetingNameCheck(row.subject)) return "greeting-name";
     if (/[\r\n]/.test(row.subject)) return "subject-multiline";
     if (row.subject.length > 200) return "subject-too-long";
   }
   if (field === "body" && typeof row?.body === "string") {
+    if (draftLeaksInternal(row.body) || (typeof row.subject === "string" && draftLeaksInternal(row.subject))) return "internal-text";
     if (draftMentionsTessAndI(row.body) || (typeof row.subject === "string" && draftMentionsTessAndI(row.subject))) return "tess-and-i";
     if (greetingNameCheck(row.body) || (typeof row.subject === "string" && greetingNameCheck(row.subject))) return "greeting-name";
     if (Buffer.byteLength(row.body, "utf8") > 4096) return "body-too-long";
@@ -809,6 +818,11 @@ function parseEvent(value: unknown, now: number): { ok: true; event: ParsedEvent
     if (typeof row.body !== "string") return { ok: false, field: "body" };
     if (Buffer.byteLength(row.body, "utf8") > 4096) return { ok: false, field: "body" };
     event.body = row.body;
+  }
+  if (type === "drafted" || type === "send_approved") {
+    if (draftLeaksInternal(event.subject ?? "") || draftLeaksInternal(event.body ?? "")) {
+      return { ok: false, field: draftLeaksInternal(event.body ?? "") ? "body" : "subject" };
+    }
   }
   if (type === "drafted") {
     if (draftMentionsTessAndI(event.subject ?? "") || greetingNameCheck(event.subject ?? "")) return { ok: false, field: "subject" };
@@ -1493,7 +1507,7 @@ export function stageLabel(stage: CocoStage, record: OutreachRecord | null) {
   if (stage === "opted-out") return "Opted out";
   if (stage === "bounced") return "Bounced";
   if (stage === "blocked") return "Blocked";
-  if (stage === "draft-skipped") return "Draft skipped";
+  if (stage === "draft-skipped") return record?.draftSkipped?.reason === NEEDS_RESEARCH_REASON ? NEEDS_RESEARCH_REASON : "Draft skipped";
   return "Unreviewed";
 }
 
@@ -1506,7 +1520,8 @@ export function draftEditWarnings(subject: string, body: string) {
 }
 
 /** Hard reject for a draft write. The check code is what the card stores. */
-export function draftRejectionCheck(subject: string, body: string): string | null {
+export function draftRejectionCheck(subject: string, body: string, org?: string): string | null {
+  if (draftLeaksInternal(subject, org) || draftLeaksInternal(body, org)) return "internal-text";
   if (draftMentionsTessAndI(subject) || draftMentionsTessAndI(body)) return "tess-and-i";
   if (greetingNameCheck(subject) || greetingNameCheck(body)) return "greeting-name";
   if (subject.includes("\u2014") || body.includes("\u2014")) return "em-dash";
@@ -1517,6 +1532,7 @@ export function draftRejectionCheck(subject: string, body: string): string | nul
 /** Plain reason for a failed, errored, or rejected draft. The raw check code is not the sentence. */
 export function draftRejectionReason(check: string) {
   const known: Record<string, string> = {
+    "internal-text": "The draft has internal notes or an unfilled slot.",
     "tess-and-i": 'The draft says "Tess and I".',
     "greeting-name": "The greeting name is initials, one or two letters, or all capitals.",
     "em-dash": "The draft has an em dash.",
@@ -1594,6 +1610,10 @@ export type CocoJoin = {
   humanizerNotes: string[];
   /** Set when the letter has to greet with Hello, because the sourced name is unusable. */
   greetingNote: string;
+  /** Clean hook text. The letter has to contain this when it is set. */
+  letterHook?: string;
+  /** Clean signal note. The letter has to contain this, or the hook, when it is set. */
+  letterSignal?: string;
 };
 
 function shownDraftSources(draft: OutreachDraft | undefined): DraftSource[] {
@@ -1627,7 +1647,9 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
   const body = shown.body;
   const shownSubject = subject;
   const hasDraft = Boolean(draft?.subject || draft?.body || draft?.editedBody);
-  const voice = humanizerCheck(shownSubject, body);
+  const specifics = letterSpecifics(company);
+  const voice = humanizerCheck(shownSubject, body, specifics);
+  const letterCheck = hasDraft ? draftRejectionCheck(shownSubject, body, company.org) : null;
   const greetingNote = body.startsWith("Hello,") ? "No usable first name. The greeting is Hello." : "";
   const wordingNote = !hasDraft
     ? ""
@@ -1663,6 +1685,7 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
       link !== null &&
       body.includes(link) &&
       voice.pass &&
+      !letterCheck &&
       !greetingNameCheck(body),
     canWithdraw: stage === "wording-approved",
     wordingNote,
@@ -1670,6 +1693,8 @@ export function cocoJoin(company: Company, record: OutreachRecord | null, dnc: D
     humanizerPass: voice.pass,
     humanizerNotes: voice.notes,
     greetingNote,
+    letterHook: specifics.hookText,
+    letterSignal: specifics.signalNote,
   };
 }
 
@@ -1912,7 +1937,7 @@ export async function storeBackgroundDraft(input: {
   const redis = await getRedisClient();
   if (!redis) return "unavailable";
   const link = unsubscribeUrl(input.company.id);
-  const check = draftRejectionCheck(input.subject, input.body);
+  const check = draftRejectionCheck(input.subject, input.body, input.company.org);
   const now = new Date().toISOString();
   const stored = await withOutreachLock(redis, input.company.id, async () => {
     const fresh = (await readOutreachRecord(redis, input.company.id)) ?? { cardId: input.company.id, touches: 0, events: [] };
@@ -1921,7 +1946,7 @@ export async function storeBackgroundDraft(input: {
     const prior = fresh.drafts?.["1"];
     if (prior?.subject || prior?.body || prior?.editedBody) return "skipped" as const;
     const ensured = link && !check ? ensureUnsubscribeLink(input.body, link) : null;
-    const after = ensured ? draftRejectionCheck(input.subject, ensured.body) : check ?? "no-unsubscribe";
+    const after = ensured ? draftRejectionCheck(input.subject, ensured.body, input.company.org) : check ?? "no-unsubscribe";
     if (!ensured || after) {
       fresh.draftRejected = { at: now, check: after || "draft-error" };
       fresh.queue = fresh.queue ?? { queuedAt: now, queuedBy: COCO_PREDRAFT_BY };
@@ -1933,7 +1958,7 @@ export async function storeBackgroundDraft(input: {
     }
     fresh.queue = fresh.queue ?? { queuedAt: now, queuedBy: COCO_PREDRAFT_BY };
     const drafts = { ...(fresh.drafts ?? {}) };
-    const voice = humanizerCheck(input.subject, ensured.body);
+    const voice = humanizerCheck(input.subject, ensured.body, letterSpecifics(input.company));
     drafts["1"] = {
       subject: input.subject,
       body: ensured.body,
@@ -1949,6 +1974,126 @@ export async function storeBackgroundDraft(input: {
     return "ready" as const;
   });
   return stored ?? "unavailable";
+}
+
+function draftCopy(draft: OutreachDraft | undefined) {
+  if (!draft) return [];
+  return [draft.subject, draft.body, draft.editedSubject, draft.editedBody].filter(
+    (text): text is string => typeof text === "string" && text.trim().length > 0,
+  );
+}
+
+function recordAlreadySent(record: OutreachRecord) {
+  if (record.firstSentAt || (record.touches ?? 0) > 0) return true;
+  return Object.values(record.drafts ?? {}).some((draft) => Boolean(draft?.sent));
+}
+
+function recordLeaks(record: OutreachRecord, org: string) {
+  for (const draft of Object.values(record.drafts ?? {})) {
+    if (draft?.sent) continue;
+    if (draftCopy(draft).some((text) => draftLeaksInternal(text, org))) return true;
+  }
+  if (!record.sendApproved) return false;
+  return draftLeaksInternal(record.sendApproved.subject, org) || draftLeaksInternal(record.sendApproved.body, org);
+}
+
+/** Marks a card that has nothing specific to quote. Does not write a draft and does not send. */
+export async function markNeedsResearch(cardId: string) {
+  const redis = await getRedisClient();
+  if (!redis) return false;
+  const stored = await withOutreachLock(redis, cardId, async () => {
+    const fresh = (await readOutreachRecord(redis, cardId)) ?? { cardId, touches: 0, events: [] };
+    if (recordAlreadySent(fresh) || fresh.sendApproved) return false;
+    const draft = fresh.drafts?.["1"];
+    if (draft?.subject || draft?.body || draft?.editedSubject || draft?.editedBody || draft?.sent) return false;
+    if (fresh.draftSkipped?.reason === NEEDS_RESEARCH_REASON) return false;
+    fresh.draftSkipped = { reason: NEEDS_RESEARCH_REASON, touch: 1, at: new Date().toISOString() };
+    await writeOutreachRecord(redis, fresh);
+    return true;
+  });
+  return stored === true;
+}
+
+export type ClearedLeaks = { count: number; companies: string[] };
+
+/**
+ * Clears stored draft text that contains an internal label. The card, its why, and its research stay.
+ * A sent letter is left as it was. Nothing here sends mail.
+ */
+export async function clearLeakedDrafts(): Promise<ClearedLeaks> {
+  const empty: ClearedLeaks = { count: 0, companies: [] };
+  const redis = await getRedisClient();
+  if (!redis) return empty;
+  const loaded = await loadBook();
+  if (loaded.storage !== "redis") return empty;
+  const records = await readOutreachMap(redis);
+  const cleared: string[] = [];
+  const clearedIds = new Set<string>();
+  for (const company of loaded.book.companies) {
+    const record = records.get(company.id);
+    if (!record || recordAlreadySent(record) || !recordLeaks(record, company.org)) continue;
+    const did = await withOutreachLock(redis, company.id, async () => {
+      const fresh = await readOutreachRecord(redis, company.id);
+      if (!fresh || recordAlreadySent(fresh) || !recordLeaks(fresh, company.org)) return false;
+      const drafts = { ...(fresh.drafts ?? {}) };
+      for (const key of ["1", "2", "3"] as const) {
+        const draft = drafts[key];
+        if (!draft || draft.sent) continue;
+        if (!draftCopy(draft).some((text) => draftLeaksInternal(text, company.org))) continue;
+        const next: OutreachDraft = { ...draft };
+        delete next.subject;
+        delete next.body;
+        delete next.editedSubject;
+        delete next.editedBody;
+        delete next.problems;
+        delete next.humanizerPass;
+        delete next.humanizerNotes;
+        drafts[key] = next;
+      }
+      fresh.drafts = drafts;
+      if (
+        fresh.sendApproved &&
+        (draftLeaksInternal(fresh.sendApproved.subject, company.org) || draftLeaksInternal(fresh.sendApproved.body, company.org))
+      ) {
+        fresh.sendApproved = undefined;
+      }
+      delete fresh.draftRejected;
+      const specifics = letterSpecifics(company);
+      if (!specifics.hookText && !specifics.signalNote) {
+        fresh.draftSkipped = { reason: NEEDS_RESEARCH_REASON, touch: 1, at: new Date().toISOString() };
+      }
+      await writeOutreachRecord(redis, fresh);
+      return true;
+    });
+    if (did) {
+      cleared.push(company.org);
+      clearedIds.add(company.id);
+    }
+  }
+  const latest = await loadBook();
+  if (latest.storage === "redis") {
+    let bookChanged = false;
+    const companies = latest.book.companies.map((company) => {
+      const record = records.get(company.id);
+      if (record && recordAlreadySent(record)) return company;
+      const subjectLeaks = Boolean(company.draftSubject.trim()) && draftLeaksInternal(company.draftSubject, company.org);
+      const bodyLeaks = Boolean(company.draftBody.trim()) && draftLeaksInternal(company.draftBody, company.org);
+      if (!subjectLeaks && !bodyLeaks) return company;
+      bookChanged = true;
+      if (!clearedIds.has(company.id)) {
+        cleared.push(company.org);
+        clearedIds.add(company.id);
+      }
+      return {
+        ...company,
+        draftSubject: subjectLeaks ? "" : company.draftSubject,
+        draftBody: bodyLeaks ? "" : company.draftBody,
+      };
+    });
+    if (bookChanged) await saveBook({ ...latest.book, companies });
+  }
+  console.info(JSON.stringify({ coco: "cleared-leaked-drafts", count: cleared.length, companies: cleared }));
+  return { count: cleared.length, companies: cleared };
 }
 
 export type DeskCocoResult =
@@ -2050,6 +2195,7 @@ export async function saveCocoDraftEdit(input: {
   body: string;
 }): Promise<DeskCocoResult> {
   if (input.touch !== 1 && input.touch !== 2 && input.touch !== 3) return { ok: false, error: "touch" };
+  if (draftLeaksInternal(input.subject) || draftLeaksInternal(input.body)) return { ok: false, error: "internal-text" };
   if (draftMentionsTessAndI(input.subject) || draftMentionsTessAndI(input.body)) return { ok: false, error: "tess-and-i" };
   if (greetingNameCheck(input.subject) || greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
   const redis = await getRedisClient();
@@ -2078,7 +2224,9 @@ export async function saveCocoDraftEdit(input: {
       return record;
     }
     const drafts = { ...(record.drafts ?? {}) };
-    const voice = humanizerCheck(input.subject, ensured.body);
+    const loaded = await loadBook();
+    const company = loaded.storage === "redis" ? loaded.book.companies.find((item) => item.id === input.cardId) : undefined;
+    const voice = humanizerCheck(input.subject, ensured.body, company ? letterSpecifics(company) : undefined);
     drafts[key] = {
       ...draft,
       editedSubject: input.subject,
@@ -2110,10 +2258,10 @@ export async function approveWording(input: {
   if (!company) return { ok: false, error: "unknown-card" };
   const link = unsubscribeUrl(company.id);
   if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
-  const rejected = draftRejectionCheck(input.subject, input.body);
+  const rejected = draftRejectionCheck(input.subject, input.body, company.org);
   if (rejected) return { ok: false, error: rejected };
   if (greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
-  const voice = humanizerCheck(input.subject, input.body);
+  const voice = humanizerCheck(input.subject, input.body, letterSpecifics(company));
   if (!voice.pass) return { ok: false, error: "humanizer", reasons: voice.notes };
   const dnc = await loadDoNotContact(redis);
   let outcome: ApplyResult | null = null;

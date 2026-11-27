@@ -609,6 +609,11 @@ function nextCompanyId(rows: { id: string }[]) {
   return `C-${String(n).padStart(3, "0")}`;
 }
 
+/** A filed note, or blank. Never an internal ingest label. */
+export function ingestWhy(why: string | undefined) {
+  return why?.trim() ?? "";
+}
+
 /** Deduplicate on domain. Unsourced emails are dropped. Never invented. */
 export function mergeScoutRows(
   companies: Company[],
@@ -674,7 +679,7 @@ export function mergeScoutRows(
       industry: coerceIndustry(row.industry),
       sizeBand: coerceSize(row.sizeBand),
       sourceUrl: row.sourceUrl || "",
-      why: row.why || "Nightly ingest. Research card.",
+      why: ingestWhy(row.why),
       whySources: incomingWhy,
       signals,
       buyerName: row.buyer?.name ?? "",

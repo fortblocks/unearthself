@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { COCO_INTROS, cocoLetter, draftMentionsTessAndI, greetingNameCheck, usableFirstName } from "./coco-letter.ts";
+import {
+  COCO_INTROS,
+  COCO_LETTER_SUBJECT,
+  cocoLetter,
+  draftLeaksInternal,
+  draftMentionsTessAndI,
+  greetingNameCheck,
+  letterSpecifics,
+  usableFirstName,
+} from "./coco-letter.ts";
 import { humanizerCheck } from "./humanizer.ts";
 import { predraftFiledLeads } from "./coco-predraft.ts";
 import { HUNTER_DNC_KEY } from "./hunter-config.ts";
@@ -17,6 +26,7 @@ import {
   draftRejectionCheck,
   readCocoCard,
   saveCocoDraftEdit,
+  clearLeakedDrafts,
   storeBackgroundDraft,
   unsubscribeBlock,
   unsubscribeUrl,
@@ -24,9 +34,10 @@ import {
   withdrawWording,
 } from "./hunter-outreach.ts";
 import { mergeHunterCompanies, spendCounterKey } from "./hunter-phase.ts";
+import { hunterCardWhy } from "./leads-hunter.ts";
 import { LEADS_KEY, emptyBook, saveBook, upsertCompany, useRedisClientForTests, type LeadsRedis } from "./leads-book.ts";
 import { draftProblems, refreshUnsentDrafts } from "./lead-copy.ts";
-import { edmontonToday, type Company } from "./lead-score.ts";
+import { edmontonToday, ingestWhy, type Company } from "./lead-score.ts";
 
 const WRITE = "w".repeat(32);
 const CARDS = "c".repeat(32);
@@ -101,8 +112,17 @@ function company(partial: Partial<Company> & { id: string }): Company {
     industry: partial.industry ?? "energy",
     sizeBand: partial.sizeBand ?? "80-800",
     sourceUrl: "https://northwind.example/about",
-    why: "The about page names a leadership offsite.",
+    why: partial.why ?? "The about page names a leadership offsite.",
     whySources: [{ url: "https://northwind.example/about", label: "About" }],
+    hook:
+      "hook" in partial
+        ? partial.hook
+        : {
+            text: "The about page names a leadership offsite.",
+            sourceUrl: "https://northwind.example/about",
+            sourceDate: "2026-11-01",
+            kind: "offsite",
+          },
     buyerName: partial.buyerName ?? "Ada North",
     buyerTitle: "People Lead",
     email: partial.email ?? "ada@northwind.example",
@@ -187,6 +207,7 @@ function letter(cardId: string, type: string, extra: Record<string, unknown> = {
 
 function approvableCopy(card: Company, link: string) {
   const draft = cocoLetter(card);
+  if (!draft) throw new Error("expected a letter");
   return { subject: draft.subject, body: `${draft.body}\n\n${unsubscribeBlock(link)}` };
 }
 
@@ -973,13 +994,13 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
 
     await seed(redis, [company({ id: "desk", draftSubject: "stale subject", draftBody: "stale body" })]);
     assert.equal((await approveAndQueueForCoco({ cardId: "desk", queuedBy: "chris@unearthself.xyz" })).ok, true);
-    assert.equal((await post(letter("desk", "drafted", { subject: "Coco subject", body: "Coco body" }))).status, 200);
+    assert.equal((await post(letter("desk", "drafted", { subject: "Desk subject", body: "Desk body" }))).status, 200);
     const loaded = await redis.get<{ companies: Company[] }>(LEADS_KEY);
     const stale = loaded?.companies[0];
     assert.ok(stale);
     await saveBook(upsertCompany({ ...emptyBook(), companies: loaded?.companies ?? [] }, { ...stale, draftSubject: "", draftBody: "", why: "Edited on the desk." }));
     const kept = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.desk ?? "{}") as { drafts?: { "1"?: { subject?: string } }; queue?: { queuedAt?: string } };
-    assert.equal(kept.drafts?.["1"]?.subject, "Coco subject");
+    assert.equal(kept.drafts?.["1"]?.subject, "Desk subject");
     assert.ok(kept.queue?.queuedAt);
     const refreshed = refreshUnsentDrafts([{ ...stale, draftSubject: "leave me" }], [], new Set(["desk"]));
     assert.equal(refreshed.companies[0]?.draftSubject, "leave me");
@@ -1010,17 +1031,31 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
   });
 
   test("a background letter uses one approved intro and never says Tess and I", () => {
-    const card = company({ id: "campfire", org: "Northwind Example" });
+    const card = company({
+      id: "campfire",
+      org: "Northwind Example",
+      why: "Research card from Hunter. Public pages show: Distributed or high-performing team.",
+    });
     const letter = cocoLetter(card);
+    assert.ok(letter);
     const chosen = COCO_INTROS.filter((intro) => letter.body.includes(intro));
     assert.equal(chosen.length, 1);
     assert.equal(letter.body.includes("Northwind Example"), true);
+    assert.equal(letter.body.includes("The about page names a leadership offsite"), true);
+    assert.equal(letter.body.includes("Research card"), false);
+    assert.equal(letter.body.includes("Hunter"), false);
     assert.equal(letter.body.includes("Play, Adaptability, Connection, Experience"), true);
-    assert.equal(letter.body.includes("We are taking bookings for 2027."), true);
+    assert.equal(letter.body.includes("Play is the start, out on the land"), true);
+    assert.equal(letter.body.includes("We are taking bookings for 2027."), false);
+    assert.equal(/first window|that window/i.test(letter.body), false);
     assert.equal(letter.body.includes("A short reply is enough."), true);
+    assert.equal(letter.body.includes("three dates"), true);
     assert.equal(draftMentionsTessAndI(letter.subject) || draftMentionsTessAndI(letter.body), false);
     assert.equal(letter.body.includes("\u2014"), false);
-    assert.equal(draftRejectionCheck(letter.subject, letter.body), null);
+    assert.equal(draftRejectionCheck(letter.subject, letter.body, card.org), null);
+    assert.equal(draftLeaksInternal(letter.body, card.org), false);
+    assert.equal(humanizerCheck(letter.subject, letter.body).pass, false);
+    assert.equal(humanizerCheck(letter.subject, letter.body, letterSpecifics(card)).pass, true);
     const link = unsubscribeUrl(card.id);
     assert.ok(link);
     const stored = `${letter.body}\n\n${unsubscribeBlock(link)}`;
@@ -1164,6 +1199,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(usableFirstName("nn.srinivas@centricsoftware.com"), "");
     assert.equal(usableFirstName("Ada North"), "Ada");
     const neutral = cocoLetter(company({ id: "centric", buyerName: "NN Srinivas", org: "Centric Software" }));
+    assert.ok(neutral);
     assert.equal(neutral.body.startsWith("Hello,"), true);
     assert.equal(greetingNameCheck(neutral.body), false);
     assert.equal(greetingNameCheck("Hello NN, thanks for reading."), true);
@@ -1183,6 +1219,227 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(short.ok, false);
     if (!short.ok) assert.equal(short.error, "humanizer");
     const ready = approvableCopy(card, link);
-    assert.equal(humanizerCheck(ready.subject, ready.body).pass, true);
+    assert.equal(humanizerCheck(ready.subject, ready.body, letterSpecifics(card)).pass, true);
+  });
+
+  test("a letter is built from a hook or a signal note, never from why", () => {
+    const hunterWhy = "Research card from Hunter. No profile signal was verified on a fetched page.";
+    const publicWhy = "Research card from Hunter. Public pages show: Distributed or high-performing team; B Corp, sustainability, or purpose.";
+    for (const why of [hunterWhy, publicWhy]) {
+      const bare = cocoLetter(company({ id: "bare", org: "Affinity Bridge", why, hook: undefined, signals: [] }));
+      assert.equal(bare, null);
+    }
+    const hook = {
+      text: "Affinity Bridge is a Certified B Corp and full-service digital agency.",
+      sourceUrl: "https://affinitybridge.example/about",
+      sourceDate: "2026-11-26",
+      kind: "purpose",
+    };
+    const fromHook = cocoLetter(
+      company({ id: "hooked", org: "Affinity Bridge", why: publicWhy, hook, buyerName: "Mack Hardy" }),
+    );
+    assert.ok(fromHook);
+    assert.equal(fromHook.body.includes(hook.text.replace(/\.$/, "")), true);
+    assert.equal(fromHook.body.includes("Research card"), false);
+    assert.equal(fromHook.body.includes("Hunter"), false);
+    assert.equal(draftLeaksInternal(fromHook.body, "Affinity Bridge"), false);
+    const fromSignal = cocoLetter(
+      company({
+        id: "signalled",
+        org: "Northwind Example",
+        why: hunterWhy,
+        hook: undefined,
+        signals: [
+          {
+            id: "s1",
+            kind: "hiring",
+            date: "2026-11-20",
+            sourceUrl: "https://northwind.example/news",
+            note: "The news post says the leadership team booked a retreat.",
+          },
+        ],
+      }),
+    );
+    assert.ok(fromSignal);
+    assert.equal(fromSignal.body.includes("The news post says the leadership team booked a retreat"), true);
+    assert.equal(fromSignal.body.includes("Research card"), false);
+  });
+
+  test("internal draft text is rejected, including the Affinity Bridge letter, and company names are not", () => {
+    const affinity = `Hi Mack,
+
+I'm Christopher, a founder of Unearth Self, a place for teams in the Canadian Badlands.
+
+I read this about Affinity Bridge: Research card from Hunter. That is the reason for this letter.
+
+The days follow PACE: Play, Adaptability, Connection, Experience. Play is the start, out on the land, before the group has to perform. Adaptability is the middle, when the route changes and the team has to choose together. Connection is the work between people. Experience is the last stretch, when the week has a shape they can take home. The evenings end at Basecamp in Drumheller.
+
+We are taking bookings for 2027. I am holding the first window of that year.
+
+A short reply is enough. If a week in that window is useful for the people you are responsible for, tell me and I will come back with three dates. If it is not, say so and I will leave the file quiet.
+
+Christopher`;
+    assert.equal(draftRejectionCheck(COCO_LETTER_SUBJECT, affinity, "Affinity Bridge"), "internal-text");
+    const voice = humanizerCheck(COCO_LETTER_SUBJECT, affinity);
+    assert.equal(voice.pass, false);
+    assert.equal(voice.notes.some((note) => note.includes("internal notes")), true);
+    assert.equal(voice.notes.some((note) => /2027|first window|that window/i.test(note)), true);
+    assert.equal(draftLeaksInternal("The team is nullable and the booking was annulled.", "Nullable Systems"), false);
+    assert.equal(draftLeaksInternal("Ask about coconut and the hunters nearby.", "Northwind Example"), false);
+    assert.equal(
+      draftLeaksInternal("I read this about Hunter Engineering: The about page names a leadership offsite.", "Hunter Engineering"),
+      false,
+    );
+    assert.equal(draftLeaksInternal("I read this about Coco Collective: The founders described a leadership week.", "Coco Collective"), false);
+    assert.equal(draftLeaksInternal("Research card from Hunter.", "Hunter Engineering"), true);
+    assert.equal(draftLeaksInternal("The value is null."), true);
+    assert.equal(draftLeaksInternal("This is undefined placeholder text with a TODO and {{name}} and ${role} and [ ]."), true);
+    assert.equal(draftLeaksInternal("Public pages show the work. Nightly ingest left this."), true);
+    const token = "https://www.unearthself.xyz/u/eyJpZCI.ab-null-cd";
+    assert.equal(draftLeaksInternal(`Hello from Drumheller.\n\n${token}`, "Northwind Example"), false);
+  });
+
+  test("approve rejects the Affinity Bridge letter", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const card = company({
+      id: "C-450",
+      org: "Affinity Bridge",
+      buyerName: "Mack Hardy",
+      why: "Research card from Hunter. Public pages show: Distributed or high-performing team.",
+      hook: undefined,
+      signals: [],
+    });
+    await seed(redis, [card]);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const body = `Hi Mack,\n\nI read this about Affinity Bridge: Research card from Hunter. That is the reason for this letter.\n\nChristopher\n\n${unsubscribeBlock(link)}`;
+    const approved = await approveWording({ cardId: card.id, subject: COCO_LETTER_SUBJECT, body });
+    assert.equal(approved.ok, false);
+    if (!approved.ok) assert.equal(approved.error, "internal-text");
+    const saved = await saveCocoDraftEdit({ cardId: card.id, touch: 1, subject: COCO_LETTER_SUBJECT, body });
+    assert.equal(saved.ok, false);
+    if (!saved.ok) assert.equal(saved.error, "internal-text");
+  });
+
+  test("a hook-less card stores no draft and shows Needs research", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const today = edmontonToday();
+    const card = company({
+      id: "no-hook",
+      org: "Affinity Bridge",
+      filedOn: today,
+      why: "Research card from Hunter. Public pages show: Distributed or high-performing team.",
+      hook: undefined,
+      signals: [],
+    });
+    await seed(redis, [card]);
+    const result = await predraftFiledLeads({ today, fetchImpl: async () => ({ status: 200 }) });
+    assert.deepEqual(result.drafted, []);
+    assert.deepEqual(result.needsResearch, ["no-hook"]);
+    const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.["no-hook"] ?? "{}") as {
+      drafts?: { "1"?: { subject?: string; body?: string } };
+      draftSkipped?: { reason?: string };
+    };
+    assert.equal(stored.drafts?.["1"]?.body, undefined);
+    assert.equal(stored.drafts?.["1"]?.subject, undefined);
+    assert.equal(stored.draftSkipped?.reason, "Needs research");
+    const view = await readCocoCard("no-hook");
+    assert.equal(view?.stage, "draft-skipped");
+    assert.equal(view?.stageLabel, "Needs research");
+    assert.equal(view?.body ?? "", "");
+    const book = await redis.get<{ companies: Company[] }>(LEADS_KEY);
+    assert.equal(book?.companies[0]?.why, card.why);
+    assert.equal(book?.companies[0]?.org, "Affinity Bridge");
+  });
+
+  test("every why the code can produce stays out of the letter", () => {
+    const desk = readFileSync(new URL("./desk-store.ts", import.meta.url), "utf8");
+    assert.equal(desk.includes("Research card filed from ${t.city}. No named contact. Concierge must not send."), true);
+    const whys = [
+      hunterCardWhy(["Distributed or high-performing team", "B Corp, sustainability, or purpose", "Outdoor or adventure-adjacent"]),
+      hunterCardWhy([]),
+      hunterCardWhy(["Nullable culture"]),
+      ingestWhy(undefined),
+      ingestWhy(""),
+      ingestWhy("Scout batch."),
+      "Research card from Hunter. Public pages show: Distributed or high-performing team.",
+      "Research card from Hunter. No profile signal was verified on a fetched page.",
+      "Nightly ingest. Research card.",
+      "Research card filed from Calgary. No named contact. Concierge must not send.",
+    ];
+    const hook = {
+      text: "The about page names a leadership offsite.",
+      sourceUrl: "https://northwind.example/about",
+      sourceDate: "2026-11-01",
+      kind: "offsite",
+    };
+    for (const why of whys) {
+      const bare = cocoLetter(company({ id: "prop", org: "Hunter Engineering", why, hook: undefined, signals: [] }));
+      assert.equal(bare, null, why);
+      const letter = cocoLetter(company({ id: "prop", org: "Hunter Engineering", why, hook, signals: [] }));
+      assert.ok(letter, why);
+      assert.equal(draftLeaksInternal(letter.body, "Hunter Engineering"), false, why);
+      assert.equal(letter.body.includes("Research card"), false, why);
+      assert.equal(letter.body.includes(hook.text), true, why);
+      assert.equal(/Nightly ingest|Public pages show|from Hunter/.test(letter.body), false, why);
+    }
+    assert.equal(hunterCardWhy(["Distributed or high-performing team"]).includes("Research card"), false);
+    assert.equal(hunterCardWhy([]).includes("Hunter"), false);
+    assert.equal(ingestWhy(undefined).includes("Nightly"), false);
+  });
+
+  test("clearing a leaked draft keeps the card and its research", async () => {
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    const leaked = company({
+      id: "C-450",
+      org: "Affinity Bridge",
+      why: "Research card from Hunter. Public pages show: Distributed or high-performing team.",
+      hook: undefined,
+      signals: [],
+      draftSubject: "A week in Drumheller for your team",
+      draftBody: "I read this about Affinity Bridge: Research card from Hunter.",
+    });
+    const clean = company({ id: "clean", org: "Hunter Engineering" });
+    const cleanLetter = cocoLetter(clean);
+    assert.ok(cleanLetter);
+    await seed(redis, [leaked, clean]);
+    await redis.hset(HUNTER_OUTREACH_KEY, {
+      "C-450": JSON.stringify({
+        cardId: "C-450",
+        touches: 0,
+        events: [],
+        drafts: { "1": { subject: COCO_LETTER_SUBJECT, body: leaked.draftBody, draftedAt: "2026-11-26T12:00:00.000Z" } },
+      }),
+      clean: JSON.stringify({
+        cardId: "clean",
+        touches: 0,
+        events: [],
+        drafts: { "1": { subject: cleanLetter.subject, body: cleanLetter.body, draftedAt: "2026-11-26T12:00:00.000Z" } },
+      }),
+    });
+    const cleared = await clearLeakedDrafts();
+    assert.deepEqual(cleared.companies, ["Affinity Bridge"]);
+    assert.equal(cleared.count, 1);
+    const leakedRecord = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.["C-450"] ?? "{}") as {
+      drafts?: { "1"?: { body?: string; subject?: string } };
+      draftSkipped?: { reason?: string };
+    };
+    assert.equal(leakedRecord.drafts?.["1"]?.body, undefined);
+    assert.equal(leakedRecord.drafts?.["1"]?.subject, undefined);
+    assert.equal(leakedRecord.draftSkipped?.reason, "Needs research");
+    const cleanRecord = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.clean ?? "{}") as {
+      drafts?: { "1"?: { body?: string } };
+    };
+    assert.equal(cleanRecord.drafts?.["1"]?.body, cleanLetter.body);
+    const book = await redis.get<{ companies: Array<Company> }>(LEADS_KEY);
+    const kept = book?.companies.find((item) => item.id === "C-450");
+    assert.equal(kept?.why, leaked.why);
+    assert.equal(kept?.org, "Affinity Bridge");
+    assert.equal(kept?.draftBody, "");
+    const again = await clearLeakedDrafts();
+    assert.equal(again.count, 0);
   });
 });

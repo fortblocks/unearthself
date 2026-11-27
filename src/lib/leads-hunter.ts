@@ -581,6 +581,11 @@ function verifiedSignals(raw: unknown, pages: Record<string, string>, idPrefix: 
   });
 }
 
+/** Labels only. The desk badge is separate, so this string never names Hunter or a research card. */
+export function hunterCardWhy(labels: readonly string[]) {
+  return labels.length ? `${labels.join("; ")}.` : "No profile signal was verified on a fetched page.";
+}
+
 function verifiedHits(draft: HunterDraft, pages: Record<string, string>, today: string): ProfileHit[] {
   const hits: ProfileHit[] = [];
   const seen = new Set<string>();
@@ -690,9 +695,7 @@ export function verifyHunterDrafts(
       regionId: opts.regionId,
       place,
     });
-    const why = hits.length
-      ? `Research card from Hunter. Public pages show: ${hits.map((hit) => hit.label).join("; ")}.`
-      : "Research card from Hunter. No profile signal was verified on a fetched page.";
+    const why = hunterCardWhy(hits.map((hit) => hit.label));
     cards.push({
       domain: draft.domain,
       org: draft.org,
