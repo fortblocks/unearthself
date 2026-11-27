@@ -6,6 +6,7 @@ import { handleHunterRead } from "./hunter-read.ts";
 import {
   BADLANDS_PROGRAMME_LINE,
   FROM_ADDRESS,
+  OUTREACH_SEND_ENABLED,
   HUNTER_OUTREACH_KEY,
   OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
   UNSUBSCRIBE_KEY_RING_WINDOW_MS,
@@ -982,6 +983,7 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     const text = unsubscribePlain(link);
     const approved = [
       "Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited.",
+      BADLANDS_PROGRAMME_LINE,
       "356 4th Street West, Drumheller, Alberta T0J 0Y3, Canada \u00b7 www.unearthself.xyz \u00b7 chris@badlandsbootcamp.com",
       "This is a business solicitation from Unearth Self.",
       "Don't want these emails? Unsubscribe here and we won't contact you again.",
@@ -989,23 +991,19 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     assert.equal(text, `${approved.join("\n")}\n${link}`);
     assert.equal(
       html,
-      `${approved.slice(0, 3).join("<br>")}<br>Don't want these emails? <a href="${link}">Unsubscribe here</a> and we won't contact you again.`,
+      `${approved.slice(0, 4).join("<br>")}<br>Don't want these emails? <a href="${link}">Unsubscribe here</a> and we won't contact you again.`,
     );
     assert.equal((html.match(/<a /g) ?? []).length, 1);
     assert.equal(html.includes('href="https://www.unearthself.xyz/"'), false);
-    assert.equal(html.includes(BADLANDS_PROGRAMME_LINE), false);
-    assert.equal(text.includes(BADLANDS_PROGRAMME_LINE), false);
-    const withProgramme = unsubscribePlain(link, "A").split("\n");
-    assert.equal(withProgramme[0], approved[0]);
-    assert.equal(withProgramme[1], BADLANDS_PROGRAMME_LINE);
-    assert.equal(withProgramme[2], approved[1]);
+    assert.equal(text.split("\n")[1], BADLANDS_PROGRAMME_LINE);
+    assert.equal(html.startsWith(`${approved[0]}<br>${BADLANDS_PROGRAMME_LINE}<br>`), true);
     assert.equal(unsubscribePlain(link, "B").includes(BADLANDS_PROGRAMME_LINE), false);
     assert.equal(outreachSendFromAddress("A"), "chris@badlandsbootcamp.com");
-    assert.equal(outreachSendFromAddress("B"), null);
-    assert.equal(outreachSendFromAddress(null), null);
+    assert.equal(OUTREACH_SEND_ENABLED, false);
     const sample = renderLegalReviewSample(link);
     assert.equal(sample.html.includes(`<a href="${link}">Unsubscribe here</a>`), true);
-    assert.equal(sample.text.endsWith(`${approved[3]}\n${link}\n`) || sample.text.includes(`${approved[3]}\n${link}`), true);
+    assert.equal(sample.text.includes(`${approved[0]}\n${BADLANDS_PROGRAMME_LINE}\n${approved[2]}`), true);
+    assert.equal(sample.text.includes(`${approved[4]}\n${link}`), true);
     assert.equal(sample.html.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
     assert.equal(sample.text.includes("alex.rivera@northwind.example"), true);
     assert.equal((sample.html.match(/<a /g) ?? []).length, 1);

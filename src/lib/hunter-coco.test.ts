@@ -22,6 +22,7 @@ import {
   OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
   OUTREACH_SOLICITATION_LINE,
   setBadlandsFooterChoiceForTests,
+  setOutreachSendEnabledForTests,
   setUnearthFromAddressForTests,
   storeBackgroundDraft,
   unsubscribeBlock,
@@ -206,6 +207,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     process.env.HUNTER_WRITE_TOKEN = WRITE;
     process.env.HUNTER_CARDS_TOKEN = CARDS;
     setBadlandsFooterChoiceForTests("A");
+    setOutreachSendEnabledForTests(true);
     setUnearthFromAddressForTests(null);
     delete process.env.COCO_DRAFT_WEBHOOK_URL;
     delete process.env.COCO_DRAFT_WEBHOOK_KEY;
@@ -214,6 +216,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
 
   afterEach(() => {
     setBadlandsFooterChoiceForTests(null);
+    setOutreachSendEnabledForTests(null);
     setUnearthFromAddressForTests(null);
     useRedisClientForTests(null);
     for (const [key, value] of Object.entries(previous)) {
@@ -1204,8 +1207,9 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(humanizerCheck(ready.subject, ready.body).pass, true);
   });
 
-  test("approve to send fails closed while the Badlands footer choice is unset", async () => {
-    setBadlandsFooterChoiceForTests(null);
+  test("approve to send fails closed while sending is disabled", async () => {
+    setBadlandsFooterChoiceForTests("A");
+    setOutreachSendEnabledForTests(false);
     const redis = memoryRedis();
     useRedisClientForTests(redis as unknown as LeadsRedis);
     const card = company({ id: "campfire", review: "approved" });
@@ -1226,27 +1230,14 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       },
     });
     assert.equal(refused.ok, false);
-    if (!refused.ok) assert.equal(refused.error, "badlands-footer");
+    if (!refused.ok) assert.equal(refused.error, "send-disabled");
     assert.equal(woke, false);
     const after = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { sendApproved?: unknown };
     assert.equal(after.sendApproved, undefined);
     const posted = await post(letter(card.id, "send_approved", { body: `Hello from Drumheller.\n${link}` }));
     assert.equal(posted.status, 409);
-    assert.deepEqual(await posted.json(), { error: "badlands-footer" });
-    setBadlandsFooterChoiceForTests("B");
-    const missingMailbox = await approveWording({
-      cardId: card.id,
-      subject: "A note",
-      body: `Hello from Drumheller.\n${link}`,
-      fetchImpl: async () => {
-        woke = true;
-        return { status: 202 };
-      },
-    });
-    assert.equal(missingMailbox.ok, false);
-    if (!missingMailbox.ok) assert.equal(missingMailbox.error, "badlands-footer");
-    assert.equal(woke, false);
-    setBadlandsFooterChoiceForTests("A");
+    assert.deepEqual(await posted.json(), { error: "send-disabled" });
+    setOutreachSendEnabledForTests(true);
     const planted = await approveWording({
       cardId: card.id,
       subject: "A note",

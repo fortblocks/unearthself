@@ -324,23 +324,37 @@ export const BADLANDS_PROGRAMME_LINE = "Badlands Bootcamp is an Unearth Self pro
 export type BadlandsFooterChoice = "A" | "B";
 
 /**
- * Chris has not chosen.
- * A: add BADLANDS_PROGRAMME_LINE after the sender line. The from address stays chris@badlandsbootcamp.com.
- * B: add no line. The send must come from an @unearthself.xyz mailbox, which is still empty.
- * null: unset. Approve to send and a send_approved event fail closed.
+ * Choice A. The programme line follows the sender line, and the from address stays chris@badlandsbootcamp.com.
+ * Choice B is not selected.
  */
-export const BADLANDS_FOOTER_CHOICE: BadlandsFooterChoice | null = null;
+export const BADLANDS_FOOTER_CHOICE: BadlandsFooterChoice = "A";
 
-/** Used only for choice B. Empty until Chris names the mailbox. */
+/**
+ * Separate from the wording. Off until Legal re-checks the rendered samples and Chris gives a separate go.
+ * Approve to send and a send_approved event fail closed while this is false.
+ */
+export const OUTREACH_SEND_ENABLED = false;
+
+/** Used only for choice B. Empty, and unused while the choice is A. */
 export const UNEARTH_FROM_ADDRESS = "";
 
 const CHOICE_UNSET = Symbol("badlands-choice-unset");
-let badlandsChoiceOverride: BadlandsFooterChoice | null | typeof CHOICE_UNSET = CHOICE_UNSET;
+let badlandsChoiceOverride: BadlandsFooterChoice | typeof CHOICE_UNSET = CHOICE_UNSET;
 let unearthFromOverride: string | null = null;
+let sendEnabledOverride: boolean | typeof CHOICE_UNSET = CHOICE_UNSET;
 
-/** Tests only. Production reads BADLANDS_FOOTER_CHOICE. */
+/** Tests only. Null uses BADLANDS_FOOTER_CHOICE. */
 export function setBadlandsFooterChoiceForTests(value: BadlandsFooterChoice | null) {
-  badlandsChoiceOverride = value;
+  badlandsChoiceOverride = value === null ? CHOICE_UNSET : value;
+}
+
+/** Tests only. Null uses OUTREACH_SEND_ENABLED. */
+export function setOutreachSendEnabledForTests(value: boolean | null) {
+  sendEnabledOverride = value === null ? CHOICE_UNSET : value;
+}
+
+export function outreachSendEnabled(): boolean {
+  return sendEnabledOverride === CHOICE_UNSET ? OUTREACH_SEND_ENABLED : sendEnabledOverride;
 }
 
 /** Tests only. Production reads UNEARTH_FROM_ADDRESS. */
@@ -348,12 +362,12 @@ export function setUnearthFromAddressForTests(value: string | null) {
   unearthFromOverride = value;
 }
 
-function effectiveBadlandsChoice(): BadlandsFooterChoice | null {
+function effectiveBadlandsChoice(): BadlandsFooterChoice {
   return badlandsChoiceOverride === CHOICE_UNSET ? BADLANDS_FOOTER_CHOICE : badlandsChoiceOverride;
 }
 
 /** The lines of the footer, without the unsubscribe URL. Choice A inserts the programme line. */
-export function outreachFooterPlainLines(choice: BadlandsFooterChoice | null): string[] {
+export function outreachFooterPlainLines(choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE): string[] {
   const lines = [OUTREACH_SENDER_LINE];
   if (choice === "A") lines.push(BADLANDS_PROGRAMME_LINE);
   lines.push(OUTREACH_CONTACT_LINE, OUTREACH_SOLICITATION_LINE, UNSUBSCRIBE_NOTICE);
@@ -371,8 +385,8 @@ export function outreachSendFromAddress(choice = effectiveBadlandsChoice()): str
   return null;
 }
 
-/** HTML footer. Only "Unsubscribe here" is a link. The default is the approved block, with no programme line. */
-export function unsubscribeHtml(link: string, choice: BadlandsFooterChoice | null = null) {
+/** HTML footer. Only "Unsubscribe here" is a link. Choice A puts the programme line after the sender line. */
+export function unsubscribeHtml(link: string, choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE) {
   return outreachFooterPlainLines(choice)
     .map((line) => {
       if (line !== UNSUBSCRIBE_NOTICE) return line;
@@ -382,25 +396,20 @@ export function unsubscribeHtml(link: string, choice: BadlandsFooterChoice | nul
 }
 
 /** Plain-text footer. The full URL is the line after the opt-out sentence. */
-export function unsubscribePlain(link: string, choice: BadlandsFooterChoice | null = null) {
+export function unsubscribePlain(link: string, choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE) {
   return `${outreachFooterPlainLines(choice).join("\n")}\n${link}`;
 }
 
-export type OutreachFooterError = "badlands-footer" | "sender-identification";
+export type OutreachFooterError = "send-disabled" | "sender-identification";
 
-/** Why a send must stop. Null means the Badlands choice and the from address are set, and the placeholder is absent. */
+/** Why a send must stop. The wording can be complete while OUTREACH_SEND_ENABLED is still false. */
 export function outreachFooterError(body: string): OutreachFooterError | null {
   if (body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return "sender-identification";
-  const choice = effectiveBadlandsChoice();
-  if (choice !== "A" && choice !== "B") return "badlands-footer";
-  if (!outreachSendFromAddress(choice)) return "badlands-footer";
+  if (!outreachSendEnabled()) return "send-disabled";
   return null;
 }
 
-/**
- * The footer stored on a send. Returns null while the Badlands choice is unset,
- * while choice B has no @unearthself.xyz mailbox, or when the body contains the placeholder.
- */
+/** The footer stored on a send. Returns null while sending is disabled, or when the body contains the placeholder. */
 export function withOutreachFooter(body: string, link: string): string | null {
   if (outreachFooterError(body)) return null;
   const choice = effectiveBadlandsChoice();
@@ -419,27 +428,27 @@ export function withOutreachFooter(body: string, link: string): string | null {
   return next;
 }
 
-/** Muted card preview of the approved block. No programme line, no link. */
+/** Muted card preview. Choice A, no link. */
 export function outreachFooterPreview(): string {
-  return `Email footer (added automatically):\n${outreachFooterPlainLines(null).join("\n")}`;
+  return `Email footer (added automatically):\n${outreachFooterPlainLines(BADLANDS_FOOTER_CHOICE).join("\n")}`;
 }
 
-/** A sample for Legal. Not used by a route, the card, or a send. The Badlands choice stays unset. */
+/** A sample for Legal. Not used by a route, the card, or a send. Sending stays off. */
 export function renderLegalReviewSample(link = "https://www.unearthself.xyz/u/example-not-a-live-link") {
   const letter = "Hello Alex,\n\nNorthwind Example is a made-up company, and Alex Rivera is not a real person. This note has not been sent.";
-  const htmlFooter = unsubscribeHtml(link, null);
-  const textFooter = unsubscribePlain(link, null);
+  const htmlFooter = unsubscribeHtml(link, "A");
+  const textFooter = unsubscribePlain(link, "A");
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Sample outreach email</title></head>
 <body>
-<p><strong>Sample for Legal review.</strong> The Badlands Bootcamp choice is unset, so a send is refused. This was not sent. Neither choice A nor choice B is selected.</p>
+<p><strong>Sample for Legal review.</strong> Choice A is in the footer. Sending is still off until Legal re-checks this sample and Chris gives a separate go. This was not sent.</p>
 <p>From: ${FROM_ADDRESS}<br>To: Alex Rivera &lt;alex.rivera@northwind.example&gt;<br>Subject: A note for the Northwind team</p>
 <p>${letter.replace(/\n\n/g, "</p><p>")}</p>
 <p>${htmlFooter}</p>
 </body>
 </html>`;
-  const text = `Sample for Legal review. The Badlands Bootcamp choice is unset, so a send is refused. This was not sent. Neither choice A nor choice B is selected.
+  const text = `Sample for Legal review. Choice A is in the footer. Sending is still off until Legal re-checks this sample and Chris gives a separate go. This was not sent.
 
 From: ${FROM_ADDRESS}
 To: Alex Rivera <alex.rivera@northwind.example>
