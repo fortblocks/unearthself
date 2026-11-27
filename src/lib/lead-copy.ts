@@ -22,6 +22,7 @@ export function draftSellsCanyon(body: string) {
 /** The house-voice count ignores the legal opt-out footer. That line is not the letter. */
 export function letterForWordCount(text: string) {
   return text
+    .replace(/\n*Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited\.[\s\S]*$/i, "")
     .replace(/\n*Don't want these emails\?[\s\S]*$/i, "")
     .replace(/\n*<a href="[^"]*">unsubscribe<\/a>[\s\S]*$/i, "")
     .replace(/\n*unsubscribe:\s+\S[\s\S]*$/i, "")

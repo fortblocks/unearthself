@@ -324,7 +324,7 @@ export function LeadCardActions({
           ),
           createElement(
             "p",
-            { className: "mt-1 text-xs leading-tight text-shale", "data-unsubscribe": "preview" },
+            { className: "mt-1 whitespace-pre-line text-xs leading-tight text-shale", "data-unsubscribe": "preview" },
             outreachFooterPreview(),
           ),
           createElement(

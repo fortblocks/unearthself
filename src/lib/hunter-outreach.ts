@@ -298,116 +298,152 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
 /** The opt-out sentence. The link sits on "Unsubscribe here". The card shows this same line as text. */
 export const UNSUBSCRIBE_NOTICE = "Don't want these emails? Unsubscribe here and we won't contact you again.";
 
-/** Postal address on every outreach footer and on the unsubscribe page. */
+/** Postal address on the unsubscribe page. The email uses OUTREACH_CONTACT_LINE. */
 export const OUTREACH_POSTAL_ADDRESS = "356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada";
 
-/** Second contact method on those footers. The card shows the words. The sent HTML links them. */
+/** Second contact method on the unsubscribe page. The email contact line prints it as text. */
 export const OUTREACH_SITE = "www.unearthself.xyz";
 
 const OUTREACH_SITE_URL = "https://www.unearthself.xyz/";
 
-/**
- * Sender identification on the outreach footer. Legal has not approved the wording.
- * Leave this equal to the placeholder until Legal replaces it with the approved line.
- * While it is the placeholder, Approve to send and a send_approved event fail closed.
- * The placeholder is not written into a draft, the card, the unsubscribe page, or a send.
- */
+/** Rejected stand-in. It is not the footer, and a body that contains it is not sent. */
 export const OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER = "[SENDER IDENTIFICATION PENDING LEGAL]";
-export const OUTREACH_SENDER_IDENTIFICATION = OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER;
 
-let senderIdentificationOverride: string | null = null;
+/** Legal's sender line. This is the wording, not a placeholder. */
+export const OUTREACH_SENDER_LINE = "Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited.";
+export const OUTREACH_SENDER_IDENTIFICATION = OUTREACH_SENDER_LINE;
 
-/** Tests only. A live send reads OUTREACH_SENDER_IDENTIFICATION and ignores this. */
-export function setOutreachSenderIdentificationForTests(value: string | null) {
-  senderIdentificationOverride = value;
+/** Address, site, and mailbox on one line. The site and mailbox are not links. */
+export const OUTREACH_CONTACT_LINE = "356 4th Street West, Drumheller, Alberta T0J 0Y3, Canada \u00b7 www.unearthself.xyz \u00b7 chris@badlandsbootcamp.com";
+
+export const OUTREACH_SOLICITATION_LINE = "This is a business solicitation from Unearth Self.";
+
+/** Added after the sender line only when the Badlands choice is A. */
+export const BADLANDS_PROGRAMME_LINE = "Badlands Bootcamp is an Unearth Self programme.";
+
+export type BadlandsFooterChoice = "A" | "B";
+
+/**
+ * Chris has not chosen.
+ * A: add BADLANDS_PROGRAMME_LINE after the sender line. The from address stays chris@badlandsbootcamp.com.
+ * B: add no line. The send must come from an @unearthself.xyz mailbox, which is still empty.
+ * null: unset. Approve to send and a send_approved event fail closed.
+ */
+export const BADLANDS_FOOTER_CHOICE: BadlandsFooterChoice | null = null;
+
+/** Used only for choice B. Empty until Chris names the mailbox. */
+export const UNEARTH_FROM_ADDRESS = "";
+
+const CHOICE_UNSET = Symbol("badlands-choice-unset");
+let badlandsChoiceOverride: BadlandsFooterChoice | null | typeof CHOICE_UNSET = CHOICE_UNSET;
+let unearthFromOverride: string | null = null;
+
+/** Tests only. Production reads BADLANDS_FOOTER_CHOICE. */
+export function setBadlandsFooterChoiceForTests(value: BadlandsFooterChoice | null) {
+  badlandsChoiceOverride = value;
 }
 
-/** Empty, the placeholder, a "PENDING LEGAL" line, or a bracketed stand-in is not approved wording. */
-export function senderIdentificationReady(value = senderIdentificationOverride ?? OUTREACH_SENDER_IDENTIFICATION): boolean {
-  const text = value.trim();
-  if (!text) return false;
-  if (text === OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER) return false;
-  if (/\bPENDING LEGAL\b/i.test(text)) return false;
-  if (text.startsWith("[") && text.endsWith("]")) return false;
-  return true;
+/** Tests only. Production reads UNEARTH_FROM_ADDRESS. */
+export function setUnearthFromAddressForTests(value: string | null) {
+  unearthFromOverride = value;
 }
 
-function configuredReadySender(): string {
-  const text = OUTREACH_SENDER_IDENTIFICATION.trim();
-  return senderIdentificationReady(text) ? text : "";
+function effectiveBadlandsChoice(): BadlandsFooterChoice | null {
+  return badlandsChoiceOverride === CHOICE_UNSET ? BADLANDS_FOOTER_CHOICE : badlandsChoiceOverride;
 }
 
-function effectiveSenderIdentification(): string {
-  const text = (senderIdentificationOverride ?? OUTREACH_SENDER_IDENTIFICATION).trim();
-  return senderIdentificationReady(text) ? text : "";
+/** The lines of the footer, without the unsubscribe URL. Choice A inserts the programme line. */
+export function outreachFooterPlainLines(choice: BadlandsFooterChoice | null): string[] {
+  const lines = [OUTREACH_SENDER_LINE];
+  if (choice === "A") lines.push(BADLANDS_PROGRAMME_LINE);
+  lines.push(OUTREACH_CONTACT_LINE, OUTREACH_SOLICITATION_LINE, UNSUBSCRIBE_NOTICE);
+  return lines;
 }
 
-function footerSender(sender: string): string {
-  const text = sender.trim();
-  return senderIdentificationReady(text) ? text : "";
+/** From address for a send. Choice B needs an @unearthself.xyz mailbox. Unset returns null. */
+export function outreachSendFromAddress(choice = effectiveBadlandsChoice()): string | null {
+  if (choice === "A") return FROM_ADDRESS;
+  if (choice === "B") {
+    const address = (unearthFromOverride ?? UNEARTH_FROM_ADDRESS).trim();
+    if (!/^[^@\s]+@unearthself\.xyz$/i.test(address)) return null;
+    return address;
+  }
+  return null;
 }
 
-/** HTML anchor. The visible words are "Unsubscribe here". The token stays in the href. */
-export function unsubscribeHtml(link: string, sender = configuredReadySender()) {
-  const who = footerSender(sender);
-  const line = who ? `${escapeHtml(who)}<br>` : "";
-  return `${line}Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.<br>${OUTREACH_POSTAL_ADDRESS}<br><a href="${OUTREACH_SITE_URL}">${OUTREACH_SITE}</a>`;
+/** HTML footer. Only "Unsubscribe here" is a link. The default is the approved block, with no programme line. */
+export function unsubscribeHtml(link: string, choice: BadlandsFooterChoice | null = null) {
+  return outreachFooterPlainLines(choice)
+    .map((line) => {
+      if (line !== UNSUBSCRIBE_NOTICE) return line;
+      return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.`;
+    })
+    .join("<br>");
 }
 
-/** Plain-text fallback for a client that does not render the anchor. The URL stays so a reply can still opt out. */
-export function unsubscribePlain(link: string, sender = configuredReadySender()) {
-  const who = footerSender(sender);
-  const line = who ? `${who}\n` : "";
-  return `${line}Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.\n${OUTREACH_POSTAL_ADDRESS}\n${OUTREACH_SITE}`;
+/** Plain-text footer. The full URL is the line after the opt-out sentence. */
+export function unsubscribePlain(link: string, choice: BadlandsFooterChoice | null = null) {
+  return `${outreachFooterPlainLines(choice).join("\n")}\n${link}`;
+}
+
+export type OutreachFooterError = "badlands-footer" | "sender-identification";
+
+/** Why a send must stop. Null means the Badlands choice and the from address are set, and the placeholder is absent. */
+export function outreachFooterError(body: string): OutreachFooterError | null {
+  if (body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return "sender-identification";
+  const choice = effectiveBadlandsChoice();
+  if (choice !== "A" && choice !== "B") return "badlands-footer";
+  if (!outreachSendFromAddress(choice)) return "badlands-footer";
+  return null;
 }
 
 /**
- * The footer stored on a send. Returns null while sender identification is unset,
- * or when the body already contains the placeholder. Null means do not send and do not store.
+ * The footer stored on a send. Returns null while the Badlands choice is unset,
+ * while choice B has no @unearthself.xyz mailbox, or when the body contains the placeholder.
  */
 export function withOutreachFooter(body: string, link: string): string | null {
-  const sender = effectiveSenderIdentification();
-  if (!sender || body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return null;
+  if (outreachFooterError(body)) return null;
+  const choice = effectiveBadlandsChoice();
   const letter = letterWithoutUnsubscribe(body, link);
-  const block = `${unsubscribeHtml(link, sender)}\n${unsubscribePlain(link, sender)}`;
+  const block = `${unsubscribeHtml(link, choice)}\n${unsubscribePlain(link, choice)}`;
   const trimmed = letter.replace(/\s+$/g, "");
   const next = trimmed ? `${trimmed}\n\n${block}` : block;
   if (next.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return null;
-  if (!next.includes(sender) || !next.includes(link) || !next.includes(OUTREACH_POSTAL_ADDRESS) || !next.includes(OUTREACH_SITE)) return null;
+  if (!next.includes(OUTREACH_SENDER_LINE) || !next.includes(OUTREACH_CONTACT_LINE) || !next.includes(OUTREACH_SOLICITATION_LINE)) return null;
   if (!next.includes(`<a href="${escapeHtml(link)}">Unsubscribe here</a>`)) return null;
-  if (!next.includes(`Unsubscribe here: ${link}`)) return null;
+  if (!next.includes(`${UNSUBSCRIBE_NOTICE}\n${link}`)) return null;
+  if (choice === "A" && !next.includes(`${OUTREACH_SENDER_LINE}\n${BADLANDS_PROGRAMME_LINE}\n`) && !next.includes(`${OUTREACH_SENDER_LINE}<br>${BADLANDS_PROGRAMME_LINE}<br>`)) {
+    return null;
+  }
+  if (choice !== "A" && next.includes(BADLANDS_PROGRAMME_LINE)) return null;
   return next;
 }
 
-/** Muted card preview. The placeholder is never included. */
+/** Muted card preview of the approved block. No programme line, no link. */
 export function outreachFooterPreview(): string {
-  const sender = configuredReadySender();
-  const tail = `${UNSUBSCRIBE_NOTICE} ${OUTREACH_POSTAL_ADDRESS}. ${OUTREACH_SITE}`;
-  return sender ? `Email footer (added automatically): ${sender}. ${tail}` : `Email footer (added automatically): ${tail}`;
+  return `Email footer (added automatically):\n${outreachFooterPlainLines(null).join("\n")}`;
 }
 
-/** A sample for Legal. Not used by a route, the card, or a send. */
-export function renderLegalReviewSample(link = "https://www.unearthself.xyz/u/sample-not-a-live-link") {
-  const sender = OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER;
-  const letter = "Hello,\n\nThis sample is for Legal review. It is not addressed to a real person, and it has not been sent.";
-  const htmlFooter = `${escapeHtml(sender)}<br>Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.<br>${OUTREACH_POSTAL_ADDRESS}<br><a href="${OUTREACH_SITE_URL}">${OUTREACH_SITE}</a>`;
-  const textFooter = `${sender}\nDon't want these emails? Unsubscribe here: ${link} and we won't contact you again.\n${OUTREACH_POSTAL_ADDRESS}\n${OUTREACH_SITE}`;
-  const htmlLetter = escapeHtml(letter).replace(/\n\n/g, "</p><p>");
+/** A sample for Legal. Not used by a route, the card, or a send. The Badlands choice stays unset. */
+export function renderLegalReviewSample(link = "https://www.unearthself.xyz/u/example-not-a-live-link") {
+  const letter = "Hello Alex,\n\nNorthwind Example is a made-up company, and Alex Rivera is not a real person. This note has not been sent.";
+  const htmlFooter = unsubscribeHtml(link, null);
+  const textFooter = unsubscribePlain(link, null);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Sample outreach email</title></head>
 <body>
-<p><strong>Sample for Legal review.</strong> The sender line below is a placeholder. It is not shown on the site, and a send is refused while that placeholder is still the configured wording.</p>
-<p>From: ${escapeHtml(FROM_ADDRESS)}</p>
-<p>Subject: A note from Unearth Self</p>
-<p>${htmlLetter}</p>
+<p><strong>Sample for Legal review.</strong> The Badlands Bootcamp choice is unset, so a send is refused. This was not sent. Neither choice A nor choice B is selected.</p>
+<p>From: ${FROM_ADDRESS}<br>To: Alex Rivera &lt;alex.rivera@northwind.example&gt;<br>Subject: A note for the Northwind team</p>
+<p>${letter.replace(/\n\n/g, "</p><p>")}</p>
 <p>${htmlFooter}</p>
 </body>
 </html>`;
-  const text = `Sample for Legal review. The sender line below is a placeholder. It is not shown on the site, and a send is refused while that placeholder is still the configured wording.
+  const text = `Sample for Legal review. The Badlands Bootcamp choice is unset, so a send is refused. This was not sent. Neither choice A nor choice B is selected.
 
 From: ${FROM_ADDRESS}
-Subject: A note from Unearth Self
+To: Alex Rivera <alex.rivera@northwind.example>
+Subject: A note for the Northwind team
 
 ${letter}
 
@@ -436,9 +472,10 @@ export function ensureUnsubscribeLink(body: string, link: string): { body: strin
 export function letterWithoutUnsubscribe(body: string, link: string | null) {
   if (!link) return body;
   let next = body;
-  const sender = effectiveSenderIdentification();
   const blocks = [unsubscribeBlock(link)];
-  if (sender) blocks.unshift(`${unsubscribeHtml(link, sender)}\n${unsubscribePlain(link, sender)}`);
+  for (const choice of ["A", "B"] as const) {
+    blocks.unshift(`${unsubscribeHtml(link, choice)}\n${unsubscribePlain(link, choice)}`);
+  }
   let stripped = false;
   for (const footer of blocks) {
     const block = `\n\n${footer}`;
@@ -449,9 +486,9 @@ export function letterWithoutUnsubscribe(body: string, link: string | null) {
     }
   }
   if (!stripped) {
-    if (sender) {
-      next = next.split(unsubscribeHtml(link, sender)).join("");
-      next = next.split(unsubscribePlain(link, sender)).join("");
+    for (const choice of ["A", "B"] as const) {
+      next = next.split(unsubscribeHtml(link, choice)).join("");
+      next = next.split(unsubscribePlain(link, choice)).join("");
     }
     next = next.split(unsubscribeHtml(link)).join("");
     next = next.split(unsubscribePlain(link)).join("");
@@ -1296,6 +1333,8 @@ async function applyCocoEvent(
   if (event.type === "send_approved") {
     const link = unsubscribeUrl(company.id);
     if (!link || !event.body?.includes(link)) return reject("unsubscribe");
+    const footerError = outreachFooterError(event.body);
+    if (footerError) return reject(footerError);
     const completed = withOutreachFooter(event.body, link);
     if (!completed) return reject("sender-identification");
     if (record.touches >= touch) return reject("touch");
@@ -2282,6 +2321,8 @@ export async function approveWording(input: {
   if (!company) return { ok: false, error: "unknown-card" };
   const link = unsubscribeUrl(company.id);
   if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
+  const footerError = outreachFooterError(input.body);
+  if (footerError) return { ok: false, error: footerError };
   const completed = withOutreachFooter(input.body, link);
   if (!completed) return { ok: false, error: "sender-identification" };
   const rejected = draftRejectionCheck(input.subject, input.body);

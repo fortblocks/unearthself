@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 import { HUNTER_DNC_KEY, HUNTER_RESET_KEYS, HUNTER_SAMPLE_FLOOR } from "./hunter-config.ts";
 import { handleHunterRead } from "./hunter-read.ts";
 import {
+  BADLANDS_PROGRAMME_LINE,
   FROM_ADDRESS,
   HUNTER_OUTREACH_KEY,
   OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
   UNSUBSCRIBE_KEY_RING_WINDOW_MS,
+  outreachSendFromAddress,
   handleOutreach,
   handleUnsubscribe,
   outreachLockKey,
@@ -974,20 +976,38 @@ describe("coco lead book routes", { concurrency: 1 }, () => {
     assert.equal(JSON.stringify(redis.hashes).includes(PREVIOUS), false);
   });
 
-  test("the legal sample shows the placeholder, and the live footer does not", () => {
-    const link = "https://www.unearthself.xyz/u/sample-not-a-live-link";
+  test("the legal footer matches the approved wording, and only Unsubscribe here is a link", () => {
+    const link = "https://www.unearthself.xyz/u/example-not-a-live-link";
+    const html = unsubscribeHtml(link);
+    const text = unsubscribePlain(link);
+    const approved = [
+      "Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited.",
+      "356 4th Street West, Drumheller, Alberta T0J 0Y3, Canada \u00b7 www.unearthself.xyz \u00b7 chris@badlandsbootcamp.com",
+      "This is a business solicitation from Unearth Self.",
+      "Don't want these emails? Unsubscribe here and we won't contact you again.",
+    ];
+    assert.equal(text, `${approved.join("\n")}\n${link}`);
+    assert.equal(
+      html,
+      `${approved.slice(0, 3).join("<br>")}<br>Don't want these emails? <a href="${link}">Unsubscribe here</a> and we won't contact you again.`,
+    );
+    assert.equal((html.match(/<a /g) ?? []).length, 1);
+    assert.equal(html.includes('href="https://www.unearthself.xyz/"'), false);
+    assert.equal(html.includes(BADLANDS_PROGRAMME_LINE), false);
+    assert.equal(text.includes(BADLANDS_PROGRAMME_LINE), false);
+    const withProgramme = unsubscribePlain(link, "A").split("\n");
+    assert.equal(withProgramme[0], approved[0]);
+    assert.equal(withProgramme[1], BADLANDS_PROGRAMME_LINE);
+    assert.equal(withProgramme[2], approved[1]);
+    assert.equal(unsubscribePlain(link, "B").includes(BADLANDS_PROGRAMME_LINE), false);
+    assert.equal(outreachSendFromAddress("A"), "chris@badlandsbootcamp.com");
+    assert.equal(outreachSendFromAddress("B"), null);
+    assert.equal(outreachSendFromAddress(null), null);
     const sample = renderLegalReviewSample(link);
-    assert.match(sample.html, /<a href="https:\/\/www\.unearthself\.xyz\/u\/sample-not-a-live-link">Unsubscribe here<\/a>/);
-    assert.match(sample.text, /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\/sample-not-a-live-link/);
-    assert.match(sample.html, /356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada/);
-    assert.match(sample.text, /www\.unearthself\.xyz/);
-    assert.equal(sample.html.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), true);
-    assert.equal(sample.text.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), true);
-    const liveHtml = unsubscribeHtml(`https://www.unearthself.xyz/u/${"a".repeat(20)}`);
-    const livePlain = unsubscribePlain(`https://www.unearthself.xyz/u/${"a".repeat(20)}`);
-    assert.equal(liveHtml.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
-    assert.equal(livePlain.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
-    assert.match(liveHtml, /<a href="https:\/\/www\.unearthself\.xyz\/u\/a{20}">Unsubscribe here<\/a>/);
-    assert.match(livePlain, /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\/a{20}/);
+    assert.equal(sample.html.includes(`<a href="${link}">Unsubscribe here</a>`), true);
+    assert.equal(sample.text.endsWith(`${approved[3]}\n${link}\n`) || sample.text.includes(`${approved[3]}\n${link}`), true);
+    assert.equal(sample.html.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    assert.equal(sample.text.includes("alex.rivera@northwind.example"), true);
+    assert.equal((sample.html.match(/<a /g) ?? []).length, 1);
   });
 });

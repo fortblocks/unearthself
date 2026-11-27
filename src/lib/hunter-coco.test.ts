@@ -17,8 +17,12 @@ import {
   draftRejectionCheck,
   readCocoCard,
   saveCocoDraftEdit,
+  BADLANDS_PROGRAMME_LINE,
+  OUTREACH_CONTACT_LINE,
   OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER,
-  setOutreachSenderIdentificationForTests,
+  OUTREACH_SOLICITATION_LINE,
+  setBadlandsFooterChoiceForTests,
+  setUnearthFromAddressForTests,
   storeBackgroundDraft,
   unsubscribeBlock,
   unsubscribeUrl,
@@ -201,14 +205,16 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     }
     process.env.HUNTER_WRITE_TOKEN = WRITE;
     process.env.HUNTER_CARDS_TOKEN = CARDS;
-    setOutreachSenderIdentificationForTests("Unearth Self");
+    setBadlandsFooterChoiceForTests("A");
+    setUnearthFromAddressForTests(null);
     delete process.env.COCO_DRAFT_WEBHOOK_URL;
     delete process.env.COCO_DRAFT_WEBHOOK_KEY;
     delete process.env.COCO_DRAFT_WEBHOOK_HEADER;
   });
 
   afterEach(() => {
-    setOutreachSenderIdentificationForTests(null);
+    setBadlandsFooterChoiceForTests(null);
+    setUnearthFromAddressForTests(null);
     useRedisClientForTests(null);
     for (const [key, value] of Object.entries(previous)) {
       if (value == null) delete process.env[key];
@@ -917,7 +923,11 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(sentRecord.sendApproved?.body.includes("I'm Christopher"), true);
     assert.equal(sentRecord.sendApproved?.body.includes("Unearth Self"), true);
     assert.match(sentRecord.sendApproved?.body ?? "", /<a href="https:\/\/www\.unearthself\.xyz\/u\/[^"]+">Unsubscribe here<\/a>/);
-    assert.match(sentRecord.sendApproved?.body ?? "", /Unsubscribe here: https:\/\/www\.unearthself\.xyz\/u\//);
+    assert.match(sentRecord.sendApproved?.body ?? "", /Don't want these emails\? Unsubscribe here and we won't contact you again\.\nhttps:\/\/www\.unearthself\.xyz\/u\//);
+    assert.equal(sentRecord.sendApproved?.body.includes(OUTREACH_CONTACT_LINE), true);
+    assert.equal(sentRecord.sendApproved?.body.includes(OUTREACH_SOLICITATION_LINE), true);
+    assert.equal(sentRecord.sendApproved?.body.includes(BADLANDS_PROGRAMME_LINE), true);
+    assert.equal((sentRecord.sendApproved?.body.match(/<a /g) ?? []).length, 1);
     assert.equal(sentRecord.sendApproved?.body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
     assert.equal(sentRecord.drafts["1"].sent?.body.includes("Changed in chat"), true);
 
@@ -1099,7 +1109,7 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(ready?.stage, "draft-ready");
     assert.equal(ready?.body.includes("<a href="), true);
     assert.equal(ready?.body.includes(">Unsubscribe here</a>"), true);
-    assert.equal(ready?.body.includes("Unsubscribe here: "), true);
+    assert.match(ready?.body ?? "", /Unsubscribe here and we won't contact you again\.\nhttps:\/\/www\.unearthself\.xyz\/u\//);
     const stored = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.a ?? "{}") as {
       sendApproved?: unknown;
       touches?: number;
@@ -1194,8 +1204,8 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.equal(humanizerCheck(ready.subject, ready.body).pass, true);
   });
 
-  test("approve to send fails closed while sender identification is the placeholder", async () => {
-    setOutreachSenderIdentificationForTests(null);
+  test("approve to send fails closed while the Badlands footer choice is unset", async () => {
+    setBadlandsFooterChoiceForTests(null);
     const redis = memoryRedis();
     useRedisClientForTests(redis as unknown as LeadsRedis);
     const card = company({ id: "campfire", review: "approved" });
@@ -1205,10 +1215,6 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.ok(link);
     const drafted = await post(letter(card.id, "drafted", { body: `Hello from Drumheller.\n${link}` }));
     assert.equal(drafted.status, 200);
-    const storedDraft = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as {
-      drafts: { "1": { body: string } };
-    };
-    assert.equal(storedDraft.drafts["1"].body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
     let woke = false;
     const refused = await approveWording({
       cardId: card.id,
@@ -1220,15 +1226,27 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
       },
     });
     assert.equal(refused.ok, false);
-    if (!refused.ok) assert.equal(refused.error, "sender-identification");
+    if (!refused.ok) assert.equal(refused.error, "badlands-footer");
     assert.equal(woke, false);
     const after = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { sendApproved?: unknown };
     assert.equal(after.sendApproved, undefined);
     const posted = await post(letter(card.id, "send_approved", { body: `Hello from Drumheller.\n${link}` }));
     assert.equal(posted.status, 409);
-    assert.deepEqual(await posted.json(), { error: "sender-identification" });
-    assert.equal(JSON.stringify(redis.hashes).includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
-    setOutreachSenderIdentificationForTests("Unearth Self");
+    assert.deepEqual(await posted.json(), { error: "badlands-footer" });
+    setBadlandsFooterChoiceForTests("B");
+    const missingMailbox = await approveWording({
+      cardId: card.id,
+      subject: "A note",
+      body: `Hello from Drumheller.\n${link}`,
+      fetchImpl: async () => {
+        woke = true;
+        return { status: 202 };
+      },
+    });
+    assert.equal(missingMailbox.ok, false);
+    if (!missingMailbox.ok) assert.equal(missingMailbox.error, "badlands-footer");
+    assert.equal(woke, false);
+    setBadlandsFooterChoiceForTests("A");
     const planted = await approveWording({
       cardId: card.id,
       subject: "A note",
@@ -1244,5 +1262,6 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     const still = JSON.parse(redis.hashes.get(HUNTER_OUTREACH_KEY)?.[card.id] ?? "{}") as { sendApproved?: unknown };
     assert.equal(still.sendApproved, undefined);
     assert.equal(JSON.stringify(redis.hashes).includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER), false);
+    assert.equal(JSON.stringify(redis.hashes).includes(BADLANDS_PROGRAMME_LINE), false);
   });
 });
