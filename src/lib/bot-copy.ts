@@ -1,28 +1,36 @@
-import type { BotId } from "@/data/bots";
-import type { Lead } from "@/data/desk";
-import { COCO_INTRO_TEAM, draftMentionsTessAndI, usableFirstName } from "@/lib/coco-letter";
+import type { BotId } from "../data/bots.ts";
+import type { Lead } from "../data/desk.ts";
+import {
+  draftLeaksInternal,
+  draftMentionsTessAndI,
+  letterParagraph,
+  renderCocoLetter,
+  usableFirstName,
+} from "./coco-letter.ts";
+import { draftHasPrice } from "./lead-copy.ts";
 
-function researchLine(org: string, note: string) {
-  const sentence = note.split("\n")[0]?.trim().replace(/\u2014/g, ",").replace(/[.]+$/, "") ?? "";
-  if (!sentence || draftMentionsTessAndI(sentence)) return `I was looking at ${org} before I wrote.`;
-  return `I read this about ${org}: ${sentence}.`;
-}
-
-function firstName(contact: string) {
-  return usableFirstName(contact);
+/** The first quotable line of a desk note. Blank when it cannot go in a letter. */
+function conciergeHook(org: string, note: string) {
+  const first = note.split("\n").map((line) => line.trim()).find(Boolean) ?? "";
+  const paragraph = letterParagraph(first);
+  if (!paragraph) return "";
+  if (draftMentionsTessAndI(paragraph) || draftLeaksInternal(paragraph, org) || draftHasPrice(paragraph)) return "";
+  return paragraph;
 }
 
 export function draftFor(bot: BotId, lead: Lead): { subject: string; body: string } {
-  const name = firstName(lead.contact);
-  const named = Boolean(name);
+  const name = usableFirstName(lead.contact);
 
   if (bot === "concierge") {
-    return {
-      subject: `${lead.org} — Unearth Self, Drumheller`,
-      body: named
-        ? `${name ? `Hi ${name},` : "Hello,"}\n\n${COCO_INTRO_TEAM}.\n\n${researchLine(lead.org, lead.note)}\n\nThe days follow PACE: Play, Adaptability, Connection, Experience. The days are spent at Basecamp in Drumheller.\n\nWe are taking bookings for 2027.\n\nI am not going to put a price in this mail. A short reply is enough. Tell me a week that works and I will come back with three dates and what a hold looks like.\n\nChristopher`
-        : `${lead.org} — this is a research file, not a conversation. Do not send until a named person exists. File sits on Christopher’s desk.`,
-    };
+    const hook = conciergeHook(lead.org, lead.note);
+    if (!hook) {
+      return {
+        subject: `${lead.org} research file`,
+        body: `${lead.org}. This is a research file, not a conversation. Do not send until a sourced note exists. The file sits on Christopher's desk.`,
+      };
+    }
+    const greeting = name ? `Hi ${name},` : "Hello,";
+    return renderCocoLetter({ org: lead.org, greeting, hookParagraph: hook });
   }
 
   if (bot === "corporate") {

@@ -1,16 +1,16 @@
 import { draftHasPrice } from "./lead-copy.ts";
 import type { Company } from "./lead-score.ts";
 
-/** Chris's approved openers. A letter uses one of these, never "Tess and I". */
-export const COCO_INTRO_TEAM =
-  "I'm Christopher, part of the Unearth Self team building a place for teams in the Canadian Badlands";
+/** Chris's approved opener. A letter uses this, never "Tess and I". */
+export const COCO_INTRO =
+  "I'm Christopher, one of the founders of Unearth Self, and we run team retreats in the Canadian Badlands near Drumheller, Alberta.";
 
-export const COCO_INTRO_FOUNDER =
-  "I'm Christopher, a founder of Unearth Self, a place for teams in the Canadian Badlands";
+export const COCO_INTROS = [COCO_INTRO] as const;
 
-export const COCO_INTROS = [COCO_INTRO_TEAM, COCO_INTRO_FOUNDER] as const;
-
-export const COCO_LETTER_SUBJECT = "A week in Drumheller for your team";
+/** Subject for one company. The public name is the only slot. */
+export function cocoLetterSubject(org: string) {
+  return `A different room for the ${org} team`;
+}
 
 /** The desk shows this when a card has no verified hook and no signal note. */
 export const NEEDS_RESEARCH_REASON = "Needs research";
@@ -48,11 +48,6 @@ export function greetingNameCheck(body: string) {
   const match = body.match(/^\s*(?:hi|hello)\s+([A-Za-z][A-Za-z.'-]*)\s*,/i);
   if (!match) return false;
   return unusableGivenName(match[1] ?? "");
-}
-
-function introFor(company: Company) {
-  const sum = [...company.id].reduce((total, char) => total + char.charCodeAt(0), 0);
-  return sum % 2 === 0 ? COCO_INTRO_TEAM : COCO_INTRO_FOUNDER;
 }
 
 /** One line the letter can quote. Em dashes become commas so the house rule still passes. */
@@ -128,9 +123,38 @@ export function draftLeaksInternal(text: string, org?: string) {
   return INTERNAL_LEAK.some((pattern) => pattern.test(shielded));
 }
 
+/** The sourced line as its own paragraph. A missing closing stop is added back. */
+export function letterParagraph(text: string) {
+  const cleaned = cleanLetterReason(text);
+  if (!cleaned) return "";
+  return /[.!?]$/.test(cleaned) ? cleaned : `${cleaned}.`;
+}
+
+/**
+ * Chris's GAM Tech letter. The greeting, the company, and paragraph 2 are the only slots.
+ * Paragraph 2 is the verified hook or the latest signal note. A later edit may add a bridge after that line.
+ */
+export function renderCocoLetter(input: { org: string; greeting: string; hookParagraph: string }) {
+  const subject = cocoLetterSubject(input.org);
+  const body = `${input.greeting}
+
+${COCO_INTRO}
+
+${input.hookParagraph}
+
+Your team would be out in the coulees, among the hoodoos, instead of sitting in a meeting room. It's a much easier place to have a proper conversation.
+
+The days follow PACE, a retreat concept we built around Play, Adaptability, Connection and Experience. They're skills that matter at work and in life, and ones we all forget now and then. It makes for good team building, and for knowing yourself a little better. The evenings end at Basecamp, our retreat centre in downtown Drumheller.
+
+We're taking bookings for 2027 now. If you're curious, reply and I'll tell you more.
+
+Christopher
+Founding Partner`;
+  return { subject, body };
+}
+
 /**
  * The desk letter Coco can file before anyone presses approve.
- * One approved intro, one sourced line, and PACE. No season claim and no internal label.
  * Returns null when there is no verified hook and no signal note. Nothing is drafted then.
  * The unsubscribe link is added later, by the draft store.
  */
@@ -141,18 +165,8 @@ export function cocoLetter(company: Company): { subject: string; body: string } 
   if (draftLeaksInternal(reason, company.org) || draftMentionsTessAndI(reason) || draftHasPrice(reason)) return null;
   const name = usableFirstName(company.buyerName);
   const greeting = name ? `Hi ${name},` : "Hello,";
-  const body = `${greeting}
-
-${introFor(company)}.
-
-I read this about ${company.org}: ${reason}. That is the reason for this letter.
-
-The days follow PACE: Play, Adaptability, Connection, Experience. Play is the start, out on the land, before the group has to perform. Adaptability is the middle, when the route changes and the team has to choose together. Connection is the work between people. Experience is the last stretch, when the week has a shape they can take home. The evenings end at Basecamp in Drumheller.
-
-A short reply is enough. If a week is useful for the people you are responsible for, tell me and I will come back with three dates. If it is not, say so and I will leave the file quiet.
-
-Christopher`;
-  if (draftLeaksInternal(`${COCO_LETTER_SUBJECT}\n${body}`, company.org)) return null;
-  if (draftMentionsTessAndI(body) || greetingNameCheck(body) || draftHasPrice(body)) return null;
-  return { subject: COCO_LETTER_SUBJECT, body };
+  const letter = renderCocoLetter({ org: company.org, greeting, hookParagraph: letterParagraph(reason) });
+  if (draftLeaksInternal(`${letter.subject}\n${letter.body}`, company.org)) return null;
+  if (draftMentionsTessAndI(letter.body) || greetingNameCheck(letter.body) || draftHasPrice(letter.body)) return null;
+  return letter;
 }

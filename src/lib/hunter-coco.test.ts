@@ -2,16 +2,19 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { draftFor } from "./bot-copy.ts";
 import {
+  COCO_INTRO,
   COCO_INTROS,
-  COCO_LETTER_SUBJECT,
   cocoLetter,
+  cocoLetterSubject,
   draftLeaksInternal,
   draftMentionsTessAndI,
   greetingNameCheck,
   letterSpecifics,
   usableFirstName,
 } from "./coco-letter.ts";
+import type { Lead } from "../data/desk.ts";
 import { humanizerCheck } from "./humanizer.ts";
 import { predraftFiledLeads } from "./coco-predraft.ts";
 import { HUNTER_DNC_KEY } from "./hunter-config.ts";
@@ -1040,16 +1043,17 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.ok(letter);
     const chosen = COCO_INTROS.filter((intro) => letter.body.includes(intro));
     assert.equal(chosen.length, 1);
-    assert.equal(letter.body.includes("Northwind Example"), true);
-    assert.equal(letter.body.includes("The about page names a leadership offsite"), true);
+    assert.equal(letter.body.includes(COCO_INTRO), true);
+    assert.equal(letter.subject, cocoLetterSubject("Northwind Example"));
+    assert.equal(letter.body.includes("The about page names a leadership offsite."), true);
     assert.equal(letter.body.includes("Research card"), false);
     assert.equal(letter.body.includes("Hunter"), false);
-    assert.equal(letter.body.includes("Play, Adaptability, Connection, Experience"), true);
-    assert.equal(letter.body.includes("Play is the start, out on the land"), true);
+    assert.equal(letter.body.includes("Play, Adaptability, Connection and Experience"), true);
     assert.equal(letter.body.includes("We are taking bookings for 2027."), false);
-    assert.equal(/first window|that window/i.test(letter.body), false);
-    assert.equal(letter.body.includes("A short reply is enough."), true);
-    assert.equal(letter.body.includes("three dates"), true);
+    assert.equal(letter.body.includes("We're taking bookings for 2027 now."), true);
+    assert.equal(/first window|that window|Spring 2027/i.test(letter.body), false);
+    assert.equal(letter.body.includes("If you're curious, reply and I'll tell you more."), true);
+    assert.equal(letter.body.endsWith("Christopher\nFounding Partner"), true);
     assert.equal(draftMentionsTessAndI(letter.subject) || draftMentionsTessAndI(letter.body), false);
     assert.equal(letter.body.includes("\u2014"), false);
     assert.equal(draftRejectionCheck(letter.subject, letter.body, card.org), null);
@@ -1062,9 +1066,11 @@ describe("coco approve and draft", { concurrency: 1 }, () => {
     assert.deepEqual(draftProblems(stored), []);
     const fallback = readFileSync(new URL("./bot-copy.ts", import.meta.url), "utf8");
     assert.equal(/tess\s+and\s+i\b/i.test(fallback), false);
-    assert.equal(fallback.includes("COCO_INTRO_TEAM"), true);
+    assert.equal(fallback.includes("renderCocoLetter"), true);
     assert.equal(fallback.includes("Hello,"), true);
-    assert.equal(fallback.includes("A short reply is enough."), true);
+    assert.equal(fallback.includes("We are taking bookings for 2027"), false);
+    assert.equal(fallback.includes("I am not going to put a price in this mail"), false);
+    assert.equal(fallback.includes("Tell me a week that works"), false);
   });
 
   test("a drafted event that says Tess and I is rejected and flagged", async () => {
@@ -1279,8 +1285,8 @@ We are taking bookings for 2027. I am holding the first window of that year.
 A short reply is enough. If a week in that window is useful for the people you are responsible for, tell me and I will come back with three dates. If it is not, say so and I will leave the file quiet.
 
 Christopher`;
-    assert.equal(draftRejectionCheck(COCO_LETTER_SUBJECT, affinity, "Affinity Bridge"), "internal-text");
-    const voice = humanizerCheck(COCO_LETTER_SUBJECT, affinity);
+    assert.equal(draftRejectionCheck(cocoLetterSubject("Affinity Bridge"), affinity, "Affinity Bridge"), "internal-text");
+    const voice = humanizerCheck(cocoLetterSubject("Affinity Bridge"), affinity);
     assert.equal(voice.pass, false);
     assert.equal(voice.notes.some((note) => note.includes("internal notes")), true);
     assert.equal(voice.notes.some((note) => /2027|first window|that window/i.test(note)), true);
@@ -1314,10 +1320,10 @@ Christopher`;
     const link = unsubscribeUrl(card.id);
     assert.ok(link);
     const body = `Hi Mack,\n\nI read this about Affinity Bridge: Research card from Hunter. That is the reason for this letter.\n\nChristopher\n\n${unsubscribeBlock(link)}`;
-    const approved = await approveWording({ cardId: card.id, subject: COCO_LETTER_SUBJECT, body });
+    const approved = await approveWording({ cardId: card.id, subject: cocoLetterSubject("Affinity Bridge"), body });
     assert.equal(approved.ok, false);
     if (!approved.ok) assert.equal(approved.error, "internal-text");
-    const saved = await saveCocoDraftEdit({ cardId: card.id, touch: 1, subject: COCO_LETTER_SUBJECT, body });
+    const saved = await saveCocoDraftEdit({ cardId: card.id, touch: 1, subject: cocoLetterSubject("Affinity Bridge"), body });
     assert.equal(saved.ok, false);
     if (!saved.ok) assert.equal(saved.error, "internal-text");
   });
@@ -1411,7 +1417,7 @@ Christopher`;
         cardId: "C-450",
         touches: 0,
         events: [],
-        drafts: { "1": { subject: COCO_LETTER_SUBJECT, body: leaked.draftBody, draftedAt: "2026-11-26T12:00:00.000Z" } },
+        drafts: { "1": { subject: cocoLetterSubject("Affinity Bridge"), body: leaked.draftBody, draftedAt: "2026-11-26T12:00:00.000Z" } },
       }),
       clean: JSON.stringify({
         cardId: "clean",
@@ -1441,5 +1447,166 @@ Christopher`;
     assert.equal(kept?.draftBody, "");
     const again = await clearLeakedDrafts();
     assert.equal(again.count, 0);
+  });
+
+  test("the GAM Tech letter passes every check", async () => {
+    const hook = "I saw that GAM Tech is a Certified B Corporation and an Alberta Living Wage Employer, which tells me staff welfare matters to you. It matters to us too, and it's why I'm writing.";
+    const card = company({
+      id: "gam-tech",
+      org: "GAM Tech",
+      buyerName: "",
+      why: "Research card from Hunter. Public pages show: B Corp, sustainability, or purpose.",
+      hook: {
+        text: hook,
+        sourceUrl: "https://gamtech.example/about",
+        sourceDate: "2026-11-27",
+        kind: "purpose",
+      },
+      signals: [],
+    });
+    const letter = cocoLetter(card);
+    assert.ok(letter);
+    assert.equal(letter.subject, "A different room for the GAM Tech team");
+    assert.equal(
+      letter.body,
+      `Hello,
+
+I'm Christopher, one of the founders of Unearth Self, and we run team retreats in the Canadian Badlands near Drumheller, Alberta.
+
+I saw that GAM Tech is a Certified B Corporation and an Alberta Living Wage Employer, which tells me staff welfare matters to you. It matters to us too, and it's why I'm writing.
+
+Your team would be out in the coulees, among the hoodoos, instead of sitting in a meeting room. It's a much easier place to have a proper conversation.
+
+The days follow PACE, a retreat concept we built around Play, Adaptability, Connection and Experience. They're skills that matter at work and in life, and ones we all forget now and then. It makes for good team building, and for knowing yourself a little better. The evenings end at Basecamp, our retreat centre in downtown Drumheller.
+
+We're taking bookings for 2027 now. If you're curious, reply and I'll tell you more.
+
+Christopher
+Founding Partner`,
+    );
+    assert.equal(letter.body.includes("Research card"), false);
+    assert.equal(draftMentionsTessAndI(letter.body), false);
+    assert.equal(greetingNameCheck(letter.body), false);
+    assert.equal(draftLeaksInternal(`${letter.subject}\n${letter.body}`, card.org), false);
+    assert.equal(draftRejectionCheck(letter.subject, letter.body, card.org), null);
+    const link = unsubscribeUrl(card.id);
+    assert.ok(link);
+    const stored = `${letter.body}\n\n${unsubscribeBlock(link)}`;
+    const voice = humanizerCheck(letter.subject, stored, letterSpecifics(card));
+    assert.deepEqual(voice.notes, []);
+    assert.equal(voice.pass, true);
+    assert.deepEqual(draftProblems(stored), []);
+    const redis = memoryRedis();
+    useRedisClientForTests(redis as unknown as LeadsRedis);
+    await seed(redis, [card]);
+    assert.equal(await storeBackgroundDraft({ company: card, subject: letter.subject, body: letter.body }), "ready");
+    const approved = await approveWording({ cardId: card.id, subject: letter.subject, body: stored });
+    assert.equal(approved.ok, true);
+
+    const fact = "GAM Tech is a Certified B Corporation and an Alberta Living Wage Employer";
+    const sourced = company({
+      id: "gam-fact",
+      org: "GAM Tech",
+      buyerName: "",
+      hook: { text: `${fact}.`, sourceUrl: "https://gamtech.example/about", sourceDate: "2026-11-27", kind: "purpose" },
+      signals: [],
+    });
+    const draft = cocoLetter(sourced);
+    assert.ok(draft);
+    const bridged = draft.body.replace(
+      `${fact}.`,
+      `${fact}, which tells me staff welfare matters to you. It matters to us too, and it's why I'm writing.`,
+    );
+    assert.equal(humanizerCheck(draft.subject, bridged, letterSpecifics(sourced)).pass, true);
+    assert.equal(
+      cocoLetter(company({ id: "gam-empty", org: "GAM Tech", buyerName: "", why: card.why, hook: undefined, signals: [] })),
+      null,
+    );
+  });
+
+  test("a first window, Spring 2027, or the banned bridge cannot be approved", () => {
+    const hook = "I saw that GAM Tech is a Certified B Corporation and an Alberta Living Wage Employer, which tells me staff welfare matters to you. It matters to us too, and it's why I'm writing.";
+    const card = company({
+      id: "gam-block",
+      org: "GAM Tech",
+      buyerName: "",
+      hook: { text: hook, sourceUrl: "https://gamtech.example/about", sourceDate: "2026-11-27", kind: "purpose" },
+      signals: [],
+    });
+    const letter = cocoLetter(card);
+    assert.ok(letter);
+    const specifics = letterSpecifics(card);
+    const optional = letter.body.replace("We're taking bookings for 2027 now. ", "");
+    assert.equal(humanizerCheck(letter.subject, optional, specifics).pass, true);
+    const spring = humanizerCheck(
+      letter.subject,
+      letter.body.replace("We're taking bookings for 2027 now.", "Spring 2027 is open for teams."),
+      specifics,
+    );
+    assert.equal(spring.pass, false);
+    assert.equal(spring.notes.some((note) => note.includes("Spring 2027")), true);
+    const held = humanizerCheck(
+      letter.subject,
+      letter.body.replace("We're taking bookings for 2027 now.", "The first window of 2027 is theirs."),
+      specifics,
+    );
+    assert.equal(held.pass, false);
+    assert.equal(held.notes.some((note) => /first window/i.test(note)), true);
+    const banned = humanizerCheck(
+      letter.subject,
+      letter.body.replace(
+        "It's a much easier place to have a proper conversation.",
+        "It's a much easier place to have a proper conversation. That's what made me think your team might enjoy what we do.",
+      ),
+      specifics,
+    );
+    assert.equal(banned.pass, false);
+    assert.equal(banned.notes.some((note) => note.includes("might enjoy what we do")), true);
+    assert.equal(banned.notes.some((note) => note.includes("120 to 180")), false);
+    const curly = humanizerCheck(
+      letter.subject,
+      letter.body.replace(
+        "It's a much easier place to have a proper conversation.",
+        "It's a much easier place to have a proper conversation. That\u2019s what made me think your team might enjoy what we do.",
+      ),
+      specifics,
+    );
+    assert.equal(curly.pass, false);
+  });
+
+  test("the concierge bot drafts the GAM Tech letter", () => {
+    const lead = (partial: Partial<Lead>): Lead => ({
+      id: "lead-gam",
+      kind: "bootcamp",
+      org: "GAM Tech",
+      contact: partial.contact ?? "",
+      email: "ada@gam.example",
+      owner: "christopher",
+      headcount: 12,
+      value: 0,
+      weight: 0,
+      status: "new",
+      next: "",
+      dates: "",
+      note: partial.note ?? "The about page names a leadership offsite.",
+      source: "scout",
+      nudges: 0,
+      lastTouch: "",
+      stopped: false,
+    });
+    const named = draftFor("concierge", lead({ contact: "Ada North" }));
+    assert.equal(named.subject, "A different room for the GAM Tech team");
+    assert.equal(named.body.startsWith("Hi Ada,"), true);
+    assert.equal(named.body.includes(COCO_INTRO), true);
+    assert.equal(named.body.includes("We're taking bookings for 2027 now."), true);
+    assert.equal(named.body.includes("We are taking bookings for 2027"), false);
+    assert.equal(named.body.includes("I am not going to put a price"), false);
+    const unnamed = draftFor("concierge", lead({ contact: "" }));
+    assert.equal(unnamed.body.startsWith("Hello,"), true);
+    const empty = draftFor("concierge", lead({ contact: "Ada North", note: "" }));
+    assert.equal(empty.body.includes("research file"), true);
+    assert.equal(empty.body.includes("We're taking bookings for 2027 now."), false);
+    const leaked = draftFor("concierge", lead({ contact: "Ada North", note: "Research card from Hunter." }));
+    assert.equal(leaked.body.includes("Research card"), false);
   });
 });
