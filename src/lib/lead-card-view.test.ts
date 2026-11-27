@@ -410,6 +410,25 @@ test("subject and email stay hidden until a draft exists", () => {
   assert.equal(edited.includes("Edited letter."), true);
 });
 
+test("a ready letter keeps the Tess and I warning when the banner does not name it", () => {
+  const html = renderToStaticMarkup(
+    createElement(LeadCardActions, {
+      cardId: "card-1",
+      coco: emptyCoco({
+        stage: "draft-ready",
+        stageLabel: "Draft ready",
+        subject: "A note",
+        body: "Tess and I will write.",
+        touch: 1,
+      }),
+      subject: "A note",
+      body: "Tess and I will write.",
+    }),
+  );
+  assert.equal(html.includes("This copy says"), true);
+  assert.equal(html.includes("data-draft-flag=\"failed\""), false);
+});
+
 test("the card notes when the unsubscribe link was added", () => {
   const html = renderToStaticMarkup(
     createElement(LeadCardActions, {
@@ -428,9 +447,17 @@ test("the card notes when the unsubscribe link was added", () => {
     }),
   );
   assert.equal(html.includes('data-unsubscribe="preview"'), true);
+  assert.equal(html.includes("Email footer (added automatically):"), true);
+  assert.equal(html.includes("356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada"), true);
+  assert.equal(html.includes("www.unearthself.xyz"), true);
   assert.equal(html.split("Unsubscribe here").length - 1, 1);
   assert.equal(html.includes("contact you again."), true);
   assert.equal(html.includes("<a "), false);
+  const preview = html.match(/<p[^>]*data-unsubscribe="preview"[^>]*>[\s\S]*?<\/p>/);
+  assert.equal(preview?.[0]?.includes("underline") ?? true, false);
+  assert.equal(preview?.[0]?.includes("<br") ?? true, false);
+  assert.equal(preview?.[0]?.includes("<a") ?? true, false);
+  assert.match(preview?.[0] ?? "", /text-xs/);
   assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });
@@ -497,11 +524,15 @@ test("the card page has no Send control and no mail link in any stage", () => {
     if (coco.stage === "draft-flagged") {
       assert.equal(html.includes("data-draft-flag=\"failed\""), true);
       assert.equal(html.includes("Draft flagged"), true);
+      assert.equal(html.includes("The draft says"), true);
+      assert.equal(html.includes("This copy says"), false);
       assert.equal(html.includes('id="card-1-subject"'), true);
       assert.equal(html.includes("Rewrite with Coco"), true);
       assert.equal(html.includes("disabled"), true);
       assert.equal(html.includes("animate-spin"), false);
     }
+    assert.equal(html.includes(">None yet<"), true, coco.stage);
+    assert.equal(html.includes("After they reply"), false, coco.stage);
     assert.equal(html.includes("Close not a fit"), false, coco.stage);
     if (coco.stage === "wording-approved") assert.equal(labels.includes("Take back send approval"), true);
     assert.equal(labels.includes("Ask Coco to draft") || coco.stage !== "new", true);
@@ -580,6 +611,7 @@ test("a queued or drafting card shows Coco writing, then the same editor when th
   );
   assert.equal(linked.includes(`href="${link}"`), false);
   assert.equal(linked.includes('data-unsubscribe="preview"'), true);
+  assert.equal(linked.includes("Email footer (added automatically):"), true);
   assert.equal(linked.includes("Unsubscribe here"), true);
   const textarea = linked.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/);
   assert.equal(textarea?.[1]?.includes("payload.signature") ?? false, false);

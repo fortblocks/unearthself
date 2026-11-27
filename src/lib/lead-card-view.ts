@@ -8,6 +8,9 @@ import {
   emailableLead,
   ensureUnsubscribeLink,
   letterWithoutUnsubscribe,
+  OUTREACH_POSTAL_ADDRESS,
+  OUTREACH_SITE,
+  UNSUBSCRIBE_NOTICE,
   type CocoJoin,
   type DraftSource,
 } from "./hunter-outreach.ts";
@@ -175,6 +178,19 @@ function actionButton(label: string, onClick: (() => void) | undefined, primary 
   );
 }
 
+/** The banner already names this check, so the line under the word count does not repeat it. */
+function bannerAlreadyStates(warning: string, notes: string[]) {
+  const fact = warning.includes("Tess and I")
+    ? "tess and i"
+    : warning.includes("em dash")
+      ? "em dash"
+      : warning.includes("a price")
+        ? "price"
+        : "";
+  if (!fact) return false;
+  return notes.some((note) => note.toLowerCase().includes(fact));
+}
+
 function optionButton(label: string, onClick: (() => void) | undefined, key?: string) {
   return createElement(
     "button",
@@ -238,6 +254,7 @@ export function LeadCardActions({
     ...(badGreeting ? ["The greeting name is initials, one or two letters, or all capitals."] : []),
     ...voice.notes,
   ];
+  const shownWarnings = warnings.filter((warning) => !bannerAlreadyStates(warning, ruleNotes));
   const showApprove = showEditor && !coco.canWithdraw;
   const askCoco = !showEditor && coco.canApproveDraft && coco.stage !== "draft-flagged";
   return createElement(
@@ -310,10 +327,8 @@ export function LeadCardActions({
           ),
           createElement(
             "p",
-            { className: "mt-2 text-sm text-shale", "data-unsubscribe": "preview" },
-            "Don't want these emails? ",
-            createElement("span", { className: "underline" }, "Unsubscribe here"),
-            " and we won't contact you again.",
+            { className: "mt-1 text-xs leading-tight text-shale", "data-unsubscribe": "preview" },
+            `Email footer (added automatically): ${UNSUBSCRIBE_NOTICE} ${OUTREACH_POSTAL_ADDRESS}. ${OUTREACH_SITE}`,
           ),
           createElement(
             "p",
@@ -321,7 +336,7 @@ export function LeadCardActions({
             words,
             coco.problems[0] ? ` ${coco.problems[0]}` : "",
           ),
-          warnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
+          shownWarnings.map((warning) => createElement("p", { key: warning, className: "mt-1 text-sm text-coal" }, warning)),
           createElement(
             "div",
             { className: "sticky bottom-0 z-10 mt-3 grid gap-2 bg-paper py-3 sm:static" },
@@ -386,7 +401,7 @@ export function LeadCardActions({
             if (mark === "replied" || mark === "booked" || mark === "won" || mark === "lost") onStage?.(mark);
           },
         },
-        createElement("option", { value: "" }, "After they reply"),
+        createElement("option", { value: "" }, "None yet"),
         ...STAGE_MARKS.map(([mark, label]) => createElement("option", { key: mark, value: mark }, label)),
       ),
     ),
