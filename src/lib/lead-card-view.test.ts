@@ -448,7 +448,9 @@ test("the card notes when the unsubscribe link was added", () => {
   );
   assert.equal(html.includes('data-unsubscribe="preview"'), true);
   assert.equal(html.includes("Email footer (added automatically):"), true);
-  assert.equal(html.includes("356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada"), true);
+  assert.equal(html.includes("356 4th Street West, Drumheller, Alberta T0J 0Y3, Canada"), true);
+  assert.equal(html.includes("This is a business solicitation from Unearth Self."), true);
+  assert.equal(html.includes("Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited.\nBadlands Bootcamp is an Unearth Self programme."), true);
   assert.equal(html.includes("www.unearthself.xyz"), true);
   assert.equal(html.split("Unsubscribe here").length - 1, 1);
   assert.equal(html.includes("contact you again."), true);
@@ -458,6 +460,7 @@ test("the card notes when the unsubscribe link was added", () => {
   assert.equal(preview?.[0]?.includes("<br") ?? true, false);
   assert.equal(preview?.[0]?.includes("<a") ?? true, false);
   assert.match(preview?.[0] ?? "", /text-xs/);
+  assert.equal(html.includes("[SENDER IDENTIFICATION PENDING LEGAL]"), false);
   assert.equal(controlLabels(html).includes("Approve to send"), true);
   assert.equal(html.includes("\u2014"), false);
 });

@@ -347,6 +347,7 @@ Settings Chris has not set, with the defaults in code:
 | `HUNTER_ALARM_WEBHOOK_KEY` | unset. Authorization for Rex only. A bare key is sent as Bearer. |
 | `HUNTER_ALARM_CC_WEBHOOK_URLS` | unset. Bo and Derek are copied by Rex's routine, so this stays unset. |
 | `HUNTER_READ_TOKEN` | unset. Bearer token for `GET /api/hunter/read`. |
+| `HUNTER_UNSUBSCRIBE_KEY_RING` | unset. Previous unsubscribe signing keys. JSON array of `{"id":"...","secret":"<the retired HUNTER_WRITE_TOKEN>","retiredAt":"<ISO-8601>"}`. A previous key verifies for 60 days after `retiredAt`, including exactly 60 days. Unset, invalid JSON, a missing field, a future `retiredAt`, or a secret shorter than 32 characters is ignored. New links are signed only with `HUNTER_WRITE_TOKEN`. `HUNTER_WRITE_TOKEN_PREVIOUS` is not read. Christopher sets this. It is a secret and is not logged. |
 | `APOLLO_DAILY_CREDIT_CAP` | 48. Reveal safety limit. Separate from the monthly dollar cap. Not a company-search cap. |
 | `HUNTER_COMPANY_SOURCE` | unset, which means `campaign`. Set to `xai` to restore the open web search. Christopher sets this himself. |
 

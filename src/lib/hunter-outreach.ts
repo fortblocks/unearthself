@@ -2,7 +2,8 @@
  * Coco's write route and the card views behind it.
  * Outreach lives in its own hash so a desk save cannot wipe it.
  * Unsubscribe links are signed with a key derived from HUNTER_WRITE_TOKEN.
- * HUNTER_WRITE_TOKEN_PREVIOUS only verifies links from before a rotation.
+ * HUNTER_UNSUBSCRIBE_KEY_RING verifies links signed by a previous token for 60 days after that token was retired.
+ * HUNTER_WRITE_TOKEN_PREVIOUS is not a verification key.
  */
 
 import { createHash, createHmac, hkdfSync, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
@@ -297,22 +298,167 @@ export function unsubscribeUrl(cardId: string, writeToken = currentWriteToken())
 /** The opt-out sentence. The link sits on "Unsubscribe here". The card shows this same line as text. */
 export const UNSUBSCRIBE_NOTICE = "Don't want these emails? Unsubscribe here and we won't contact you again.";
 
-/** Postal address on every outreach footer and on the unsubscribe page. */
+/** Postal address on the unsubscribe page. The email uses OUTREACH_CONTACT_LINE. */
 export const OUTREACH_POSTAL_ADDRESS = "356 4th Street West, Drumheller, Alberta, T0J 0Y3, Canada";
 
-/** Second contact method on those footers. The card shows the words. The sent HTML links them. */
+/** Second contact method on the unsubscribe page. The email contact line prints it as text. */
 export const OUTREACH_SITE = "www.unearthself.xyz";
 
 const OUTREACH_SITE_URL = "https://www.unearthself.xyz/";
 
-/** HTML anchor. The visible words are "Unsubscribe here". The token stays in the href. */
-export function unsubscribeHtml(link: string) {
-  return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.<br>${OUTREACH_POSTAL_ADDRESS}<br><a href="${OUTREACH_SITE_URL}">${OUTREACH_SITE}</a>`;
+/** Rejected stand-in. It is not the footer, and a body that contains it is not sent. */
+export const OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER = "[SENDER IDENTIFICATION PENDING LEGAL]";
+
+/** Legal's sender line. This is the wording, not a placeholder. */
+export const OUTREACH_SENDER_LINE = "Sent by Christopher Mair on behalf of Unearth Self, a trading name of RA Hamilton Limited.";
+export const OUTREACH_SENDER_IDENTIFICATION = OUTREACH_SENDER_LINE;
+
+/** Address, site, and mailbox on one line. The site and mailbox are not links. */
+export const OUTREACH_CONTACT_LINE = "356 4th Street West, Drumheller, Alberta T0J 0Y3, Canada \u00b7 www.unearthself.xyz \u00b7 chris@badlandsbootcamp.com";
+
+export const OUTREACH_SOLICITATION_LINE = "This is a business solicitation from Unearth Self.";
+
+/** Added after the sender line only when the Badlands choice is A. */
+export const BADLANDS_PROGRAMME_LINE = "Badlands Bootcamp is an Unearth Self programme.";
+
+export type BadlandsFooterChoice = "A" | "B";
+
+/**
+ * Choice A. The programme line follows the sender line, and the from address stays chris@badlandsbootcamp.com.
+ * Choice B is not selected.
+ */
+export const BADLANDS_FOOTER_CHOICE: BadlandsFooterChoice = "A";
+
+/**
+ * Separate from the wording. Off until Legal re-checks the rendered samples and Chris gives a separate go.
+ * Approve to send and a send_approved event fail closed while this is false.
+ */
+export const OUTREACH_SEND_ENABLED = false;
+
+/** Used only for choice B. Empty, and unused while the choice is A. */
+export const UNEARTH_FROM_ADDRESS = "";
+
+const CHOICE_UNSET = Symbol("badlands-choice-unset");
+let badlandsChoiceOverride: BadlandsFooterChoice | typeof CHOICE_UNSET = CHOICE_UNSET;
+let unearthFromOverride: string | null = null;
+let sendEnabledOverride: boolean | typeof CHOICE_UNSET = CHOICE_UNSET;
+
+/** Tests only. Null uses BADLANDS_FOOTER_CHOICE. */
+export function setBadlandsFooterChoiceForTests(value: BadlandsFooterChoice | null) {
+  badlandsChoiceOverride = value === null ? CHOICE_UNSET : value;
 }
 
-/** Plain-text fallback for a client that does not render the anchor. The URL stays so a reply can still opt out. */
-export function unsubscribePlain(link: string) {
-  return `Don't want these emails? Unsubscribe here: ${link} and we won't contact you again.\n${OUTREACH_POSTAL_ADDRESS}\n${OUTREACH_SITE}`;
+/** Tests only. Null uses OUTREACH_SEND_ENABLED. */
+export function setOutreachSendEnabledForTests(value: boolean | null) {
+  sendEnabledOverride = value === null ? CHOICE_UNSET : value;
+}
+
+export function outreachSendEnabled(): boolean {
+  return sendEnabledOverride === CHOICE_UNSET ? OUTREACH_SEND_ENABLED : sendEnabledOverride;
+}
+
+/** Tests only. Production reads UNEARTH_FROM_ADDRESS. */
+export function setUnearthFromAddressForTests(value: string | null) {
+  unearthFromOverride = value;
+}
+
+function effectiveBadlandsChoice(): BadlandsFooterChoice {
+  return badlandsChoiceOverride === CHOICE_UNSET ? BADLANDS_FOOTER_CHOICE : badlandsChoiceOverride;
+}
+
+/** The lines of the footer, without the unsubscribe URL. Choice A inserts the programme line. */
+export function outreachFooterPlainLines(choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE): string[] {
+  const lines = [OUTREACH_SENDER_LINE];
+  if (choice === "A") lines.push(BADLANDS_PROGRAMME_LINE);
+  lines.push(OUTREACH_CONTACT_LINE, OUTREACH_SOLICITATION_LINE, UNSUBSCRIBE_NOTICE);
+  return lines;
+}
+
+/** From address for a send. Choice B needs an @unearthself.xyz mailbox. Unset returns null. */
+export function outreachSendFromAddress(choice = effectiveBadlandsChoice()): string | null {
+  if (choice === "A") return FROM_ADDRESS;
+  if (choice === "B") {
+    const address = (unearthFromOverride ?? UNEARTH_FROM_ADDRESS).trim();
+    if (!/^[^@\s]+@unearthself\.xyz$/i.test(address)) return null;
+    return address;
+  }
+  return null;
+}
+
+/** HTML footer. Only "Unsubscribe here" is a link. Choice A puts the programme line after the sender line. */
+export function unsubscribeHtml(link: string, choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE) {
+  return outreachFooterPlainLines(choice)
+    .map((line) => {
+      if (line !== UNSUBSCRIBE_NOTICE) return line;
+      return `Don't want these emails? <a href="${escapeHtml(link)}">Unsubscribe here</a> and we won't contact you again.`;
+    })
+    .join("<br>");
+}
+
+/** Plain-text footer. The full URL is the line after the opt-out sentence. */
+export function unsubscribePlain(link: string, choice: BadlandsFooterChoice = BADLANDS_FOOTER_CHOICE) {
+  return `${outreachFooterPlainLines(choice).join("\n")}\n${link}`;
+}
+
+export type OutreachFooterError = "send-disabled" | "sender-identification";
+
+/** Why a send must stop. The wording can be complete while OUTREACH_SEND_ENABLED is still false. */
+export function outreachFooterError(body: string): OutreachFooterError | null {
+  if (body.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return "sender-identification";
+  if (!outreachSendEnabled()) return "send-disabled";
+  return null;
+}
+
+/** The footer stored on a send. Returns null while sending is disabled, or when the body contains the placeholder. */
+export function withOutreachFooter(body: string, link: string): string | null {
+  if (outreachFooterError(body)) return null;
+  const choice = effectiveBadlandsChoice();
+  const letter = letterWithoutUnsubscribe(body, link);
+  const block = `${unsubscribeHtml(link, choice)}\n${unsubscribePlain(link, choice)}`;
+  const trimmed = letter.replace(/\s+$/g, "");
+  const next = trimmed ? `${trimmed}\n\n${block}` : block;
+  if (next.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) return null;
+  if (!next.includes(OUTREACH_SENDER_LINE) || !next.includes(OUTREACH_CONTACT_LINE) || !next.includes(OUTREACH_SOLICITATION_LINE)) return null;
+  if (!next.includes(`<a href="${escapeHtml(link)}">Unsubscribe here</a>`)) return null;
+  if (!next.includes(`${UNSUBSCRIBE_NOTICE}\n${link}`)) return null;
+  if (choice === "A" && !next.includes(`${OUTREACH_SENDER_LINE}\n${BADLANDS_PROGRAMME_LINE}\n`) && !next.includes(`${OUTREACH_SENDER_LINE}<br>${BADLANDS_PROGRAMME_LINE}<br>`)) {
+    return null;
+  }
+  if (choice !== "A" && next.includes(BADLANDS_PROGRAMME_LINE)) return null;
+  return next;
+}
+
+/** Muted card preview. Choice A, no link. */
+export function outreachFooterPreview(): string {
+  return `Email footer (added automatically):\n${outreachFooterPlainLines(BADLANDS_FOOTER_CHOICE).join("\n")}`;
+}
+
+/** A sample for Legal. Not used by a route, the card, or a send. Sending stays off. */
+export function renderLegalReviewSample(link = "https://www.unearthself.xyz/u/example-not-a-live-link") {
+  const letter = "Hello Alex,\n\nNorthwind Example is a made-up company, and Alex Rivera is not a real person. This note has not been sent.";
+  const htmlFooter = unsubscribeHtml(link, "A");
+  const textFooter = unsubscribePlain(link, "A");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Sample outreach email</title></head>
+<body>
+<p><strong>Sample for Legal review.</strong> Choice A is in the footer. Sending is still off until Legal re-checks this sample and Chris gives a separate go. This was not sent.</p>
+<p>From: ${FROM_ADDRESS}<br>To: Alex Rivera &lt;alex.rivera@northwind.example&gt;<br>Subject: A note for the Northwind team</p>
+<p>${letter.replace(/\n\n/g, "</p><p>")}</p>
+<p>${htmlFooter}</p>
+</body>
+</html>`;
+  const text = `Sample for Legal review. Choice A is in the footer. Sending is still off until Legal re-checks this sample and Chris gives a separate go. This was not sent.
+
+From: ${FROM_ADDRESS}
+To: Alex Rivera <alex.rivera@northwind.example>
+Subject: A note for the Northwind team
+
+${letter}
+
+${textFooter}
+`;
+  return { html, text };
 }
 
 export function unsubscribeBlock(link: string) {
@@ -335,9 +481,24 @@ export function ensureUnsubscribeLink(body: string, link: string): { body: strin
 export function letterWithoutUnsubscribe(body: string, link: string | null) {
   if (!link) return body;
   let next = body;
-  const block = `\n\n${unsubscribeBlock(link)}`;
-  if (next.endsWith(block)) next = next.slice(0, -block.length);
-  else {
+  const blocks = [unsubscribeBlock(link)];
+  for (const choice of ["A", "B"] as const) {
+    blocks.unshift(`${unsubscribeHtml(link, choice)}\n${unsubscribePlain(link, choice)}`);
+  }
+  let stripped = false;
+  for (const footer of blocks) {
+    const block = `\n\n${footer}`;
+    if (next.endsWith(block)) {
+      next = next.slice(0, -block.length);
+      stripped = true;
+      break;
+    }
+  }
+  if (!stripped) {
+    for (const choice of ["A", "B"] as const) {
+      next = next.split(unsubscribeHtml(link, choice)).join("");
+      next = next.split(unsubscribePlain(link, choice)).join("");
+    }
     next = next.split(unsubscribeHtml(link)).join("");
     next = next.split(unsubscribePlain(link)).join("");
     const trailing = `\n\n${link}`;
@@ -355,16 +516,54 @@ export function letterWithoutUnsubscribe(body: string, link: string | null) {
   return next.replace(/[ \t]+$/g, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/g, "");
 }
 
-function verificationKeys(): Buffer[] {
-  const current = deriveUnsubscribeKey(process.env.HUNTER_WRITE_TOKEN ?? "");
-  if (!current) return [];
-  const keys = [current];
-  const previous = deriveUnsubscribeKey(process.env.HUNTER_WRITE_TOKEN_PREVIOUS ?? "");
-  if (previous) keys.push(previous);
+/** Name of the env var Chris sets. JSON array of { id, secret, retiredAt }. Unset or invalid is ignored. */
+export const HUNTER_UNSUBSCRIBE_KEY_RING_ENV = "HUNTER_UNSUBSCRIBE_KEY_RING";
+
+/** A retired signing key verifies for this long, including a key retired exactly this long ago. */
+export const UNSUBSCRIBE_KEY_RING_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+
+const KEY_RING_LIMIT = 8;
+
+/**
+ * Previous unsubscribe signing keys. Each entry is
+ * { "id": string, "secret": "<the retired HUNTER_WRITE_TOKEN>", "retiredAt": "<ISO-8601>" }.
+ * secret is at least 32 characters and is derived with the same HKDF as the current token.
+ * A key verifies only when now - retiredAt is from 0 through 60 days. A missing field, a future
+ * retiredAt, an unparseable date, a short secret, invalid JSON, or an unset value is skipped.
+ * The secret is never logged.
+ */
+export function unsubscribeKeysFromRing(raw: string | undefined, now: number): Buffer[] {
+  if (!raw || !raw.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const keys: Buffer[] = [];
+  for (const item of parsed.slice(0, KEY_RING_LIMIT)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== "string" || !row.id.trim()) continue;
+    if (typeof row.secret !== "string" || typeof row.retiredAt !== "string") continue;
+    const retired = Date.parse(row.retiredAt);
+    if (!Number.isFinite(retired)) continue;
+    const age = now - retired;
+    if (age < 0 || age > UNSUBSCRIBE_KEY_RING_WINDOW_MS) continue;
+    const key = deriveUnsubscribeKey(row.secret);
+    if (key) keys.push(key);
+  }
   return keys;
 }
 
-/** Accepts the current key and, when set, the previous rotation. Returns the card id or null. */
+function verificationKeys(now = Date.now()): Buffer[] {
+  const current = deriveUnsubscribeKey(process.env.HUNTER_WRITE_TOKEN ?? "");
+  if (!current) return [];
+  return [current, ...unsubscribeKeysFromRing(process.env[HUNTER_UNSUBSCRIBE_KEY_RING_ENV], now)];
+}
+
+/** Accepts the current key and previous keys still inside the 60-day window. Returns the card id or null. */
 export function readUnsubscribeCardId(token: string, keys = verificationKeys()): string | null {
   const parts = token.split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1] || keys.length === 0) return null;
@@ -991,6 +1190,11 @@ async function applyEvent(
     const blocked = refusal(record, company, dnc, today, event.type === "followup_sent");
     if (blocked) return blocked;
   }
+  if (event.type === "sent" || event.type === "followup_sent") {
+    if (event.body?.includes(OUTREACH_SENDER_IDENTIFICATION_PLACEHOLDER)) {
+      return { ok: false, status: 409, error: "sender-identification" };
+    }
+  }
   if (event.type === "sent") {
     if (event.emailSource !== company.emailSource) return { ok: false, status: 409, error: "email-source" };
     const edited = editedFlag(record, 1, event);
@@ -1138,6 +1342,10 @@ async function applyCocoEvent(
   if (event.type === "send_approved") {
     const link = unsubscribeUrl(company.id);
     if (!link || !event.body?.includes(link)) return reject("unsubscribe");
+    const footerError = outreachFooterError(event.body);
+    if (footerError) return reject(footerError);
+    const completed = withOutreachFooter(event.body, link);
+    if (!completed) return reject("sender-identification");
     if (record.touches >= touch) return reject("touch");
     if (record.sendApproved && record.sendApproved.touch === touch && record.touches < touch) {
       return reject("send-approved");
@@ -1146,7 +1354,7 @@ async function applyCocoEvent(
       eventId: event.eventId,
       touch,
       subject: event.subject ?? "",
-      body: event.body ?? "",
+      body: completed,
       at: event.at,
     };
     record.events.push(toStoredEvent(event));
@@ -2122,6 +2330,10 @@ export async function approveWording(input: {
   if (!company) return { ok: false, error: "unknown-card" };
   const link = unsubscribeUrl(company.id);
   if (!link || !input.body.includes(link)) return { ok: false, error: "unsubscribe" };
+  const footerError = outreachFooterError(input.body);
+  if (footerError) return { ok: false, error: footerError };
+  const completed = withOutreachFooter(input.body, link);
+  if (!completed) return { ok: false, error: "sender-identification" };
   const rejected = draftRejectionCheck(input.subject, input.body);
   if (rejected) return { ok: false, error: rejected };
   if (greetingNameCheck(input.body)) return { ok: false, error: "greeting-name" };
@@ -2147,7 +2359,7 @@ export async function approveWording(input: {
         at: new Date().toISOString(),
         touch,
         subject: input.subject,
-        body: input.body,
+        body: completed,
       };
       return applyEvent(redis, company, record, event, dnc);
     });
