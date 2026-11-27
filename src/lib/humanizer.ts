@@ -46,12 +46,17 @@ const BANNED: Array<[string, RegExp]> = [
   ["GeoLab", /\bgeolab(?: studio)?\b/i],
   ["Apollo", /\bapollo\b/i],
   ["Clay", /\bclay\b/i],
+  // Chris banned this bridge. A company-specific bridge may follow the hook. This sentence may not.
+  [
+    "That's what made me think your team might enjoy what we do",
+    /That['\u2019]s\s+what\s+made\s+me\s+think\s+your\s+team\s+might\s+enjoy\s+what\s+we\s+do/i,
+  ],
 ];
 
-/** Confirmed facts may stay. A season, a held window, boardroom, and resort are not in the source of truth yet. */
+/** A 2027 bookings line may stay. A season, a held window, boardroom, and resort may not. */
 const PENDING_FACT: Array<[string, RegExp]> = [
   ["Spring 2027", /\bSpring 2027\b/],
-  ["bookings for 2027", /\b(?:bookings? for|first window of)\b[^.]*2027/i],
+  ["first window", /\bfirst window\b/i],
   ["holding the first window", /\bholding the first window\b/i],
   ["that window", /\bthat window\b/i],
   ["boardroom", /\bboardroom\b/i],
@@ -63,7 +68,7 @@ export type LetterReference = {
   signalNote?: string;
 };
 
-/** The template's own "I read this about" is not a reference. The hook or the signal note has to be in the letter. */
+/** The hook or the signal note has to appear word for word. Extra bridge text around it is allowed. */
 function hasSpecificReference(body: string, reference?: LetterReference) {
   const parts = [reference?.hookText?.trim() ?? "", reference?.signalNote?.trim() ?? ""].filter((part) => part.length > 0);
   if (parts.length === 0) return false;
